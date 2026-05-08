@@ -32,8 +32,37 @@ export const CartProvider = ({ children }) => {
     });
   };
 
+  // Remove from cart
+  const removeFromCart = (id) => {
+    setCart(prev => {
+      const newCart = prev.filter(i => i.id !== id);
+      localStorage.setItem('pinkCart', JSON.stringify(newCart));
+      setCartCount(newCart.reduce((sum, i) => sum + i.quantity, 0));
+      return newCart;
+    });
+  };
+
+  // Update quantity
+  const updateQuantity = (id, newQuantity) => {
+    if (newQuantity < 1) {
+      removeFromCart(id);
+      return;
+    }
+    setCart(prev => {
+      const newCart = prev.map(i => i.id === id ? { ...i, quantity: newQuantity } : i);
+      localStorage.setItem('pinkCart', JSON.stringify(newCart));
+      setCartCount(newCart.reduce((sum, i) => sum + i.quantity, 0));
+      return newCart;
+    });
+  };
+
+  // Cart total
+  const cartTotal = () => {
+    return cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+  };
+
   return (
-    <CartContext.Provider value={{ cart, cartCount, addToCart }}>
+    <CartContext.Provider value={{ cart, cartCount, addToCart, removeFromCart, updateQuantity, cartTotal }}>
       {children}
     </CartContext.Provider>
   );
