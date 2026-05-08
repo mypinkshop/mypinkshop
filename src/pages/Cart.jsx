@@ -19,6 +19,11 @@ function Cart() {
     );
   }
 
+  const subtotal = cartTotal();
+  const shipping = subtotal > 999 ? 0 : 99;
+  const tax = Math.round(subtotal * 0.05);
+  const total = subtotal + shipping + tax;
+
   return (
     <div className="min-h-screen bg-pink-50">
       {/* Header */}
@@ -52,6 +57,7 @@ function Cart() {
           {/* Cart Items */}
           <div className="flex-1">
             <div className="bg-white rounded-xl border border-pink-100 overflow-hidden">
+              {/* Header Row - Hidden on mobile */}
               <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-pink-50 text-sm font-semibold text-gray-600 border-b border-pink-100">
                 <div className="col-span-6">Product</div>
                 <div className="col-span-2 text-center">Price</div>
@@ -63,7 +69,7 @@ function Cart() {
                 <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 md:px-6 py-5 border-b border-pink-100">
                   {/* Product Info */}
                   <div className="md:col-span-6 flex gap-4">
-                    <div className="w-20 h-20 bg-pink-50 rounded-xl flex items-center justify-center text-3xl">
+                    <div className="w-16 h-16 bg-pink-50 rounded-xl flex items-center justify-center text-3xl">
                       {item.emoji}
                     </div>
                     <div>
@@ -125,21 +131,21 @@ function Cart() {
               <div className="space-y-3 mb-4">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>₹{cartTotal()}</span>
+                  <span>₹{subtotal}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span>{cartTotal() > 999 ? 'FREE' : '₹99'}</span>
+                  <span>{shipping === 0 ? 'FREE' : '₹' + shipping}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 pb-2 border-b border-pink-100">
                   <span>Tax (5% GST)</span>
-                  <span>₹{Math.round(cartTotal() * 0.05)}</span>
+                  <span>₹{tax}</span>
                 </div>
               </div>
 
               <div className="flex justify-between text-lg font-bold text-gray-800 mb-6">
                 <span>Total</span>
-                <span className="text-pink-500">₹{cartTotal() + (cartTotal() > 999 ? 0 : 99) + Math.round(cartTotal() * 0.05)}</span>
+                <span className="text-pink-500">₹{total}</span>
               </div>
 
               <button className="w-full bg-gradient-to-r from-pink-500 to-pink-400 text-white py-3 rounded-full font-semibold hover:from-pink-600 transition">
