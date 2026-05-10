@@ -1,32 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-const products = [
-  { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, emoji: "💧", badge: "⭐ Bestseller" },
-  { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, emoji: "🌸", badge: "🔥 Trending" },
-  { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, emoji: "🍒", badge: "💄 Viral" },
-  { id: 4, name: "Satin Slip Dress", category: "drip", price: 2499, originalPrice: 3999, rating: 4.9, emoji: "👗", badge: "✨ Main Character" },
-  { id: 5, name: "Baby Pink Blush", category: "makeup", price: 799, originalPrice: 1299, rating: 4.5, emoji: "🎀", badge: "🌸 Soft Girl" },
-  { id: 6, name: "Coquette Bow Dress", category: "drip", price: 2999, originalPrice: 4499, rating: 4.8, emoji: "🎀", badge: "👗 Coquette" },
-  { id: 7, name: "Vitamin C Glow Drops", category: "skincare", price: 1499, originalPrice: 2299, rating: 4.9, emoji: "🍊", badge: "⭐ Holy Grail" },
-  { id: 8, name: "Y2K Mesh Top", category: "drip", price: 1599, originalPrice: 2499, rating: 4.6, emoji: "💅", badge: "🔥 Y2K" },
-  { id: 9, name: "Matte Lipstick Set", category: "makeup", price: 999, originalPrice: 1599, rating: 4.4, emoji: "💄", badge: "🎨 3 Shades" },
-  { id: 10, name: "Pearl Hair Clips", category: "accessories", price: 299, originalPrice: 599, rating: 4.7, emoji: "🎀", badge: "🌸 Cute" },
-  { id: 11, name: "Pink Tote Bag", category: "accessories", price: 899, originalPrice: 1499, rating: 4.5, emoji: "👜", badge: "🎀 Trendy" },
-  { id: 12, name: "Sunscreen SPF 50", category: "skincare", price: 699, originalPrice: 999, rating: 4.8, emoji: "☀️", badge: "⭐ Bestseller" },
-];
+const API_URL = import.meta.env.VITE_API_URL;
 
 function Home() {
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [selectedRating, setSelectedRating] = useState(0);
   const [discountOnly, setDiscountOnly] = useState(false);
+
+  // Fetch products from backend
+  useEffect(() => {
+    fetch(`${API_URL}/products`)
+      .then(res => res.json())
+      .then(data => {
+        setProducts(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.log('Error fetching products:', err);
+        setLoading(false);
+      });
+  }, []);
 
   const filteredProducts = products.filter(p => {
     if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
@@ -175,10 +178,16 @@ function Home() {
         {/* Products Content */}
         <div className="flex-1">
           <div className="bg-white rounded-xl px-5 py-3 mb-4 border border-pink-100">
-            <span className="text-sm text-gray-500">Showing {filteredProducts.length} products</span>
+            <span className="text-sm text-gray-500">
+              {loading ? 'Loading...' : `Showing ${filteredProducts.length} products`}
+            </span>
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="bg-white rounded-xl p-10 text-center border border-pink-100">
+              <p className="text-gray-500">Loading products... ✨</p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="bg-white rounded-xl p-10 text-center border border-pink-100">
               <p className="text-gray-500">No products found matching your filters.</p>
               <button onClick={clearFilters} className="mt-3 text-pink-500 underline">Clear all filters</button>
@@ -186,10 +195,10 @@ function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredProducts.map(p => (
-                <div key={p.id} className="bg-white rounded-xl overflow-hidden border border-pink-100 hover:shadow-lg transition">
+                <div key={p._id || p.id} className="bg-white rounded-xl overflow-hidden border border-pink-100 hover:shadow-lg transition">
                   <div className="h-48 flex items-center justify-center bg-pink-50 text-6xl relative">
-                    <span className="absolute top-2 left-2 bg-pink-500 text-white text-xs px-2 py-1 rounded-full">{p.badge}</span>
-                    {p.emoji}
+                    <span className="absolute top-2 left-2 bg-pink-500 text-white text-xs px-2 py-1 rounded-full">{p.badge || '✨ New'}</span>
+                    {p.emoji || '🛍️'}
                   </div>
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-800">{p.name}</h3>
