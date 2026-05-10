@@ -8,7 +8,7 @@ function VendorHeader({ vendor }) {
     localStorage.removeItem('vendor');
     navigate('/vendor/login');
   };
-
+  
   return (
     <div className="fixed top-0 right-0 left-0 z-50 border-b border-pink-100 bg-white/80 backdrop-blur-md">
       <div className="flex items-center justify-between px-6 py-3 max-w-[1600px] mx-auto">
