@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 const products = [
   { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, emoji: "💧", badge: "⭐ Bestseller" },
@@ -18,6 +20,7 @@ const products = [
 
 function Home() {
   const { addToCart, cartCount } = useCart();
+  const { user, logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [minPrice, setMinPrice] = useState('');
@@ -55,10 +58,10 @@ function Home() {
       {/* Header */}
       <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-pink-100">
         <div className="flex items-center justify-between flex-wrap gap-4 px-4 py-3 max-w-7xl mx-auto">
-          <div>
+          <Link to="/">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-500 to-amber-500 bg-clip-text text-transparent">MyPinkShop</h1>
             <p className="text-xs text-pink-400">for the girlies ✨</p>
-          </div>
+          </Link>
           
           <div className="flex-1 max-w-md flex">
             <input 
@@ -71,13 +74,25 @@ function Home() {
             <button className="bg-pink-500 text-white px-5 rounded-r-full">🔍</button>
           </div>
           
-          <div className="flex gap-5 text-gray-600">
+          <div className="flex gap-5 text-gray-600 items-center">
             <i className="fa-regular fa-heart text-xl cursor-pointer"></i>
-            <div className="relative cursor-pointer">
+            <Link to="/cart" className="relative cursor-pointer">
               <i className="fa-solid fa-bag-shopping text-xl"></i>
               <span className="absolute -top-2 -right-3 bg-pink-500 text-white text-xs rounded-full px-1.5">{cartCount}</span>
-            </div>
-            <i className="fa-regular fa-user text-xl cursor-pointer"></i>
+            </Link>
+            
+            {user ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-pink-500 font-medium">Hi, {user.name}</span>
+                <button onClick={logout} className="text-sm text-gray-500 hover:text-pink-500">
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="text-gray-600 hover:text-pink-500">
+                <i className="fa-regular fa-user text-xl"></i>
+              </Link>
+            )}
           </div>
         </div>
       </header>
