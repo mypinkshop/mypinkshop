@@ -8,7 +8,7 @@ function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const API_URL = 'https://mypinkshop-backend.vercel.app/api';
+  const API_URL = 'https://mypinkshop-dr93.vercel.app/api';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
