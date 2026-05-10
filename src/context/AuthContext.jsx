@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
 
-  const API_URL = 'https://mypinkshop-backend.vercel.app/api';
+  const API_URL = 'https://mypinkshop-dr93.vercel.app/api';
 
   useEffect(() => {
     // Check if user is logged in (localStorage)
