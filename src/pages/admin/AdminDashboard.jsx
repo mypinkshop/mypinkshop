@@ -1,81 +1,71 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Users, Store, Package, DollarSign, TrendingUp, 
-  ShoppingBag, CheckCircle, Clock, XCircle,
-  Eye, MoreHorizontal, ArrowUpRight, ArrowDownRight 
-} from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 function AdminDashboard() {
+  const [darkMode, setDarkMode] = useState(false);
+  const [visitors, setVisitors] = useState(1247);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
-  const token = localStorage.getItem('adminToken');
+  // Mock stats
+  const mockStats = {
+    totalSales: 4582000,
+    totalOrders: 342,
+    totalProducts: 2847,
+    totalVendors: 342,
+    pendingOrders: 23,
+    lowStock: 12,
+  };
 
   useEffect(() => {
-    const mockStats = {
-      totalUsers: 12580,
-      totalVendors: 342,
-      totalProducts: 2847,
-      totalEarnings: 4582000,
-      pendingVendors: 18,
-      revenueGrowth: 23.5,
-      ordersGrowth: 15.2,
-      recentOrders: [
-        { _id: 1, orderNumber: 'MPS-1001', buyerId: { name: 'Priya Sharma' }, vendorId: { brandName: 'Nykaa Beauty' }, total: 2598, status: 'delivered', date: '2024-05-10' },
-        { _id: 2, orderNumber: 'MPS-1002', buyerId: { name: 'Aditi Singh' }, vendorId: { brandName: 'Mamaearth' }, total: 1798, status: 'shipped', date: '2024-05-09' },
-        { _id: 3, orderNumber: 'MPS-1003', buyerId: { name: 'Neha Gupta' }, vendorId: { brandName: 'Sugar Cosmetics' }, total: 899, status: 'pending', date: '2024-05-09' },
-        { _id: 4, orderNumber: 'MPS-1004', buyerId: { name: 'Riya Mehta' }, vendorId: { brandName: 'Plum' }, total: 3499, status: 'delivered', date: '2024-05-08' },
-        { _id: 5, orderNumber: 'MPS-1005', buyerId: { name: 'Anjali Verma' }, vendorId: { brandName: 'Nykaa Beauty' }, total: 1599, status: 'processing', date: '2024-05-08' },
-      ]
-    };
-
-    fetch('https://mypinkshop-dr93.vercel.app/api/admin/dashboard', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => {
-        setStats(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setStats(mockStats);
-        setLoading(false);
-      });
+    // Simulate real-time visitors
+    const interval = setInterval(() => {
+      setVisitors(prev => prev + Math.floor(Math.random() * 10) - 3);
+    }, 5000);
+    setStats(mockStats);
+    setLoading(false);
+    return () => clearInterval(interval);
   }, []);
 
-  const statsCards = [
-    { title: 'Total Users', value: stats?.totalUsers?.toLocaleString() || '0', icon: Users, color: 'from-blue-500 to-cyan-500', change: '+12%', changeType: 'up' },
-    { title: 'Total Vendors', value: stats?.totalVendors?.toLocaleString() || '0', icon: Store, color: 'from-purple-500 to-pink-500', change: '+8%', changeType: 'up' },
-    { title: 'Total Products', value: stats?.totalProducts?.toLocaleString() || '0', icon: Package, color: 'from-emerald-500 to-teal-500', change: '+23%', changeType: 'up' },
-    { title: 'Revenue', value: `₹${(stats?.totalEarnings || 0).toLocaleString()}`, icon: DollarSign, color: 'from-amber-500 to-orange-500', change: '+18%', changeType: 'up' },
+  const statCards = [
+    { title: 'Total Revenue', value: `₹${(stats?.totalSales || 0).toLocaleString()}`, icon: '💰', change: '+23.5%', color: 'from-pink-500 to-rose-500' },
+    { title: 'Total Orders', value: stats?.totalOrders?.toLocaleString() || '0', icon: '📦', change: '+15.2%', color: 'from-blue-500 to-cyan-500' },
+    { title: 'Active Vendors', value: stats?.totalVendors?.toLocaleString() || '0', icon: '🏪', change: '+8.1%', color: 'from-purple-500 to-indigo-500' },
+    { title: 'Products', value: stats?.totalProducts?.toLocaleString() || '0', icon: '👗', change: '+12.3%', color: 'from-emerald-500 to-teal-500' },
   ];
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'delivered': return 'bg-emerald-100 text-emerald-700';
-      case 'shipped': return 'bg-blue-100 text-blue-700';
-      case 'pending': return 'bg-amber-100 text-amber-700';
-      case 'processing': return 'bg-purple-100 text-purple-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
+  const recentOrders = [
+    { id: '#MPS-1001', customer: 'Priya Sharma', amount: 2598, status: 'Delivered', date: '2024-05-10' },
+    { id: '#MPS-1002', customer: 'Aditi Singh', amount: 1798, status: 'Shipped', date: '2024-05-09' },
+    { id: '#MPS-1003', customer: 'Neha Gupta', amount: 899, status: 'Pending', date: '2024-05-09' },
+    { id: '#MPS-1004', customer: 'Riya Mehta', amount: 3499, status: 'Processing', date: '2024-05-08' },
+    { id: '#MPS-1005', customer: 'Anjali Verma', amount: 1599, status: 'Delivered', date: '2024-05-08' },
+  ];
 
-  const getStatusIcon = (status) => {
-    switch(status) {
-      case 'delivered': return <CheckCircle size={14} className="mr-1" />;
-      case 'shipped': return <Clock size={14} className="mr-1" />;
-      case 'pending': return <Clock size={14} className="mr-1" />;
-      default: return <ShoppingBag size={14} className="mr-1" />;
-    }
-  };
+  const activities = [
+    { action: 'New vendor registered', user: 'Nykaa Beauty', time: '2 min ago', icon: '🏪' },
+    { action: 'Order #MPS-1002 delivered', user: 'Aditi Singh', time: '15 min ago', icon: '📦' },
+    { action: 'Product added', user: 'Mamaearth', time: '1 hour ago', icon: '👗' },
+    { action: 'New user joined', user: 'Priya Sharma', time: '3 hours ago', icon: '👤' },
+    { action: 'Low stock alert', user: '12 products', time: '5 hours ago', icon: '⚠️' },
+  ];
+
+  const categoryData = [
+    { name: 'Skincare', percentage: 35, color: '#ec4899' },
+    { name: 'Makeup', percentage: 28, color: '#8b5cf6' },
+    { name: 'The Drip', percentage: 22, color: '#f59e0b' },
+    { name: 'Accessories', percentage: 15, color: '#10b981' },
+  ];
+
+  const salesData = [4200, 5800, 7100, 8900, 12400, 15600, 13200];
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const maxSale = Math.max(...salesData);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-gray-500">Loading dashboard...</p>
         </div>
       </div>
@@ -83,125 +73,144 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       
-      {/* Animated Background */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
+      {/* Top Navbar */}
+      <div className={`fixed top-0 right-0 left-64 z-50 ${darkMode ? 'bg-gray-900/90 border-gray-800' : 'bg-white/90'} backdrop-blur-md border-b shadow-sm`}>
+        <div className="px-6 py-3 flex justify-between items-center">
+          <div className="relative">
+            <input type="text" placeholder="Search orders, products, vendors..." className={`pl-9 pr-4 py-2 rounded-lg text-sm w-80 ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-200'} border focus:outline-none focus:ring-2 focus:ring-pink-500`} />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="relative">
+              <span className="text-xl">🔔</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-pink-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
+            </button>
+            <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-lg bg-gray-100">
+              {darkMode ? '☀️' : '🌙'}
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="text-right text-sm">
+                <p className="font-semibold">Super Admin</p>
+                <p className="text-gray-500 text-xs">admin@mypinkshop.com</p>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold">SA</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-72 bg-white/80 backdrop-blur-xl border-r border-white/20 shadow-xl z-50">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">M</span>
-            </div>
+      <aside className={`fixed left-0 top-0 h-full w-64 ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white'} shadow-xl z-40`}>
+        <div className="p-5 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">M</div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">MyPinkShop</h1>
-              <p className="text-xs text-gray-500">Admin Panel v2.0</p>
+              <h1 className="font-bold text-lg">MyPinkShop</h1>
+              <p className="text-xs text-gray-500">Admin Panel</p>
             </div>
           </div>
-
-          <nav className="space-y-2">
-            <Link to="/admin/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg transition-all">
-              <TrendingUp size={20} />
-              <span>Dashboard</span>
-            </Link>
-            <Link to="/admin/vendors" className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-100 transition-all group">
-              <Store size={20} />
-              <span>Vendors</span>
-            </Link>
-            <Link to="/admin/products" className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-100 transition-all group">
-              <Package size={20} />
-              <span>Products</span>
-            </Link>
-            <Link to="/admin/orders" className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-100 transition-all group">
-              <ShoppingBag size={20} />
-              <span>Orders</span>
-            </Link>
-          </nav>
         </div>
+        <nav className="p-4 space-y-1">
+          <Link to="/admin/dashboard" className="flex items-center gap-3 px-4 py-2 rounded-lg bg-pink-50 text-pink-600">
+            <span>📊</span> Dashboard
+          </Link>
+          <Link to="/admin/vendors" className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50">
+            <span>🏪</span> Vendors
+          </Link>
+          <Link to="/admin/products" className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50">
+            <span>👗</span> Products
+          </Link>
+          <Link to="/admin/orders" className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50">
+            <span>📦</span> Orders
+          </Link>
+          <Link to="/admin/analytics" className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50">
+            <span>📈</span> Analytics
+          </Link>
+          <Link to="/admin/settings" className="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50">
+            <span>⚙️</span> Settings
+          </Link>
+        </nav>
       </aside>
 
       {/* Main Content */}
-      <main className="ml-72 p-8">
+      <main className="ml-64 pt-16 p-6">
         
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Dashboard</h1>
-            <p className="text-gray-500 mt-1">Welcome back, Super Admin</p>
+            <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Dashboard</h1>
+            <p className="text-gray-500 text-sm">Welcome back! Here's what's happening today.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition">
-                <span className="text-white font-bold text-lg">A</span>
-              </div>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600 transition flex items-center gap-2">
+              <span>📊</span> Export Report
+            </button>
+            <button className="px-4 py-2 border border-pink-500 text-pink-500 rounded-lg text-sm font-medium hover:bg-pink-50 transition flex items-center gap-2">
+              <span>➕</span> Add Product
+            </button>
+          </div>
+        </div>
+
+        {/* Live Visitors Banner */}
+        <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl p-4 mb-6 text-white">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm opacity-90">Live Visitors</p>
+              <p className="text-3xl font-bold">{visitors}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm opacity-90">Today's Revenue</p>
+              <p className="text-xl font-bold">₹{(stats?.totalSales || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {statsCards.map((stat, index) => (
-            <div key={index} className="group relative overflow-hidden bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.color} rounded-full -mr-16 -mt-16 opacity-10 group-hover:opacity-20 transition`}></div>
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color} shadow-lg`}>
-                    <stat.icon size={24} className="text-white" />
-                  </div>
-                  <span className={`flex items-center gap-1 text-sm font-semibold ${stat.changeType === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {stat.change}
-                    {stat.changeType === 'up' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                  </span>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-800">{stat.value}</h3>
-                <p className="text-gray-500 text-sm mt-1">{stat.title}</p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+          {statCards.map((card, idx) => (
+            <div key={idx} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm border ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-2xl">{card.icon}</span>
+                <span className="text-green-500 text-sm font-medium">{card.change}</span>
               </div>
+              <p className="text-2xl font-bold">{card.value}</p>
+              <p className="text-gray-500 text-sm mt-1">{card.title}</p>
             </div>
           ))}
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Revenue Chart */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-semibold text-gray-800">Revenue Overview</h3>
-              <select className="text-sm border rounded-lg px-3 py-1 bg-white">
-                <option>This Week</option>
-                <option>This Month</option>
-                <option>This Year</option>
-              </select>
-            </div>
-            <div className="h-64 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white rounded-xl">
-              <div className="text-center">
-                <TrendingUp size={48} className="text-pink-400 mx-auto mb-3" />
-                <p className="text-gray-400">Chart visualization coming soon</p>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Sales Chart */}
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm`}>
+            <h3 className="font-semibold mb-4">Sales Overview (Last 7 Days)</h3>
+            <div className="flex items-end gap-2 h-48">
+              {salesData.map((sale, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+                  <div className="w-full bg-pink-100 rounded-t-lg transition-all duration-500 hover:bg-pink-200" style={{ height: `${(sale / maxSale) * 100}%`, minHeight: '20px' }}>
+                    <div className="w-full h-full bg-pink-500 rounded-t-lg opacity-70 hover:opacity-100 transition" style={{ height: `${(sale / maxSale) * 100}%` }}></div>
+                  </div>
+                  <span className="text-xs text-gray-500">{days[idx]}</span>
+                  <span className="text-xs font-medium">₹{sale}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Top Categories */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6">
-            <h3 className="font-semibold text-gray-800 mb-6">Top Categories</h3>
-            <div className="space-y-4">
-              {[
-                { name: 'Skincare', percentage: 35, color: 'bg-pink-500' },
-                { name: 'Makeup', percentage: 28, color: 'bg-purple-500' },
-                { name: 'The Drip', percentage: 22, color: 'bg-amber-500' },
-                { name: 'Accessories', percentage: 15, color: 'bg-emerald-500' },
-              ].map((cat, i) => (
-                <div key={i}>
+          {/* Category Donut */}
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm`}>
+            <h3 className="font-semibold mb-4">Sales by Category</h3>
+            <div className="space-y-3">
+              {categoryData.map((cat, idx) => (
+                <div key={idx}>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">{cat.name}</span>
-                    <span className="text-gray-500">{cat.percentage}%</span>
+                    <span>{cat.name}</span>
+                    <span>{cat.percentage}%</span>
                   </div>
                   <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${cat.color} rounded-full transition-all duration-500`} style={{ width: `${cat.percentage}%` }}></div>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${cat.percentage}%`, backgroundColor: cat.color }}></div>
                   </div>
                 </div>
               ))}
@@ -209,50 +218,75 @@ function AdminDashboard() {
           </div>
         </div>
 
-        {/* Recent Orders Table */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="font-semibold text-gray-800">Recent Orders</h3>
-            <Link to="/admin/orders" className="text-sm text-pink-500 hover:text-pink-600 flex items-center gap-1">
-              View All <ArrowUpRight size={14} />
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendor</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {stats?.recentOrders?.map(order => (
-                  <tr key={order._id} className="hover:bg-gray-50/50 transition">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-800">{order.orderNumber}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{order.buyerId?.name || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{order.vendorId?.brandName || order.vendorId?.name}</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-800">₹{order.total}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                        {getStatusIcon(order.status)}
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{new Date(order.date).toLocaleDateString('en-IN')}</td>
-                    <td className="px-6 py-4">
-                      <button className="text-gray-400 hover:text-pink-500 transition">
-                        <Eye size={18} />
-                      </button>
-                    </td>
+        {/* Recent Orders & Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Orders Table */}
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-sm overflow-hidden`}>
+            <div className="px-5 py-3 border-b flex justify-between items-center">
+              <h3 className="font-semibold">Recent Orders</h3>
+              <Link to="/admin/orders" className="text-sm text-pink-500 hover:text-pink-600">View All →</Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <tr>
+                    <th className="px-5 py-3 text-left">Order ID</th>
+                    <th className="px-5 py-3 text-left">Customer</th>
+                    <th className="px-5 py-3 text-left">Amount</th>
+                    <th className="px-5 py-3 text-left">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {recentOrders.map((order, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium">{order.id}</td>
+                      <td className="px-5 py-3">{order.customer}</td>
+                      <td className="px-5 py-3">₹{order.amount}</td>
+                      <td className="px-5 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
+                          order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' :
+                          order.status === 'Processing' ? 'bg-purple-100 text-purple-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Activity Log */}
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm`}>
+            <h3 className="font-semibold mb-4">Recent Activity</h3>
+            <div className="space-y-4">
+              {activities.map((act, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-lg`}>
+                    {act.icon}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{act.action}</p>
+                    <p className="text-xs text-gray-500">{act.user} · {act.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Low Stock Alert */}
+        <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
+          <div className="flex items-center gap-3">
+            <span className="text-amber-600 text-xl">⚠️</span>
+            <div>
+              <p className="text-sm font-medium text-amber-800">Low Stock Alert</p>
+              <p className="text-xs text-amber-700"><strong>{stats?.lowStock || 0}</strong> products are running low on stock. Please restock soon.</p>
+            </div>
+            <button className="ml-auto text-sm text-amber-700 underline">View Details</button>
           </div>
         </div>
       </main>
