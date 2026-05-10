@@ -3,249 +3,339 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = import.meta.env.VITE_API_URL;
-
 function Home() {
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [selectedRating, setSelectedRating] = useState(0);
-  const [discountOnly, setDiscountOnly] = useState(false);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-  // Fetch products from backend
+  // Countdown timer for sale
   useEffect(() => {
-    fetch(`${API_URL}/products`)
-      .then(res => res.json())
-      .then(data => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.log('Error fetching products:', err);
-        setLoading(false);
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 3);
+    targetDate.setHours(23, 59, 59, 999);
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = targetDate - now;
+
+      if (diff <= 0) {
+        clearInterval(interval);
+        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        return;
+      }
+
+      setCountdown({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff % (86400000)) / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (3600000)) / (1000 * 60)),
+        seconds: Math.floor((diff % (60000)) / 1000),
       });
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const filteredProducts = products.filter(p => {
-    if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
-    if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    const min = minPrice ? parseInt(minPrice) : 0;
-    const max = maxPrice ? parseInt(maxPrice) : Infinity;
-    if (p.price < min || p.price > max) return false;
-    if (selectedRating > 0 && p.rating < selectedRating) return false;
-    if (discountOnly && p.originalPrice <= p.price) return false;
-    return true;
-  });
+  const products = [
+    { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, emoji: "💧", badge: "⭐ Bestseller", isNew: true },
+    { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, emoji: "🌸", badge: "🔥 Trending", isNew: false },
+    { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, emoji: "🍒", badge: "💄 Viral", isNew: true },
+    { id: 4, name: "Satin Slip Dress", category: "drip", price: 2499, originalPrice: 3999, rating: 4.9, emoji: "👗", badge: "✨ Main Character", isNew: false },
+    { id: 5, name: "Baby Pink Blush", category: "makeup", price: 799, originalPrice: 1299, rating: 4.5, emoji: "🎀", badge: "🌸 Soft Girl", isNew: true },
+    { id: 6, name: "Coquette Bow Dress", category: "drip", price: 2999, originalPrice: 4499, rating: 4.8, emoji: "🎀", badge: "👗 Coquette", isNew: false },
+    { id: 7, name: "Vitamin C Drops", category: "skincare", price: 1499, originalPrice: 2299, rating: 4.9, emoji: "🍊", badge: "⭐ Holy Grail", isNew: true },
+    { id: 8, name: "Y2K Mesh Top", category: "drip", price: 1599, originalPrice: 2499, rating: 4.6, emoji: "💅", badge: "🔥 Y2K", isNew: false },
+  ];
 
-  const clearFilters = () => {
-    setSelectedCategory('all');
-    setSearchTerm('');
-    setMinPrice('');
-    setMaxPrice('');
-    setSelectedRating(0);
-    setDiscountOnly(false);
-  };
+  const categories = [
+    { name: "Skincare", icon: "✨", image: "🧴", color: "from-rose-100 to-pink-100", link: "/shop?category=skincare" },
+    { name: "Makeup", icon: "💄", image: "💋", color: "from-pink-100 to-purple-100", link: "/shop?category=makeup" },
+    { name: "The Drip", icon: "👗", image: "👠", color: "from-purple-100 to-indigo-100", link: "/shop?category=drip" },
+    { name: "Accessories", icon: "👜", image: "💍", color: "from-indigo-100 to-blue-100", link: "/shop?category=accessories" },
+  ];
+
+  const offers = [
+    { title: "Buy 1 Get 1 Free", subtitle: "On selected skincare", bg: "from-amber-500 to-rose-500", emoji: "🎁", link: "/shop?offer=bogo" },
+    { title: "Flat 20% Off", subtitle: "On first order", bg: "from-pink-500 to-purple-600", emoji: "✨", link: "/shop?offer=first" },
+    { title: "Free Shipping", subtitle: "On orders above ₹999", bg: "from-emerald-500 to-teal-500", emoji: "🚚", link: "/shop" },
+  ];
+
+  const instagramFeed = [
+    { id: 1, img: "💄", likes: "12.5k" },
+    { id: 2, img: "👗", likes: "8.2k" },
+    { id: 3, img: "💅", likes: "15.3k" },
+    { id: 4, img: "💋", likes: "6.8k" },
+    { id: 5, img: "👠", likes: "9.4k" },
+    { id: 6, img: "👜", likes: "11.2k" },
+  ];
 
   return (
-    <div className="min-h-screen bg-pink-50">
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-pink-100 to-pink-50 text-pink-600 text-center py-2 text-sm">
-        🎀 Free Shipping on ₹999+ | Extra 10% off on first order | COD Available 🎀
+    <div className="min-h-screen bg-white">
+      
+      {/* Top Bar - Countdown Timer */}
+      <div className="bg-gradient-to-r from-amber-600 to-rose-600 text-white py-3 text-center">
+        <div className="container mx-auto px-4">
+          <p className="text-sm font-medium tracking-wide">
+            🔥 LIMITED TIME OFFER — Sale ends in: 
+            <span className="font-bold mx-2 bg-white/20 px-2 py-1 rounded-lg">
+              {String(countdown.days).padStart(2, '0')}d {String(countdown.hours).padStart(2, '0')}h {String(countdown.minutes).padStart(2, '0')}m {String(countdown.seconds).padStart(2, '0')}s
+            </span>
+            🔥
+          </p>
+        </div>
       </div>
 
       {/* Header */}
-      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-pink-100">
-        <div className="flex items-center justify-between flex-wrap gap-4 px-4 py-3 max-w-7xl mx-auto">
-          <Link to="/">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-500 to-amber-500 bg-clip-text text-transparent">MyPinkShop</h1>
-            <p className="text-xs text-pink-400">for the girlies ✨</p>
-          </Link>
-          
-          <div className="flex-1 max-w-md flex">
-            <input 
-              type="text" 
-              placeholder="Search skincare, makeup, dresses..."
-              className="flex-1 px-4 py-2 border border-pink-100 rounded-l-full focus:outline-none focus:border-pink-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <button className="bg-pink-500 text-white px-5 rounded-r-full">🔍</button>
-          </div>
-          
-          <div className="flex gap-5 text-gray-600 items-center">
-            <i className="fa-regular fa-heart text-xl cursor-pointer"></i>
-            <Link to="/cart" className="relative cursor-pointer">
-              <i className="fa-solid fa-bag-shopping text-xl"></i>
-              <span className="absolute -top-2 -right-3 bg-pink-500 text-white text-xs rounded-full px-1.5">{cartCount}</span>
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-r from-amber-500 to-rose-500 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-xl">M</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-amber-600 to-rose-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                <p className="text-[10px] text-gray-400 tracking-wider">LUXURY BEAUTY</p>
+              </div>
             </Link>
-            
-            {user ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-pink-500 font-medium">Hi, {user.name}</span>
-                <button onClick={logout} className="text-sm text-gray-500 hover:text-pink-500">
-                  Logout
+
+            {/* Search Bar */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="Search for products..." 
+                  className="w-full px-5 py-3 border border-gray-200 rounded-full focus:outline-none focus:border-amber-400 bg-gray-50"
+                />
+                <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-amber-500 to-rose-500 text-white px-4 py-1.5 rounded-full text-sm">
+                  Search
                 </button>
               </div>
-            ) : (
-              <Link to="/login" className="text-gray-600 hover:text-pink-500">
-                <i className="fa-regular fa-user text-xl"></i>
+            </div>
+
+            {/* Icons */}
+            <div className="flex items-center gap-6">
+              <button className="relative">
+                <span className="text-2xl">🤍</span>
+                <span className="absolute -top-1 -right-2 bg-amber-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">0</span>
+              </button>
+              <Link to="/cart" className="relative">
+                <span className="text-2xl">🛒</span>
+                <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>
               </Link>
-            )}
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-700">Hi, {user.name}</span>
+                  <button onClick={logout} className="text-sm text-gray-500 hover:text-rose-500">Logout</button>
+                </div>
+              ) : (
+                <Link to="/login" className="text-2xl">👤</Link>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Category Navbar */}
-      <div className="bg-white border-b border-pink-100 px-4 py-3 flex gap-6 overflow-x-auto max-w-7xl mx-auto">
-        {['all', 'skincare', 'makeup', 'drip', 'accessories'].map(cat => (
-          <button 
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`text-sm font-medium ${selectedCategory === cat ? 'text-pink-500 border-b-2 border-pink-500 pb-1' : 'text-gray-500'}`}
-          >
-            {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
-          </button>
-        ))}
+      {/* Hero Section - Lancome Style */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1887&auto=format')] bg-cover bg-center opacity-20"></div>
+        <div className="container mx-auto px-4 py-20 relative z-10">
+          <div className="max-w-2xl">
+            <div className="inline-block px-4 py-1 bg-amber-500/20 backdrop-blur-sm rounded-full text-amber-400 text-sm mb-6">
+              ✨ NEW DROP ALERT
+            </div>
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+              Glow Up <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-rose-400">This Summer</span>
+            </h1>
+            <p className="text-gray-300 text-lg mb-8 max-w-lg">
+              Discover our latest collection of premium skincare and makeup. Up to 40% off + free gift with purchase.
+            </p>
+            <div className="flex gap-4">
+              <button className="bg-gradient-to-r from-amber-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition">
+                Shop Now →
+              </button>
+              <button className="border border-white/30 hover:bg-white/10 px-8 py-3 rounded-full font-semibold transition">
+                Explore Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Brand Strip */}
+      <div className="border-y border-gray-100 py-4 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-around items-center flex-wrap gap-6">
+            <span className="text-xl font-serif text-gray-500">LANCÔME</span>
+            <span className="text-2xl">✨</span>
+            <span className="text-xl font-serif text-gray-500">NYkaa</span>
+            <span className="text-2xl">💄</span>
+            <span className="text-xl font-serif text-gray-500">Mamaearth</span>
+            <span className="text-2xl">🌿</span>
+            <span className="text-xl font-serif text-gray-500">HUDA</span>
+            <span className="text-2xl">💋</span>
+            <span className="text-xl font-serif text-gray-500">SUGAR</span>
+          </div>
+        </div>
       </div>
 
-      {/* Breadcrumb */}
-      <div className="max-w-7xl mx-auto px-4 py-3 text-sm text-gray-500">
-        Home &gt; <span className="text-pink-500">Shop</span>
-      </div>
-
-      {/* Main Layout - Sidebar + Products */}
-      <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row gap-6 pb-10">
-        
-        {/* Sidebar Filters */}
-        <aside className="md:w-72 bg-white rounded-xl p-5 h-fit sticky top-24 border border-pink-100">
-          <h3 className="font-bold text-lg mb-4 text-gray-800">Filters</h3>
-          
-          <div className="mb-5 border-b border-pink-100 pb-4">
-            <h4 className="font-semibold text-sm mb-3">📁 Category</h4>
-            {['skincare', 'makeup', 'drip', 'accessories'].map(cat => (
-              <label key={cat} className="flex items-center gap-2 mb-2 text-sm text-gray-600 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={selectedCategory === cat}
-                  onChange={() => setSelectedCategory(selectedCategory === cat ? 'all' : cat)}
-                  className="accent-pink-500"
-                />
-                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-              </label>
-            ))}
+      {/* Categories Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <p className="text-amber-600 text-sm tracking-wider mb-2">SHOP BY CATEGORY</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Find Your Perfect Match</h2>
+            <div className="w-20 h-0.5 bg-gradient-to-r from-amber-500 to-rose-500 mx-auto mt-4"></div>
           </div>
-          
-          <div className="mb-5 border-b border-pink-100 pb-4">
-            <h4 className="font-semibold text-sm mb-3">💰 Price Range</h4>
-            <div className="flex gap-2">
-              <input type="number" placeholder="Min" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="w-1/2 px-3 py-2 border border-pink-100 rounded-lg text-sm" />
-              <input type="number" placeholder="Max" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-1/2 px-3 py-2 border border-pink-100 rounded-lg text-sm" />
-            </div>
-          </div>
-          
-          <div className="mb-5 border-b border-pink-100 pb-4">
-            <h4 className="font-semibold text-sm mb-3">⭐ Rating</h4>
-            {[4, 3].map(r => (
-              <label key={r} className="flex items-center gap-2 mb-2 text-sm text-gray-600 cursor-pointer">
-                <input type="radio" name="rating" checked={selectedRating === r} onChange={() => setSelectedRating(selectedRating === r ? 0 : r)} className="accent-pink-500" />
-                {r}★ & above
-              </label>
-            ))}
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input type="radio" name="rating" checked={selectedRating === 0} onChange={() => setSelectedRating(0)} className="accent-pink-500" />
-              All ratings
-            </label>
-          </div>
-          
-          <div className="mb-5 pb-2">
-            <h4 className="font-semibold text-sm mb-3">🎁 Offers</h4>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input type="checkbox" checked={discountOnly} onChange={(e) => setDiscountOnly(e.target.checked)} className="accent-pink-500" />
-              Discounted items only
-            </label>
-          </div>
-          
-          <button onClick={clearFilters} className="w-full mt-3 border border-pink-500 text-pink-500 py-2 rounded-full text-sm hover:bg-pink-500 hover:text-white transition">
-            Clear All Filters ✨
-          </button>
-        </aside>
-
-        {/* Products Content */}
-        <div className="flex-1">
-          <div className="bg-white rounded-xl px-5 py-3 mb-4 border border-pink-100">
-            <span className="text-sm text-gray-500">
-              {loading ? 'Loading...' : `Showing ${filteredProducts.length} products`}
-            </span>
-          </div>
-
-          {loading ? (
-            <div className="bg-white rounded-xl p-10 text-center border border-pink-100">
-              <p className="text-gray-500">Loading products... ✨</p>
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="bg-white rounded-xl p-10 text-center border border-pink-100">
-              <p className="text-gray-500">No products found matching your filters.</p>
-              <button onClick={clearFilters} className="mt-3 text-pink-500 underline">Clear all filters</button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredProducts.map(p => (
-                <div key={p._id || p.id} className="bg-white rounded-xl overflow-hidden border border-pink-100 hover:shadow-lg transition">
-                  <div className="h-48 flex items-center justify-center bg-pink-50 text-6xl relative">
-                    <span className="absolute top-2 left-2 bg-pink-500 text-white text-xs px-2 py-1 rounded-full">{p.badge || '✨ New'}</span>
-                    {p.emoji || '🛍️'}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {categories.map((cat, idx) => (
+              <Link key={idx} to={cat.link} className="group">
+                <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 text-center border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-amber-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">
+                    {cat.image}
                   </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-800">{p.name}</h3>
-                    <div className="text-yellow-500 text-sm mt-1">{"★".repeat(Math.floor(p.rating))} {p.rating}</div>
-                    <div className="mt-2">
-                      <span className="text-pink-500 font-bold text-lg">₹{p.price}</span>
-                      <span className="text-gray-400 line-through text-sm ml-2">₹{p.originalPrice}</span>
-                    </div>
-                    <button onClick={() => addToCart(p)} className="w-full mt-3 bg-gradient-to-r from-pink-500 to-pink-400 text-white py-2 rounded-full hover:from-pink-600 transition font-medium">
-                      Add to Cart 🛒
-                    </button>
+                  <h3 className="font-semibold text-gray-900">{cat.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">Shop Now →</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Offer Banners */}
+      <section className="py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {offers.map((offer, idx) => (
+              <Link key={idx} to={offer.link} className={`bg-gradient-to-r ${offer.bg} rounded-2xl p-6 text-white hover:shadow-xl transition hover:-translate-y-1`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-4xl mb-2">{offer.emoji}</div>
+                    <h3 className="text-xl font-bold">{offer.title}</h3>
+                    <p className="text-white/80 text-sm mt-1">{offer.subtitle}</p>
+                  </div>
+                  <div className="text-3xl">→</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Bestsellers Section */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <p className="text-amber-600 text-sm tracking-wider mb-2">⭐ CUSTOMER FAVORITES</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Bestsellers</h2>
+            <div className="w-20 h-0.5 bg-gradient-to-r from-amber-500 to-rose-500 mx-auto mt-4"></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {products.slice(0, 4).map(product => (
+              <div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <div className="relative h-64 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center text-7xl">
+                  {product.emoji}
+                  <span className="absolute top-3 left-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full">{product.badge}</span>
+                  {product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-2 py-1 rounded-full">NEW</span>}
+                </div>
+                <div className="p-5">
+                  <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex text-amber-400 text-sm">{"★".repeat(Math.floor(product.rating))}</div>
+                    <span className="text-xs text-gray-400">({product.rating})</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xl font-bold text-rose-600">₹{product.price}</span>
+                    <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
+                  </div>
+                  <button onClick={() => addToCart(product)} className="w-full bg-gray-900 text-white py-2 rounded-full font-medium hover:bg-rose-600 transition">
+                    Add to Cart
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Instagram Feed */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <p className="text-amber-600 text-sm tracking-wider mb-2">📸 FOLLOW US</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">@mypinkshop</h2>
+            <div className="w-20 h-0.5 bg-gradient-to-r from-amber-500 to-rose-500 mx-auto mt-4"></div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {instagramFeed.map((item) => (
+              <div key={item.id} className="group relative aspect-square bg-gradient-to-br from-pink-100 to-purple-100 rounded-2xl overflow-hidden cursor-pointer">
+                <div className="absolute inset-0 flex items-center justify-center text-6xl">{item.img}</div>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                  <div className="text-white text-center">
+                    <div className="text-2xl">❤️</div>
+                    <div className="text-sm">{item.likes}</div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* Newsletter */}
+      <section className="py-16 bg-gradient-to-r from-gray-900 to-gray-800 text-white">
+        <div className="container mx-auto px-4 text-center">
+          <div className="max-w-2xl mx-auto">
+            <div className="text-5xl mb-4">💌</div>
+            <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
+            <p className="text-gray-300 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
+            <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" />
+              <button className="bg-gradient-to-r from-amber-500 to-rose-500 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">
+                Subscribe
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 mt-10 py-10 px-4">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-            <h3 className="text-pink-500 font-bold text-lg mb-2">MyPinkShop</h3>
-            <p className="text-sm">aesthetic & affordable 💕</p>
+      <footer className="bg-white border-t border-gray-100 py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <h3 className="font-bold text-gray-900 mb-4">MyPinkShop</h3>
+              <p className="text-gray-500 text-sm">Luxury beauty for the modern woman.</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Shop</h4>
+              <ul className="space-y-2 text-sm text-gray-500">
+                <li><a href="#" className="hover:text-rose-500">Skincare</a></li>
+                <li><a href="#" className="hover:text-rose-500">Makeup</a></li>
+                <li><a href="#" className="hover:text-rose-500">The Drip</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Support</h4>
+              <ul className="space-y-2 text-sm text-gray-500">
+                <li><a href="#" className="hover:text-rose-500">Contact</a></li>
+                <li><a href="#" className="hover:text-rose-500">FAQs</a></li>
+                <li><a href="#" className="hover:text-rose-500">Shipping</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Social</h4>
+              <ul className="space-y-2 text-sm text-gray-500">
+                <li><a href="#" className="hover:text-rose-500">Instagram</a></li>
+                <li><a href="#" className="hover:text-rose-500">TikTok</a></li>
+                <li><a href="#" className="hover:text-rose-500">Pinterest</a></li>
+              </ul>
+            </div>
           </div>
-          <div>
-            <h4 className="font-semibold text-white mb-3">Shop</h4>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">Skincare</a>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">Makeup</a>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">The Drip</a>
+          <div className="text-center pt-8 border-t border-gray-100">
+            <p className="text-sm text-gray-400">© 2025 MyPinkShop — All rights reserved. Made with 💖</p>
           </div>
-          <div>
-            <h4 className="font-semibold text-white mb-3">Support</h4>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">Contact Us</a>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">FAQs</a>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">Shipping</a>
-          </div>
-          <div>
-            <h4 className="font-semibold text-white mb-3">Social</h4>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">Instagram</a>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">TikTok</a>
-            <a href="#" className="text-sm block py-1 hover:text-pink-500">Pinterest</a>
-          </div>
-        </div>
-        <div className="text-center text-xs pt-8 border-t border-gray-800 mt-8">
-          <p>© 2025 MyPinkShop – made with 💖 for the girlies</p>
         </div>
       </footer>
     </div>
