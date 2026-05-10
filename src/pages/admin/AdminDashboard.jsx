@@ -6,7 +6,7 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const API_URL = 'https://mypinkshop-backend.vercel.app/api';
+  const API_URL = 'https://mypinkshop-dr93.vercel.app/api';
   const token = localStorage.getItem('adminToken');
 
   useEffect(() => {
