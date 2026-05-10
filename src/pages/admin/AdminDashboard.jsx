@@ -6,7 +6,7 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app/api';
+  const API_URL = 'https://mypinkshop-dr93.vercel.app/';
   const token = localStorage.getItem('adminToken');
 
   useEffect(() => {
@@ -15,7 +15,7 @@ function AdminDashboard() {
       return;
     }
 
-    fetch(`${API_URL}/admin/dashboard`, {
+    fetch(`${API_URL}/api/admin/dashboard`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
