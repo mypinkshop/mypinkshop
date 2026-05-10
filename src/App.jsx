@@ -3,7 +3,7 @@ import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import AdminLogin from './pages/AdminLogin';
+import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
