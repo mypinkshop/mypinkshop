@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [darkMode, setDarkMode] = useState(true); // Dark by default
-  const [loading, setLoading] = useState(false);
 
   const stats = {
     orders: 351,
@@ -28,23 +26,22 @@ function AdminDashboard() {
     { id: 4, name: 'Riya Mehta', amount: 3499, date: '2 hours ago', avatar: 'RM' },
   ];
 
-  const StatCard = ({ title, value, icon, subtitle, badge, progress }) => (
-    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
-      <div className="absolute top-0 right-0 h-32 w-32 -translate-y-8 translate-x-8 rounded-full bg-gradient-to-br from-pink-500/20 to-purple-500/20 blur-2xl" />
+  const StatCard = ({ title, value, icon, badge, progress }) => (
+    <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-pink-100">
+      <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
       <div className="relative z-10">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-400">{title}</p>
-            <p className="mt-2 text-3xl font-bold text-white">{value}</p>
-            {subtitle && <p className="mt-1 text-xs text-gray-500">{subtitle}</p>}
-            {badge && <span className="mt-2 inline-block rounded-full bg-pink-500/20 px-2 py-0.5 text-xs font-medium text-pink-400">{badge}</span>}
+            <p className="text-sm font-semibold uppercase tracking-wider text-gray-400">{title}</p>
+            <p className="mt-2 text-4xl font-bold text-gray-800">{value}</p>
+            {badge && <span className="mt-2 inline-block rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-600">{badge}</span>}
           </div>
-          <div className="rounded-xl bg-gray-800/50 p-3 backdrop-blur-sm">{icon}</div>
+          <div className="rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 p-3 text-white shadow-md">{icon}</div>
         </div>
         {progress && (
-          <div className="mt-4">
-            <div className="h-1.5 w-full rounded-full bg-gray-700">
-              <div className="h-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500" style={{ width: `${progress}%` }} />
+          <div className="mt-5">
+            <div className="h-1.5 w-full rounded-full bg-pink-100">
+              <div className="h-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -53,62 +50,64 @@ function AdminDashboard() {
   );
 
   const SmallStat = ({ title, value, change }) => (
-    <div className="rounded-xl bg-gray-800/50 p-4 backdrop-blur-sm transition-all hover:bg-gray-800">
+    <div className="rounded-xl border border-pink-100 bg-white p-4 transition-all hover:border-pink-200 hover:shadow-md">
       <p className="text-xs text-gray-400">{title}</p>
-      <p className="mt-1 text-xl font-bold text-white">{value}</p>
-      {change && <p className="mt-1 text-xs text-green-400">{change}</p>}
+      <p className="mt-1 text-xl font-bold text-gray-800">{value}</p>
+      {change && <p className="mt-1 text-xs text-green-500">{change}</p>}
     </div>
   );
 
   const BuyerCard = ({ name, amount, date, avatar }) => (
-    <div className="flex items-center gap-3 rounded-xl bg-gray-800/30 p-3 transition-all hover:bg-gray-800">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-sm font-bold text-white">
+    <div className="flex items-center gap-3 rounded-xl border border-pink-50 bg-white p-3 transition-all hover:border-pink-100 hover:shadow-sm">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-sm font-bold text-white shadow-md">
         {avatar}
       </div>
       <div className="flex-1">
-        <p className="font-medium text-white">{name}</p>
+        <p className="font-semibold text-gray-800">{name}</p>
         <p className="text-xs text-gray-400">{date}</p>
       </div>
-      <p className="font-semibold text-white">₹{amount}</p>
+      <p className="font-bold text-gray-800">₹{amount}</p>
     </div>
   );
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-900">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-pink-500 border-t-transparent" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
       {/* Top Bar */}
-      <div className="fixed top-0 right-0 left-0 z-50 border-b border-gray-800 bg-gray-900/95 backdrop-blur-md">
-        <div className="flex items-center justify-between px-6 py-3">
+      <div className="fixed top-0 right-0 left-0 z-50 border-b border-pink-100 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold">M</div>
-            <h1 className="text-xl font-bold text-white">MyPinkShop <span className="text-xs font-normal text-gray-400">Super Admin</span></h1>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold shadow-md">
+              M
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">
+              MyPinkShop <span className="text-xs font-normal text-gray-400">Super Admin</span>
+            </h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative">
-              <input type="text" placeholder="Search..." className="w-64 rounded-lg bg-gray-800 border border-gray-700 py-1.5 pl-9 pr-4 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-500" />
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-64 rounded-lg border border-pink-100 bg-white py-1.5 pl-9 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-200"
+              />
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
-            <button className="rounded-lg bg-gray-800 p-2 text-gray-400 hover:bg-gray-700">🔔</button>
+            <button className="rounded-lg bg-pink-50 p-2 text-pink-500 transition-colors hover:bg-pink-100">🔔</button>
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold">SA</div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold shadow-md">
+                SA
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Sidebar */}
-      <aside className="fixed left-0 top-14 h-full w-64 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm">
+      <aside className="fixed left-0 top-14 h-full w-64 border-r border-pink-100 bg-white">
         <div className="p-4">
-          <div className="mb-6 flex items-center gap-2 border-b border-gray-800 pb-4">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white">📊</div>
-            <span className="text-sm font-semibold text-white">Dashboard</span>
+          <div className="mb-6 flex items-center gap-2 border-b border-pink-100 pb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 text-white">📊</div>
+            <span className="text-sm font-semibold text-gray-700">Dashboard</span>
           </div>
           <nav className="space-y-1">
             {[
@@ -126,16 +125,14 @@ function AdminDashboard() {
               { id: 'cart', label: 'Shopping Cart', icon: '🛒' },
               { id: 'rma', label: 'RMA Settings', icon: '🛠️' },
               { id: 'notifications', label: 'Push Notification', icon: '🔔' },
-              { id: 'channel', label: 'Channel Manager', icon: '🌐' },
-              { id: 'wishlist', label: 'WishList', icon: '❤️' },
             ].map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
                   activeTab === item.id
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
+                    : 'text-gray-500 hover:bg-pink-50 hover:text-pink-600'
                 }`}
               >
                 <span>{item.icon}</span>
@@ -151,77 +148,77 @@ function AdminDashboard() {
         <div className="mx-auto max-w-[1400px] space-y-6">
           {/* Language Selector */}
           <div className="flex justify-end">
-            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-1.5">
-              <span className="text-sm text-gray-300">🌐</span>
-              <span className="text-sm text-white">Select Language</span>
+            <div className="flex items-center gap-2 rounded-lg border border-pink-100 bg-white px-3 py-1.5 shadow-sm">
+              <span className="text-sm text-gray-500">🌐</span>
+              <span className="text-sm font-medium text-gray-600">Select Language</span>
             </div>
           </div>
 
           {/* Main Stats Grid */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <StatCard title="ORDERS" value={stats.orders} icon={<span className="text-xl">📦</span>} subtitle="Total Orders" />
-            <StatCard title="CUSTOMERS" value={stats.customers} icon={<span className="text-xl">👥</span>} subtitle="Active Customers" />
-            <StatCard title="QUOTES" value={stats.quotes} icon={<span className="text-xl">💬</span>} subtitle="Pending Quotes" badge="7 New" />
-            <StatCard title="RETURN REQUESTS" value={stats.returns} icon={<span className="text-xl">🔄</span>} subtitle="Awaiting Action" badge="29 Pending" />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title="ORDERS" value={stats.orders} icon={<span className="text-xl">📦</span>} />
+            <StatCard title="CUSTOMERS" value={stats.customers} icon={<span className="text-xl">👥</span>} />
+            <StatCard title="QUOTES" value={stats.quotes} icon={<span className="text-xl">💬</span>} badge="7 New" />
+            <StatCard title="RETURN REQUESTS" value={stats.returns} icon={<span className="text-xl">🔄</span>} badge="29 Pending" />
           </div>
 
           {/* Second Row */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            {/* Left Column - Currently Pending */}
+            {/* Left Column */}
             <div className="space-y-5">
-              <div className="rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-400">CURRENTLY PENDING</h3>
-                  <span className="text-xs text-pink-400">VIEW ALL →</span>
+              <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">CURRENTLY PENDING</h3>
+                  <span className="text-xs font-medium text-pink-500 hover:cursor-pointer hover:underline">VIEW ALL →</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-3xl font-bold text-white">{stats.pendingOrders}</p>
+                    <p className="text-3xl font-bold text-gray-800">{stats.pendingOrders}</p>
                     <p className="text-sm text-gray-500">ORDERS</p>
-                    <p className="mt-2 text-xs text-green-400">₹{stats.revenue.toLocaleString()}</p>
+                    <p className="mt-2 text-sm font-semibold text-green-600">₹{stats.revenue.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-white">{stats.pendingReturns}</p>
+                    <p className="text-3xl font-bold text-gray-800">{stats.pendingReturns}</p>
                     <p className="text-sm text-gray-500">RETURN/EXCHANGE</p>
-                    <p className="mt-2 text-xs text-red-400">₹{stats.returnAmount.toLocaleString()}</p>
+                    <p className="mt-2 text-sm font-semibold text-red-500">₹{stats.returnAmount.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5">
-                <h3 className="mb-3 text-sm font-semibold text-gray-400">ABANDONED CART</h3>
+              <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">ABANDONED CART</h3>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-3xl font-bold text-white">{stats.abandonedCart}</p>
+                    <p className="text-3xl font-bold text-gray-800">{stats.abandonedCart}</p>
                     <p className="text-sm text-gray-500">Carts</p>
                   </div>
-                  <p className="text-lg font-semibold text-white">₹{stats.abandonedAmount.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-gray-800">₹{stats.abandonedAmount.toLocaleString()}</p>
                 </div>
-                <div className="mt-3 h-1.5 w-full rounded-full bg-gray-700">
-                  <div className="h-1.5 w-2/3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
+                <div className="mt-4 h-1.5 w-full rounded-full bg-pink-100">
+                  <div className="h-1.5 w-2/3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500" />
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5">
-                <h3 className="mb-3 text-sm font-semibold text-gray-400">OUT OF STOCK PRODUCTS</h3>
+              <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">OUT OF STOCK PRODUCTS</h3>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-3xl font-bold text-white">{stats.outOfStock}</p>
+                    <p className="text-3xl font-bold text-gray-800">{stats.outOfStock}</p>
                     <p className="text-sm text-gray-500">Products</p>
                   </div>
-                  <p className="text-lg font-semibold text-white">₹{stats.outOfStockAmount.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-gray-800">₹{stats.outOfStockAmount.toLocaleString()}</p>
                 </div>
-                <div className="mt-3 h-1.5 w-full rounded-full bg-gray-700">
-                  <div className="h-1.5 w-1/4 rounded-full bg-gradient-to-r from-red-500 to-pink-500" />
+                <div className="mt-4 h-1.5 w-full rounded-full bg-pink-100">
+                  <div className="h-1.5 w-1/4 rounded-full bg-gradient-to-r from-pink-500 to-rose-500" />
                 </div>
               </div>
             </div>
 
             {/* Right Column - Recent Buyers */}
-            <div className="rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-5">
+            <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-400">RECENT BUYERS</h3>
-                <span className="text-xs text-gray-500">In the last 1 hour</span>
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">RECENT BUYERS</h3>
+                <span className="text-xs text-gray-400">In the last 1 hour</span>
               </div>
               <div className="space-y-2">
                 {recentBuyers.map((buyer) => (
