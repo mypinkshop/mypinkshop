@@ -50,6 +50,19 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 🔥 TEMPORARY ADMIN BYPASS - Remove after database fix 🔥
+    if (email === 'admin@mypinkshop.com' && password === 'admin123') {
+      console.log('✅ Admin bypass login successful');
+      return res.json({
+        _id: 'admin_temp_id_123',
+        name: 'Super Admin',
+        email: 'admin@mypinkshop.com',
+        role: 'admin',
+        vendorStatus: 'approved',
+        token: generateToken('admin_temp_id_123')
+      });
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
