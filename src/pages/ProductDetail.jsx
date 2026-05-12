@@ -1,51 +1,96 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState('S');
   const [activeTab, setActiveTab] = useState('description');
-  const [addedToWishlist, setAddedToWishlist] = useState(false);
 
   const products = {
     1: {
       id: 1,
       name: "Glass Skin Serum",
       brand: "Nykaa Beauty",
-      category: "skincare",
+      category: "Skincare",
       price: 1299,
       originalPrice: 1999,
       discount: 35,
       rating: 4.8,
       reviewCount: 1243,
+      emoji: "💧",
       images: ["💧", "✨", "💎", "🌟"],
       sizes: ["S", "M", "L"],
+      colors: ["Pink", "White"],
       inStock: true,
-      description: "Achieve glass-like glowing skin with our premium serum. Enriched with hyaluronic acid and vitamin C.",
+      description: "Achieve glass-like glowing skin with our premium serum. Enriched with hyaluronic acid and vitamin C, this lightweight formula hydrates, brightens, and reduces fine lines with regular use.",
       benefits: [
         "Deep hydration for all skin types",
-        "Brightens skin tone",
-        "Reduces fine lines",
-        "Lightweight formula"
+        "Brightens skin tone and reduces dark spots",
+        "Minimizes fine lines and wrinkles",
+        "Lightweight, non-greasy formula",
+        "Dermatologically tested",
+        "Cruelty-free and vegan"
       ],
+      howToUse: "Apply 2-3 drops on cleansed face morning and evening. Gently massage until fully absorbed. Follow with moisturizer.",
+      ingredients: ["Hyaluronic Acid", "Vitamin C", "Niacinamide", "Green Tea Extract", "Aloe Vera", "Squalane"],
+    },
+    2: {
+      id: 2,
+      name: "Rice Water Toner",
+      brand: "Mamaearth",
+      category: "Skincare",
+      price: 899,
+      originalPrice: 1299,
+      discount: 30,
+      rating: 4.6,
+      reviewCount: 892,
+      emoji: "🌸",
+      images: ["🌸", "🌾", "💧", "✨"],
+      sizes: ["100ml", "200ml"],
+      colors: [],
+      inStock: true,
+      description: "Rice water-infused toner that gently exfoliates and brightens your skin. Perfect for all skin types.",
+      benefits: [
+        "Brightens complexion",
+        "Removes dead skin cells",
+        "Pore tightening",
+        "Hydrating formula",
+        "pH balanced",
+        "Alcohol-free"
+      ],
+      howToUse: "Apply with cotton pad after cleansing. Use twice daily for best results.",
+      ingredients: ["Rice Water", "Niacinamide", "Witch Hazel", "Aloe Vera", "Glycerin"],
     },
   };
 
-  const reviews = [
-    { id: 1, user: "Priya Sharma", rating: 5, date: "May 10, 2024", comment: "Absolutely love this product!", helpful: 45 },
-    { id: 2, user: "Aditi Singh", rating: 4, date: "May 8, 2024", comment: "Good product, takes time to show results.", helpful: 23 },
-  ];
+  const allReviews = {
+    1: [
+      { id: 1, user: "Priya Sharma", rating: 5, date: "May 10, 2024", comment: "Absolutely love this product! My skin feels so smooth and hydrated. Will definitely repurchase!", helpful: 45 },
+      { id: 2, user: "Aditi Singh", rating: 4, date: "May 8, 2024", comment: "Good product. Takes about 2 weeks to see visible results. Worth the price.", helpful: 23 },
+      { id: 3, user: "Neha Gupta", rating: 5, date: "May 5, 2024", comment: "This serum is a game changer! My acne scars have faded significantly.", helpful: 67 },
+      { id: 4, user: "Riya Mehta", rating: 4, date: "May 1, 2024", comment: "Nice texture, absorbs quickly. Giving 4 stars because of the price.", helpful: 12 },
+    ],
+    2: [
+      { id: 1, user: "Anjali Verma", rating: 5, date: "May 9, 2024", comment: "Best toner I've ever used! My skin feels refreshed.", helpful: 34 },
+      { id: 2, user: "Kavya Sharma", rating: 4, date: "May 6, 2024", comment: "Good product, very gentle on skin.", helpful: 18 },
+    ],
+  };
 
   useEffect(() => {
     setTimeout(() => {
-      setProduct(products[id]);
+      const foundProduct = products[id];
+      if (foundProduct) {
+        setProduct(foundProduct);
+      }
       setLoading(false);
     }, 500);
   }, [id]);
@@ -55,10 +100,21 @@ function ProductDetail() {
     alert(`✨ ${product.name} added to cart!`);
   };
 
+  const handleWishlistToggle = () => {
+    if (isInWishlist(product.id)) {
+      removeFromWishlist(product.id);
+    } else {
+      addToWishlist(product);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-pink-50 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-gray-500">Loading product...</p>
+        </div>
       </div>
     );
   }
@@ -78,20 +134,21 @@ function ProductDetail() {
     );
   }
 
+  const reviews = allReviews[id] || [];
+
   return (
     <div className="min-h-screen bg-pink-50">
       
-      {/* Header — Dark Pink (same as homepage) */}
+      {/* Header */}
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           <Link to="/">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">MyPinkShop</h1>
           </Link>
           <div className="flex items-center gap-5">
-            <button className="relative">
+            <Link to="/wishlist" className="relative">
               <span className="text-2xl text-gray-600 hover:text-pink-500 transition">🤍</span>
-              <span className="absolute -top-1 -right-2 bg-pink-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">0</span>
-            </button>
+            </Link>
             <Link to="/cart" className="relative">
               <span className="text-2xl text-gray-600 hover:text-pink-500 transition">🛒</span>
             </Link>
@@ -100,6 +157,7 @@ function ProductDetail() {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         
         {/* Breadcrumb */}
@@ -113,10 +171,16 @@ function ProductDetail() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           
-          {/* Left — Images */}
+          {/* Left Column - Images */}
           <div>
-            <div className="bg-white rounded-2xl aspect-square flex items-center justify-center text-8xl shadow-sm border border-pink-100">
+            <div className="relative bg-white rounded-2xl aspect-square flex items-center justify-center text-8xl shadow-sm border border-pink-100">
               {product.images[selectedImage]}
+              <button 
+                onClick={handleWishlistToggle}
+                className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition"
+              >
+                <span className="text-xl">{isInWishlist(product.id) ? '❤️' : '🤍'}</span>
+              </button>
             </div>
             <div className="flex gap-3 mt-4">
               {product.images.map((img, idx) => (
@@ -133,7 +197,7 @@ function ProductDetail() {
             </div>
           </div>
 
-          {/* Right — Product Info */}
+          {/* Right Column - Product Info */}
           <div>
             <div className="mb-2">
               <span className="text-sm text-pink-600 font-medium">{product.brand}</span>
@@ -160,7 +224,7 @@ function ProductDetail() {
               <p className="text-sm text-gray-500 mt-2">Inclusive of all taxes. Free shipping on orders above ₹999.</p>
             </div>
 
-            {/* Size */}
+            {/* Size Selector */}
             {product.sizes.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">Select Size</h3>
@@ -205,7 +269,7 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* Buttons */}
+            {/* Action Buttons */}
             <div className="flex gap-4 mb-8">
               <button
                 onClick={handleAddToCart}
@@ -252,7 +316,7 @@ function ProductDetail() {
                   activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-500'
                 }`}
               >
-                {tab}
+                {tab} {tab === 'reviews' && `(${reviews.length})`}
               </button>
             ))}
           </div>
@@ -263,12 +327,12 @@ function ProductDetail() {
                 <p className="text-gray-600 leading-relaxed">{product.description}</p>
                 <div className="bg-pink-50 rounded-xl p-6">
                   <h4 className="font-medium text-gray-800 mb-2">How To Use</h4>
-                  <p className="text-gray-600 text-sm">Apply 2-3 drops on cleansed face morning and evening. Gently massage until fully absorbed.</p>
+                  <p className="text-gray-600 text-sm">{product.howToUse}</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-800 mb-3">Key Ingredients</h4>
                   <div className="flex flex-wrap gap-2">
-                    {["Hyaluronic Acid", "Vitamin C", "Niacinamide", "Green Tea Extract"].map(ing => (
+                    {product.ingredients.map(ing => (
                       <span key={ing} className="bg-pink-100 text-pink-700 px-3 py-1.5 rounded-full text-sm">{ing}</span>
                     ))}
                   </div>
@@ -308,25 +372,27 @@ function ProductDetail() {
                 </div>
 
                 {/* Reviews List */}
-                {reviews.map(review => (
-                  <div key={review.id} className="border-b border-pink-100 pb-6 last:border-0">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <span className="font-medium text-gray-800">{review.user}</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex text-yellow-400 text-sm">
-                            {'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}
+                <div className="space-y-5">
+                  {reviews.map(review => (
+                    <div key={review.id} className="border-b border-pink-100 pb-5 last:border-0">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="font-medium text-gray-800">{review.user}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex text-yellow-400 text-sm">
+                              {'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}
+                            </div>
+                            <span className="text-xs text-gray-400">{review.date}</span>
                           </div>
-                          <span className="text-xs text-gray-400">{review.date}</span>
                         </div>
+                        <button className="text-sm text-gray-400 hover:text-pink-500 transition">
+                          Helpful ({review.helpful})
+                        </button>
                       </div>
-                      <button className="text-sm text-gray-400 hover:text-pink-500 transition">
-                        Helpful ({review.helpful})
-                      </button>
+                      <p className="text-gray-600 text-sm mt-2">{review.comment}</p>
                     </div>
-                    <p className="text-gray-600 text-sm mt-2">{review.comment}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
