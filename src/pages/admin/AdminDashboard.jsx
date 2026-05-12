@@ -133,6 +133,13 @@ function AdminDashboard() {
               <span>Products</span>
             </Link>
             <Link 
+              to="/admin/categories"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"
+            >
+              <span>📁</span>
+              <span>Categories</span>
+            </Link>
+            <Link 
               to="/admin/orders"
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"
             >
