@@ -110,35 +110,41 @@ function AdminDashboard() {
             <span className="text-sm font-semibold text-gray-700">Dashboard</span>
           </div>
           <nav className="space-y-1">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-              { id: 'configurations', label: 'Configurations', icon: '⚙️' },
-              { id: 'catalog', label: 'Catalog', icon: '📚' },
-              { id: 'orders', label: 'Orders', icon: '📦' },
-              { id: 'customers', label: 'Customers', icon: '👥' },
-              { id: 'returns', label: 'Returns', icon: '🔄' },
-              { id: 'content', label: 'Content Management', icon: '📝' },
-              { id: 'sales', label: 'Sales', icon: '💰' },
-              { id: 'wallet', label: 'Wallet System', icon: '💳' },
-              { id: 'shipping', label: 'Shipping & Taxes', icon: '🚚' },
-              { id: 'quotes', label: 'Request Quotes', icon: '💬' },
-              { id: 'cart', label: 'Shopping Cart', icon: '🛒' },
-              { id: 'rma', label: 'RMA Settings', icon: '🛠️' },
-              { id: 'notifications', label: 'Push Notification', icon: '🔔' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
-                  activeTab === item.id
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md'
-                    : 'text-gray-500 hover:bg-pink-50 hover:text-pink-600'
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
+            <Link 
+              to="/admin/dashboard"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md"
+            >
+              <span>📊</span>
+              <span>Dashboard</span>
+            </Link>
+            <Link 
+              to="/admin/vendors"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"
+            >
+              <span>🏪</span>
+              <span>Vendors</span>
+              <span className="ml-auto bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">18</span>
+            </Link>
+            <Link 
+              to="/admin/products"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"
+            >
+              <span>📦</span>
+              <span>Products</span>
+            </Link>
+            <Link 
+              to="/admin/orders"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"
+            >
+              <span>📋</span>
+              <span>Orders</span>
+            </Link>
+            <button
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"
+            >
+              <span>⚙️</span>
+              <span>Settings</span>
+            </button>
           </nav>
         </div>
       </aside>
