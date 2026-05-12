@@ -8,6 +8,7 @@ import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import Wishlist from './pages/Wishlist';
 import Shop from './pages/Shop';
+import TrackOrder from './pages/TrackOrder';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminVendors from './pages/admin/AdminVendors';
@@ -40,6 +41,7 @@ function App() {
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/shop" element={<Shop />} />
+              <Route path="/track-order/:orderId" element={<TrackOrder />} />
               
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
