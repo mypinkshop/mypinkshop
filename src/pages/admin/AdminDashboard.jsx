@@ -128,7 +128,7 @@ function AdminDashboard() {
                       <th className="px-5 py-3 text-left">Customer</th>
                       <th className="px-5 py-3 text-left">Amount</th>
                       <th className="px-5 py-3 text-left">Status</th>
-                    </table>
+                    </tr>
                   </thead>
                   <tbody className="divide-y">
                     {recentOrders.map((order) => (
