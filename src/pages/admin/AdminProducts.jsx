@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 
@@ -18,10 +18,10 @@ function AdminProducts() {
     if (!token) { navigate('/admin/login'); return; }
     
     const mockBrands = [
-      { id: 1, name: 'Nykaa Beauty', productCount: 24 },
-      { id: 2, name: 'Mamaearth', productCount: 18 },
-      { id: 3, name: 'Sugar Cosmetics', productCount: 12 },
-      { id: 4, name: 'Plum Beauty', productCount: 8 },
+      { id: 1, name: 'Nykaa Beauty', logo: 'https://placehold.co/40x40/pink/white?text=NB', productCount: 24 },
+      { id: 2, name: 'Mamaearth', logo: 'https://placehold.co/40x40/green/white?text=ME', productCount: 18 },
+      { id: 3, name: 'Sugar Cosmetics', logo: 'https://placehold.co/40x40/red/white?text=SC', productCount: 12 },
+      { id: 4, name: 'Plum Beauty', logo: 'https://placehold.co/40x40/purple/white?text=PB', productCount: 8 },
     ];
     setBrands(mockBrands);
     
@@ -121,10 +121,24 @@ function AdminProducts() {
         <Header />
         <main className="p-6">
           
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">Product Management</h1>
-            <p className="text-gray-500 text-sm">Select a brand to view and manage products</p>
+          {/* Header with Back Button and Clickable Logo */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-2 text-gray-600 hover:text-pink-500 transition"
+              >
+                <span className="text-xl">←</span>
+                <span className="text-sm">Back</span>
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">Product Management</h1>
+                <p className="text-gray-500 text-sm">Select a brand to view and manage products</p>
+              </div>
+            </div>
+            <Link to="/admin/dashboard" className="text-sm text-pink-500 hover:text-pink-600 transition">
+              Go to Dashboard →
+            </Link>
           </div>
 
           {/* Brand Cards */}
@@ -135,11 +149,13 @@ function AdminProducts() {
                 <button
                   key={brand.id}
                   onClick={() => handleBrandClick(brand)}
-                  className={`bg-white rounded-xl p-4 text-center border-2 transition-all hover:shadow-md ${
+                  className={`bg-white rounded-xl p-4 text-center border-2 transition-all hover:shadow-md group ${
                     selectedBrand?.id === brand.id ? 'border-pink-500 bg-pink-50' : 'border-gray-100 hover:border-pink-200'
                   }`}
                 >
-                  <div className="text-4xl mb-2">🏢</div>
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                    {brand.name.charAt(0)}
+                  </div>
                   <p className="font-medium text-gray-800">{brand.name}</p>
                   <p className="text-xs text-gray-400">{brand.productCount} products</p>
                 </button>
@@ -151,11 +167,16 @@ function AdminProducts() {
           {selectedBrand ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">
-                    {selectedBrand.name}
-                  </h2>
-                  <p className="text-sm text-gray-500">Manage products for this brand</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                    {selectedBrand.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      {selectedBrand.name}
+                    </h2>
+                    <p className="text-sm text-gray-500">Manage products for this brand</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', stock: '', category: 'skincare' }); setShowAddModal(true); }}
