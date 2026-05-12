@@ -19,9 +19,8 @@ function Login() {
     setError('');
     setLoading(true);
 
-    // Check if identifier is email or mobile
     const isEmail = identifier.includes('@');
-    const email = isEmail ? identifier : `${identifier}@phone.com`; // For demo
+    const email = isEmail ? identifier : `${identifier}@phone.com`;
     
     const result = await login(email, password);
     
@@ -40,7 +39,6 @@ function Login() {
       return;
     }
     setLoading(true);
-    // Simulate sending reset link
     setTimeout(() => {
       setResetSent(true);
       setLoading(false);
@@ -90,7 +88,6 @@ function Login() {
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder=""
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                     required
                   />
