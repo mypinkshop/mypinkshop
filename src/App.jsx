@@ -23,6 +23,7 @@ import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
+import AdminProducts from './pages/admin/AdminProducts';
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/vendors" element={<AdminVendors />} />
+              <Route path="/admin/products" element={<AdminProducts />} />
               
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
