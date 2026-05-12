@@ -1,158 +1,176 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import StatsCard from './components/StatsCard';
 
 function AdminDashboard() {
-  const stats = {
-    orders: 351,
-    customers: 210,
-    quotes: 7,
-    returns: 29,
-    pendingOrders: 145,
-    pendingReturns: 27,
-    abandonedCart: 196,
-    outOfStock: 71,
-    revenue: 4800,
-    returnAmount: 32711,
-    abandonedAmount: 32711,
-    outOfStockAmount: 32711,
-  };
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    todayRevenue: 12450,
+    todayOrders: 45,
+    totalRevenue: 4520000,
+    totalOrders: 1234,
+    totalProducts: 2847,
+    totalVendors: 342,
+    pendingVendors: 18,
+    lowStockProducts: 12,
+  });
 
-  const recentBuyers = [
-    { id: 1, name: 'Priya Sharma', amount: 2598, date: '10 mins ago', avatar: 'PS' },
-    { id: 2, name: 'Aditi Singh', amount: 1798, date: '25 mins ago', avatar: 'AS' },
-    { id: 3, name: 'Neha Gupta', amount: 899, date: '1 hour ago', avatar: 'NG' },
-    { id: 4, name: 'Riya Mehta', amount: 3499, date: '2 hours ago', avatar: 'RM' },
+  const [recentOrders, setRecentOrders] = useState([
+    { id: '#MPS1001', customer: 'Priya Sharma', vendor: 'Nykaa Beauty', amount: 2598, status: 'delivered', date: '2024-05-12' },
+    { id: '#MPS1002', customer: 'Aditi Singh', vendor: 'Mamaearth', amount: 1798, status: 'shipped', date: '2024-05-12' },
+    { id: '#MPS1003', customer: 'Neha Gupta', vendor: 'Sugar Cosmetics', amount: 899, status: 'pending', date: '2024-05-11' },
+    { id: '#MPS1004', customer: 'Riya Mehta', vendor: 'Nykaa Beauty', amount: 3499, status: 'delivered', date: '2024-05-11' },
+    { id: '#MPS1005', customer: 'Anjali Verma', vendor: 'Plum', amount: 1599, status: 'processing', date: '2024-05-10' },
+  ]);
+
+  const topProducts = [
+    { id: 1, name: 'Glass Skin Serum', sales: 234, revenue: 303966 },
+    { id: 2, name: 'Cherry Lip Tint', sales: 189, revenue: 113211 },
+    { id: 3, name: 'Satin Slip Dress', sales: 156, revenue: 389844 },
+    { id: 4, name: 'Rice Water Toner', sales: 145, revenue: 130355 },
+    { id: 5, name: 'Baby Pink Blush', sales: 123, revenue: 98277 },
   ];
 
-  const StatCard = ({ title, value, icon, badge, progress }) => (
-    <div className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-pink-100">
-      <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-to-br from-pink-100 to-purple-100 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-      <div className="relative z-10">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-gray-400">{title}</p>
-            <p className="mt-2 text-4xl font-bold text-gray-800">{value}</p>
-            {badge && <span className="mt-2 inline-block rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-600">{badge}</span>}
-          </div>
-          <div className="rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 p-3 text-white shadow-md">{icon}</div>
+  useEffect(() => {
+    setTimeout(() => setLoading(false), 500);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-gray-500">Loading...</p>
         </div>
-        {progress && (
-          <div className="mt-5">
-            <div className="h-1.5 w-full rounded-full bg-pink-100">
-              <div className="h-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-        )}
       </div>
-    </div>
-  );
-
-  const SmallStat = ({ title, value, change }) => (
-    <div className="rounded-xl border border-pink-100 bg-white p-4 transition-all hover:border-pink-200 hover:shadow-md">
-      <p className="text-xs text-gray-400">{title}</p>
-      <p className="mt-1 text-xl font-bold text-gray-800">{value}</p>
-      {change && <p className="mt-1 text-xs text-green-500">{change}</p>}
-    </div>
-  );
-
-  const BuyerCard = ({ name, amount, date, avatar }) => (
-    <div className="flex items-center gap-3 rounded-xl border border-pink-50 bg-white p-3 transition-all hover:border-pink-100 hover:shadow-sm">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-sm font-bold text-white shadow-md">
-        {avatar}
-      </div>
-      <div className="flex-1">
-        <p className="font-semibold text-gray-800">{name}</p>
-        <p className="text-xs text-gray-400">{date}</p>
-      </div>
-      <p className="font-bold text-gray-800">₹{amount}</p>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
-      {/* Top Bar */}
-      <div className="fixed top-0 right-0 left-0 z-50 border-b border-pink-100 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-3">
-          <Link to="/admin/dashboard" className="flex items-center gap-3 hover:opacity-80 transition">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold shadow-md">M</div>
-            <h1 className="text-xl font-bold text-gray-800">MyPinkShop <span className="text-xs font-normal text-gray-400">Super Admin</span></h1>
-          </Link>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <input type="text" placeholder="Search..." className="w-64 rounded-lg border border-pink-100 bg-white py-1.5 pl-9 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-200" />
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-            </div>
-            <button className="rounded-lg bg-pink-50 p-2 text-pink-500 transition-colors hover:bg-pink-100">🔔</button>
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold shadow-md">SA</div>
+    <div className="min-h-screen bg-gray-100">
+      <Sidebar />
+      <div className="ml-64">
+        <Header />
+        <main className="p-6">
+          {/* Today's Stats */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Today's Performance</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              <StatsCard title="Today's Revenue" value={`₹${stats.todayRevenue.toLocaleString()}`} icon="💰" trend="up" trendValue="12%" />
+              <StatsCard title="Today's Orders" value={stats.todayOrders} icon="📦" trend="up" trendValue="8%" />
+              <StatsCard title="Total Revenue" value={`₹${stats.totalRevenue.toLocaleString()}`} icon="🏆" />
+              <StatsCard title="Total Orders" value={stats.totalOrders} icon="📋" />
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-14 h-full w-64 border-r border-pink-100 bg-white">
-        <div className="p-4">
-          <div className="mb-6 flex items-center gap-2 border-b border-pink-100 pb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 text-white">📊</div>
-            <span className="text-sm font-semibold text-gray-700">Dashboard</span>
-          </div>
-          <nav className="space-y-1">
-            <Link to="/admin/dashboard" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md"><span>📊</span><span>Dashboard</span></Link>
-            <Link to="/admin/vendors" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"><span>🏪</span><span>Vendors</span><span className="ml-auto bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">18</span></Link>
-            <Link to="/admin/products" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"><span>📦</span><span>Products</span></Link>
-            <Link to="/admin/categories" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"><span>📁</span><span>Categories</span></Link>
-            <Link to="/admin/orders" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all text-gray-500 hover:bg-pink-50 hover:text-pink-600"><span>📋</span><span>Orders</span></Link>
-          </nav>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="ml-64 mt-14 p-6">
-        <div className="mx-auto max-w-[1400px] space-y-6">
-          <div className="flex justify-end">
-            <div className="flex items-center gap-2 rounded-lg border border-pink-100 bg-white px-3 py-1.5 shadow-sm"><span className="text-sm text-gray-500">🌐</span><span className="text-sm font-medium text-gray-600">Select Language</span></div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="ORDERS" value={stats.orders} icon={<span className="text-xl">📦</span>} />
-            <StatCard title="CUSTOMERS" value={stats.customers} icon={<span className="text-xl">👥</span>} />
-            <StatCard title="QUOTES" value={stats.quotes} icon={<span className="text-xl">💬</span>} badge="7 New" />
-            <StatCard title="RETURN REQUESTS" value={stats.returns} icon={<span className="text-xl">🔄</span>} badge="29 Pending" />
+          {/* Key Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-gray-500">Total Products</p>
+                <span className="text-2xl">📦</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.totalProducts}</p>
+            </div>
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-gray-500">Total Vendors</p>
+                <span className="text-2xl">🏪</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.totalVendors}</p>
+              <p className="text-xs text-yellow-600 mt-1">{stats.pendingVendors} pending approval</p>
+            </div>
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-gray-500">Low Stock Alert</p>
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <p className="text-2xl font-bold text-red-500">{stats.lowStockProducts}</p>
+              <p className="text-xs text-gray-500 mt-1">Products with stock {'<'} 10</p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">CURRENTLY PENDING</h3><span className="text-xs font-medium text-pink-500 hover:cursor-pointer hover:underline">VIEW ALL →</span></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div><p className="text-3xl font-bold text-gray-800">{stats.pendingOrders}</p><p className="text-sm text-gray-500">ORDERS</p><p className="mt-2 text-sm font-semibold text-green-600">₹{stats.revenue.toLocaleString()}</p></div>
-                  <div><p className="text-3xl font-bold text-gray-800">{stats.pendingReturns}</p><p className="text-sm text-gray-500">RETURN/EXCHANGE</p><p className="mt-2 text-sm font-semibold text-red-500">₹{stats.returnAmount.toLocaleString()}</p></div>
+          {/* Top Products & Recent Orders */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Products */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="font-semibold">🔥 Top Selling Products</h3>
+              </div>
+              <div className="divide-y">
+                {topProducts.map((product, idx) => (
+                  <div key={product.id} className="px-5 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-gray-400 w-6">{idx + 1}</span>
+                      <span className="font-medium">{product.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold">{product.sales} sales</p>
+                      <p className="text-xs text-gray-500">₹{product.revenue.toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Orders */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-semibold">📋 Recent Orders</h3>
+                <button className="text-sm text-pink-500 hover:text-pink-600">View All →</button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-5 py-3 text-left">Order ID</th>
+                      <th className="px-5 py-3 text-left">Customer</th>
+                      <th className="px-5 py-3 text-left">Amount</th>
+                      <th className="px-5 py-3 text-left">Status</th>
+                    </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {recentOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-medium">{order.id}</td>
+                        <td className="px-5 py-3">{order.customer}</td>
+                        <td className="px-5 py-3">₹{order.amount}</td>
+                        <td className="px-5 py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                            order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
+                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-purple-100 text-purple-700'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Required */}
+          <div className="mt-6 bg-yellow-50 rounded-xl p-4 border border-yellow-200">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⏳</span>
+                <div>
+                  <p className="font-medium text-gray-800">Action Required</p>
+                  <p className="text-sm text-gray-600">{stats.pendingVendors} vendors pending approval</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">ABANDONED CART</h3>
-                <div className="flex items-center justify-between"><div><p className="text-3xl font-bold text-gray-800">{stats.abandonedCart}</p><p className="text-sm text-gray-500">Carts</p></div><p className="text-lg font-bold text-gray-800">₹{stats.abandonedAmount.toLocaleString()}</p></div>
-                <div className="mt-4 h-1.5 w-full rounded-full bg-pink-100"><div className="h-1.5 w-2/3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500" /></div>
-              </div>
-              <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">OUT OF STOCK PRODUCTS</h3>
-                <div className="flex items-center justify-between"><div><p className="text-3xl font-bold text-gray-800">{stats.outOfStock}</p><p className="text-sm text-gray-500">Products</p></div><p className="text-lg font-bold text-gray-800">₹{stats.outOfStockAmount.toLocaleString()}</p></div>
-                <div className="mt-4 h-1.5 w-full rounded-full bg-pink-100"><div className="h-1.5 w-1/4 rounded-full bg-gradient-to-r from-pink-500 to-rose-500" /></div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-pink-100 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">RECENT BUYERS</h3><span className="text-xs text-gray-400">In the last 1 hour</span></div>
-              <div className="space-y-2">{recentBuyers.map((buyer) => (<BuyerCard key={buyer.id} {...buyer} />))}</div>
+              <button className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition">
+                Review Now →
+              </button>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <SmallStat title="Amazon" value="Sync" /><SmallStat title="eBay" value="Connected" /><SmallStat title="Channel Manager" value="Active" /><SmallStat title="Push Notification" value="On" /><SmallStat title="RMA Settings" value="Configured" />
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
