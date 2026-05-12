@@ -10,7 +10,7 @@ function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedSize, setSelectedSize] = useState('S');
+  const [selectedSize, setSelectedSize] = useState('Small');
   const [activeTab, setActiveTab] = useState('description');
   const [addedToWishlist, setAddedToWishlist] = useState(false);
 
@@ -19,25 +19,28 @@ function ProductDetail() {
       id: 1,
       name: "Glass Skin Serum",
       brand: "Nykaa Beauty",
-      category: "skincare",
+      category: "Skincare",
       price: 1299,
       originalPrice: 1999,
       discount: 35,
       rating: 4.8,
       reviewCount: 1243,
-      emoji: "💧",
       images: ["💧", "✨", "💎", "🌟"],
-      sizes: ["S", "M", "L"],
+      sizes: ["Small", "Medium", "Large"],
       inStock: true,
-      description: "Achieve that glass-like glowing skin with our premium serum. Enriched with hyaluronic acid and vitamin C.",
-      benefits: ["Deep hydration", "Brightens skin tone", "Reduces fine lines", "Lightweight formula"],
+      description: "Achieve glass-like glowing skin with our premium serum. Enriched with hyaluronic acid and vitamin C, this lightweight formula hydrates, brightens, and reduces fine lines with regular use.",
+      benefits: [
+        "Deep hydration for all skin types",
+        "Brightens skin tone and reduces dark spots",
+        "Minimizes fine lines and wrinkles",
+        "Lightweight, non-greasy formula"
+      ],
     },
   };
 
   const reviews = [
-    { id: 1, user: "Priya S.", avatar: "👩", rating: 5, date: "2 days ago", comment: "Obsessed! My skin has never looked better ✨", helpful: 45 },
-    { id: 2, user: "Aditi R.", avatar: "👧", rating: 5, date: "5 days ago", comment: "10/10 would recommend! 🎀", helpful: 23 },
-    { id: 3, user: "Neha K.", avatar: "👩‍🦱", rating: 4, date: "1 week ago", comment: "Worth every penny! ❤️", helpful: 67 },
+    { id: 1, user: "Priya Sharma", rating: 5, date: "May 10, 2024", comment: "Absolutely love this product! My skin feels so smooth and hydrated.", helpful: 45 },
+    { id: 2, user: "Aditi Singh", rating: 4, date: "May 8, 2024", comment: "Good product. Takes about 2 weeks to see visible results.", helpful: 23 },
   ];
 
   useEffect(() => {
@@ -49,19 +52,12 @@ function ProductDetail() {
 
   const handleAddToCart = () => {
     addToCart({ ...product, quantity });
-    alert(`✨ ${product.name} added to bag!`);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto relative">
-            <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-pink-400 rounded-full border-t-transparent animate-spin"></div>
-          </div>
-          <p className="text-gray-400 mt-4">loading... ✨</p>
-        </div>
+        <div className="w-12 h-12 border-2 border-gray-200 border-t-pink-500 rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -70,11 +66,11 @@ function ProductDetail() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="text-7xl mb-4">🔍</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">oops! not found</h2>
-          <p className="text-gray-400 mb-6">the product you're looking for doesn't exist.</p>
-          <Link to="/" className="inline-flex items-center gap-2 bg-black text-white px-8 py-3 rounded-full hover:bg-gray-800 transition">
-            back to home →
+          <div className="text-6xl mb-4">🔍</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Product Not Found</h2>
+          <p className="text-gray-500 mb-6">The product you're looking for does not exist.</p>
+          <Link to="/" className="bg-gray-900 text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition">
+            Back to Home
           </Link>
         </div>
       </div>
@@ -84,54 +80,45 @@ function ProductDetail() {
   return (
     <div className="min-h-screen bg-white">
       
-      {/* Header — Clean Minimal */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/" className="text-2xl font-bold tracking-tighter bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent">
-            mypinkshop
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <Link to="/" className="text-xl font-semibold tracking-tight">
+            MyPinkShop
           </Link>
           <div className="flex items-center gap-6">
-            <button className="text-2xl hover:scale-110 transition">🤍</button>
-            <Link to="/cart" className="relative text-2xl hover:scale-110 transition">🛒</Link>
-            <button className="text-2xl hover:scale-110 transition">👤</button>
+            <button className="text-gray-600 hover:text-gray-900 transition">Wishlist</button>
+            <Link to="/cart" className="text-gray-600 hover:text-gray-900 transition">Cart</Link>
+            <button className="text-gray-600 hover:text-gray-900 transition">Account</button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Breadcrumb — Minimal */}
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-8">
-          <Link to="/" className="hover:text-black transition">home</Link>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+          <Link to="/" className="hover:text-gray-900 transition">Home</Link>
           <span>/</span>
-          <Link to="/shop" className="hover:text-black transition">{product.category}</Link>
+          <Link to="/shop" className="hover:text-gray-900 transition">{product.category}</Link>
           <span>/</span>
-          <span className="text-black font-medium">{product.name}</span>
+          <span className="text-gray-900">{product.name}</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           
-          {/* Left — Image Section */}
-          <div className="space-y-4">
-            <div className="group relative bg-gray-50 rounded-3xl p-8 flex items-center justify-center text-8xl">
-              <div className="absolute inset-0 bg-gradient-to-tr from-pink-100/30 to-transparent rounded-3xl"></div>
-              <div className="animate-float">{product.images[selectedImage]}</div>
-              <div className="absolute top-4 left-4">
-                <span className="bg-black text-white text-xs px-3 py-1 rounded-full">-{product.discount}%</span>
-              </div>
-              <button 
-                onClick={() => setAddedToWishlist(!addedToWishlist)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition"
-              >
-                <span className="text-xl">{addedToWishlist ? '❤️' : '🤍'}</span>
-              </button>
+          {/* Left Column - Images */}
+          <div>
+            <div className="bg-gray-50 rounded-2xl aspect-square flex items-center justify-center text-8xl">
+              {product.images[selectedImage]}
             </div>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 mt-4">
               {product.images.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedImage(idx)}
-                  className={`w-16 h-16 bg-gray-50 rounded-xl flex items-center justify-center text-2xl border-2 transition-all duration-300 ${
-                    selectedImage === idx ? 'border-pink-500 shadow-lg scale-105' : 'border-transparent hover:border-gray-200'
+                  className={`w-20 h-20 bg-gray-50 rounded-xl flex items-center justify-center text-3xl border-2 transition ${
+                    selectedImage === idx ? 'border-gray-900' : 'border-transparent hover:border-gray-300'
                   }`}
                 >
                   {img}
@@ -140,45 +127,46 @@ function ProductDetail() {
             </div>
           </div>
 
-          {/* Right — Product Info */}
+          {/* Right Column - Product Info */}
           <div>
             <div className="mb-2">
-              <span className="text-sm text-pink-500 font-medium uppercase tracking-wider">{product.brand}</span>
+              <span className="text-sm text-pink-600 font-medium">{product.brand}</span>
             </div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-3 leading-tight">{product.name}</h1>
+            <h1 className="text-3xl font-semibold text-gray-900 mb-3">{product.name}</h1>
             
             {/* Rating */}
             <div className="flex items-center gap-3 mb-6">
-              <div className="flex items-center gap-1">
-                <span className="text-yellow-400 text-lg">★★★★★</span>
-                <span className="text-sm font-medium ml-1">{product.rating}</span>
+              <div className="flex items-center">
+                <span className="text-yellow-500 text-sm">★★★★★</span>
+                <span className="text-sm font-medium ml-2">{product.rating}</span>
               </div>
               <span className="text-gray-300">|</span>
-              <span className="text-gray-400 text-sm">{product.reviewCount} reviews</span>
+              <span className="text-sm text-gray-500">{product.reviewCount} Reviews</span>
             </div>
 
             {/* Price */}
-            <div className="mb-8">
+            <div className="mb-6">
               <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-bold text-gray-900">₹{product.price}</span>
-                <span className="text-lg text-gray-400 line-through">₹{product.originalPrice}</span>
+                <span className="text-3xl font-semibold text-gray-900">₹{product.price}</span>
+                <span className="text-base text-gray-400 line-through">₹{product.originalPrice}</span>
+                <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-sm font-medium">{product.discount}% Off</span>
               </div>
-              <p className="text-sm text-green-600 mt-2">✓ free shipping on orders above ₹999</p>
+              <p className="text-sm text-gray-500 mt-2">Inclusive of all taxes. Free shipping on orders above ₹999.</p>
             </div>
 
-            {/* Size */}
+            {/* Size Selector */}
             {product.sizes.length > 0 && (
               <div className="mb-8">
-                <h3 className="font-semibold mb-3">size</h3>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Select Size</h3>
                 <div className="flex gap-3">
                   {product.sizes.map(size => (
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
-                      className={`w-12 h-12 rounded-full font-medium transition-all duration-300 ${
+                      className={`px-5 py-2 rounded-full border text-sm font-medium transition ${
                         selectedSize === size 
-                          ? 'bg-black text-white shadow-md' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          ? 'border-gray-900 bg-gray-900 text-white' 
+                          : 'border-gray-300 text-gray-700 hover:border-gray-900'
                       }`}
                     >
                       {size}
@@ -190,56 +178,56 @@ function ProductDetail() {
 
             {/* Quantity */}
             <div className="mb-8">
-              <h3 className="font-semibold mb-3">quantity</h3>
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Quantity</h3>
               <div className="flex items-center gap-4">
-                <div className="flex items-center bg-gray-100 rounded-full">
+                <div className="flex items-center border border-gray-300 rounded-full">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 rounded-full bg-white shadow-sm hover:bg-gray-50 transition text-xl"
+                    className="w-10 h-10 rounded-full hover:bg-gray-100 transition text-xl"
                   >
                     −
                   </button>
-                  <span className="w-12 text-center font-medium">{quantity}</span>
+                  <span className="w-12 text-center text-sm">{quantity}</span>
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="w-10 h-10 rounded-full bg-white shadow-sm hover:bg-gray-50 transition text-xl"
+                    className="w-10 h-10 rounded-full hover:bg-gray-100 transition text-xl"
                   >
                     +
                   </button>
                 </div>
-                <span className="text-sm text-green-600">{product.inStock ? 'in stock' : 'out of stock'}</span>
+                <span className="text-sm text-green-600">{product.inStock ? 'In Stock' : 'Out of Stock'}</span>
               </div>
             </div>
 
-            {/* Buttons */}
+            {/* Action Buttons */}
             <div className="flex gap-4 mb-8">
               <button
                 onClick={handleAddToCart}
-                className="flex-1 bg-black text-white py-4 rounded-full font-medium hover:bg-gray-800 transition-all duration-300"
+                className="flex-1 bg-gray-900 text-white py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition"
               >
-                add to bag 🛒
+                Add to Cart
               </button>
               <button
                 onClick={() => { handleAddToCart(); navigate('/cart'); }}
-                className="flex-1 border-2 border-black text-black py-4 rounded-full font-medium hover:bg-black hover:text-white transition-all duration-300"
+                className="flex-1 border border-gray-900 text-gray-900 py-3 rounded-full text-sm font-medium hover:bg-gray-50 transition"
               >
-                buy now
+                Buy Now
               </button>
             </div>
 
-            {/* Delivery Info — Glass Cards */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Info Cards */}
+            <div className="grid grid-cols-2 gap-4">
               {[
-                { emoji: "🚚", label: "free shipping", detail: "on ₹999+" },
-                { emoji: "🔄", label: "easy returns", detail: "30 days policy" },
-                { emoji: "💳", label: "secure payment", detail: "100% safe" },
-                { emoji: "🎁", label: "free gift", detail: "on ₹1499+" },
+                { icon: "🚚", title: "Free Shipping", detail: "On orders above ₹999" },
+                { icon: "🔄", title: "Easy Returns", detail: "30 days return policy" },
+                { icon: "💳", title: "Secure Payment", detail: "100% secure transactions" },
+                { icon: "🎁", title: "Free Gift", detail: "On orders above ₹1499" },
               ].map((item, idx) => (
-                <div key={idx} className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                  <span className="text-2xl">{item.emoji}</span>
+                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <span className="text-2xl">{item.icon}</span>
                   <div>
-                    <p className="font-medium text-sm">{item.label}</p>
-                    <p className="text-xs text-gray-400">{item.detail}</p>
+                    <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                    <p className="text-xs text-gray-500">{item.detail}</p>
                   </div>
                 </div>
               ))}
@@ -249,16 +237,16 @@ function ProductDetail() {
 
         {/* Tabs Section */}
         <div className="mt-16">
-          <div className="flex gap-6 border-b border-gray-100">
-            {['description', 'benefits', 'reviews'].map(tab => (
+          <div className="flex gap-8 border-b border-gray-200">
+            {['description', 'benefits', 'reviews'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`pb-3 text-sm font-medium transition ${
-                  activeTab === tab ? 'text-black border-b-2 border-black' : 'text-gray-400 hover:text-black'
+                  activeTab === tab ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
-                {tab}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -267,14 +255,14 @@ function ProductDetail() {
             {activeTab === 'description' && (
               <div className="space-y-6">
                 <p className="text-gray-600 leading-relaxed">{product.description}</p>
-                <div className="bg-gray-50 rounded-2xl p-6">
-                  <h4 className="font-semibold mb-3">how to use</h4>
-                  <p className="text-gray-600">Apply 2-3 drops on clean face morning and evening. Gently massage until absorbed.</p>
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h4 className="font-medium text-gray-900 mb-2">How To Use</h4>
+                  <p className="text-gray-600 text-sm">Apply 2-3 drops on cleansed face morning and evening. Gently massage until fully absorbed. Follow with moisturizer.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-3">key ingredients</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Key Ingredients</h4>
                   <div className="flex flex-wrap gap-2">
-                    {["Hyaluronic Acid", "Vitamin C", "Niacinamide"].map(ing => (
+                    {["Hyaluronic Acid", "Vitamin C", "Niacinamide", "Green Tea Extract"].map((ing) => (
                       <span key={ing} className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full text-sm">{ing}</span>
                     ))}
                   </div>
@@ -286,46 +274,57 @@ function ProductDetail() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {product.benefits.map((benefit, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                    <span className="text-xl">✨</span>
-                    <span className="text-gray-700">{benefit}</span>
+                    <div className="w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs">✓</span>
+                    </div>
+                    <span className="text-gray-700 text-sm">{benefit}</span>
                   </div>
                 ))}
               </div>
             )}
 
             {activeTab === 'reviews' && (
-              <div className="space-y-6">
-                <div className="bg-gray-50 rounded-2xl p-6">
-                  <h3 className="font-semibold mb-4">write a review</h3>
+              <div className="space-y-8">
+                {/* Write Review */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="font-medium text-gray-900 mb-4">Write a Review</h3>
                   <div className="flex gap-2 mb-4">
-                    {[1,2,3,4,5].map(r => (
+                    {[5,4,3,2,1].map((r) => (
                       <button key={r} className="text-2xl text-yellow-400">★</button>
                     ))}
                   </div>
-                  <textarea placeholder="share your experience..." rows="3" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-black"></textarea>
-                  <button className="mt-4 bg-black text-white px-6 py-2 rounded-full text-sm hover:bg-gray-800 transition">submit review</button>
+                  <textarea
+                    placeholder="Share your experience with this product..."
+                    rows="3"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 text-sm"
+                  ></textarea>
+                  <button className="mt-4 bg-gray-900 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition">
+                    Submit Review
+                  </button>
                 </div>
 
-                {reviews.map(review => (
-                  <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0">
-                    <div className="flex gap-3">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-lg">{review.avatar}</div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-medium">{review.user}</span>
-                            <div className="flex text-yellow-400 text-sm mt-1">
-                              {'★'.repeat(review.rating)}{'☆'.repeat(5-review.rating)}
+                {/* Reviews List */}
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="font-medium text-gray-900">{review.user}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex text-yellow-400 text-sm">
+                              {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                             </div>
+                            <span className="text-xs text-gray-400">{review.date}</span>
                           </div>
-                          <span className="text-xs text-gray-400">{review.date}</span>
                         </div>
-                        <p className="text-gray-600 mt-2">{review.comment}</p>
-                        <button className="text-sm text-gray-400 mt-2 hover:text-black transition">helpful ({review.helpful})</button>
+                        <button className="text-sm text-gray-400 hover:text-gray-600 transition">
+                          Helpful ({review.helpful})
+                        </button>
                       </div>
+                      <p className="text-gray-600 text-sm mt-2">{review.comment}</p>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -334,30 +333,24 @@ function ProductDetail() {
         {/* Related Products */}
         <div className="mt-16">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold tracking-tight">you may also like</h2>
-            <button className="text-sm text-gray-400 hover:text-black transition">view all →</button>
+            <h2 className="text-xl font-semibold text-gray-900">You May Also Like</h2>
+            <button className="text-sm text-gray-500 hover:text-gray-900 transition">View All →</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => (
-              <Link key={i} to={`/product/${i+2}`} className="group bg-gray-50 rounded-2xl p-4 text-center hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition">✨</div>
-                <h3 className="font-medium text-sm">premium product</h3>
-                <p className="text-black font-bold mt-2">₹999</p>
+            {[1, 2, 3, 4].map((i) => (
+              <Link
+                key={i}
+                to={`/product/${i + 2}`}
+                className="group bg-gray-50 rounded-xl p-4 text-center hover:shadow-md transition"
+              >
+                <div className="text-4xl mb-3">🌟</div>
+                <h3 className="font-medium text-sm text-gray-900">Premium Product</h3>
+                <p className="text-pink-600 font-medium text-sm mt-2">₹999</p>
               </Link>
             ))}
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
