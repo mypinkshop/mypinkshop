@@ -5,8 +5,6 @@ import { useAuth } from '../context/AuthContext';
 function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [showTrackModal, setShowTrackModal] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -19,7 +17,7 @@ function MyOrders() {
     // Mock orders data (will connect to API later)
     setOrders([
       {
-        id: 'MPS-1001',
+        id: 'MPS1001',
         date: '2024-05-15',
         total: 2598,
         status: 'delivered',
@@ -38,7 +36,7 @@ function MyOrders() {
         paymentMethod: 'COD'
       },
       {
-        id: 'MPS-1002',
+        id: 'MPS1002',
         date: '2024-05-10',
         total: 1798,
         status: 'shipped',
@@ -57,7 +55,7 @@ function MyOrders() {
         paymentMethod: 'Card'
       },
       {
-        id: 'MPS-1003',
+        id: 'MPS1003',
         date: '2024-05-05',
         total: 899,
         status: 'pending',
@@ -109,49 +107,11 @@ function MyOrders() {
 
   const reorder = (order) => {
     order.items.forEach(item => {
-      // Add to cart logic will go here
       console.log('Adding to cart:', item.name);
     });
     alert('Items added to cart!');
     navigate('/cart');
   };
-
-  const trackOrder = (order) => {
-    setSelectedOrder(order);
-    setShowTrackModal(true);
-  };
-
-  const TrackModal = () => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowTrackModal(false)}>
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white border-b border-pink-100 p-5 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-gray-800">Track Order #{selectedOrder?.id}</h3>
-          <button onClick={() => setShowTrackModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-        </div>
-        <div className="p-6">
-          {/* Timeline */}
-          <div className="relative">
-            {selectedOrder?.tracking.map((step, idx) => (
-              <div key={idx} className="flex mb-8 relative">
-                <div className="flex flex-col items-center mr-4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${step.completed ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                    {step.completed ? '✓' : idx + 1}
-                  </div>
-                  {idx < selectedOrder.tracking.length - 1 && (
-                    <div className={`w-0.5 h-12 mt-1 ${step.completed ? 'bg-pink-500' : 'bg-gray-200'}`}></div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className={`font-semibold ${step.completed ? 'text-gray-900' : 'text-gray-400'}`}>{step.stage}</p>
-                  <p className="text-sm text-gray-500">{step.date}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   if (loading) {
     return (
@@ -167,7 +127,6 @@ function MyOrders() {
   if (orders.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
-        {/* Header */}
         <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-pink-100">
           <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
             <Link to="/">
@@ -258,9 +217,12 @@ function MyOrders() {
 
               {/* Order Actions */}
               <div className="bg-gray-50 px-6 py-4 border-t border-pink-100 flex flex-wrap gap-3 justify-end">
-                <button onClick={() => trackOrder(order)} className="px-4 py-2 text-pink-600 border border-pink-200 rounded-lg hover:bg-pink-50 transition text-sm font-medium">
+                <Link 
+                  to={`/track-order/${order.id}`}
+                  className="px-4 py-2 text-pink-600 border border-pink-200 rounded-lg hover:bg-pink-50 transition text-sm font-medium"
+                >
                   Track Order
-                </button>
+                </Link>
                 {order.status === 'pending' && (
                   <button onClick={() => cancelOrder(order.id)} className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition text-sm font-medium">
                     Cancel Order
@@ -281,9 +243,6 @@ function MyOrders() {
           ))}
         </div>
       </div>
-
-      {/* Track Modal */}
-      {showTrackModal && <TrackModal />}
     </div>
   );
 }
