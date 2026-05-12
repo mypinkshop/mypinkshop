@@ -17,6 +17,7 @@ import VendorOrders from './pages/vendor/VendorOrders';
 import VendorEarnings from './pages/vendor/VendorEarnings';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import Checkout from './pages/Checkout';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/my-orders" element={<MyOrders />} />
           <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/checkout" element={<Checkout />} />
           
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
