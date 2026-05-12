@@ -73,7 +73,6 @@ function Login() {
                   <span className="text-white text-2xl">✨</span>
                 </div>
                 <h1 className="text-2xl font-bold text-gray-800">Sign In</h1>
-                <p className="text-gray-500 text-sm mt-1">Enter your email or mobile number</p>
               </div>
 
               {error && (
@@ -85,13 +84,13 @@ function Login() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email address or mobile number
+                    Email Address or Mobile Number
                   </label>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="example@email.com or +91 9876543210"
+                    placeholder=""
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                     required
                   />
@@ -232,7 +231,7 @@ function Login() {
             <a href="#" className="hover:text-pink-500 transition">Help</a>
           </div>
           <p className="text-center text-xs text-gray-400">
-            © 2025 MyPinkShop. All rights reserved.
+            © 2026 MyPinkShop. All rights reserved.
           </p>
         </div>
       </footer>
