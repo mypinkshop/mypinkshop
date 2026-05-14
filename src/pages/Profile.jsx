@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 function Profile() {
   const navigate = useNavigate();
@@ -317,7 +317,7 @@ function Profile() {
             </div>
             <div className="p-5 text-center text-gray-500">
               <div className="text-4xl mb-3">💳</div>
-              <p>No saved payment methods</p>
+              <p className="text-gray-500">No saved payment methods</p>
               <button className="mt-2 text-pink-500 text-sm">Add a card or UPI</button>
             </div>
           </div>
