@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } useLocation } from 'react-router-dom';
 
 function Profile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('orders');
   const [userData, setUserData] = useState({
     name: '',
@@ -12,10 +13,12 @@ function Profile() {
     mobileVerified: false,
     joinedDate: '',
   });
+  const [profileImage, setProfileImage] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [orders, setOrders] = useState([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
+  const fileInputRef = useRef(null);
   const [addressForm, setAddressForm] = useState({
     fullName: '',
     mobile: '',
@@ -25,6 +28,13 @@ function Profile() {
     state: '',
     isDefault: false,
   });
+
+  // Get tab from URL query param
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'addresses') setActiveTab('addresses');
+  }, [location]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -40,6 +50,12 @@ function Profile() {
       });
     }
 
+    // Load profile image
+    const savedImage = localStorage.getItem('profileImage');
+    if (savedImage) {
+      setProfileImage(savedImage);
+    }
+
     // Mock addresses
     setAddresses([
       { id: 1, fullName: 'Priya Sharma', mobile: '9876543210', pincode: '400053', address: '123, Andheri West', city: 'Mumbai', state: 'Maharashtra', isDefault: true },
@@ -50,7 +66,21 @@ function Profile() {
       { id: '#MPS1001', date: '2025-05-10', total: 2598, status: 'Delivered', items: 2, image: '💧' },
       { id: '#MPS1002', date: '2025-05-05', total: 1798, status: 'Shipped', items: 1, image: '🌸' },
     ]);
-  }, []);
+  }, [location]);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const imageData = reader.result;
+        setProfileImage(imageData);
+        localStorage.setItem('profileImage', imageData);
+        alert('Profile picture updated!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleAddressSubmit = (e) => {
     e.preventDefault();
@@ -98,11 +128,37 @@ function Profile() {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Welcome Section */}
+        {/* Welcome Section with Profile Picture */}
         <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-6 text-white mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-2xl backdrop-blur-sm">
-              {userData.name?.charAt(0) || 'U'}
+            <div className="relative">
+              {profileImage ? (
+                <img
+                  src={profileImage}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-md"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-2xl backdrop-blur-sm">
+                  {userData.name?.charAt(0) || 'U'}
+                </div>
+              )}
+              <button
+                onClick={() => fileInputRef.current.click()}
+                className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-md hover:bg-gray-100 transition"
+              >
+                <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                className="hidden"
+              />
             </div>
             <div>
               <h1 className="text-2xl font-bold">Hello, {userData.name || 'User'}!</h1>
@@ -158,7 +214,12 @@ function Profile() {
                       <div className="text-right">
                         <p className="font-bold text-pink-600">₹{order.total}</p>
                         <p className="text-sm text-green-600">{order.status}</p>
-                        <button className="text-sm text-pink-500 hover:underline mt-1">Track Order</button>
+                        <button 
+                          onClick={() => navigate(`/track-order/${order.id}`)}
+                          className="text-sm text-pink-500 hover:underline mt-1"
+                        >
+                          Track Order
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -284,7 +345,7 @@ function Profile() {
                 <input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })} />
                 <span className="text-sm">Set as default address</span>
               </label>
-              <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium">{editingAddress ? 'Update' : 'Add'} Address</button>
+              <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">{editingAddress ? 'Update' : 'Add'} Address</button>
             </form>
           </div>
         </div>
