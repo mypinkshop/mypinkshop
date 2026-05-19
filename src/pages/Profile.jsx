@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate }react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 function Profile() {
   const navigate = useNavigate();
@@ -262,31 +262,16 @@ function Profile() {
                   </div>
                 </div>
                 {filteredOrders.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-gray-500">No orders found</p>
-                  </div>
+                  <div className="p-8 text-center"><p className="text-gray-500">No orders found</p></div>
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {filteredOrders.map(order => (
                       <div key={order.id} className="p-4">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-gray-800">{order.id}</p>
-                            <p className="text-sm text-gray-500">Ordered on {order.date}</p>
-                            <p className="text-sm text-gray-500 mt-1">{order.items} items</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-gray-800">₹{order.total.toLocaleString()}</p>
-                            <p className={`text-sm ${getStatusColor(order.status)}`}>{order.status}</p>
-                            {order.status === 'Processing' && (
-                              <button onClick={() => cancelOrder(order.id)} className="text-sm text-red-600 hover:underline mt-1">Cancel Order</button>
-                            )}
-                          </div>
+                          <div><p className="font-medium text-gray-800">{order.id}</p><p className="text-sm text-gray-500">Ordered on {order.date}</p><p className="text-sm text-gray-500 mt-1">{order.items} items</p></div>
+                          <div className="text-right"><p className="font-bold text-gray-800">₹{order.total.toLocaleString()}</p><p className={`text-sm ${getStatusColor(order.status)}`}>{order.status}</p>{order.status === 'Processing' && (<button onClick={() => cancelOrder(order.id)} className="text-sm text-red-600 hover:underline mt-1">Cancel Order</button>)}</div>
                         </div>
-                        <div className="mt-3 flex gap-3">
-                          <button className="text-sm text-pink-600 hover:underline">View Order Details</button>
-                          {order.status === 'Shipped' && <button className="text-sm text-pink-600 hover:underline">Track Package</button>}
-                        </div>
+                        <div className="mt-3 flex gap-3"><button className="text-sm text-pink-600 hover:underline">View Order Details</button>{order.status === 'Shipped' && <button className="text-sm text-pink-600 hover:underline">Track Package</button>}</div>
                       </div>
                     ))}
                   </div>
@@ -301,9 +286,7 @@ function Profile() {
                   <h2 className="font-medium text-gray-700">Your Addresses</h2>
                   <button onClick={() => { setEditingAddress(null); setAddressForm({ fullName: '', mobile: '', pincode: '', addressLine1: '', addressLine2: '', city: '', state: '', isDefault: false }); setShowAddressModal(true); }} className="text-pink-600 text-sm hover:underline">Add Address</button>
                 </div>
-                {addresses.length === 0 ? (
-                  <div className="p-8 text-center"><p className="text-gray-500">No addresses saved</p></div>
-                ) : (
+                {addresses.length === 0 ? (<div className="p-8 text-center"><p className="text-gray-500">No addresses saved</p></div>) : (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {addresses.map(addr => (
                       <div key={addr.id} className="border border-gray-200 rounded-md p-4">
@@ -313,11 +296,7 @@ function Profile() {
                         {addr.addressLine2 && <p className="text-sm text-gray-600">{addr.addressLine2}</p>}
                         <p className="text-sm text-gray-600">{addr.city}, {addr.state} - {addr.pincode}</p>
                         <p className="text-sm text-gray-500 mt-1">Mobile: {addr.mobile}</p>
-                        <div className="flex gap-4 mt-3">
-                          <button onClick={() => { setEditingAddress(addr); setAddressForm(addr); setShowAddressModal(true); }} className="text-sm text-pink-600 hover:underline">Edit</button>
-                          <button onClick={() => deleteAddress(addr.id)} className="text-sm text-red-600 hover:underline">Delete</button>
-                          {!addr.isDefault && <button onClick={() => setDefaultAddress(addr.id)} className="text-sm text-gray-600 hover:underline">Set as Default</button>}
-                        </div>
+                        <div className="flex gap-4 mt-3"><button onClick={() => { setEditingAddress(addr); setAddressForm(addr); setShowAddressModal(true); }} className="text-sm text-pink-600 hover:underline">Edit</button><button onClick={() => deleteAddress(addr.id)} className="text-sm text-red-600 hover:underline">Delete</button>{!addr.isDefault && <button onClick={() => setDefaultAddress(addr.id)} className="text-sm text-gray-600 hover:underline">Set as Default</button>}</div>
                       </div>
                     ))}
                   </div>
@@ -325,50 +304,15 @@ function Profile() {
               </div>
             )}
 
-            {/* Security Tab — Full Working */}
+            {/* Security Tab */}
             {activeTab === 'security' && (
               <div className="border border-gray-200 rounded-md bg-white">
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                  <h2 className="font-medium text-gray-700">Login & Security</h2>
-                </div>
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200"><h2 className="font-medium text-gray-700">Login & Security</h2></div>
                 <div className="divide-y divide-gray-100">
-                  {/* Name */}
-                  <div className="p-4 flex justify-between items-center">
-                    <div><p className="text-sm text-gray-500">Name</p><p className="font-medium">{userData.name}</p></div>
-                    {showNameEdit ? (
-                      <div className="flex gap-2"><input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="border rounded px-2 py-1 text-sm" /><button onClick={handleNameUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowNameEdit(false)} className="text-gray-500 text-sm">Cancel</button></div>
-                    ) : (<button onClick={() => setShowNameEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>)}
-                  </div>
-
-                  {/* Email — Editable + Verify Option */}
-                  <div className="p-4 flex justify-between items-center">
-                    <div><p className="text-sm text-gray-500">Email</p><p className="font-medium">{userData.email}</p>{!userData.emailVerified && <p className="text-xs text-yellow-600 mt-1">Not verified</p>}</div>
-                    <div className="flex gap-3">
-                      {!userData.emailVerified && <button onClick={sendVerificationEmail} className="text-blue-600 text-sm hover:underline">Verify</button>}
-                      {showEmailEdit ? (
-                        <div className="flex gap-2"><input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border rounded px-2 py-1 text-sm" /><button onClick={handleEmailUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowEmailEdit(false)} className="text-gray-500 text-sm">Cancel</button></div>
-                      ) : (<button onClick={() => setShowEmailEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>)}
-                    </div>
-                  </div>
-
-                  {/* Mobile — Editable + Verify Option */}
-                  <div className="p-4 flex justify-between items-center">
-                    <div><p className="text-sm text-gray-500">Mobile Number</p><p className="font-medium">{userData.mobile || 'Not added'}</p>{userData.mobile && !userData.mobileVerified && <p className="text-xs text-yellow-600 mt-1">Not verified</p>}</div>
-                    <div className="flex gap-3">
-                      {userData.mobile && !userData.mobileVerified && <button onClick={sendMobileVerification} className="text-blue-600 text-sm hover:underline">Verify</button>}
-                      {showMobileEdit ? (
-                        <div className="flex gap-2"><input type="tel" value={newMobile} onChange={(e) => setNewMobile(e.target.value)} placeholder="10-digit mobile" className="border rounded px-2 py-1 text-sm" /><button onClick={handleMobileUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowMobileEdit(false)} className="text-gray-500 text-sm">Cancel</button></div>
-                      ) : (<button onClick={() => setShowMobileEdit(true)} className="text-pink-600 text-sm hover:underline">Add/Update</button>)}
-                    </div>
-                  </div>
-
-                  {/* Password */}
-                  <div className="p-4 flex justify-between items-center">
-                    <div><p className="text-sm text-gray-500">Password</p><p className="font-medium">••••••••</p></div>
-                    {showPasswordEdit ? (
-                      <div className="flex flex-col gap-2 items-end"><input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="border rounded px-2 py-1 text-sm w-48" /><input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border rounded px-2 py-1 text-sm w-48" /><input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border rounded px-2 py-1 text-sm w-48" /><div className="flex gap-2"><button onClick={handlePasswordUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowPasswordEdit(false)} className="text-gray-500 text-sm">Cancel</button></div></div>
-                    ) : (<button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline">Change</button>)}
-                  </div>
+                  <div className="p-4 flex justify-between items-center"><div><p className="text-sm text-gray-500">Name</p><p className="font-medium">{userData.name}</p></div>{showNameEdit ? (<div className="flex gap-2"><input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="border rounded px-2 py-1 text-sm" /><button onClick={handleNameUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowNameEdit(false)} className="text-gray-500 text-sm">Cancel</button></div>) : (<button onClick={() => setShowNameEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>)}</div>
+                  <div className="p-4 flex justify-between items-center"><div><p className="text-sm text-gray-500">Email</p><p className="font-medium">{userData.email}</p>{!userData.emailVerified && <p className="text-xs text-yellow-600 mt-1">Not verified</p>}</div><div className="flex gap-3">{!userData.emailVerified && <button onClick={sendVerificationEmail} className="text-blue-600 text-sm hover:underline">Verify</button>}{showEmailEdit ? (<div className="flex gap-2"><input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border rounded px-2 py-1 text-sm" /><button onClick={handleEmailUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowEmailEdit(false)} className="text-gray-500 text-sm">Cancel</button></div>) : (<button onClick={() => setShowEmailEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>)}</div></div>
+                  <div className="p-4 flex justify-between items-center"><div><p className="text-sm text-gray-500">Mobile Number</p><p className="font-medium">{userData.mobile || 'Not added'}</p>{userData.mobile && !userData.mobileVerified && <p className="text-xs text-yellow-600 mt-1">Not verified</p>}</div><div className="flex gap-3">{userData.mobile && !userData.mobileVerified && <button onClick={sendMobileVerification} className="text-blue-600 text-sm hover:underline">Verify</button>}{showMobileEdit ? (<div className="flex gap-2"><input type="tel" value={newMobile} onChange={(e) => setNewMobile(e.target.value)} placeholder="10-digit mobile" className="border rounded px-2 py-1 text-sm" /><button onClick={handleMobileUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowMobileEdit(false)} className="text-gray-500 text-sm">Cancel</button></div>) : (<button onClick={() => setShowMobileEdit(true)} className="text-pink-600 text-sm hover:underline">Add/Update</button>)}</div></div>
+                  <div className="p-4 flex justify-between items-center"><div><p className="text-sm text-gray-500">Password</p><p className="font-medium">••••••••</p></div>{showPasswordEdit ? (<div className="flex flex-col gap-2 items-end"><input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="border rounded px-2 py-1 text-sm w-48" /><input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border rounded px-2 py-1 text-sm w-48" /><input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border rounded px-2 py-1 text-sm w-48" /><div className="flex gap-2"><button onClick={handlePasswordUpdate} className="text-green-600 text-sm">Save</button><button onClick={() => setShowPasswordEdit(false)} className="text-gray-500 text-sm">Cancel</button></div></div>) : (<button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline">Change</button>)}</div>
                 </div>
               </div>
             )}
@@ -376,13 +320,8 @@ function Profile() {
             {/* Payments Tab */}
             {activeTab === 'payments' && (
               <div className="border border-gray-200 rounded-md bg-white">
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                  <h2 className="font-medium text-gray-700">Payment Methods</h2>
-                </div>
-                <div className="p-8 text-center">
-                  <p className="text-gray-500">No saved payment methods</p>
-                  <button className="mt-2 text-pink-600 text-sm hover:underline">Add a payment method</button>
-                </div>
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200"><h2 className="font-medium text-gray-700">Payment Methods</h2></div>
+                <div className="p-8 text-center"><p className="text-gray-500">No saved payment methods</p><button className="mt-2 text-pink-600 text-sm hover:underline">Add a payment method</button></div>
               </div>
             )}
           </div>
@@ -393,10 +332,7 @@ function Profile() {
       {showAddressModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddressModal(false)}>
           <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-4 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-lg font-medium">{editingAddress ? 'Edit Address' : 'Add New Address'}</h3>
-              <button onClick={() => setShowAddressModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-            </div>
+            <div className="border-b p-4 flex justify-between items-center sticky top-0 bg-white"><h3 className="text-lg font-medium">{editingAddress ? 'Edit Address' : 'Add New Address'}</h3><button onClick={() => setShowAddressModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button></div>
             <form onSubmit={handleAddressSubmit} className="p-5 space-y-3">
               <input type="text" placeholder="Full Name" value={addressForm.fullName} onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-pink-500" required />
               <input type="tel" placeholder="Mobile Number" value={addressForm.mobile} onChange={(e) => setAddressForm({ ...addressForm, mobile: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded" required />
