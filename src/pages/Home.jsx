@@ -9,10 +9,11 @@ function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
 
   useEffect(() => {
     const targetDate = new Date();
@@ -50,12 +51,39 @@ function Home() {
     { id: 10, name: "Pink Tote Bag", category: "accessories", price: 899, originalPrice: 1499, rating: 4.5, badge: "Trendy", isNew: false },
   ];
 
-  const filteredProducts = allProducts.filter(p => {
-    if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
-    if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  // Handle search
+  const handleSearch = () => {
+    if (searchTerm.trim()) {
+      const results = allProducts.filter(p => 
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  };
 
+  const handleWishlistToggle = (product) => {
+    if (isInWishlist(product.id)) {
+      removeFromWishlist(product.id);
+    } else {
+      addToWishlist(product);
+    }
+  };
+
+  // Display products based on search or category filter
+  const getDisplayProducts = () => {
+    if (searchResults.length > 0) {
+      return searchResults;
+    }
+    let filtered = allProducts;
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.category === selectedCategory);
+    }
+    return filtered;
+  };
+
+  const displayProducts = getDisplayProducts();
   const categories = [
     { name: "Skincare", icon: "🧴", value: "skincare" },
     { name: "Makeup", icon: "💄", value: "makeup" },
@@ -68,14 +96,6 @@ function Home() {
     { title: "Flat 20% Off", subtitle: "On first order", bg: "from-rose-500 to-pink-600", link: "/shop?offer=first" },
     { title: "Free Shipping", subtitle: "On orders above ₹999", bg: "from-pink-400 to-rose-400", link: "/shop" },
   ];
-
-  const handleWishlistToggle = (product) => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-    } else {
-      addToWishlist(product);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -106,6 +126,7 @@ function Home() {
               </div>
             </Link>
 
+            {/* Search Bar - Working */}
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <input 
@@ -113,20 +134,36 @@ function Home() {
                   placeholder="Search for products..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   className="w-full px-5 py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-400 bg-gray-50"
                 />
-                <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-pink-600 transition">
+                <button 
+                  onClick={handleSearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-pink-600 transition"
+                >
                   Search
                 </button>
               </div>
             </div>
 
+            {/* Icons with Counts */}
             <div className="flex items-center gap-6">
-              <button onClick={() => navigate('/wishlist')} className="relative text-gray-600 hover:text-pink-500 transition">
+              {/* Wishlist Icon with Count */}
+              <button 
+                onClick={() => navigate('/wishlist')}
+                className="relative text-gray-600 hover:text-pink-500 transition"
+              >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
               </button>
+
+              {/* Cart Icon with Count */}
               <Link to="/cart" className="relative text-gray-600 hover:text-pink-500 transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -137,6 +174,8 @@ function Home() {
                   </span>
                 )}
               </Link>
+
+              {/* Profile */}
               {user ? (
                 <Avatar user={user} onLogout={logout} />
               ) : (
@@ -191,7 +230,11 @@ function Home() {
             {categories.map((cat, idx) => (
               <button
                 key={idx}
-                onClick={() => setSelectedCategory(cat.value)}
+                onClick={() => {
+                  setSelectedCategory(cat.value);
+                  setSearchResults([]);
+                  setSearchTerm('');
+                }}
                 className="group bg-white rounded-2xl p-8 text-center border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
               >
                 <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">
@@ -221,49 +264,69 @@ function Home() {
         </div>
       </section>
 
-      {/* Bestsellers Section */}
+      {/* Products Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <p className="text-pink-500 text-sm font-medium tracking-wider mb-2">CUSTOMER FAVORITES</p>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Bestsellers</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+              {searchResults.length > 0 ? 'Search Results' : (selectedCategory === 'all' ? 'Bestsellers' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1))}
+            </h2>
             <div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div>
+            {searchResults.length > 0 && (
+              <button onClick={() => { setSearchResults([]); setSearchTerm(''); }} className="mt-4 text-pink-500 text-sm hover:underline">Clear Search → Show All</button>
+            )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {filteredProducts.slice(0, 4).map(product => (
-              <div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
-                <Link to={`/product/${product.id}`}>
-                  <div className="relative h-64 bg-gray-50 flex items-center justify-center text-7xl">
-                    <span className="text-7xl">✨</span>
-                    <span className="absolute top-3 left-3 bg-pink-500 text-white text-xs px-3 py-1 rounded-full">{product.badge}</span>
-                    {product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-3 py-1 rounded-full">NEW</span>}
-                  </div>
-                </Link>
-                <div className="p-5">
+          {displayProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No products found</p>
+              <button onClick={() => { setSelectedCategory('all'); setSearchResults([]); setSearchTerm(''); }} className="mt-3 text-pink-500 hover:underline">Clear filters</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {displayProducts.slice(0, 8).map(product => (
+                <div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
                   <Link to={`/product/${product.id}`}>
-                    <h3 className="font-semibold text-gray-900 mb-1 hover:text-pink-500 transition">{product.name}</h3>
+                    <div className="relative h-64 bg-gray-50 flex items-center justify-center text-7xl">
+                      <span className="text-7xl">✨</span>
+                      <span className="absolute top-3 left-3 bg-pink-500 text-white text-xs px-3 py-1 rounded-full">{product.badge}</span>
+                      {product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-3 py-1 rounded-full">NEW</span>}
+                    </div>
                   </Link>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex text-yellow-400 text-sm">{"★".repeat(Math.floor(product.rating))}{"☆".repeat(5 - Math.floor(product.rating))}</div>
-                    <span className="text-xs text-gray-400">({product.rating})</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
-                    <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => addToCart(product)} className="flex-1 bg-pink-500 text-white py-2 rounded-full font-medium hover:bg-pink-600 transition">Add to Cart</button>
-                    <button onClick={() => handleWishlistToggle(product)} className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-pink-50 transition">
-                      <svg className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </button>
+                  <div className="p-5">
+                    <Link to={`/product/${product.id}`}>
+                      <h3 className="font-semibold text-gray-900 mb-1 hover:text-pink-500 transition">{product.name}</h3>
+                    </Link>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex text-yellow-400 text-sm">{"★".repeat(Math.floor(product.rating))}{"☆".repeat(5 - Math.floor(product.rating))}</div>
+                      <span className="text-xs text-gray-400">({product.rating})</span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
+                      <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
+                    </div>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => addToCart(product)}
+                        className="flex-1 bg-pink-500 text-white py-2 rounded-full font-medium hover:bg-pink-600 transition"
+                      >
+                        Add to Cart
+                      </button>
+                      <button 
+                        onClick={() => handleWishlistToggle(product)}
+                        className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-pink-50 transition"
+                      >
+                        <svg className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          {selectedCategory !== 'all' && (
+              ))}
+            </div>
+          )}
+          {selectedCategory !== 'all' && displayProducts.length > 0 && (
             <div className="text-center mt-8">
               <button onClick={() => setSelectedCategory('all')} className="text-pink-500 hover:text-pink-600 text-sm font-medium">Clear Filter → Show All Products</button>
             </div>
