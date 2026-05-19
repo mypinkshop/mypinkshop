@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate }react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -179,7 +179,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Categories Section - Original Design, Only Filter Working */}
+      {/* Categories Section */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -221,7 +221,7 @@ function Home() {
         </div>
       </section>
 
-      {/* Bestsellers Section - Shows Filtered Products */}
+      {/* Bestsellers Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
