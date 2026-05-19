@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate }react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -57,10 +57,10 @@ function Home() {
   });
 
   const categories = [
-    { name: "Skincare", icon: "🧴", value: "skincare", count: allProducts.filter(p => p.category === "skincare").length },
-    { name: "Makeup", icon: "💄", value: "makeup", count: allProducts.filter(p => p.category === "makeup").length },
-    { name: "Clothing", icon: "👗", value: "clothing", count: allProducts.filter(p => p.category === "clothing").length },
-    { name: "Accessories", icon: "👜", value: "accessories", count: allProducts.filter(p => p.category === "accessories").length },
+    { name: "Skincare", icon: "🧴", value: "skincare" },
+    { name: "Makeup", icon: "💄", value: "makeup" },
+    { name: "Clothing", icon: "👗", value: "clothing" },
+    { name: "Accessories", icon: "👜", value: "accessories" },
   ];
 
   const offers = [
@@ -96,7 +96,6 @@ function Home() {
       <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            {/* Logo */}
             <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition">
               <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">M</span>
@@ -107,7 +106,6 @@ function Home() {
               </div>
             </Link>
 
-            {/* Search Bar */}
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <input 
@@ -123,12 +121,8 @@ function Home() {
               </div>
             </div>
 
-            {/* Icons */}
             <div className="flex items-center gap-6">
-              <button 
-                onClick={() => navigate('/wishlist')}
-                className="relative text-gray-600 hover:text-pink-500 transition"
-              >
+              <button onClick={() => navigate('/wishlist')} className="relative text-gray-600 hover:text-pink-500 transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
@@ -161,22 +155,12 @@ function Home() {
       <section className="bg-gradient-to-br from-pink-50 to-white">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="max-w-2xl">
-            <div className="inline-block px-4 py-1 bg-pink-100 rounded-full text-pink-600 text-sm font-medium mb-6">
-              New Collection
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight text-gray-900">
-              Glow Up <span className="text-pink-600">This Summer</span>
-            </h1>
-            <p className="text-gray-600 text-lg mb-8 max-w-lg">
-              Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.
-            </p>
+            <div className="inline-block px-4 py-1 bg-pink-100 rounded-full text-pink-600 text-sm font-medium mb-6">New Collection</div>
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight text-gray-900">Glow Up <span className="text-pink-600">This Summer</span></h1>
+            <p className="text-gray-600 text-lg mb-8 max-w-lg">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
             <div className="flex gap-4">
-              <Link to="/shop" className="bg-pink-500 text-white px-8 py-3 rounded-full font-medium hover:bg-pink-600 transition shadow-md">
-                Shop Now
-              </Link>
-              <button className="border border-pink-300 hover:bg-pink-50 px-8 py-3 rounded-full font-medium transition text-gray-700">
-                Explore Collection
-              </button>
+              <Link to="/shop" className="bg-pink-500 text-white px-8 py-3 rounded-full font-medium hover:bg-pink-600 transition shadow-md">Shop Now</Link>
+              <button className="border border-pink-300 hover:bg-pink-50 px-8 py-3 rounded-full font-medium transition text-gray-700">Explore Collection</button>
             </div>
           </div>
         </div>
@@ -195,7 +179,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Categories Section - Working Filter */}
+      {/* Categories Section - Original Design, Only Filter Working */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -203,30 +187,18 @@ function Home() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Find Your Perfect Match</h2>
             <div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div>
           </div>
-          <div className="flex flex-wrap justify-center gap-4">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-6 py-3 rounded-full font-medium transition-all ${
-                selectedCategory === 'all' 
-                  ? 'bg-pink-500 text-white shadow-md' 
-                  : 'bg-white text-gray-700 hover:bg-pink-50 border border-gray-200'
-              }`}
-            >
-              All Products ({allProducts.length})
-            </button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {categories.map((cat, idx) => (
               <button
                 key={idx}
                 onClick={() => setSelectedCategory(cat.value)}
-                className={`px-6 py-3 rounded-full font-medium transition-all flex items-center gap-2 ${
-                  selectedCategory === cat.value 
-                    ? 'bg-pink-500 text-white shadow-md' 
-                    : 'bg-white text-gray-700 hover:bg-pink-50 border border-gray-200'
-                }`}
+                className="group bg-white rounded-2xl p-8 text-center border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
               >
-                <span>{cat.icon}</span>
-                <span>{cat.name}</span>
-                <span className={`text-xs ${selectedCategory === cat.value ? 'text-white/80' : 'text-gray-400'}`}>({cat.count})</span>
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">
+                  {cat.icon}
+                </div>
+                <h3 className="font-semibold text-gray-900 text-lg">{cat.name}</h3>
+                <p className="text-sm text-pink-500 mt-2">Shop Now →</p>
               </button>
             ))}
           </div>
@@ -240,10 +212,7 @@ function Home() {
             {offers.map((offer, idx) => (
               <Link key={idx} to={offer.link} className={`bg-gradient-to-r ${offer.bg} rounded-2xl p-6 text-white hover:shadow-xl transition hover:-translate-y-1`}>
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold">{offer.title}</h3>
-                    <p className="text-white/80 text-sm mt-1">{offer.subtitle}</p>
-                  </div>
+                  <div><h3 className="text-xl font-bold">{offer.title}</h3><p className="text-white/80 text-sm mt-1">{offer.subtitle}</p></div>
                   <div className="text-3xl">→</div>
                 </div>
               </Link>
@@ -252,76 +221,51 @@ function Home() {
         </div>
       </section>
 
-      {/* Products Section - Shows Filtered Products */}
+      {/* Bestsellers Section - Shows Filtered Products */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900">
-                {selectedCategory === 'all' ? 'All Products' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
-              </h2>
-              <p className="text-gray-500 mt-1">Showing {filteredProducts.length} products</p>
-            </div>
-            {selectedCategory !== 'all' && (
-              <button 
-                onClick={() => setSelectedCategory('all')}
-                className="text-pink-500 text-sm hover:underline"
-              >
-                Clear Filter → Show All
-              </button>
-            )}
+          <div className="text-center mb-12">
+            <p className="text-pink-500 text-sm font-medium tracking-wider mb-2">CUSTOMER FAVORITES</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Bestsellers</h2>
+            <div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div>
           </div>
-          
-          {filteredProducts.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔍</div>
-              <p className="text-gray-500">No products found in this category.</p>
-              <button onClick={() => setSelectedCategory('all')} className="mt-3 text-pink-500 hover:underline">View all products</button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {filteredProducts.slice(0, 4).map(product => (
+              <div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <Link to={`/product/${product.id}`}>
+                  <div className="relative h-64 bg-gray-50 flex items-center justify-center text-7xl">
+                    <span className="text-7xl">✨</span>
+                    <span className="absolute top-3 left-3 bg-pink-500 text-white text-xs px-3 py-1 rounded-full">{product.badge}</span>
+                    {product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-3 py-1 rounded-full">NEW</span>}
+                  </div>
+                </Link>
+                <div className="p-5">
                   <Link to={`/product/${product.id}`}>
-                    <div className="relative h-64 bg-gray-50 flex items-center justify-center text-7xl">
-                      <span className="text-7xl">✨</span>
-                      <span className="absolute top-3 left-3 bg-pink-500 text-white text-xs px-3 py-1 rounded-full">{product.badge}</span>
-                      {product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-3 py-1 rounded-full">NEW</span>}
-                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-1 hover:text-pink-500 transition">{product.name}</h3>
                   </Link>
-                  <div className="p-5">
-                    <Link to={`/product/${product.id}`}>
-                      <h3 className="font-semibold text-gray-900 mb-1 hover:text-pink-500 transition">{product.name}</h3>
-                    </Link>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex text-yellow-400 text-sm">
-                        {"★".repeat(Math.floor(product.rating))}{"☆".repeat(5 - Math.floor(product.rating))}
-                      </div>
-                      <span className="text-xs text-gray-400">({product.rating})</span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
-                      <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
-                    </div>
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={() => addToCart(product)}
-                        className="flex-1 bg-pink-500 text-white py-2 rounded-full font-medium hover:bg-pink-600 transition"
-                      >
-                        Add to Cart
-                      </button>
-                      <button 
-                        onClick={() => handleWishlistToggle(product)}
-                        className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-pink-50 transition"
-                      >
-                        <svg className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex text-yellow-400 text-sm">{"★".repeat(Math.floor(product.rating))}{"☆".repeat(5 - Math.floor(product.rating))}</div>
+                    <span className="text-xs text-gray-400">({product.rating})</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
+                    <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={() => addToCart(product)} className="flex-1 bg-pink-500 text-white py-2 rounded-full font-medium hover:bg-pink-600 transition">Add to Cart</button>
+                    <button onClick={() => handleWishlistToggle(product)} className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-pink-50 transition">
+                      <svg className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+          {selectedCategory !== 'all' && (
+            <div className="text-center mt-8">
+              <button onClick={() => setSelectedCategory('all')} className="text-pink-500 hover:text-pink-600 text-sm font-medium">Clear Filter → Show All Products</button>
             </div>
           )}
         </div>
@@ -335,9 +279,7 @@ function Home() {
             <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
             <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
               <input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" />
-              <button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">
-                Subscribe
-              </button>
+              <button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button>
             </div>
           </div>
         </div>
@@ -347,46 +289,12 @@ function Home() {
       <footer className="bg-gray-900 text-gray-400 pt-12 pb-8">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">M</span>
-                </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-              </div>
-              <p className="text-sm text-gray-500">Luxury beauty and fashion for the modern woman.</p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Contact Us</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">FAQs</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Shipping Info</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Returns Policy</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-              </ul>
-            </div>
+            <div><div className="flex items-center gap-2 mb-4"><div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center"><span className="text-white font-bold text-sm">M</span></div><h3 className="font-bold text-white text-lg">MyPinkShop</h3></div><p className="text-sm text-gray-500">Luxury beauty and fashion for the modern woman.</p></div>
+            <div><h4 className="font-semibold text-white mb-4">Shop</h4><ul className="space-y-2 text-sm"><li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li><li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li><li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li><li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li></ul></div>
+            <div><h4 className="font-semibold text-white mb-4">Support</h4><ul className="space-y-2 text-sm"><li><a href="#" className="hover:text-pink-500 transition">Contact Us</a></li><li><a href="#" className="hover:text-pink-500 transition">FAQs</a></li><li><a href="#" className="hover:text-pink-500 transition">Shipping Info</a></li><li><a href="#" className="hover:text-pink-500 transition">Returns Policy</a></li></ul></div>
+            <div><h4 className="font-semibold text-white mb-4">Follow Us</h4><ul className="space-y-2 text-sm"><li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li><li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li><li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li><li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li></ul></div>
           </div>
-          <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm text-gray-500">© 2025 MyPinkShop. All rights reserved.</p>
-          </div>
+          <div className="text-center pt-8 border-t border-gray-800"><p className="text-sm text-gray-500">© 2025 MyPinkShop. All rights reserved.</p></div>
         </div>
       </footer>
     </div>
