@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -11,19 +11,20 @@ function AdminProducts() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [brandFormData, setBrandFormData] = useState({ name: '', logo: '🏢' });
+  const [brandFormData, setBrandFormData] = useState({ name: '', logo: null, logoPreview: null });
   const [formData, setFormData] = useState({ name: '', price: '', stock: '', category: 'skincare' });
   const navigate = useNavigate();
   const token = localStorage.getItem('adminToken');
+  const logoInputRef = useRef(null);
 
   useEffect(() => {
     if (!token) { navigate('/admin/login'); return; }
     
     const mockBrands = [
-      { id: 1, name: 'Nykaa Beauty', logo: '🏢', productCount: 24 },
-      { id: 2, name: 'Mamaearth', logo: '🌿', productCount: 18 },
-      { id: 3, name: 'Sugar Cosmetics', logo: '💄', productCount: 12 },
-      { id: 4, name: 'Plum Beauty', logo: '🍑', productCount: 8 },
+      { id: 1, name: 'Nykaa Beauty', logo: 'https://placehold.co/40x40/pink/white?text=N', productCount: 24 },
+      { id: 2, name: 'Mamaearth', logo: 'https://placehold.co/40x40/green/white?text=M', productCount: 18 },
+      { id: 3, name: 'Sugar Cosmetics', logo: 'https://placehold.co/40x40/red/white?text=S', productCount: 12 },
+      { id: 4, name: 'Plum Beauty', logo: 'https://placehold.co/40x40/purple/white?text=P', productCount: 8 },
     ];
     setBrands(mockBrands);
     
@@ -52,6 +53,17 @@ function AdminProducts() {
     setSelectedBrand(brand);
   };
 
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBrandFormData({ ...brandFormData, logo: reader.result, logoPreview: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const addBrand = () => {
     if (!brandFormData.name) {
       alert('Please enter brand name');
@@ -60,13 +72,13 @@ function AdminProducts() {
     const newBrand = {
       id: Date.now(),
       name: brandFormData.name,
-      logo: brandFormData.logo || '🏢',
+      logo: brandFormData.logo || 'https://placehold.co/40x40/gray/white?text=' + brandFormData.name.charAt(0),
       productCount: 0,
     };
     setBrands([...brands, newBrand]);
     setProducts({ ...products, [newBrand.id]: [] });
     setShowBrandModal(false);
-    setBrandFormData({ name: '', logo: '🏢' });
+    setBrandFormData({ name: '', logo: null, logoPreview: null });
     alert('Brand added successfully!');
   };
 
@@ -86,7 +98,6 @@ function AdminProducts() {
       const updatedProducts = { ...products };
       updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].filter(p => p.id !== productId);
       setProducts(updatedProducts);
-      // Update product count in brand
       setBrands(brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b));
       alert('Product deleted!');
     }
@@ -110,7 +121,6 @@ function AdminProducts() {
     const updatedProducts = { ...products };
     updatedProducts[selectedBrand.id] = [...(updatedProducts[selectedBrand.id] || []), newProduct];
     setProducts(updatedProducts);
-    // Update product count in brand
     setBrands(brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount + 1 } : b));
     setShowAddModal(false);
     setFormData({ name: '', price: '', stock: '', category: 'skincare' });
@@ -163,7 +173,7 @@ function AdminProducts() {
               <p className="text-gray-500 text-sm">Select a brand to view and manage products</p>
             </div>
             <button
-              onClick={() => { setShowBrandModal(true); setBrandFormData({ name: '', logo: '🏢' }); }}
+              onClick={() => { setShowBrandModal(true); setBrandFormData({ name: '', logo: null, logoPreview: null }); }}
               className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -173,25 +183,29 @@ function AdminProducts() {
 
           {/* Brand Cards */}
           <div className="mb-8">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-sm font-semibold text-gray-500">BRANDS</h2>
-            </div>
+            <h2 className="text-sm font-semibold text-gray-500 mb-3">BRANDS</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {brands.map(brand => (
-                <div key={brand.id} className="relative">
+                <div key={brand.id} className="relative group">
                   <button
                     onClick={() => handleBrandClick(brand)}
                     className={`w-full bg-white rounded-xl p-4 text-center border-2 transition-all hover:shadow-md ${
                       selectedBrand?.id === brand.id ? 'border-pink-500 bg-pink-50' : 'border-gray-100 hover:border-pink-200'
                     }`}
                   >
-                    <div className="text-4xl mb-2">{brand.logo}</div>
-                    <p className="font-medium text-gray-800">{brand.name}</p>
+                    <div className="w-16 h-16 mx-auto mb-2 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                      {brand.logo ? (
+                        <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl">🏢</span>
+                      )}
+                    </div>
+                    <p className="font-medium text-gray-800 text-sm">{brand.name}</p>
                     <p className="text-xs text-gray-400">{brand.productCount} products</p>
                   </button>
                   <button
                     onClick={() => deleteBrand(brand.id)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 transition"
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
                     title="Delete Brand"
                   >
                     ✕
@@ -206,7 +220,13 @@ function AdminProducts() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 flex items-center justify-center text-white text-lg">{selectedBrand.logo}</div>
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {selectedBrand.logo ? (
+                      <img src={selectedBrand.logo} alt={selectedBrand.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl">🏢</span>
+                    )}
+                  </div>
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800">{selectedBrand.name}</h2>
                     <p className="text-sm text-gray-500">Manage products for this brand</p>
@@ -274,7 +294,7 @@ function AdminProducts() {
         </main>
       </div>
 
-      {/* Add Brand Modal */}
+      {/* Add Brand Modal with Image Upload */}
       {showBrandModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBrandModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
@@ -283,8 +303,29 @@ function AdminProducts() {
               <button onClick={() => setShowBrandModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); addBrand(); }} className="p-5 space-y-4">
-              <div><label className="block text-sm font-medium mb-1">Brand Name *</label><input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div>
-              <div><label className="block text-sm font-medium mb-1">Brand Logo (Emoji)</label><input type="text" value={brandFormData.logo} onChange={(e) => setBrandFormData({ ...brandFormData, logo: e.target.value })} placeholder="🏢" className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Brand Name *</label>
+                <input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Brand Logo</label>
+                <div className="flex items-center gap-4">
+                  {brandFormData.logoPreview && (
+                    <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100">
+                      <img src={brandFormData.logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current.click()}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition"
+                  >
+                    Upload Logo
+                  </button>
+                  <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Upload a square image (recommended size: 64x64px)</p>
+              </div>
               <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">Add Brand</button>
             </form>
           </div>
