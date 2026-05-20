@@ -1,286 +1,213 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 
 function AdminProducts() {
-  const [brands, setBrands] = useState([]);
-  const [selectedBrand, setSelectedBrand] = useState(null);
-  const [products, setProducts] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showBrandModal, setShowBrandModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [brandFormData, setBrandFormData] = useState({ name: '', logo: null, logoPreview: null });
-  const [formData, setFormData] = useState({ name: '', price: '', stock: '', category: 'skincare' });
   const navigate = useNavigate();
-  const token = localStorage.getItem('adminToken');
-  const logoInputRef = useRef(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
-    if (!token) { navigate('/admin/login'); return; }
-    
-    const savedBrands = localStorage.getItem('adminBrands');
-    const savedProducts = localStorage.getItem('adminProducts');
-    
-    if (savedBrands && savedProducts) {
-      setBrands(JSON.parse(savedBrands));
+    // Load from localStorage or use default
+    const savedProducts = localStorage.getItem('adminProductsList');
+    if (savedProducts) {
       setProducts(JSON.parse(savedProducts));
     } else {
-      const mockBrands = [
-        { id: 1, name: 'Nykaa Beauty', logo: 'https://placehold.co/40x40/pink/white?text=N', productCount: 3 },
-        { id: 2, name: 'Mamaearth', logo: 'https://placehold.co/40x40/green/white?text=M', productCount: 2 },
-        { id: 3, name: 'Sugar Cosmetics', logo: 'https://placehold.co/40x40/red/white?text=S', productCount: 1 },
-        { id: 4, name: 'Plum Beauty', logo: 'https://placehold.co/40x40/purple/white?text=P', productCount: 1 },
+      const defaultProducts = [
+        { id: 1, name: 'Glass Skin Serum', sku: 'SKU-001', category: 'skincare', price: 1299, originalPrice: 1999, stock: 45, status: 'active', vendor: 'Nykaa Beauty', image: '💧', sales: 234, rating: 4.8 },
+        { id: 2, name: 'Rice Water Toner', sku: 'SKU-002', category: 'skincare', price: 899, originalPrice: 1299, stock: 60, status: 'active', vendor: 'Nykaa Beauty', image: '🌸', sales: 189, rating: 4.6 },
+        { id: 3, name: 'Cherry Lip Tint', sku: 'SKU-003', category: 'makeup', price: 599, originalPrice: 999, stock: 100, status: 'active', vendor: 'Nykaa Beauty', image: '🍒', sales: 567, rating: 4.7 },
+        { id: 4, name: 'Satin Slip Dress', sku: 'SKU-004', category: 'clothing', price: 2499, originalPrice: 3999, stock: 25, status: 'active', vendor: 'Nykaa Fashion', image: '👗', sales: 89, rating: 4.9 },
+        { id: 5, name: 'Vitamin C Face Wash', sku: 'SKU-005', category: 'skincare', price: 399, originalPrice: 599, stock: 8, status: 'lowstock', vendor: 'Mamaearth', image: '🍊', sales: 234, rating: 4.5 },
       ];
-      const mockProducts = {
-        1: [
-          { id: 1, name: 'Glass Skin Serum', price: 1299, stock: 45, category: 'skincare', status: 'active', badge: 'Bestseller', isNew: true, rating: 4.8, originalPrice: 1999 },
-          { id: 2, name: 'Rice Water Toner', price: 899, stock: 60, category: 'skincare', status: 'active', badge: 'Trending', isNew: false, rating: 4.6, originalPrice: 1299 },
-          { id: 3, name: 'Cherry Lip Tint', price: 599, stock: 100, category: 'makeup', status: 'active', badge: 'Viral', isNew: true, rating: 4.7, originalPrice: 999 },
-        ],
-        2: [
-          { id: 4, name: 'Vitamin C Face Wash', price: 399, stock: 80, category: 'skincare', status: 'active', badge: 'Natural', isNew: false, rating: 4.5, originalPrice: 599 },
-          { id: 5, name: 'Ubtan Face Mask', price: 499, stock: 55, category: 'skincare', status: 'active', badge: 'Glow', isNew: true, rating: 4.6, originalPrice: 799 },
-        ],
-        3: [
-          { id: 6, name: 'Matte Lipstick', price: 599, stock: 120, category: 'makeup', status: 'active', badge: 'Trending', isNew: true, rating: 4.7, originalPrice: 999 },
-        ],
-        4: [
-          { id: 7, name: 'Plum Body Oil', price: 799, stock: 30, category: 'bodycare', status: 'active', badge: 'Natural', isNew: false, rating: 4.5, originalPrice: 1199 },
-        ],
-      };
-      setBrands(mockBrands);
-      setProducts(mockProducts);
-      localStorage.setItem('adminBrands', JSON.stringify(mockBrands));
-      localStorage.setItem('adminProducts', JSON.stringify(mockProducts));
+      setProducts(defaultProducts);
+      localStorage.setItem('adminProductsList', JSON.stringify(defaultProducts));
     }
     setLoading(false);
-  }, [token, navigate]);
+  }, []);
 
-  const saveAllData = (updatedBrands, updatedProducts) => {
-    localStorage.setItem('adminBrands', JSON.stringify(updatedBrands));
-    localStorage.setItem('adminProducts', JSON.stringify(updatedProducts));
-    const allProducts = [];
-    Object.keys(updatedProducts).forEach(brandId => {
-      const brandProducts = updatedProducts[brandId] || [];
-      const brand = updatedBrands.find(b => b.id === parseInt(brandId));
-      brandProducts.forEach(product => {
-        allProducts.push({ ...product, brandId: parseInt(brandId), brandName: brand?.name || 'Unknown' });
-      });
-    });
-    localStorage.setItem('homepageProducts', JSON.stringify(allProducts));
-  };
-
-  const handleBrandClick = (brand) => { setSelectedBrand(brand); };
-
-  const handleLogoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => { setBrandFormData({ ...brandFormData, logo: reader.result, logoPreview: reader.result }); };
-      reader.readAsDataURL(file);
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'active': return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Active</span>;
+      case 'lowstock': return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Low Stock</span>;
+      case 'outofstock': return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Out of Stock</span>;
+      default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">Inactive</span>;
     }
   };
 
-  const addBrand = () => {
-    if (!brandFormData.name) { alert('Please enter brand name'); return; }
-    const newBrand = { id: Date.now(), name: brandFormData.name, logo: brandFormData.logo || 'https://placehold.co/40x40/gray/white?text=' + brandFormData.name.charAt(0), productCount: 0 };
-    const updatedBrands = [...brands, newBrand];
-    const updatedProducts = { ...products, [newBrand.id]: [] };
-    setBrands(updatedBrands);
-    setProducts(updatedProducts);
-    saveAllData(updatedBrands, updatedProducts);
-    setShowBrandModal(false);
-    setBrandFormData({ name: '', logo: null, logoPreview: null });
-    alert('Brand added successfully!');
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedProducts(filteredProducts.map(p => p.id));
+    } else {
+      setSelectedProducts([]);
+    }
   };
 
-  const deleteBrand = (brandId) => {
-    if (confirm('Delete this brand?')) {
-      const updatedBrands = brands.filter(b => b.id !== brandId);
-      const updatedProducts = { ...products };
-      delete updatedProducts[brandId];
-      setBrands(updatedBrands);
-      setProducts(updatedProducts);
-      if (selectedBrand?.id === brandId) setSelectedBrand(null);
-      saveAllData(updatedBrands, updatedProducts);
-      alert('Brand deleted!');
+  const handleSelectProduct = (productId) => {
+    if (selectedProducts.includes(productId)) {
+      setSelectedProducts(selectedProducts.filter(id => id !== productId));
+    } else {
+      setSelectedProducts([...selectedProducts, productId]);
     }
   };
 
   const deleteProduct = (productId) => {
-    if (confirm('Delete this product?')) {
-      const updatedProducts = { ...products };
-      updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].filter(p => p.id !== productId);
-      const updatedBrands = brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b);
-      setProducts(updatedProducts);
-      setBrands(updatedBrands);
-      saveAllData(updatedBrands, updatedProducts);
-      alert('Product deleted!');
-    }
-  };
-
-  const toggleProductStatus = (productId) => {
-    const updatedProducts = { ...products };
-    updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].map(p => p.id === productId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p);
+    const updatedProducts = products.filter(p => p.id !== productId);
     setProducts(updatedProducts);
-    saveAllData(brands, updatedProducts);
+    localStorage.setItem('adminProductsList', JSON.stringify(updatedProducts));
+    setShowDeleteModal(false);
+    setProductToDelete(null);
+    alert('Product deleted successfully');
   };
 
-  const handleAddProduct = (e) => {
-    e.preventDefault();
-    const newProduct = {
-      id: Date.now(), ...formData, status: 'active', badge: 'New', isNew: true, rating: 4.5,
-      originalPrice: Math.round(formData.price * 1.5),
-    };
-    const updatedProducts = { ...products };
-    updatedProducts[selectedBrand.id] = [...(updatedProducts[selectedBrand.id] || []), newProduct];
-    const updatedBrands = brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount + 1 } : b);
+  const bulkDelete = () => {
+    if (selectedProducts.length === 0) return;
+    const updatedProducts = products.filter(p => !selectedProducts.includes(p.id));
     setProducts(updatedProducts);
-    setBrands(updatedBrands);
-    saveAllData(updatedBrands, updatedProducts);
-    setShowAddModal(false);
-    setFormData({ name: '', price: '', stock: '', category: 'skincare' });
-    alert('Product added!');
+    localStorage.setItem('adminProductsList', JSON.stringify(updatedProducts));
+    setSelectedProducts([]);
+    alert(`${selectedProducts.length} products deleted successfully`);
   };
 
-  const handleEditProduct = (product) => {
-    setEditingProduct(product);
-    setFormData({ name: product.name, price: product.price, stock: product.stock, category: product.category });
-    setShowAddModal(true);
-  };
-
-  const updateProduct = (e) => {
-    e.preventDefault();
-    const updatedProducts = { ...products };
-    updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].map(p => p.id === editingProduct.id ? { ...p, ...formData } : p);
+  const toggleProductStatus = (productId, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const updatedProducts = products.map(p => p.id === productId ? { ...p, status: newStatus } : p);
     setProducts(updatedProducts);
-    saveAllData(brands, updatedProducts);
-    setShowAddModal(false);
-    setEditingProduct(null);
-    setFormData({ name: '', price: '', stock: '', category: 'skincare' });
-    alert('Product updated!');
+    localStorage.setItem('adminProductsList', JSON.stringify(updatedProducts));
+    alert(`Product status updated to ${newStatus}`);
   };
+
+  const filteredProducts = products.filter(p => {
+    if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase()) && !p.sku.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (filterCategory !== 'all' && p.category !== filterCategory) return false;
+    if (filterStatus !== 'all' && p.status !== filterStatus) return false;
+    return true;
+  });
+
+  const categories = [
+    { value: 'all', label: 'All Categories' },
+    { value: 'skincare', label: 'Skincare' },
+    { value: 'makeup', label: 'Makeup' },
+    { value: 'clothing', label: 'Clothing' },
+    { value: 'accessories', label: 'Accessories' },
+  ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Sidebar />
-      <div className="ml-64">
-        <Header />
-        <main className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div><h1 className="text-2xl font-bold text-gray-800">Product Management</h1><p className="text-gray-500 text-sm">Select a brand to view and manage products</p></div>
-            <button onClick={() => { setShowBrandModal(true); setBrandFormData({ name: '', logo: null, logoPreview: null }); }} className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Brand
-            </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate('/admin/dashboard')} className="text-gray-600 hover:text-gray-800">←</button>
+            <h1 className="text-xl font-semibold text-gray-800">Product Management</h1>
           </div>
-
-          <div className="mb-8">
-            <h2 className="text-sm font-semibold text-gray-500 mb-3">BRANDS</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {brands.map(brand => (
-                <div key={brand.id} className="relative group">
-                  <button onClick={() => handleBrandClick(brand)} className={`w-full bg-white rounded-xl p-4 text-center border-2 transition-all hover:shadow-md ${selectedBrand?.id === brand.id ? 'border-pink-500 bg-pink-50' : 'border-gray-100 hover:border-pink-200'}`}>
-                    <div className="w-16 h-16 mx-auto mb-2 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {brand.logo ? <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" /> : <span className="text-3xl">🏢</span>}
-                    </div>
-                    <p className="font-medium text-gray-800 text-sm">{brand.name}</p>
-                    <p className="text-xs text-gray-400">{brand.productCount} products</p>
-                  </button>
-                  <button onClick={() => deleteBrand(brand.id)} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 transition opacity-0 group-hover:opacity-100" title="Delete Brand">✕</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {selectedBrand ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                    {selectedBrand.logo ? <img src={selectedBrand.logo} alt={selectedBrand.name} className="w-full h-full object-cover" /> : <span className="text-xl">🏢</span>}
-                  </div>
-                  <div><h2 className="text-lg font-semibold text-gray-800">{selectedBrand.name}</h2><p className="text-sm text-gray-500">Manage products for this brand</p></div>
-                </div>
-                <button onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', stock: '', category: 'skincare' }); setShowAddModal(true); }} className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Product
-                </button>
-              </div>
-
-              {products[selectedBrand.id]?.length === 0 ? (
-                <div className="p-10 text-center"><div className="text-5xl mb-3">📦</div><p className="text-gray-500">No products yet</p><button onClick={() => { setEditingProduct(null); setShowAddModal(true); }} className="mt-3 text-pink-500 text-sm">Add your first product →</button></div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                      <tr className="border-b"><th className="px-6 py-3 text-left">Product Name</th><th className="px-6 py-3 text-left">Category</th><th className="px-6 py-3 text-right">Price</th><th className="px-6 py-3 text-right">Stock</th><th className="px-6 py-3 text-center">Status</th><th className="px-6 py-3 text-center">Actions</th></tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {products[selectedBrand.id]?.map(product => (
-                        <tr key={product.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-3 font-medium text-gray-800">{product.name}</td>
-                          <td className="px-6 py-3 capitalize text-gray-500">{product.category}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-gray-800">₹{product.price}</td>
-                          <td className="px-6 py-3 text-right text-gray-500">{product.stock} units</td>
-                          <td className="px-6 py-3 text-center">
-                            <button onClick={() => toggleProductStatus(product.id)} className={`px-2 py-1 rounded-full text-xs font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                              {product.status === 'active' ? 'Active' : 'Inactive'}
-                            </button>
-                          </td>
-                          <td className="px-6 py-3 text-center">
-                            <div className="flex justify-center gap-2">
-                              <button onClick={() => handleEditProduct(product)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition" title="Edit">✏️</button>
-                              <button onClick={() => deleteProduct(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition" title="Delete">🗑️</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl p-10 text-center border border-gray-100">
-              <div className="text-5xl mb-3">🏢</div>
-              <p className="text-gray-500">Select a brand from above to view products</p>
-            </div>
-          )}
-        </main>
+          <Link to="/admin/add-product" className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700 transition">
+            + Add Product
+          </Link>
+        </div>
       </div>
 
-      {showBrandModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBrandModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-5 flex justify-between items-center sticky top-0 bg-white"><h3 className="text-xl font-bold">Add New Brand</h3><button onClick={() => setShowBrandModal(false)} className="text-gray-400 hover:text-gray-600">✕</button></div>
-            <form onSubmit={(e) => { e.preventDefault(); addBrand(); }} className="p-5 space-y-4">
-              <div><label className="block text-sm font-medium mb-1">Brand Name *</label><input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div>
-              <div><label className="block text-sm font-medium mb-1">Brand Logo</label><div className="flex items-center gap-4">{brandFormData.logoPreview && (<div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100"><img src={brandFormData.logoPreview} alt="Preview" className="w-full h-full object-cover" /></div>)}<button type="button" onClick={() => logoInputRef.current.click()} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">Upload Logo</button><input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" /></div><p className="text-xs text-gray-400 mt-1">Upload a square image (recommended size: 64x64px)</p></div>
-              <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">Add Brand</button>
-            </form>
-          </div>
+      <div className="p-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Total Products</p><p className="text-2xl font-semibold">{products.length}</p></div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Active</p><p className="text-2xl font-semibold text-green-600">{products.filter(p => p.status === 'active').length}</p></div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Low Stock</p><p className="text-2xl font-semibold text-yellow-600">{products.filter(p => p.status === 'lowstock').length}</p></div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Out of Stock</p><p className="text-2xl font-semibold text-red-600">{products.filter(p => p.status === 'outofstock').length}</p></div>
         </div>
-      )}
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-5 flex justify-between items-center"><h3 className="text-xl font-bold">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3><button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">✕</button></div>
-            <form onSubmit={editingProduct ? updateProduct : handleAddProduct} className="p-5 space-y-4">
-              <div><label className="block text-sm font-medium mb-1">Product Name</label><input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div>
-              <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">Price (₹)</label><input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div><div><label className="block text-sm font-medium mb-1">Stock</label><input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div></div>
-              <div><label className="block text-sm font-medium mb-1">Category</label><select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full px-3 py-2 border rounded-lg"><option value="skincare">Skincare</option><option value="makeup">Makeup</option><option value="clothing">Clothing</option><option value="accessories">Accessories</option></select></div>
-              <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">{editingProduct ? 'Update Product' : 'Add Product'}</button>
-            </form>
+        {/* Filters */}
+        <div className="bg-white border border-gray-200 rounded-lg mb-6 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex flex-wrap gap-3">
+              <div className="relative">
+                <input type="text" placeholder="Search by name or SKU" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded text-sm" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              </div>
+              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded text-sm">
+                {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
+              </select>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded text-sm">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="lowstock">Low Stock</option>
+                <option value="outofstock">Out of Stock</option>
+              </select>
+            </div>
+            {selectedProducts.length > 0 && (
+              <button onClick={bulkDelete} className="bg-red-500 text-white px-3 py-1.5 rounded text-sm">Delete Selected ({selectedProducts.length})</button>
+            )}
+          </div>
+
+          {/* Products Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 w-8"><input type="checkbox" onChange={handleSelectAll} checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0} className="rounded" /></th>
+                  <th className="px-4 py-3 text-left">Product</th>
+                  <th className="px-4 py-3 text-left">SKU</th>
+                  <th className="px-4 py-3 text-left">Vendor</th>
+                  <th className="px-4 py-3 text-right">Price</th>
+                  <th className="px-4 py-3 text-center">Stock</th>
+                  <th className="px-4 py-3 text-center">Sales</th>
+                  <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredProducts.map(product => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3"><input type="checkbox" checked={selectedProducts.includes(product.id)} onChange={() => handleSelectProduct(product.id)} className="rounded" /></td>
+                    <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-xl">{product.image}</div><span className="font-medium">{product.name}</span></div></td>
+                    <td className="px-4 py-3 text-gray-500">{product.sku}</td>
+                    <td className="px-4 py-3 text-gray-500">{product.vendor}</td>
+                    <td className="px-4 py-3 text-right font-medium">₹{product.price}</td>
+                    <td className={`px-4 py-3 text-center ${product.stock < 10 ? 'text-red-500 font-medium' : ''}`}>{product.stock}</td>
+                    <td className="px-4 py-3 text-center">{product.sales}</td>
+                    <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex justify-center gap-2">
+                        <Link to={`/admin/edit-product/${product.id}`} className="text-blue-500 hover:text-blue-700">✏️</Link>
+                        <button onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} className="text-red-500 hover:text-red-700">🗑️</button>
+                        <button onClick={() => toggleProductStatus(product.id, product.status)} className="text-gray-500 hover:text-gray-700">🔄</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredProducts.length === 0 && (
+            <div className="p-8 text-center"><p className="text-gray-500">No products found</p></div>
+          )}
+        </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && productToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-2">Delete Product</h3>
+            <p className="text-gray-500 mb-4">Are you sure you want to delete "{productToDelete.name}"? This action cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+              <button onClick={() => deleteProduct(productToDelete.id)} className="px-4 py-2 bg-red-500 text-white rounded-lg">Delete</button>
+            </div>
           </div>
         </div>
       )}
