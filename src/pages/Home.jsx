@@ -14,6 +14,7 @@ function Home() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [products, setProducts] = useState([]);
 
   useEffect(() => {
     const targetDate = new Date();
@@ -38,23 +39,34 @@ function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const allProducts = [
-    { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, badge: "Bestseller", isNew: true },
-    { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, badge: "Trending", isNew: false },
-    { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, badge: "Viral", isNew: true },
-    { id: 4, name: "Satin Slip Dress", category: "clothing", price: 2499, originalPrice: 3999, rating: 4.9, badge: "Best Seller", isNew: false },
-    { id: 5, name: "Baby Pink Blush", category: "makeup", price: 799, originalPrice: 1299, rating: 4.5, badge: "Trending", isNew: true },
-    { id: 6, name: "Coquette Bow Dress", category: "clothing", price: 2999, originalPrice: 4499, rating: 4.8, badge: "New Arrival", isNew: true },
-    { id: 7, name: "Vitamin C Drops", category: "skincare", price: 1499, originalPrice: 2299, rating: 4.9, badge: "Bestseller", isNew: true },
-    { id: 8, name: "Y2K Mesh Top", category: "clothing", price: 1599, originalPrice: 2499, rating: 4.6, badge: "Trending", isNew: false },
-    { id: 9, name: "Pearl Hair Clips", category: "accessories", price: 299, originalPrice: 599, rating: 4.7, badge: "Cute", isNew: true },
-    { id: 10, name: "Pink Tote Bag", category: "accessories", price: 899, originalPrice: 1499, rating: 4.5, badge: "Trendy", isNew: false },
-  ];
+  // Load products from localStorage OR use default
+  useEffect(() => {
+    const storedProducts = localStorage.getItem('homepageProducts');
+    if (storedProducts) {
+      setProducts(JSON.parse(storedProducts));
+    } else {
+      // Default products
+      const defaultProducts = [
+        { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, badge: "Bestseller", isNew: true },
+        { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, badge: "Trending", isNew: false },
+        { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, badge: "Viral", isNew: true },
+        { id: 4, name: "Satin Slip Dress", category: "clothing", price: 2499, originalPrice: 3999, rating: 4.9, badge: "Best Seller", isNew: false },
+        { id: 5, name: "Baby Pink Blush", category: "makeup", price: 799, originalPrice: 1299, rating: 4.5, badge: "Trending", isNew: true },
+        { id: 6, name: "Coquette Bow Dress", category: "clothing", price: 2999, originalPrice: 4499, rating: 4.8, badge: "New Arrival", isNew: true },
+        { id: 7, name: "Vitamin C Drops", category: "skincare", price: 1499, originalPrice: 2299, rating: 4.9, badge: "Bestseller", isNew: true },
+        { id: 8, name: "Y2K Mesh Top", category: "clothing", price: 1599, originalPrice: 2499, rating: 4.6, badge: "Trending", isNew: false },
+        { id: 9, name: "Pearl Hair Clips", category: "accessories", price: 299, originalPrice: 599, rating: 4.7, badge: "Cute", isNew: true },
+        { id: 10, name: "Pink Tote Bag", category: "accessories", price: 899, originalPrice: 1499, rating: 4.5, badge: "Trendy", isNew: false },
+      ];
+      setProducts(defaultProducts);
+      localStorage.setItem('homepageProducts', JSON.stringify(defaultProducts));
+    }
+  }, []);
 
   // Handle search
   const handleSearch = () => {
     if (searchTerm.trim()) {
-      const results = allProducts.filter(p => 
+      const results = products.filter(p => 
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setSearchResults(results);
@@ -76,7 +88,7 @@ function Home() {
     if (searchResults.length > 0) {
       return searchResults;
     }
-    let filtered = allProducts;
+    let filtered = products;
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => p.category === selectedCategory);
     }
