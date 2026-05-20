@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 function AdminDashboard() {
@@ -15,35 +15,28 @@ function AdminDashboard() {
     todayOrders: 45,
   });
 
-  const [recentOrders, setRecentOrders] = useState([
+  const recentOrders = [
     { id: '#MPS-1001', customer: 'Priya Sharma', vendor: 'Nykaa Beauty', amount: 2598, status: 'delivered', date: '2025-05-19' },
     { id: '#MPS-1002', customer: 'Aditi Singh', vendor: 'Mamaearth', amount: 1798, status: 'shipped', date: '2025-05-18' },
     { id: '#MPS-1003', customer: 'Neha Gupta', vendor: 'Sugar Cosmetics', amount: 899, status: 'pending', date: '2025-05-18' },
     { id: '#MPS-1004', customer: 'Riya Mehta', vendor: 'Nykaa Beauty', amount: 3499, status: 'processing', date: '2025-05-17' },
     { id: '#MPS-1005', customer: 'Anjali Verma', vendor: 'Plum', amount: 1599, status: 'shipped', date: '2025-05-17' },
-  ]);
+  ];
 
-  const [topProducts, setTopProducts] = useState([
+  const topProducts = [
     { id: 1, name: 'Glass Skin Serum', sales: 234, revenue: 303966 },
     { id: 2, name: 'Cherry Lip Tint', sales: 189, revenue: 113211 },
     { id: 3, name: 'Satin Slip Dress', sales: 156, revenue: 389844 },
     { id: 4, name: 'Rice Water Toner', sales: 145, revenue: 130355 },
     { id: 5, name: 'Baby Pink Blush', sales: 123, revenue: 98277 },
-  ]);
-
-  const [recentVendors, setRecentVendors] = useState([
-    { id: 1, name: 'Nykaa Beauty', email: 'nykaa@mypinkshop.com', products: 24, status: 'approved' },
-    { id: 2, name: 'Mamaearth', email: 'mamaearth@mypinkshop.com', products: 18, status: 'approved' },
-    { id: 3, name: 'Sugar Cosmetics', email: 'sugar@mypinkshop.com', products: 0, status: 'pending' },
-    { id: 4, name: 'Plum Beauty', email: 'plum@mypinkshop.com', products: 0, status: 'pending' },
-  ]);
+  ];
 
   const quickActions = [
     { name: 'Add Product', icon: '➕', link: '/admin/add-product', color: 'bg-pink-500' },
     { name: 'Manage Vendors', icon: '🏪', link: '/admin/vendors', color: 'bg-blue-500' },
     { name: 'View Orders', icon: '📦', link: '/admin/orders', color: 'bg-green-500' },
     { name: 'Create Coupon', icon: '🎫', link: '/admin/coupons', color: 'bg-purple-500' },
-    { name: 'Shipping Settings', icon: '🚚', link: '/admin/shipping', color: 'bg-amber-500' },
+    { name: 'Shipping', icon: '🚚', link: '/admin/shipping', color: 'bg-amber-500' },
     { name: 'Tax Settings', icon: '💰', link: '/admin/tax', color: 'bg-indigo-500' },
     { name: 'Advertising', icon: '📢', link: '/admin/advertising', color: 'bg-rose-500' },
     { name: 'Reports', icon: '📊', link: '/admin/reports', color: 'bg-teal-500' },
@@ -58,7 +51,6 @@ function AdminDashboard() {
     ]},
     { title: 'SALES', icon: '💰', items: [
       { name: 'Orders', link: '/admin/orders', count: stats.totalOrders },
-      { name: 'Returns & Refunds', link: '/admin/orders?tab=returns' },
       { name: 'Coupons', link: '/admin/coupons' },
       { name: 'Tax Settings', link: '/admin/tax' },
     ]},
@@ -69,7 +61,6 @@ function AdminDashboard() {
     ]},
     { title: 'CUSTOMERS', icon: '👥', items: [
       { name: 'All Customers', link: '/admin/customers', count: stats.totalCustomers },
-      { name: 'Customer Reviews', link: '/admin/reviews' },
     ]},
     { title: 'MARKETING', icon: '📢', items: [
       { name: 'Advertising', link: '/admin/advertising' },
@@ -77,17 +68,12 @@ function AdminDashboard() {
     ]},
     { title: 'LOGISTICS', icon: '🚚', items: [
       { name: 'Shipping Zones', link: '/admin/shipping' },
-      { name: 'Shipping Settings', link: '/admin/settings#shipping' },
     ]},
     { title: 'REPORTS', icon: '📊', items: [
       { name: 'Sales Report', link: '/admin/reports' },
-      { name: 'Inventory Report', link: '/admin/reports?type=inventory' },
-      { name: 'Tax Report', link: '/admin/reports?type=tax' },
     ]},
     { title: 'SETTINGS', icon: '⚙️', items: [
       { name: 'General Settings', link: '/admin/settings' },
-      { name: 'Commission Settings', link: '/admin/settings#commission' },
-      { name: 'Payment Settings', link: '/admin/settings#payment' },
     ]},
   ];
 
@@ -143,7 +129,7 @@ function AdminDashboard() {
                 <span className="text-lg">{section.icon}</span>
                 <h3 className="font-semibold text-gray-700">{section.title}</h3>
               </div>
-              <div className="divide-y">
+              <div className="divide-y divide-gray-100">
                 {section.items.map(item => (
                   <Link key={item.name} to={item.link} className="flex justify-between items-center px-4 py-2 hover:bg-gray-50 transition">
                     <span className="text-sm text-gray-600">{item.name}</span>
@@ -157,7 +143,7 @@ function AdminDashboard() {
 
         {/* Recent Orders & Top Products */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Orders */}
+          {/* Recent Orders Table */}
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
               <h3 className="font-semibold text-gray-700">Recent Orders</h3>
@@ -165,15 +151,29 @@ function AdminDashboard() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50"><tr><th className="px-3 py-2 text-left">Order ID</th><th className="px-3 py-2 text-left">Customer</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2 text-center">Status</th></tr></thead>
-                <tbody className="divide-y">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Order ID</th>
+                    <th className="px-3 py-2 text-left">Customer</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
                   {recentOrders.map(order => (
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 font-medium">{order.id}</td>
                       <td className="px-3 py-2">{order.customer}</td>
                       <td className="px-3 py-2 text-right">₹{order.amount}</td>
-                      <td className="px-3 py-2 text-center"><span className={`px-2 py-0.5 rounded-full text-xs ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : order.status === 'shipped' ? 'bg-blue-100 text-blue-700' : order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'}`}>{order.status}</span></td>
-                    </table>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${
+                          order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                          order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
+                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-purple-100 text-purple-700'
+                        }`}>{order.status}</span>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -185,7 +185,7 @@ function AdminDashboard() {
             <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
               <h3 className="font-semibold text-gray-700">Top Selling Products</h3>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-gray-100">
               {topProducts.map(product => (
                 <div key={product.id} className="flex justify-between items-center px-4 py-2 hover:bg-gray-50">
                   <div><p className="font-medium text-sm">{product.name}</p><p className="text-xs text-gray-400">{product.sales} units sold</p></div>
