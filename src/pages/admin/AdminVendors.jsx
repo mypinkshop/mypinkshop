@@ -8,49 +8,102 @@ function AdminVendors() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [formData, setFormData] = useState({
+    brandName: '',
+    email: '',
+    phone: '',
+    gstNumber: '',
+    address: '',
+    commission: 15,
+  });
   const navigate = useNavigate();
-
   const token = localStorage.getItem('adminToken');
 
   useEffect(() => {
     if (!token) { navigate('/admin/login'); return; }
     
     const mockVendors = [
-      { id: 1, brandName: 'Nykaa Beauty', email: 'nykaa@mypinkshop.com', phone: '9876543210', status: 'approved', productsCount: 24, totalSales: 1250000, joinedDate: '2024-01-15', gst: '22AAAAA0000A1Z', address: 'Mumbai, Maharashtra', commission: 15 },
-      { id: 2, brandName: 'Mamaearth', email: 'mamaearth@mypinkshop.com', phone: '9876543211', status: 'approved', productsCount: 18, totalSales: 890000, joinedDate: '2024-02-01', gst: '22BBBBB0000B2Z', address: 'Gurgaon, Haryana', commission: 15 },
-      { id: 3, brandName: 'Sugar Cosmetics', email: 'sugar@mypinkshop.com', phone: '9876543212', status: 'pending', productsCount: 0, totalSales: 0, joinedDate: '2024-05-10', gst: '22CCCCC0000C3Z', address: 'Bangalore, Karnataka', commission: 15 },
-      { id: 4, brandName: 'Plum Beauty', email: 'plum@mypinkshop.com', phone: '9876543213', status: 'pending', productsCount: 0, totalSales: 0, joinedDate: '2024-05-12', gst: '22DDDDD0000D4Z', address: 'Pune, Maharashtra', commission: 15 },
+      { id: 1, brandName: 'Nykaa Beauty', email: 'nykaa@mypinkshop.com', phone: '9876543210', status: 'approved', productsCount: 24, totalSales: 1250000, joinedDate: '2024-01-15', gstNumber: '22AAAAA0000A1Z', address: 'Mumbai, Maharashtra', commission: 15 },
+      { id: 2, brandName: 'Mamaearth', email: 'mamaearth@mypinkshop.com', phone: '9876543211', status: 'approved', productsCount: 18, totalSales: 890000, joinedDate: '2024-02-01', gstNumber: '22BBBBB0000B2Z', address: 'Gurgaon, Haryana', commission: 15 },
+      { id: 3, brandName: 'Sugar Cosmetics', email: 'sugar@mypinkshop.com', phone: '9876543212', status: 'pending', productsCount: 0, totalSales: 0, joinedDate: '2024-05-10', gstNumber: '22CCCCC0000C3Z', address: 'Bangalore, Karnataka', commission: 15 },
+      { id: 4, brandName: 'Plum Beauty', email: 'plum@mypinkshop.com', phone: '9876543213', status: 'pending', productsCount: 0, totalSales: 0, joinedDate: '2024-05-12', gstNumber: '22DDDDD0000D4Z', address: 'Pune, Maharashtra', commission: 15 },
     ];
     setVendors(mockVendors);
     setLoading(false);
   }, [token, navigate]);
 
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const addVendor = () => {
+    if (!formData.brandName || !formData.email) {
+      alert('Please fill brand name and email');
+      return;
+    }
+    const newVendor = {
+      id: Date.now(),
+      ...formData,
+      status: 'pending',
+      productsCount: 0,
+      totalSales: 0,
+      joinedDate: new Date().toISOString().split('T')[0],
+    };
+    setVendors([...vendors, newVendor]);
+    setShowAddModal(false);
+    setFormData({ brandName: '', email: '', phone: '', gstNumber: '', address: '', commission: 15 });
+    alert('Vendor added successfully!');
+  };
+
+  const editVendor = () => {
+    setVendors(vendors.map(v => v.id === selectedVendor.id ? { ...v, ...formData } : v));
+    setShowEditModal(false);
+    setSelectedVendor(null);
+    setFormData({ brandName: '', email: '', phone: '', gstNumber: '', address: '', commission: 15 });
+    alert('Vendor updated successfully!');
+  };
+
+  const openEditModal = (vendor) => {
+    setSelectedVendor(vendor);
+    setFormData({
+      brandName: vendor.brandName,
+      email: vendor.email,
+      phone: vendor.phone || '',
+      gstNumber: vendor.gstNumber || '',
+      address: vendor.address || '',
+      commission: vendor.commission || 15,
+    });
+    setShowEditModal(true);
+  };
+
   const approveVendor = (id) => {
     setVendors(vendors.map(v => v.id === id ? { ...v, status: 'approved' } : v));
-    alert('✅ Vendor approved!');
+    alert('Vendor approved!');
+  };
+
+  const rejectVendor = (id) => {
+    if (confirm('Reject this vendor?')) {
+      setVendors(vendors.filter(v => v.id !== id));
+      alert('Vendor rejected');
+    }
   };
 
   const blockVendor = (id) => {
     if (confirm('Block this vendor?')) {
       setVendors(vendors.map(v => v.id === id ? { ...v, status: 'blocked' } : v));
-      alert('🔒 Vendor blocked');
+      alert('Vendor blocked');
     }
   };
 
   const deleteVendor = (id) => {
     if (confirm('Delete this vendor permanently?')) {
       setVendors(vendors.filter(v => v.id !== id));
-      alert('🗑️ Vendor deleted');
+      alert('Vendor deleted');
     }
   };
-
-  const filteredVendors = vendors.filter(v => {
-    if (activeTab !== 'all' && v.status !== activeTab) return false;
-    if (searchTerm && !v.brandName.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
 
   const getStatusBadge = (status) => {
     switch(status) {
@@ -61,7 +114,19 @@ function AdminVendors() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-gray-100 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div></div>;
+  const filteredVendors = vendors.filter(v => {
+    if (activeTab !== 'all' && v.status !== activeTab) return false;
+    if (searchTerm && !v.brandName.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -74,6 +139,13 @@ function AdminVendors() {
               <h1 className="text-2xl font-bold text-gray-800">Vendors</h1>
               <p className="text-gray-500 text-sm">Manage all marketplace sellers</p>
             </div>
+            <button
+              onClick={() => { setFormData({ brandName: '', email: '', phone: '', gstNumber: '', address: '', commission: 15 }); setShowAddModal(true); }}
+              className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Vendor
+            </button>
           </div>
 
           {/* Tabs & Search */}
@@ -93,7 +165,7 @@ function AdminVendors() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
-                <tr>
+                <tr className="border-b">
                   <th className="px-6 py-3 text-left">Brand Name</th>
                   <th className="px-6 py-3 text-left">Email</th>
                   <th className="px-6 py-3 text-center">Products</th>
@@ -104,15 +176,17 @@ function AdminVendors() {
               </thead>
               <tbody className="divide-y">
                 {filteredVendors.map(vendor => (
-                  <tr key={vendor.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedVendor(vendor); setShowDetails(true); }}>
+                  <tr key={vendor.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium">{vendor.brandName}</td>
                     <td className="px-6 py-4">{vendor.email}</td>
                     <td className="px-6 py-4 text-center">{vendor.productsCount}</td>
                     <td className="px-6 py-4 text-center">₹{vendor.totalSales.toLocaleString()}</td>
                     <td className="px-6 py-4 text-center"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(vendor.status)}`}>{vendor.status}</span></td>
                     <td className="px-6 py-4 text-center">
-                      <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-center gap-2">
+                        <button onClick={() => openEditModal(vendor)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="Edit">✏️</button>
                         {vendor.status === 'pending' && <button onClick={() => approveVendor(vendor.id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded" title="Approve">✅</button>}
+                        {vendor.status === 'pending' && <button onClick={() => rejectVendor(vendor.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Reject">❌</button>}
                         {vendor.status === 'approved' && <button onClick={() => blockVendor(vendor.id)} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded" title="Block">🔒</button>}
                         <button onClick={() => deleteVendor(vendor.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">🗑️</button>
                       </div>
@@ -125,28 +199,44 @@ function AdminVendors() {
         </main>
       </div>
 
-      {/* Vendor Details Modal */}
-      {showDetails && selectedVendor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetails(false)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-5 flex justify-between items-center">
-              <h3 className="text-xl font-bold">{selectedVendor.brandName}</h3>
-              <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+      {/* Add Vendor Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b p-5 flex justify-between items-center sticky top-0 bg-white">
+              <h3 className="text-xl font-bold">Add New Vendor</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-xs text-gray-400">Email</p><p className="font-medium">{selectedVendor.email}</p></div>
-                <div><p className="text-xs text-gray-400">Phone</p><p className="font-medium">{selectedVendor.phone}</p></div>
-                <div><p className="text-xs text-gray-400">GST Number</p><p className="font-medium">{selectedVendor.gst}</p></div>
-                <div><p className="text-xs text-gray-400">Commission</p><p className="font-medium">{selectedVendor.commission}%</p></div>
-                <div><p className="text-xs text-gray-400">Address</p><p className="font-medium">{selectedVendor.address}</p></div>
-                <div><p className="text-xs text-gray-400">Joined</p><p className="font-medium">{new Date(selectedVendor.joinedDate).toLocaleDateString()}</p></div>
-              </div>
-              <div className="pt-4 border-t flex gap-3">
-                <button className="flex-1 bg-pink-500 text-white py-2 rounded-lg">View Products</button>
-                <button className="flex-1 border border-gray-300 py-2 rounded-lg">Edit Details</button>
-              </div>
+            <form onSubmit={(e) => { e.preventDefault(); addVendor(); }} className="p-5 space-y-4">
+              <div><label className="block text-sm font-medium mb-1">Brand Name *</label><input type="text" name="brandName" value={formData.brandName} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" required /></div>
+              <div><label className="block text-sm font-medium mb-1">Email *</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" required /></div>
+              <div><label className="block text-sm font-medium mb-1">Phone Number</label><input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div><label className="block text-sm font-medium mb-1">GST Number</label><input type="text" name="gstNumber" value={formData.gstNumber} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div><label className="block text-sm font-medium mb-1">Address</label><textarea name="address" rows="2" value={formData.address} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div><label className="block text-sm font-medium mb-1">Commission (%)</label><input type="number" name="commission" value={formData.commission} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">Add Vendor</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Vendor Modal */}
+      {showEditModal && selectedVendor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b p-5 flex justify-between items-center sticky top-0 bg-white">
+              <h3 className="text-xl font-bold">Edit Vendor</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
+            <form onSubmit={(e) => { e.preventDefault(); editVendor(); }} className="p-5 space-y-4">
+              <div><label className="block text-sm font-medium mb-1">Brand Name</label><input type="text" name="brandName" value={formData.brandName} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" required /></div>
+              <div><label className="block text-sm font-medium mb-1">Email</label><input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" required /></div>
+              <div><label className="block text-sm font-medium mb-1">Phone Number</label><input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div><label className="block text-sm font-medium mb-1">GST Number</label><input type="text" name="gstNumber" value={formData.gstNumber} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div><label className="block text-sm font-medium mb-1">Address</label><textarea name="address" rows="2" value={formData.address} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <div><label className="block text-sm font-medium mb-1">Commission (%)</label><input type="number" name="commission" value={formData.commission} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg" /></div>
+              <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">Update Vendor</button>
+            </form>
           </div>
         </div>
       )}
