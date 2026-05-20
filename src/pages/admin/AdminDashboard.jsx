@@ -1,175 +1,230 @@
 import { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import StatsCard from './components/StatsCard';
+import { Link } from 'react-router-dom';
 
 function AdminDashboard() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    todayRevenue: 12450,
-    todayOrders: 45,
-    totalRevenue: 4520000,
-    totalOrders: 1234,
-    totalProducts: 2847,
-    totalVendors: 342,
-    pendingVendors: 18,
-    lowStockProducts: 12,
-  });
+  const [activeTab, setActiveTab] = useState('inventory');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const [recentOrders, setRecentOrders] = useState([
-    { id: '#MPS1001', customer: 'Priya Sharma', vendor: 'Nykaa Beauty', amount: 2598, status: 'delivered', date: '2024-05-12' },
-    { id: '#MPS1002', customer: 'Aditi Singh', vendor: 'Mamaearth', amount: 1798, status: 'shipped', date: '2024-05-12' },
-    { id: '#MPS1003', customer: 'Neha Gupta', vendor: 'Sugar Cosmetics', amount: 899, status: 'pending', date: '2024-05-11' },
-    { id: '#MPS1004', customer: 'Riya Mehta', vendor: 'Nykaa Beauty', amount: 3499, status: 'delivered', date: '2024-05-11' },
-    { id: '#MPS1005', customer: 'Anjali Verma', vendor: 'Plum', amount: 1599, status: 'processing', date: '2024-05-10' },
-  ]);
-
-  const topProducts = [
-    { id: 1, name: 'Glass Skin Serum', sales: 234, revenue: 303966 },
-    { id: 2, name: 'Cherry Lip Tint', sales: 189, revenue: 113211 },
-    { id: 3, name: 'Satin Slip Dress', sales: 156, revenue: 389844 },
-    { id: 4, name: 'Rice Water Toner', sales: 145, revenue: 130355 },
-    { id: 5, name: 'Baby Pink Blush', sales: 123, revenue: 98277 },
+  const products = [
+    { 
+      id: 1, 
+      status: 'Out of stock', 
+      statusDate: '20 Jan 2022, 06:03 am',
+      title: 'Teksu SCW-009 Combination Screw Driver Kit with Tester (Blue and Silver, 9 Pcs)',
+      asin: 'B09HL8NQ6B',
+      sku: 'scrwset-1pcs',
+      sales: 0,
+      available: 0,
+      price: 285.00,
+      mrp: 315.00,
+      image: '🔧'
+    },
+    { 
+      id: 2, 
+      status: 'Out of stock', 
+      statusDate: '20 Jan 2022, 06:02 am',
+      title: 'Teksu Rice Light Cork Lights, Battery Operated 20 LEDs Silver Wire 2M/7.2FT',
+      asin: 'B09GX6HP23',
+      sku: 'WWCL10PCS',
+      sales: 0,
+      available: 0,
+      price: 285.00,
+      mrp: 315.00,
+      image: '💡'
+    },
+    { 
+      id: 3, 
+      status: 'Out of stock', 
+      statusDate: '16 Oct 2021, 02:14 pm',
+      title: 'Teksu Smart LED Music Light Bulb Controlled via Bluetooth Remote',
+      asin: 'B09GX6HP24',
+      sku: 'LEDBLUETOOTH01',
+      sales: 0,
+      available: 0,
+      price: 285.00,
+      mrp: 315.00,
+      image: '💡'
+    },
   ];
 
-  useEffect(() => {
-    setTimeout(() => setLoading(false), 500);
-  }, []);
+  const stats = {
+    suppressed: 11,
+    inactive: 11,
+    active: 0,
+    outOfStock: 3,
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-gray-500">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredProducts = products.filter(p => 
+    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.asin.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Sidebar />
-      <div className="ml-64">
-        <Header />
-        <main className="p-6">
-          {/* Today's Stats */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Today's Performance</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              <StatsCard title="Today's Revenue" value={`₹${stats.todayRevenue.toLocaleString()}`} icon="💰" trend="up" trendValue="12%" />
-              <StatsCard title="Today's Orders" value={stats.todayOrders} icon="📦" trend="up" trendValue="8%" />
-              <StatsCard title="Total Revenue" value={`₹${stats.totalRevenue.toLocaleString()}`} icon="🏆" />
-              <StatsCard title="Total Orders" value={stats.totalOrders} icon="📋" />
+    <div className="min-h-screen bg-gray-50">
+      
+      {/* Amazon Style Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-gray-800">MyPinkShop</h1>
+            <span className="text-xs text-gray-400">Seller Central</span>
+            <div className="relative ml-4">
+              <input 
+                type="text" 
+                placeholder="Search" 
+                className="w-80 pl-9 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-pink-500"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="text-sm text-gray-600 hover:text-gray-800">EN ▼</button>
+            <button className="text-sm text-gray-600 hover:text-gray-800">Help</button>
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">SA</div>
+          </div>
+        </div>
+      </header>
+
+      {/* Amazon Style Navigation */}
+      <div className="bg-white border-b border-gray-200 px-6 py-2 flex gap-6 text-sm">
+        <button className="text-pink-600 border-b-2 border-pink-600 pb-2 font-medium">Manage Inventory</button>
+        <button className="text-gray-600 hover:text-gray-800 pb-2">Orders</button>
+        <button className="text-gray-600 hover:text-gray-800 pb-2">Reports</button>
+        <button className="text-gray-600 hover:text-gray-800 pb-2">Performance</button>
+        <button className="text-gray-600 hover:text-gray-800 pb-2">Settings</button>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6">
+        
+        {/* Welcome Banner */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-gray-800">Manage All Inventory</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your inventory across marketplaces from a single place.</p>
+        </div>
+
+        {/* Stats Cards - Amazon Style */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-white border border-gray-200 rounded p-4">
+            <p className="text-xs text-gray-500">Suppressed and Inactive Listings</p>
+            <p className="text-2xl font-semibold text-gray-800">{stats.suppressed}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded p-4">
+            <p className="text-xs text-gray-500">Active Listings</p>
+            <p className="text-2xl font-semibold text-gray-800">{stats.active}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded p-4">
+            <p className="text-xs text-gray-500">Out of Stock</p>
+            <p className="text-2xl font-semibold text-red-500">{stats.outOfStock}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded p-4">
+            <p className="text-xs text-gray-500">Total Listings</p>
+            <p className="text-2xl font-semibold text-gray-800">{stats.suppressed + stats.active}</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 mb-6">
+          <button className="bg-pink-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-pink-700 transition">Add Products</button>
+          <button className="border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-50 transition">Manage Pricing</button>
+          <button className="border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded text-sm font-medium hover:bg-gray-50 transition">Listing Tools ▼</button>
+        </div>
+
+        {/* Search and Sort Bar */}
+        <div className="bg-white border border-gray-200 rounded mb-4 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Search</span>
+              <select className="border border-gray-300 rounded px-2 py-1 text-sm">
+                <option>All</option>
+                <option>SKU</option>
+                <option>Title</option>
+                <option>ASIN</option>
+              </select>
+              <input 
+                type="text" 
+                placeholder="Search SKU, Title/Keyword, FNSKU, ASIN, UPC/EAN"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-96 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-pink-500"
+              />
+              <button className="bg-pink-600 text-white px-4 py-1.5 rounded text-sm">Search</button>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>1 - {filteredProducts.length} of {filteredProducts.length}</span>
+              <span className="border-l border-gray-300 pl-2">Sort by: Sales: Highest on top ▼</span>
             </div>
           </div>
 
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-500">Total Products</p>
-                <span className="text-2xl">📦</span>
-              </div>
-              <p className="text-2xl font-bold">{stats.totalProducts}</p>
-            </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-500">Total Vendors</p>
-                <span className="text-2xl">🏪</span>
-              </div>
-              <p className="text-2xl font-bold">{stats.totalVendors}</p>
-              <p className="text-xs text-yellow-600 mt-1">{stats.pendingVendors} pending approval</p>
-            </div>
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-500">Low Stock Alert</p>
-                <span className="text-2xl">⚠️</span>
-              </div>
-              <p className="text-2xl font-bold text-red-500">{stats.lowStockProducts}</p>
-              <p className="text-xs text-gray-500 mt-1">Products with stock {'<'} 10</p>
-            </div>
+          {/* Table Header */}
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">
+            <div className="col-span-3">Listing status</div>
+            <div className="col-span-4">Product details</div>
+            <div className="col-span-1 text-center">Performance</div>
+            <div className="col-span-1 text-center">Inventory</div>
+            <div className="col-span-2 text-right">Price and shipping cost</div>
+            <div className="col-span-1 text-right">Estimated fees</div>
           </div>
 
-          {/* Top Products & Recent Orders */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top Products */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="font-semibold">🔥 Top Selling Products</h3>
+          {/* Product Rows */}
+          {filteredProducts.map(product => (
+            <div key={product.id} className="grid grid-cols-12 gap-4 px-4 py-4 border-b border-gray-100 hover:bg-gray-50 transition">
+              {/* Listing Status */}
+              <div className="col-span-3">
+                <div className="text-red-600 font-medium text-sm">{product.status}</div>
+                <div className="text-xs text-gray-400">{product.statusDate}</div>
               </div>
-              <div className="divide-y">
-                {topProducts.map((product, idx) => (
-                  <div key={product.id} className="px-5 py-3 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-gray-400 w-6">{idx + 1}</span>
-                      <span className="font-medium">{product.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">{product.sales} sales</p>
-                      <p className="text-xs text-gray-500">₹{product.revenue.toLocaleString()}</p>
-                    </div>
+
+              {/* Product Details */}
+              <div className="col-span-4">
+                <div className="flex gap-3">
+                  <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-2xl">
+                    {product.image}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Orders */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="font-semibold">📋 Recent Orders</h3>
-                <button className="text-sm text-pink-500 hover:text-pink-600">View All →</button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-5 py-3 text-left">Order ID</th>
-                      <th className="px-5 py-3 text-left">Customer</th>
-                      <th className="px-5 py-3 text-left">Amount</th>
-                      <th className="px-5 py-3 text-left">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {recentOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium">{order.id}</td>
-                        <td className="px-5 py-3">{order.customer}</td>
-                        <td className="px-5 py-3">₹{order.amount}</td>
-                        <td className="px-5 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            order.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                            order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
-                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-purple-100 text-purple-700'
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Required */}
-          <div className="mt-6 bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⏳</span>
-                <div>
-                  <p className="font-medium text-gray-800">Action Required</p>
-                  <p className="text-sm text-gray-600">{stats.pendingVendors} vendors pending approval</p>
+                  <div>
+                    <p className="text-sm text-gray-800 line-clamp-2">{product.title}</p>
+                    <p className="text-xs text-gray-400 mt-1">ASIN: {product.asin}</p>
+                    <p className="text-xs text-gray-400">SKU: {product.sku}</p>
+                  </div>
                 </div>
               </div>
-              <button className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700 transition">
-                Review Now →
-              </button>
+
+              {/* Performance */}
+              <div className="col-span-1 text-center">
+                <p className="text-sm text-gray-600">—</p>
+                <p className="text-xs text-gray-400">Units sold</p>
+              </div>
+
+              {/* Inventory */}
+              <div className="col-span-1 text-center">
+                <p className="text-sm text-gray-600">{product.available}</p>
+                <p className="text-xs text-gray-400">Available</p>
+              </div>
+
+              {/* Price */}
+              <div className="col-span-2 text-right">
+                <p className="text-sm text-gray-800">₹{product.price.toFixed(2)}</p>
+                <p className="text-xs text-gray-400 line-through">MRP: ₹{product.mrp.toFixed(2)}</p>
+                <p className="text-xs text-pink-600 mt-1">View reference prices</p>
+              </div>
+
+              {/* Fees */}
+              <div className="col-span-1 text-right">
+                <p className="text-sm text-gray-400">—</p>
+              </div>
             </div>
-          </div>
-        </main>
+          ))}
+        </div>
+
+        {/* Pagination */}
+        <div className="flex justify-center gap-2 mt-6">
+          <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">‹</button>
+          <button className="px-3 py-1 border border-pink-600 bg-pink-600 text-white rounded text-sm">1</button>
+          <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">2</button>
+          <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">3</button>
+          <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">›</button>
+        </div>
       </div>
     </div>
   );
