@@ -17,7 +17,6 @@ function AdminProducts() {
   const token = localStorage.getItem('adminToken');
   const logoInputRef = useRef(null);
 
-  // Load data from localStorage first, then fallback to mock
   useEffect(() => {
     if (!token) { navigate('/admin/login'); return; }
     
@@ -59,58 +58,34 @@ function AdminProducts() {
     setLoading(false);
   }, [token, navigate]);
 
-  // Save all data to localStorage
   const saveAllData = (updatedBrands, updatedProducts) => {
     localStorage.setItem('adminBrands', JSON.stringify(updatedBrands));
     localStorage.setItem('adminProducts', JSON.stringify(updatedProducts));
-    // Also sync to homepage
-    syncToHomepage(updatedProducts, updatedBrands);
-  };
-
-  // Sync all products to homepage localStorage
-  const syncToHomepage = (currentProducts, currentBrands) => {
     const allProducts = [];
-    Object.keys(currentProducts).forEach(brandId => {
-      const brandProducts = currentProducts[brandId] || [];
-      const brand = currentBrands.find(b => b.id === parseInt(brandId));
+    Object.keys(updatedProducts).forEach(brandId => {
+      const brandProducts = updatedProducts[brandId] || [];
+      const brand = updatedBrands.find(b => b.id === parseInt(brandId));
       brandProducts.forEach(product => {
-        allProducts.push({
-          ...product,
-          brandId: parseInt(brandId),
-          brandName: brand?.name || 'Unknown',
-        });
+        allProducts.push({ ...product, brandId: parseInt(brandId), brandName: brand?.name || 'Unknown' });
       });
     });
     localStorage.setItem('homepageProducts', JSON.stringify(allProducts));
-    console.log('✅ Products synced to homepage:', allProducts.length);
   };
 
-  const handleBrandClick = (brand) => {
-    setSelectedBrand(brand);
-  };
+  const handleBrandClick = (brand) => { setSelectedBrand(brand); };
 
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setBrandFormData({ ...brandFormData, logo: reader.result, logoPreview: reader.result });
-      };
+      reader.onloadend = () => { setBrandFormData({ ...brandFormData, logo: reader.result, logoPreview: reader.result }); };
       reader.readAsDataURL(file);
     }
   };
 
   const addBrand = () => {
-    if (!brandFormData.name) {
-      alert('Please enter brand name');
-      return;
-    }
-    const newBrand = {
-      id: Date.now(),
-      name: brandFormData.name,
-      logo: brandFormData.logo || 'https://placehold.co/40x40/gray/white?text=' + brandFormData.name.charAt(0),
-      productCount: 0,
-    };
+    if (!brandFormData.name) { alert('Please enter brand name'); return; }
+    const newBrand = { id: Date.now(), name: brandFormData.name, logo: brandFormData.logo || 'https://placehold.co/40x40/gray/white?text=' + brandFormData.name.charAt(0), productCount: 0 };
     const updatedBrands = [...brands, newBrand];
     const updatedProducts = { ...products, [newBrand.id]: [] };
     setBrands(updatedBrands);
@@ -122,7 +97,7 @@ function AdminProducts() {
   };
 
   const deleteBrand = (brandId) => {
-    if (confirm('Delete this brand? All products under this brand will also be deleted.')) {
+    if (confirm('Delete this brand?')) {
       const updatedBrands = brands.filter(b => b.id !== brandId);
       const updatedProducts = { ...products };
       delete updatedProducts[brandId];
@@ -138,9 +113,7 @@ function AdminProducts() {
     if (confirm('Delete this product?')) {
       const updatedProducts = { ...products };
       updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].filter(p => p.id !== productId);
-      const updatedBrands = brands.map(b => 
-        b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b
-      );
+      const updatedBrands = brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b);
       setProducts(updatedProducts);
       setBrands(updatedBrands);
       saveAllData(updatedBrands, updatedProducts);
@@ -150,9 +123,7 @@ function AdminProducts() {
 
   const toggleProductStatus = (productId) => {
     const updatedProducts = { ...products };
-    updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].map(p => 
-      p.id === productId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
-    );
+    updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].map(p => p.id === productId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p);
     setProducts(updatedProducts);
     saveAllData(brands, updatedProducts);
   };
@@ -160,19 +131,12 @@ function AdminProducts() {
   const handleAddProduct = (e) => {
     e.preventDefault();
     const newProduct = {
-      id: Date.now(),
-      ...formData,
-      status: 'active',
-      badge: 'New',
-      isNew: true,
-      rating: 4.5,
+      id: Date.now(), ...formData, status: 'active', badge: 'New', isNew: true, rating: 4.5,
       originalPrice: Math.round(formData.price * 1.5),
     };
     const updatedProducts = { ...products };
     updatedProducts[selectedBrand.id] = [...(updatedProducts[selectedBrand.id] || []), newProduct];
-    const updatedBrands = brands.map(b => 
-      b.id === selectedBrand.id ? { ...b, productCount: b.productCount + 1 } : b
-    );
+    const updatedBrands = brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount + 1 } : b);
     setProducts(updatedProducts);
     setBrands(updatedBrands);
     saveAllData(updatedBrands, updatedProducts);
@@ -183,21 +147,14 @@ function AdminProducts() {
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      price: product.price,
-      stock: product.stock,
-      category: product.category,
-    });
+    setFormData({ name: product.name, price: product.price, stock: product.stock, category: product.category });
     setShowAddModal(true);
   };
 
   const updateProduct = (e) => {
     e.preventDefault();
     const updatedProducts = { ...products };
-    updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].map(p => 
-      p.id === editingProduct.id ? { ...p, ...formData } : p
-    );
+    updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].map(p => p.id === editingProduct.id ? { ...p, ...formData } : p);
     setProducts(updatedProducts);
     saveAllData(brands, updatedProducts);
     setShowAddModal(false);
@@ -220,53 +177,31 @@ function AdminProducts() {
       <div className="ml-64">
         <Header />
         <main className="p-6">
-          
-          {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Product Management</h1>
-              <p className="text-gray-500 text-sm">Select a brand to view and manage products</p>
-            </div>
-            <button
-              onClick={() => { setShowBrandModal(true); setBrandFormData({ name: '', logo: null, logoPreview: null }); }}
-              className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Add Brand
+            <div><h1 className="text-2xl font-bold text-gray-800">Product Management</h1><p className="text-gray-500 text-sm">Select a brand to view and manage products</p></div>
+            <button onClick={() => { setShowBrandModal(true); setBrandFormData({ name: '', logo: null, logoPreview: null }); }} className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Brand
             </button>
           </div>
 
-          {/* Brand Cards */}
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-gray-500 mb-3">BRANDS</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {brands.map(brand => (
                 <div key={brand.id} className="relative group">
-                  <button
-                    onClick={() => handleBrandClick(brand)}
-                    className={`w-full bg-white rounded-xl p-4 text-center border-2 transition-all hover:shadow-md ${
-                      selectedBrand?.id === brand.id ? 'border-pink-500 bg-pink-50' : 'border-gray-100 hover:border-pink-200'
-                    }`}
-                  >
+                  <button onClick={() => handleBrandClick(brand)} className={`w-full bg-white rounded-xl p-4 text-center border-2 transition-all hover:shadow-md ${selectedBrand?.id === brand.id ? 'border-pink-500 bg-pink-50' : 'border-gray-100 hover:border-pink-200'}`}>
                     <div className="w-16 h-16 mx-auto mb-2 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
                       {brand.logo ? <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" /> : <span className="text-3xl">🏢</span>}
                     </div>
                     <p className="font-medium text-gray-800 text-sm">{brand.name}</p>
                     <p className="text-xs text-gray-400">{brand.productCount} products</p>
                   </button>
-                  <button
-                    onClick={() => deleteBrand(brand.id)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 transition opacity-0 group-hover:opacity-100"
-                    title="Delete Brand"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => deleteBrand(brand.id)} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 transition opacity-0 group-hover:opacity-100" title="Delete Brand">✕</button>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Products Section */}
           {selectedBrand ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
@@ -274,26 +209,15 @@ function AdminProducts() {
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
                     {selectedBrand.logo ? <img src={selectedBrand.logo} alt={selectedBrand.name} className="w-full h-full object-cover" /> : <span className="text-xl">🏢</span>}
                   </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800">{selectedBrand.name}</h2>
-                    <p className="text-sm text-gray-500">Manage products for this brand</p>
-                  </div>
+                  <div><h2 className="text-lg font-semibold text-gray-800">{selectedBrand.name}</h2><p className="text-sm text-gray-500">Manage products for this brand</p></div>
                 </div>
-                <button
-                  onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', stock: '', category: 'skincare' }); setShowAddModal(true); }}
-                  className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                  Add Product
+                <button onClick={() => { setEditingProduct(null); setFormData({ name: '', price: '', stock: '', category: 'skincare' }); setShowAddModal(true); }} className="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-600 transition flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Product
                 </button>
               </div>
 
               {products[selectedBrand.id]?.length === 0 ? (
-                <div className="p-10 text-center">
-                  <div className="text-5xl mb-3">📦</div>
-                  <p className="text-gray-500">No products yet</p>
-                  <button onClick={() => { setEditingProduct(null); setShowAddModal(true); }} className="mt-3 text-pink-500 text-sm">Add your first product →</button>
-                </div>
+                <div className="p-10 text-center"><div className="text-5xl mb-3">📦</div><p className="text-gray-500">No products yet</p><button onClick={() => { setEditingProduct(null); setShowAddModal(true); }} className="mt-3 text-pink-500 text-sm">Add your first product →</button></div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -304,11 +228,20 @@ function AdminProducts() {
                       {products[selectedBrand.id]?.map(product => (
                         <tr key={product.id} className="hover:bg-gray-50">
                           <td className="px-6 py-3 font-medium text-gray-800">{product.name}</td>
-                          <td className="px-6 py-3 capitalize text-gray-500">{product.category}<td>
+                          <td className="px-6 py-3 capitalize text-gray-500">{product.category}</td>
                           <td className="px-6 py-3 text-right font-semibold text-gray-800">₹{product.price}</td>
                           <td className="px-6 py-3 text-right text-gray-500">{product.stock} units</td>
-                          <td className="px-6 py-3 text-center"><button onClick={() => toggleProductStatus(product.id)} className={`px-2 py-1 rounded-full text-xs font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{product.status === 'active' ? 'Active' : 'Inactive'}</button></td>
-                          <td className="px-6 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => handleEditProduct(product)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition" title="Edit">✏️</button><button onClick={() => deleteProduct(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition" title="Delete">🗑️</button></div></td>
+                          <td className="px-6 py-3 text-center">
+                            <button onClick={() => toggleProductStatus(product.id)} className={`px-2 py-1 rounded-full text-xs font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                              {product.status === 'active' ? 'Active' : 'Inactive'}
+                            </button>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => handleEditProduct(product)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition" title="Edit">✏️</button>
+                              <button onClick={() => deleteProduct(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition" title="Delete">🗑️</button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -325,7 +258,6 @@ function AdminProducts() {
         </main>
       </div>
 
-      {/* Add Brand Modal */}
       {showBrandModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBrandModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
@@ -339,7 +271,6 @@ function AdminProducts() {
         </div>
       )}
 
-      {/* Add/Edit Product Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
