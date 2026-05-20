@@ -49,6 +49,23 @@ function AdminProducts() {
     setLoading(false);
   }, [token, navigate]);
 
+  // Sync all products to homepage localStorage
+  const syncToHomepage = () => {
+    const allProducts = [];
+    Object.keys(products).forEach(brandId => {
+      const brandProducts = products[brandId] || [];
+      brandProducts.forEach(product => {
+        allProducts.push({
+          ...product,
+          brandId: parseInt(brandId),
+          brandName: brands.find(b => b.id === parseInt(brandId))?.name || 'Unknown',
+        });
+      });
+    });
+    localStorage.setItem('homepageProducts', JSON.stringify(allProducts));
+    console.log('✅ Products synced to homepage:', allProducts.length);
+  };
+
   const handleBrandClick = (brand) => {
     setSelectedBrand(brand);
   };
@@ -80,6 +97,7 @@ function AdminProducts() {
     setShowBrandModal(false);
     setBrandFormData({ name: '', logo: null, logoPreview: null });
     alert('Brand added successfully!');
+    syncToHomepage();
   };
 
   const deleteBrand = (brandId) => {
@@ -90,6 +108,7 @@ function AdminProducts() {
       setProducts(newProducts);
       if (selectedBrand?.id === brandId) setSelectedBrand(null);
       alert('Brand deleted!');
+      syncToHomepage();
     }
   };
 
@@ -100,6 +119,7 @@ function AdminProducts() {
       setProducts(updatedProducts);
       setBrands(brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b));
       alert('Product deleted!');
+      syncToHomepage();
     }
   };
 
@@ -109,6 +129,7 @@ function AdminProducts() {
       p.id === productId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
     );
     setProducts(updatedProducts);
+    syncToHomepage();
   };
 
   const handleAddProduct = (e) => {
@@ -117,6 +138,10 @@ function AdminProducts() {
       id: Date.now(),
       ...formData,
       status: 'active',
+      badge: 'New',
+      isNew: true,
+      rating: 4.5,
+      originalPrice: Math.round(formData.price * 1.5),
     };
     const updatedProducts = { ...products };
     updatedProducts[selectedBrand.id] = [...(updatedProducts[selectedBrand.id] || []), newProduct];
@@ -125,6 +150,7 @@ function AdminProducts() {
     setShowAddModal(false);
     setFormData({ name: '', price: '', stock: '', category: 'skincare' });
     alert('Product added!');
+    syncToHomepage();
   };
 
   const handleEditProduct = (product) => {
@@ -149,6 +175,7 @@ function AdminProducts() {
     setEditingProduct(null);
     setFormData({ name: '', price: '', stock: '', category: 'skincare' });
     alert('Product updated!');
+    syncToHomepage();
   };
 
   if (loading) {
@@ -294,7 +321,7 @@ function AdminProducts() {
         </main>
       </div>
 
-      {/* Add Brand Modal with Image Upload */}
+      {/* Add Brand Modal */}
       {showBrandModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBrandModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
@@ -303,29 +330,8 @@ function AdminProducts() {
               <button onClick={() => setShowBrandModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); addBrand(); }} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Brand Name *</label>
-                <input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Brand Logo</label>
-                <div className="flex items-center gap-4">
-                  {brandFormData.logoPreview && (
-                    <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100">
-                      <img src={brandFormData.logoPreview} alt="Preview" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => logoInputRef.current.click()}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition"
-                  >
-                    Upload Logo
-                  </button>
-                  <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                </div>
-                <p className="text-xs text-gray-400 mt-1">Upload a square image (recommended size: 64x64px)</p>
-              </div>
+              <div><label className="block text-sm font-medium mb-1">Brand Name *</label><input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div>
+              <div><label className="block text-sm font-medium mb-1">Brand Logo</label><div className="flex items-center gap-4">{brandFormData.logoPreview && (<div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100"><img src={brandFormData.logoPreview} alt="Preview" className="w-full h-full object-cover" /></div>)}<button type="button" onClick={() => logoInputRef.current.click()} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">Upload Logo</button><input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" /></div><p className="text-xs text-gray-400 mt-1">Upload a square image (recommended size: 64x64px)</p></div>
               <button type="submit" className="w-full bg-pink-500 text-white py-2 rounded-lg font-medium hover:bg-pink-600 transition">Add Brand</button>
             </form>
           </div>
