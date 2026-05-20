@@ -19,6 +19,10 @@ import AdminOrders from './pages/admin/AdminOrders';
 import AdminCustomers from './pages/admin/AdminCustomers';
 import AdminReports from './pages/admin/AdminReports';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminInventory from './pages/admin/AdminInventory';
+import AdminAdvertising from './pages/admin/AdminAdvertising';
+import AdminPayments from './pages/admin/AdminPayments';
+import AdminAddProduct from './pages/admin/AdminAddProduct';
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -61,6 +65,10 @@ function App() {
               <Route path="/admin/customers" element={<AdminCustomers />} />
               <Route path="/admin/reports" element={<AdminReports />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/inventory" element={<AdminInventory />} />
+              <Route path="/admin/advertising" element={<AdminAdvertising />} />
+              <Route path="/admin/payments" element={<AdminPayments />} />
+              <Route path="/admin/add-product" element={<AdminAddProduct />} />
               
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
