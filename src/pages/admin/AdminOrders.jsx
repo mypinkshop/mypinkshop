@@ -38,7 +38,10 @@ function AdminOrders() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
-        <div className="flex items-center gap-4"><button onClick={() => window.history.back()} className="text-gray-600 hover:text-gray-800">←</button><h1 className="text-xl font-semibold text-gray-800">Orders & Returns</h1></div>
+        <div className="flex items-center gap-4">
+          <button onClick={() => window.history.back()} className="text-gray-600 hover:text-gray-800">←</button>
+          <h1 className="text-xl font-semibold text-gray-800">Orders & Returns</h1>
+        </div>
       </div>
 
       <div className="p-6">
@@ -51,47 +54,91 @@ function AdminOrders() {
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b"><tr><th className="px-4 py-3 text-left">Order ID</th><th className="px-4 py-3 text-left">Customer</th><th className="px-4 py-3 text-left">Vendor</th><th className="px-4 py-3 text-right">Amount</th><th className="px-4 py-3 text-center">Items</th><th className="px-4 py-3 text-center">Date</th><th className="px-4 py-3 text-center">Payment</th><th className="px-4 py-3 text-center">Status</th><th className="px-4 py-3 text-center">Action</th></tr></thead>
-              <tbody className="divide-y">
-                {orders.map(order => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{order.id}{order.returnRequested && <span className="ml-2 text-xs bg-red-100 text-red-600 px-1 rounded">Return</span>}</td>
-                    <td className="px-4 py-3">{order.customer}</td>
-                    <td className="px-4 py-3">{order.vendor}</td>
-                    <td className="px-4 py-3 text-right font-medium">₹{order.amount}</td>
-                    <td className="px-4 py-3 text-center">{order.items}</td>
-                    <td className="px-4 py-3 text-center">{order.date}</td>
-                    <td className="px-4 py-3 text-center text-xs">{order.paymentMethod}</td>
-                    <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(order.status)}`}>{order.status}</span></td>
-                    <td className="px-4 py-3 text-center"><select value={order.status} onChange={(e) => updateOrderStatus(order.id, e.target.value)} className="px-2 py-1 border rounded text-xs"><option value="pending">Pending</option><option value="processing">Processing</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option></select></td>
-                  </td>
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Order ID</th>
+                    <th className="px-4 py-3 text-left">Customer</th>
+                    <th className="px-4 py-3 text-left">Vendor</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3 text-center">Items</th>
+                    <th className="px-4 py-3 text-center">Date</th>
+                    <th className="px-4 py-3 text-center">Payment</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {orders.map(order => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium">{order.id}{order.returnRequested && <span className="ml-2 text-xs bg-red-100 text-red-600 px-1 rounded">Return</span>}</td>
+                      <td className="px-4 py-3">{order.customer}</td>
+                      <td className="px-4 py-3">{order.vendor}</td>
+                      <td className="px-4 py-3 text-right font-medium">₹{order.amount}</td>
+                      <td className="px-4 py-3 text-center">{order.items}</td>
+                      <td className="px-4 py-3 text-center">{order.date}</td>
+                      <td className="px-4 py-3 text-center text-xs">{order.paymentMethod}</td>
+                      <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(order.status)}`}>{order.status}</span></td>
+                      <td className="px-4 py-3 text-center">
+                        <select value={order.status} onChange={(e) => updateOrderStatus(order.id, e.target.value)} className="px-2 py-1 border rounded text-xs">
+                          <option value="pending">Pending</option>
+                          <option value="processing">Processing</option>
+                          <option value="shipped">Shipped</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {/* Returns Tab */}
         {activeTab === 'returns' && (
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b"><tr><th className="px-4 py-3 text-left">Return ID</th><th className="px-4 py-3 text-left">Order ID</th><th className="px-4 py-3 text-left">Customer</th><th className="px-4 py-3 text-left">Product</th><th className="px-4 py-3 text-left">Reason</th><th className="px-4 py-3 text-right">Amount</th><th className="px-4 py-3 text-center">Status</th><th className="px-4 py-3 text-center">Action</th></tr></thead>
-              <tbody className="divide-y">
-                {returns.map(returnReq => (
-                  <tr key={returnReq.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs">{returnReq.id}</td>
-                    <td className="px-4 py-3">{returnReq.orderId}</td>
-                    <td className="px-4 py-3">{returnReq.customer}</td>
-                    <td className="px-4 py-3">{returnReq.product}</td>
-                    <td className="px-4 py-3 text-gray-500">{returnReq.reason}</td>
-                    <td className="px-4 py-3 text-right font-medium">₹{returnReq.amount}</td>
-                    <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded-full text-xs ${returnReq.status === 'approved' ? 'bg-green-100 text-green-700' : returnReq.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{returnReq.status}</span></td>
-                    <td className="px-4 py-3 text-center"><div className="flex gap-2 justify-center">{returnReq.status === 'pending' && <><button onClick={() => updateReturnStatus(returnReq.id, 'approved')} className="text-green-600 text-xs hover:underline">Approve</button><button onClick={() => updateReturnStatus(returnReq.id, 'rejected')} className="text-red-600 text-xs hover:underline">Reject</button></>}</div></td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Return ID</th>
+                    <th className="px-4 py-3 text-left">Order ID</th>
+                    <th className="px-4 py-3 text-left">Customer</th>
+                    <th className="px-4 py-3 text-left">Product</th>
+                    <th className="px-4 py-3 text-left">Reason</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-center">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {returns.map(returnReq => (
+                    <tr key={returnReq.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono text-xs">{returnReq.id}</td>
+                      <td className="px-4 py-3">{returnReq.orderId}</td>
+                      <td className="px-4 py-3">{returnReq.customer}</td>
+                      <td className="px-4 py-3">{returnReq.product}</td>
+                      <td className="px-4 py-3 text-gray-500">{returnReq.reason}</td>
+                      <td className="px-4 py-3 text-right font-medium">₹{returnReq.amount}</td>
+                      <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded-full text-xs ${returnReq.status === 'approved' ? 'bg-green-100 text-green-700' : returnReq.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{returnReq.status}</span></td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex gap-2 justify-center">
+                          {returnReq.status === 'pending' && (
+                            <>
+                              <button onClick={() => updateReturnStatus(returnReq.id, 'approved')} className="text-green-600 text-xs hover:underline">Approve</button>
+                              <button onClick={() => updateReturnStatus(returnReq.id, 'rejected')} className="text-red-600 text-xs hover:underline">Reject</button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
