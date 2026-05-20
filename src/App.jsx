@@ -23,6 +23,9 @@ import AdminInventory from './pages/admin/AdminInventory';
 import AdminAdvertising from './pages/admin/AdminAdvertising';
 import AdminPayments from './pages/admin/AdminPayments';
 import AdminAddProduct from './pages/admin/AdminAddProduct';
+import AdminShipping from './pages/admin/AdminShipping';
+import AdminTax from './pages/admin/AdminTax';
+import AdminCoupons from './pages/admin/AdminCoupons';
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -69,6 +72,9 @@ function App() {
               <Route path="/admin/advertising" element={<AdminAdvertising />} />
               <Route path="/admin/payments" element={<AdminPayments />} />
               <Route path="/admin/add-product" element={<AdminAddProduct />} />
+              <Route path="/admin/shipping" element={<AdminShipping />} />
+              <Route path="/admin/tax" element={<AdminTax />} />
+              <Route path="/admin/coupons" element={<AdminCoupons />} />
               
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
