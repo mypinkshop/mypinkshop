@@ -17,48 +17,67 @@ function AdminProducts() {
   const token = localStorage.getItem('adminToken');
   const logoInputRef = useRef(null);
 
+  // Load data from localStorage first, then fallback to mock
   useEffect(() => {
     if (!token) { navigate('/admin/login'); return; }
     
-    const mockBrands = [
-      { id: 1, name: 'Nykaa Beauty', logo: 'https://placehold.co/40x40/pink/white?text=N', productCount: 24 },
-      { id: 2, name: 'Mamaearth', logo: 'https://placehold.co/40x40/green/white?text=M', productCount: 18 },
-      { id: 3, name: 'Sugar Cosmetics', logo: 'https://placehold.co/40x40/red/white?text=S', productCount: 12 },
-      { id: 4, name: 'Plum Beauty', logo: 'https://placehold.co/40x40/purple/white?text=P', productCount: 8 },
-    ];
-    setBrands(mockBrands);
+    const savedBrands = localStorage.getItem('adminBrands');
+    const savedProducts = localStorage.getItem('adminProducts');
     
-    const mockProducts = {
-      1: [
-        { id: 1, name: 'Glass Skin Serum', price: 1299, stock: 45, category: 'skincare', status: 'active' },
-        { id: 2, name: 'Rice Water Toner', price: 899, stock: 60, category: 'skincare', status: 'active' },
-        { id: 3, name: 'Cherry Lip Tint', price: 599, stock: 100, category: 'makeup', status: 'active' },
-      ],
-      2: [
-        { id: 4, name: 'Vitamin C Face Wash', price: 399, stock: 80, category: 'skincare', status: 'active' },
-        { id: 5, name: 'Ubtan Face Mask', price: 499, stock: 55, category: 'skincare', status: 'active' },
-      ],
-      3: [
-        { id: 6, name: 'Matte Lipstick', price: 599, stock: 120, category: 'makeup', status: 'active' },
-      ],
-      4: [
-        { id: 7, name: 'Plum Body Oil', price: 799, stock: 30, category: 'bodycare', status: 'active' },
-      ],
-    };
-    setProducts(mockProducts);
+    if (savedBrands && savedProducts) {
+      setBrands(JSON.parse(savedBrands));
+      setProducts(JSON.parse(savedProducts));
+    } else {
+      const mockBrands = [
+        { id: 1, name: 'Nykaa Beauty', logo: 'https://placehold.co/40x40/pink/white?text=N', productCount: 3 },
+        { id: 2, name: 'Mamaearth', logo: 'https://placehold.co/40x40/green/white?text=M', productCount: 2 },
+        { id: 3, name: 'Sugar Cosmetics', logo: 'https://placehold.co/40x40/red/white?text=S', productCount: 1 },
+        { id: 4, name: 'Plum Beauty', logo: 'https://placehold.co/40x40/purple/white?text=P', productCount: 1 },
+      ];
+      const mockProducts = {
+        1: [
+          { id: 1, name: 'Glass Skin Serum', price: 1299, stock: 45, category: 'skincare', status: 'active', badge: 'Bestseller', isNew: true, rating: 4.8, originalPrice: 1999 },
+          { id: 2, name: 'Rice Water Toner', price: 899, stock: 60, category: 'skincare', status: 'active', badge: 'Trending', isNew: false, rating: 4.6, originalPrice: 1299 },
+          { id: 3, name: 'Cherry Lip Tint', price: 599, stock: 100, category: 'makeup', status: 'active', badge: 'Viral', isNew: true, rating: 4.7, originalPrice: 999 },
+        ],
+        2: [
+          { id: 4, name: 'Vitamin C Face Wash', price: 399, stock: 80, category: 'skincare', status: 'active', badge: 'Natural', isNew: false, rating: 4.5, originalPrice: 599 },
+          { id: 5, name: 'Ubtan Face Mask', price: 499, stock: 55, category: 'skincare', status: 'active', badge: 'Glow', isNew: true, rating: 4.6, originalPrice: 799 },
+        ],
+        3: [
+          { id: 6, name: 'Matte Lipstick', price: 599, stock: 120, category: 'makeup', status: 'active', badge: 'Trending', isNew: true, rating: 4.7, originalPrice: 999 },
+        ],
+        4: [
+          { id: 7, name: 'Plum Body Oil', price: 799, stock: 30, category: 'bodycare', status: 'active', badge: 'Natural', isNew: false, rating: 4.5, originalPrice: 1199 },
+        ],
+      };
+      setBrands(mockBrands);
+      setProducts(mockProducts);
+      localStorage.setItem('adminBrands', JSON.stringify(mockBrands));
+      localStorage.setItem('adminProducts', JSON.stringify(mockProducts));
+    }
     setLoading(false);
   }, [token, navigate]);
 
+  // Save all data to localStorage
+  const saveAllData = (updatedBrands, updatedProducts) => {
+    localStorage.setItem('adminBrands', JSON.stringify(updatedBrands));
+    localStorage.setItem('adminProducts', JSON.stringify(updatedProducts));
+    // Also sync to homepage
+    syncToHomepage(updatedProducts, updatedBrands);
+  };
+
   // Sync all products to homepage localStorage
-  const syncToHomepage = () => {
+  const syncToHomepage = (currentProducts, currentBrands) => {
     const allProducts = [];
-    Object.keys(products).forEach(brandId => {
-      const brandProducts = products[brandId] || [];
+    Object.keys(currentProducts).forEach(brandId => {
+      const brandProducts = currentProducts[brandId] || [];
+      const brand = currentBrands.find(b => b.id === parseInt(brandId));
       brandProducts.forEach(product => {
         allProducts.push({
           ...product,
           brandId: parseInt(brandId),
-          brandName: brands.find(b => b.id === parseInt(brandId))?.name || 'Unknown',
+          brandName: brand?.name || 'Unknown',
         });
       });
     });
@@ -92,23 +111,26 @@ function AdminProducts() {
       logo: brandFormData.logo || 'https://placehold.co/40x40/gray/white?text=' + brandFormData.name.charAt(0),
       productCount: 0,
     };
-    setBrands([...brands, newBrand]);
-    setProducts({ ...products, [newBrand.id]: [] });
+    const updatedBrands = [...brands, newBrand];
+    const updatedProducts = { ...products, [newBrand.id]: [] };
+    setBrands(updatedBrands);
+    setProducts(updatedProducts);
+    saveAllData(updatedBrands, updatedProducts);
     setShowBrandModal(false);
     setBrandFormData({ name: '', logo: null, logoPreview: null });
     alert('Brand added successfully!');
-    syncToHomepage();
   };
 
   const deleteBrand = (brandId) => {
     if (confirm('Delete this brand? All products under this brand will also be deleted.')) {
-      setBrands(brands.filter(b => b.id !== brandId));
-      const newProducts = { ...products };
-      delete newProducts[brandId];
-      setProducts(newProducts);
+      const updatedBrands = brands.filter(b => b.id !== brandId);
+      const updatedProducts = { ...products };
+      delete updatedProducts[brandId];
+      setBrands(updatedBrands);
+      setProducts(updatedProducts);
       if (selectedBrand?.id === brandId) setSelectedBrand(null);
+      saveAllData(updatedBrands, updatedProducts);
       alert('Brand deleted!');
-      syncToHomepage();
     }
   };
 
@@ -116,10 +138,13 @@ function AdminProducts() {
     if (confirm('Delete this product?')) {
       const updatedProducts = { ...products };
       updatedProducts[selectedBrand.id] = updatedProducts[selectedBrand.id].filter(p => p.id !== productId);
+      const updatedBrands = brands.map(b => 
+        b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b
+      );
       setProducts(updatedProducts);
-      setBrands(brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount - 1 } : b));
+      setBrands(updatedBrands);
+      saveAllData(updatedBrands, updatedProducts);
       alert('Product deleted!');
-      syncToHomepage();
     }
   };
 
@@ -129,7 +154,7 @@ function AdminProducts() {
       p.id === productId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
     );
     setProducts(updatedProducts);
-    syncToHomepage();
+    saveAllData(brands, updatedProducts);
   };
 
   const handleAddProduct = (e) => {
@@ -145,12 +170,15 @@ function AdminProducts() {
     };
     const updatedProducts = { ...products };
     updatedProducts[selectedBrand.id] = [...(updatedProducts[selectedBrand.id] || []), newProduct];
+    const updatedBrands = brands.map(b => 
+      b.id === selectedBrand.id ? { ...b, productCount: b.productCount + 1 } : b
+    );
     setProducts(updatedProducts);
-    setBrands(brands.map(b => b.id === selectedBrand.id ? { ...b, productCount: b.productCount + 1 } : b));
+    setBrands(updatedBrands);
+    saveAllData(updatedBrands, updatedProducts);
     setShowAddModal(false);
     setFormData({ name: '', price: '', stock: '', category: 'skincare' });
     alert('Product added!');
-    syncToHomepage();
   };
 
   const handleEditProduct = (product) => {
@@ -171,11 +199,11 @@ function AdminProducts() {
       p.id === editingProduct.id ? { ...p, ...formData } : p
     );
     setProducts(updatedProducts);
+    saveAllData(brands, updatedProducts);
     setShowAddModal(false);
     setEditingProduct(null);
     setFormData({ name: '', price: '', stock: '', category: 'skincare' });
     alert('Product updated!');
-    syncToHomepage();
   };
 
   if (loading) {
@@ -221,11 +249,7 @@ function AdminProducts() {
                     }`}
                   >
                     <div className="w-16 h-16 mx-auto mb-2 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {brand.logo ? (
-                        <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-3xl">🏢</span>
-                      )}
+                      {brand.logo ? <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" /> : <span className="text-3xl">🏢</span>}
                     </div>
                     <p className="font-medium text-gray-800 text-sm">{brand.name}</p>
                     <p className="text-xs text-gray-400">{brand.productCount} products</p>
@@ -248,11 +272,7 @@ function AdminProducts() {
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                    {selectedBrand.logo ? (
-                      <img src={selectedBrand.logo} alt={selectedBrand.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xl">🏢</span>
-                    )}
+                    {selectedBrand.logo ? <img src={selectedBrand.logo} alt={selectedBrand.name} className="w-full h-full object-cover" /> : <span className="text-xl">🏢</span>}
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-gray-800">{selectedBrand.name}</h2>
@@ -278,33 +298,17 @@ function AdminProducts() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
-                      <tr className="border-b">
-                        <th className="px-6 py-3 text-left">Product Name</th>
-                        <th className="px-6 py-3 text-left">Category</th>
-                        <th className="px-6 py-3 text-right">Price</th>
-                        <th className="px-6 py-3 text-right">Stock</th>
-                        <th className="px-6 py-3 text-center">Status</th>
-                        <th className="px-6 py-3 text-center">Actions</th>
-                      </tr>
+                      <tr className="border-b"><th className="px-6 py-3 text-left">Product Name</th><th className="px-6 py-3 text-left">Category</th><th className="px-6 py-3 text-right">Price</th><th className="px-6 py-3 text-right">Stock</th><th className="px-6 py-3 text-center">Status</th><th className="px-6 py-3 text-center">Actions</th></tr>
                     </thead>
                     <tbody className="divide-y">
                       {products[selectedBrand.id]?.map(product => (
                         <tr key={product.id} className="hover:bg-gray-50">
                           <td className="px-6 py-3 font-medium text-gray-800">{product.name}</td>
-                          <td className="px-6 py-3 capitalize text-gray-500">{product.category}</td>
+                          <td className="px-6 py-3 capitalize text-gray-500">{product.category}<td>
                           <td className="px-6 py-3 text-right font-semibold text-gray-800">₹{product.price}</td>
                           <td className="px-6 py-3 text-right text-gray-500">{product.stock} units</td>
-                          <td className="px-6 py-3 text-center">
-                            <button onClick={() => toggleProductStatus(product.id)} className={`px-2 py-1 rounded-full text-xs font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                              {product.status === 'active' ? 'Active' : 'Inactive'}
-                            </button>
-                          </td>
-                          <td className="px-6 py-3 text-center">
-                            <div className="flex justify-center gap-2">
-                              <button onClick={() => handleEditProduct(product)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition" title="Edit">✏️</button>
-                              <button onClick={() => deleteProduct(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition" title="Delete">🗑️</button>
-                            </div>
-                          </td>
+                          <td className="px-6 py-3 text-center"><button onClick={() => toggleProductStatus(product.id)} className={`px-2 py-1 rounded-full text-xs font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{product.status === 'active' ? 'Active' : 'Inactive'}</button></td>
+                          <td className="px-6 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => handleEditProduct(product)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition" title="Edit">✏️</button><button onClick={() => deleteProduct(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition" title="Delete">🗑️</button></div></td>
                         </tr>
                       ))}
                     </tbody>
@@ -325,10 +329,7 @@ function AdminProducts() {
       {showBrandModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowBrandModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-5 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-xl font-bold">Add New Brand</h3>
-              <button onClick={() => setShowBrandModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
+            <div className="border-b p-5 flex justify-between items-center sticky top-0 bg-white"><h3 className="text-xl font-bold">Add New Brand</h3><button onClick={() => setShowBrandModal(false)} className="text-gray-400 hover:text-gray-600">✕</button></div>
             <form onSubmit={(e) => { e.preventDefault(); addBrand(); }} className="p-5 space-y-4">
               <div><label className="block text-sm font-medium mb-1">Brand Name *</label><input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div>
               <div><label className="block text-sm font-medium mb-1">Brand Logo</label><div className="flex items-center gap-4">{brandFormData.logoPreview && (<div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100"><img src={brandFormData.logoPreview} alt="Preview" className="w-full h-full object-cover" /></div>)}<button type="button" onClick={() => logoInputRef.current.click()} className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition">Upload Logo</button><input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" /></div><p className="text-xs text-gray-400 mt-1">Upload a square image (recommended size: 64x64px)</p></div>
@@ -342,10 +343,7 @@ function AdminProducts() {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-5 flex justify-between items-center">
-              <h3 className="text-xl font-bold">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
+            <div className="border-b p-5 flex justify-between items-center"><h3 className="text-xl font-bold">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3><button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">✕</button></div>
             <form onSubmit={editingProduct ? updateProduct : handleAddProduct} className="p-5 space-y-4">
               <div><label className="block text-sm font-medium mb-1">Product Name</label><input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div>
               <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">Price (₹)</label><input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div><div><label className="block text-sm font-medium mb-1">Stock</label><input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required /></div></div>
