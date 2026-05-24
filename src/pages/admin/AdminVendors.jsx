@@ -18,45 +18,66 @@ function AdminVendors() {
     if (tab === 'pending') setActiveTab('pending');
   }, [location]);
 
-  useEffect(() => {
-    const mockVendors = [
-      { id: 1, brandName: 'Nykaa Beauty', name: 'Nykaa Beauty', email: 'nykaa@mypinkshop.com', phone: '9876543210', vendorStatus: 'approved', productsCount: 24, totalSales: 1250000, joinedDate: '2024-01-15', gstNumber: '22AAAAA0000A1Z', address: 'Mumbai, Maharashtra', commission: 15 },
-      { id: 2, brandName: 'Mamaearth', name: 'Mamaearth', email: 'mamaearth@mypinkshop.com', phone: '9876543211', vendorStatus: 'approved', productsCount: 18, totalSales: 890000, joinedDate: '2024-02-01', gstNumber: '22BBBBB0000B2Z', address: 'Gurgaon, Haryana', commission: 15 },
-      { id: 3, brandName: 'Sugar Cosmetics', name: 'Sugar Cosmetics', email: 'sugar@mypinkshop.com', phone: '9876543212', vendorStatus: 'pending', productsCount: 0, totalSales: 0, joinedDate: '2024-05-10', gstNumber: '22CCCCC0000C3Z', address: 'Bangalore, Karnataka', commission: 15 },
-      { id: 4, brandName: 'Plum Beauty', name: 'Plum Beauty', email: 'plum@mypinkshop.com', phone: '9876543213', vendorStatus: 'pending', productsCount: 0, totalSales: 0, joinedDate: '2024-05-12', gstNumber: '22DDDDD0000D4Z', address: 'Pune, Maharashtra', commission: 15 },
-      { id: 5, brandName: 'Kay Beauty', name: 'Kay Beauty', email: 'kay@mypinkshop.com', phone: '9876543214', vendorStatus: 'blocked', productsCount: 0, totalSales: 0, joinedDate: '2024-05-15', gstNumber: '22EEEEE0000E5Z', address: 'Mumbai, Maharashtra', commission: 15 },
-    ];
-    setVendors(mockVendors);
+  // Load vendors from localStorage (where signup saves them)
+  const loadVendors = () => {
+    // First, try to get from localStorage (real signups)
+    const registeredVendors = localStorage.getItem('registeredVendors');
+    let registeredList = registeredVendors ? JSON.parse(registeredVendors) : [];
+    
+    // Add default vendors if none exist
+    if (registeredList.length === 0) {
+      registeredList = [
+        { id: 1, brandName: 'Nykaa Beauty', email: 'nykaa@mypinkshop.com', phone: '9876543210', vendorStatus: 'approved', productsCount: 24, totalSales: 1250000, joinedDate: '2024-01-15', gstNumber: '22AAAAA0000A1Z', address: 'Mumbai, Maharashtra', commission: 15 },
+        { id: 2, brandName: 'Mamaearth', email: 'mamaearth@mypinkshop.com', phone: '9876543211', vendorStatus: 'approved', productsCount: 18, totalSales: 890000, joinedDate: '2024-02-01', gstNumber: '22BBBBB0000B2Z', address: 'Gurgaon, Haryana', commission: 15 },
+      ];
+      localStorage.setItem('registeredVendors', JSON.stringify(registeredList));
+    }
+    
+    setVendors(registeredList);
     setLoading(false);
+  };
+
+  useEffect(() => {
+    loadVendors();
   }, []);
 
   const approveVendor = (vendorId) => {
-    setVendors(vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'approved' } : v));
+    const updatedVendors = vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'approved' } : v);
+    setVendors(updatedVendors);
+    localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
     alert('✅ Vendor approved successfully! They can now login.');
   };
 
   const rejectVendor = (vendorId) => {
     if (confirm('Reject this vendor application?')) {
-      setVendors(vendors.filter(v => v.id !== vendorId));
+      const updatedVendors = vendors.filter(v => v.id !== vendorId);
+      setVendors(updatedVendors);
+      localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
       alert('❌ Vendor application rejected.');
     }
   };
 
   const blockVendor = (vendorId) => {
     if (confirm('Block this vendor?')) {
-      setVendors(vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'blocked' } : v));
+      const updatedVendors = vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'blocked' } : v);
+      setVendors(updatedVendors);
+      localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
       alert('🔒 Vendor blocked.');
     }
   };
 
   const unblockVendor = (vendorId) => {
-    setVendors(vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'approved' } : v));
+    const updatedVendors = vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'approved' } : v);
+    setVendors(updatedVendors);
+    localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
     alert('🔓 Vendor unblocked.');
   };
 
   const deleteVendor = (vendorId) => {
     if (confirm('Delete this vendor permanently? This will delete all their products too.')) {
-      setVendors(vendors.filter(v => v.id !== vendorId));
+      const updatedVendors = vendors.filter(v => v.id !== vendorId);
+      setVendors(updatedVendors);
+      localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
       alert('🗑️ Vendor deleted.');
     }
   };
@@ -155,7 +176,7 @@ function AdminVendors() {
                         <button onClick={() => deleteVendor(vendor.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">🗑️</button>
                       </div>
                     </td>
-                  </tr>
+                  <tr>
                 ))}
               </tbody>
             </table>
