@@ -33,6 +33,12 @@ import VendorProducts from './pages/vendor/VendorProducts';
 import VendorAddProduct from './pages/vendor/VendorAddProduct';
 import VendorOrders from './pages/vendor/VendorOrders';
 import VendorEarnings from './pages/vendor/VendorEarnings';
+import VendorBusinessDetails from './pages/vendor/VendorBusinessDetails';
+import VendorAds from './pages/vendor/VendorAds';
+import VendorShipping from './pages/vendor/VendorShipping';
+import VendorTax from './pages/vendor/VendorTax';
+import VendorReports from './pages/vendor/VendorReports';
+import VendorSettings from './pages/vendor/VendorSettings';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -80,10 +86,16 @@ function App() {
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
               <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+              <Route path="/vendor/business-details" element={<VendorBusinessDetails />} />
               <Route path="/vendor/products" element={<VendorProducts />} />
               <Route path="/vendor/add-product" element={<VendorAddProduct />} />
               <Route path="/vendor/orders" element={<VendorOrders />} />
               <Route path="/vendor/earnings" element={<VendorEarnings />} />
+              <Route path="/vendor/ads" element={<VendorAds />} />
+              <Route path="/vendor/shipping" element={<VendorShipping />} />
+              <Route path="/vendor/tax" element={<VendorTax />} />
+              <Route path="/vendor/reports" element={<VendorReports />} />
+              <Route path="/vendor/settings" element={<VendorSettings />} />
             </Routes>
           </ReviewProvider>
         </CartProvider>
