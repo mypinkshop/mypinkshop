@@ -18,13 +18,11 @@ function AdminVendors() {
     if (tab === 'pending') setActiveTab('pending');
   }, [location]);
 
-  // Load vendors from localStorage (where signup saves them)
+  // Load vendors from localStorage
   const loadVendors = () => {
-    // First, try to get from localStorage (real signups)
     const registeredVendors = localStorage.getItem('registeredVendors');
     let registeredList = registeredVendors ? JSON.parse(registeredVendors) : [];
     
-    // Add default vendors if none exist
     if (registeredList.length === 0) {
       registeredList = [
         { id: 1, brandName: 'Nykaa Beauty', email: 'nykaa@mypinkshop.com', phone: '9876543210', vendorStatus: 'approved', productsCount: 24, totalSales: 1250000, joinedDate: '2024-01-15', gstNumber: '22AAAAA0000A1Z', address: 'Mumbai, Maharashtra', commission: 15 },
@@ -45,7 +43,7 @@ function AdminVendors() {
     const updatedVendors = vendors.map(v => v.id === vendorId ? { ...v, vendorStatus: 'approved' } : v);
     setVendors(updatedVendors);
     localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
-    alert('✅ Vendor approved successfully! They can now login.');
+    alert('✅ Vendor approved successfully!');
   };
 
   const rejectVendor = (vendorId) => {
@@ -74,7 +72,7 @@ function AdminVendors() {
   };
 
   const deleteVendor = (vendorId) => {
-    if (confirm('Delete this vendor permanently? This will delete all their products too.')) {
+    if (confirm('Delete this vendor permanently?')) {
       const updatedVendors = vendors.filter(v => v.id !== vendorId);
       setVendors(updatedVendors);
       localStorage.setItem('registeredVendors', JSON.stringify(updatedVendors));
@@ -122,23 +120,35 @@ function AdminVendors() {
       <div className="p-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Total Vendors</p><p className="text-2xl font-semibold">{vendors.length}</p></div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Approved</p><p className="text-2xl font-semibold text-green-600">{approvedCount}</p></div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Pending</p><p className="text-2xl font-semibold text-yellow-600">{pendingCount}</p></div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Blocked</p><p className="text-2xl font-semibold text-red-600">{blockedCount}</p></div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500">Total Vendors</p>
+            <p className="text-2xl font-semibold">{vendors.length}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500">Approved</p>
+            <p className="text-2xl font-semibold text-green-600">{approvedCount}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500">Pending</p>
+            <p className="text-2xl font-semibold text-yellow-600">{pendingCount}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs text-gray-500">Blocked</p>
+            <p className="text-2xl font-semibold text-red-600">{blockedCount}</p>
+          </div>
         </div>
 
         {/* Tabs & Search */}
         <div className="bg-white border border-gray-200 rounded-lg mb-6 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
             <div className="flex gap-2">
-              <button onClick={() => setActiveTab('all')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'all' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All Vendors ({vendors.length})</button>
+              <button onClick={() => setActiveTab('all')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'all' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All ({vendors.length})</button>
               <button onClick={() => setActiveTab('pending')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'pending' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Pending ({pendingCount})</button>
               <button onClick={() => setActiveTab('approved')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'approved' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Approved ({approvedCount})</button>
               <button onClick={() => setActiveTab('blocked')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${activeTab === 'blocked' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Blocked ({blockedCount})</button>
             </div>
             <div className="relative">
-              <input type="text" placeholder="Search vendors by name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded text-sm" />
+              <input type="text" placeholder="Search vendors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded text-sm" />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
           </div>
@@ -147,7 +157,7 @@ function AdminVendors() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
-                <tr className="border-b">
+                <tr>
                   <th className="px-4 py-3 text-left">Brand Name</th>
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-left">Phone</th>
@@ -170,20 +180,31 @@ function AdminVendors() {
                     <td className="px-4 py-3 text-center">{getStatusBadge(vendor.vendorStatus)}</td>
                     <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-center gap-2">
-                        {vendor.vendorStatus === 'pending' && <><button onClick={() => approveVendor(vendor.id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded" title="Approve">✅</button><button onClick={() => rejectVendor(vendor.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Reject">❌</button></>}
-                        {vendor.vendorStatus === 'approved' && <button onClick={() => blockVendor(vendor.id)} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded" title="Block">🔒</button>}
-                        {vendor.vendorStatus === 'blocked' && <button onClick={() => unblockVendor(vendor.id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded" title="Unblock">✅</button>}
+                        {vendor.vendorStatus === 'pending' && (
+                          <>
+                            <button onClick={() => approveVendor(vendor.id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded" title="Approve">✅</button>
+                            <button onClick={() => rejectVendor(vendor.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Reject">❌</button>
+                          </>
+                        )}
+                        {vendor.vendorStatus === 'approved' && (
+                          <button onClick={() => blockVendor(vendor.id)} className="p-1.5 text-orange-500 hover:bg-orange-50 rounded" title="Block">🔒</button>
+                        )}
+                        {vendor.vendorStatus === 'blocked' && (
+                          <button onClick={() => unblockVendor(vendor.id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded" title="Unblock">✅</button>
+                        )}
                         <button onClick={() => deleteVendor(vendor.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Delete">🗑️</button>
                       </div>
                     </td>
-                  <tr>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
           {filteredVendors.length === 0 && (
-            <div className="p-8 text-center"><p className="text-gray-500">No vendors found</p></div>
+            <div className="p-8 text-center">
+              <p className="text-gray-500">No vendors found</p>
+            </div>
           )}
         </div>
       </div>
@@ -210,9 +231,18 @@ function AdminVendors() {
                 <div><p className="text-xs text-gray-400">Total Sales</p><p className="text-xl font-bold text-green-600">₹{selectedVendor.totalSales.toLocaleString()}</p></div>
               </div>
               <div className="pt-4 border-t flex gap-3">
-                {selectedVendor.vendorStatus === 'pending' && <><button onClick={() => { approveVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg">Approve</button><button onClick={() => { rejectVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg">Reject</button></>}
-                {selectedVendor.vendorStatus === 'approved' && <button onClick={() => { blockVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-orange-500 text-white py-2 rounded-lg">Block Vendor</button>}
-                {selectedVendor.vendorStatus === 'blocked' && <button onClick={() => { unblockVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg">Unblock</button>}
+                {selectedVendor.vendorStatus === 'pending' && (
+                  <>
+                    <button onClick={() => { approveVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg">Approve</button>
+                    <button onClick={() => { rejectVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg">Reject</button>
+                  </>
+                )}
+                {selectedVendor.vendorStatus === 'approved' && (
+                  <button onClick={() => { blockVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-orange-500 text-white py-2 rounded-lg">Block</button>
+                )}
+                {selectedVendor.vendorStatus === 'blocked' && (
+                  <button onClick={() => { unblockVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg">Unblock</button>
+                )}
                 <button onClick={() => { deleteVendor(selectedVendor.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg">Delete</button>
               </div>
             </div>
