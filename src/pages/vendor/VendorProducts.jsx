@@ -20,10 +20,7 @@ function VendorProducts() {
     const vendor = JSON.parse(vendorData);
     const vendorName = vendor.brandName || vendor.name;
     
-    // Get all products from localStorage (adminProductsList)
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    
-    // Filter products by this vendor
     const myProducts = allProducts.filter(p => p.vendor === vendorName);
     
     setProducts(myProducts);
@@ -31,30 +28,28 @@ function VendorProducts() {
   }, [navigate]);
 
   const getStatusBadge = (status) => {
-    const styles = {
-      active: 'bg-green-100 text-green-700',
-      lowstock: 'bg-amber-100 text-amber-700',
-      outofstock: 'bg-red-100 text-red-700',
-    };
-    return styles[status] || 'bg-gray-100 text-gray-700';
+    switch(status) {
+      case 'active': return 'bg-green-100 text-green-700';
+      case 'lowstock': return 'bg-amber-100 text-amber-700';
+      case 'outofstock': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
   };
 
   const getStatusText = (status) => {
-    const texts = {
-      active: 'Active',
-      lowstock: 'Low Stock',
-      outofstock: 'Out of Stock',
-    };
-    return texts[status] || status;
+    switch(status) {
+      case 'active': return 'Active';
+      case 'lowstock': return 'Low Stock';
+      case 'outofstock': return 'Out of Stock';
+      default: return status;
+    }
   };
 
   const deleteProduct = (productId) => {
-    if (confirm('Are you sure you want to delete this product?')) {
+    if (window.confirm('Are you sure you want to delete this product?')) {
       const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
       const updatedProducts = allProducts.filter(p => p.id !== productId);
       localStorage.setItem('adminProductsList', JSON.stringify(updatedProducts));
-      
-      // Update local state
       setProducts(products.filter(p => p.id !== productId));
       alert('Product deleted successfully!');
     }
@@ -131,7 +126,7 @@ function VendorProducts() {
                     </tr>
                   ))}
                 </tbody>
-              <table>
+              </table>
             </div>
           )}
         </div>
