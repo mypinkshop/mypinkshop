@@ -1,35 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import VendorSidebar from './components/VendorSidebar';
 import VendorHeader from './components/VendorHeader';
 
 function VendorAds() {
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('campaigns');
-  const [campaigns, setCampaigns] = useState([
-    { id: 1, name: 'Summer Sale Campaign', budget: 5000, spent: 3240, status: 'active', impressions: 12500, clicks: 432, ctr: 3.46, sales: 12499, acos: 25.9 },
-    { id: 2, name: 'Festival Special', budget: 3000, spent: 1200, status: 'paused', impressions: 4500, clicks: 123, ctr: 2.73, sales: 5670, acos: 21.2 },
-    { id: 3, name: 'New Launch Promotion', budget: 2000, spent: 2000, status: 'ended', impressions: 8900, clicks: 234, ctr: 2.63, sales: 8900, acos: 22.5 },
-  ]);
-
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: '', budget: '', dailyBudget: '', startDate: '', endDate: '' });
+  const navigate = useNavigate();
 
-  const getStatusBadge = (status) => {
-    switch(status) {
-      case 'active': return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Active</span>;
-      case 'paused': return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Paused</span>;
-      case 'ended': return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">Ended</span>;
-      default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">{status}</span>;
+  useEffect(() => {
+    const token = localStorage.getItem('vendorToken');
+    const vendorData = localStorage.getItem('vendor');
+    
+    if (!token || !vendorData) {
+      navigate('/vendor/login');
+      return;
     }
-  };
 
-  const toggleCampaignStatus = (id) => {
-    setCampaigns(campaigns.map(c => c.id === id ? { ...c, status: c.status === 'active' ? 'paused' : 'active' } : c));
-  };
+    // Load campaigns from localStorage
+    const savedCampaigns = JSON.parse(localStorage.getItem('vendorCampaigns') || '[]');
+    setCampaigns(savedCampaigns);
+    setLoading(false);
+  }, [navigate]);
 
-  const deleteCampaign = (id) => {
-    if (window.confirm('Delete this campaign?')) {
-      setCampaigns(campaigns.filter(c => c.id !== id));
-    }
+  const saveCampaigns = (updatedCampaigns) => {
+    localStorage.setItem('vendorCampaigns', JSON.stringify(updatedCampaigns));
+    setCampaigns(updatedCampaigns);
   };
 
   const createCampaign = () => {
@@ -37,11 +36,12 @@ function VendorAds() {
       alert('Please fill campaign name and budget');
       return;
     }
-    const newId = campaigns.length + 1;
-    setCampaigns([...campaigns, {
+    const newId = Date.now();
+    const campaign = {
       id: newId,
       name: newCampaign.name,
       budget: parseInt(newCampaign.budget),
+      dailyBudget: newCampaign.dailyBudget ? parseInt(newCampaign.dailyBudget) : 0,
       spent: 0,
       status: 'paused',
       impressions: 0,
@@ -49,10 +49,39 @@ function VendorAds() {
       ctr: 0,
       sales: 0,
       acos: 0,
-    }]);
+      startDate: newCampaign.startDate || new Date().toISOString().split('T')[0],
+      endDate: newCampaign.endDate || '',
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    const updatedCampaigns = [...campaigns, campaign];
+    saveCampaigns(updatedCampaigns);
     setShowCreateModal(false);
     setNewCampaign({ name: '', budget: '', dailyBudget: '', startDate: '', endDate: '' });
     alert('Campaign created successfully!');
+  };
+
+  const toggleCampaignStatus = (id) => {
+    const updatedCampaigns = campaigns.map(c => 
+      c.id === id ? { ...c, status: c.status === 'active' ? 'paused' : 'active' } : c
+    );
+    saveCampaigns(updatedCampaigns);
+    alert(`Campaign ${campaigns.find(c => c.id === id)?.status === 'active' ? 'paused' : 'activated'}`);
+  };
+
+  const deleteCampaign = (id) => {
+    if (window.confirm('Delete this campaign?')) {
+      const updatedCampaigns = campaigns.filter(c => c.id !== id);
+      saveCampaigns(updatedCampaigns);
+      alert('Campaign deleted');
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'active': return 'bg-green-100 text-green-700';
+      case 'paused': return 'bg-yellow-100 text-yellow-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
   };
 
   const totalStats = {
@@ -62,7 +91,16 @@ function VendorAds() {
     totalImpressions: campaigns.reduce((sum, c) => sum + c.impressions, 0),
     totalClicks: campaigns.reduce((sum, c) => sum + c.clicks, 0),
     totalSales: campaigns.reduce((sum, c) => sum + c.sales, 0),
+    avgCtr: campaigns.length > 0 ? (campaigns.reduce((sum, c) => sum + c.ctr, 0) / campaigns.length).toFixed(2) : 0,
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -71,7 +109,6 @@ function VendorAds() {
       
       <main className="ml-64 pt-16 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Advertising</h1>
@@ -82,24 +119,43 @@ function VendorAds() {
             </button>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Active Campaigns</p><p className="text-2xl font-bold text-green-600">{totalStats.activeCampaigns}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Total Budget</p><p className="text-2xl font-bold">₹{totalStats.totalBudget.toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Total Spent</p><p className="text-2xl font-bold text-orange-600">₹{totalStats.totalSpent.toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Impressions</p><p className="text-2xl font-bold">{totalStats.totalImpressions.toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Clicks</p><p className="text-2xl font-bold">{totalStats.totalClicks.toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Sales Generated</p><p className="text-2xl font-bold text-green-600">₹{totalStats.totalSales.toLocaleString()}</p></div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Active Campaigns</p>
+              <p className="text-2xl font-bold text-green-600">{totalStats.activeCampaigns}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Total Budget</p>
+              <p className="text-2xl font-bold">₹{totalStats.totalBudget.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Total Spent</p>
+              <p className="text-2xl font-bold text-orange-600">₹{totalStats.totalSpent.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Impressions</p>
+              <p className="text-2xl font-bold">{totalStats.totalImpressions.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Clicks</p>
+              <p className="text-2xl font-bold">{totalStats.totalClicks.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Avg CTR</p>
+              <p className="text-2xl font-bold">{totalStats.avgCtr}%</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <p className="text-xs text-gray-500">Sales Generated</p>
+              <p className="text-2xl font-bold text-green-600">₹{totalStats.totalSales.toLocaleString()}</p>
+            </div>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-4 border-b border-gray-200 mb-6">
             <button onClick={() => setActiveTab('campaigns')} className={`px-4 py-2 text-sm font-medium ${activeTab === 'campaigns' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}>Campaigns</button>
             <button onClick={() => setActiveTab('performance')} className={`px-4 py-2 text-sm font-medium ${activeTab === 'performance' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}>Performance</button>
             <button onClick={() => setActiveTab('recommendations')} className={`px-4 py-2 text-sm font-medium ${activeTab === 'recommendations' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}>Recommendations</button>
           </div>
 
-          {/* Campaigns Tab */}
           {activeTab === 'campaigns' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -119,59 +175,113 @@ function VendorAds() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {campaigns.map(campaign => (
-                      <tr key={campaign.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium">{campaign.name}</td>
-                        <td className="px-4 py-3 text-right">₹{campaign.budget.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">₹{campaign.spent.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">{campaign.impressions.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">{campaign.clicks.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">{campaign.ctr}%</td>
-                        <td className="px-4 py-3 text-right text-green-600">₹{campaign.sales.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-right">{campaign.acos}%</td>
-                        <td className="px-4 py-3 text-center">{getStatusBadge(campaign.status)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex justify-center gap-2">
-                            <button onClick={() => toggleCampaignStatus(campaign.id)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title={campaign.status === 'active' ? 'Pause' : 'Activate'}>⏯️</button>
-                            <button onClick={() => deleteCampaign(campaign.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">🗑️</button>
-                          </div>
-                        </td>
+                    {campaigns.length === 0 ? (
+                      <tr className="hover:bg-gray-50">
+                        <td colSpan="10" className="px-4 py-8 text-center text-gray-500">No campaigns yet. Create your first campaign!</td>
                       </tr>
-                    ))}
+                    ) : (
+                      campaigns.map(campaign => (
+                        <tr key={campaign.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium">{campaign.name}</td>
+                          <td className="px-4 py-3 text-right">₹{campaign.budget.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">₹{campaign.spent.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{campaign.impressions.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{campaign.clicks.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{campaign.ctr}%</td>
+                          <td className="px-4 py-3 text-right text-green-600">₹{campaign.sales.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{campaign.acos}%</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(campaign.status)}`}>{campaign.status}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => toggleCampaignStatus(campaign.id)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title={campaign.status === 'active' ? 'Pause' : 'Activate'}>⏯️</button>
+                              <button onClick={() => deleteCampaign(campaign.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">🗑️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           )}
 
-          {/* Performance Tab */}
           {activeTab === 'performance' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold mb-4">Performance Overview</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border rounded-lg p-4"><h3 className="font-medium mb-2">Top Performing Campaign</h3><p className="text-2xl font-bold text-green-600">Summer Sale Campaign</p><p className="text-sm text-gray-500 mt-1">₹12,499 sales • 3.46% CTR</p></div>
-                <div className="border rounded-lg p-4"><h3 className="font-medium mb-2">Best CTR</h3><p className="text-2xl font-bold">3.46%</p><p className="text-sm text-gray-500">Summer Sale Campaign</p></div>
-                <div className="border rounded-lg p-4"><h3 className="font-medium mb-2">Lowest ACOS</h3><p className="text-2xl font-bold">21.2%</p><p className="text-sm text-gray-500">Festival Special</p></div>
-                <div className="border rounded-lg p-4"><h3 className="font-medium mb-2">Total ROI</h3><p className="text-2xl font-bold text-green-600">{(totalStats.totalSales / totalStats.totalSpent * 100).toFixed(1)}%</p><p className="text-sm text-gray-500">Return on ad spend</p></div>
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-medium mb-2">Top Performing Campaign</h3>
+                  {campaigns.length > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold text-green-600">{campaigns.sort((a,b) => b.sales - a.sales)[0]?.name}</p>
+                      <p className="text-sm text-gray-500 mt-1">₹{campaigns.sort((a,b) => b.sales - a.sales)[0]?.sales} sales • {campaigns.sort((a,b) => b.ctr - a.ctr)[0]?.ctr}% CTR</p>
+                    </>
+                  ) : <p className="text-gray-500">No campaigns yet</p>}
+                </div>
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-medium mb-2">Best CTR</h3>
+                  {campaigns.length > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold">{Math.max(...campaigns.map(c => c.ctr), 0)}%</p>
+                      <p className="text-sm text-gray-500 mt-1">{campaigns.find(c => c.ctr === Math.max(...campaigns.map(c => c.ctr)))?.name}</p>
+                    </>
+                  ) : <p className="text-gray-500">No campaigns yet</p>}
+                </div>
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-medium mb-2">Lowest ACOS</h3>
+                  {campaigns.length > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold">{Math.min(...campaigns.map(c => c.acos), 0)}%</p>
+                      <p className="text-sm text-gray-500 mt-1">{campaigns.find(c => c.acos === Math.min(...campaigns.map(c => c.acos)))?.name}</p>
+                    </>
+                  ) : <p className="text-gray-500">No campaigns yet</p>}
+                </div>
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-medium mb-2">Total ROI</h3>
+                  <p className="text-2xl font-bold text-green-600">{totalStats.totalSpent > 0 ? ((totalStats.totalSales / totalStats.totalSpent) * 100).toFixed(1) : 0}%</p>
+                  <p className="text-sm text-gray-500 mt-1">Return on ad spend</p>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Recommendations Tab */}
           {activeTab === 'recommendations' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold mb-4">Ad Recommendations</h2>
               <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4"><p className="font-medium text-blue-800">📈 Increase Budget for Summer Sale Campaign</p><p className="text-sm text-blue-600 mt-1">This campaign has high CTR (3.46%). Increasing budget could boost sales.</p></div>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4"><p className="font-medium text-yellow-800">⚠️ Festival Special Campaign is Paused</p><p className="text-sm text-yellow-600 mt-1">Your campaign has been paused for 5 days. Consider reactivating.</p></div>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="font-medium text-green-800">✨ New Keyword Suggestions</p><p className="text-sm text-green-600 mt-1">Add "glass skin", "organic skincare" to improve reach.</p></div>
+                {campaigns.filter(c => c.ctr > 3).length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="font-medium text-blue-800">📈 Increase Budget for High CTR Campaigns</p>
+                    <p className="text-sm text-blue-600 mt-1">Your campaigns with CTR above 3% are performing well. Consider increasing budget to boost sales.</p>
+                  </div>
+                )}
+                {campaigns.filter(c => c.status === 'paused').length > 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="font-medium text-yellow-800">⚠️ {campaigns.filter(c => c.status === 'paused').length} Campaign(s) are Paused</p>
+                    <p className="text-sm text-yellow-600 mt-1">Your campaigns have been paused. Activate them to start getting sales.</p>
+                  </div>
+                )}
+                {campaigns.filter(c => c.spent === 0).length === campaigns.length && campaigns.length > 0 && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <p className="font-medium text-purple-800">✨ New Campaigns Created</p>
+                    <p className="text-sm text-purple-600 mt-1">Your campaigns are ready to launch. Activate them to start advertising.</p>
+                  </div>
+                )}
+                {campaigns.length === 0 && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="font-medium text-gray-800">📢 Create Your First Campaign</p>
+                    <p className="text-sm text-gray-600 mt-1">Start advertising your products to reach more customers.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
       </main>
 
-      {/* Create Campaign Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowCreateModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
