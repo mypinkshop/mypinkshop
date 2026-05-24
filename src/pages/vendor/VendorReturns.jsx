@@ -24,10 +24,8 @@ function VendorReturns() {
     const vendor = JSON.parse(vendorData);
     const vendorName = vendor.brandName || vendor.name;
     
-    // Get all orders from localStorage
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     
-    // Filter orders with return requests for this vendor
     const returnRequests = allOrders
       .filter(order => order.vendor === vendorName && order.returnRequested === true)
       .map(order => ({
@@ -47,25 +45,17 @@ function VendorReturns() {
     setLoading(false);
   }, [navigate]);
 
-  const updateReturnStatus = (returnId, newStatus, resolution = '') => {
+  const updateReturnStatus = (returnId, newStatus) => {
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     const updatedOrders = allOrders.map(order => {
       if (order.returnId === returnId || order.id === returnId.replace('RET-', '')) {
-        return {
-          ...order,
-          returnStatus: newStatus,
-          returnResolution: resolution,
-          returnResolvedDate: new Date().toISOString().split('T')[0]
-        };
+        return { ...order, returnStatus: newStatus };
       }
       return order;
     });
     localStorage.setItem('adminOrdersList', JSON.stringify(updatedOrders));
     
-    // Update local state
-    setReturns(returns.map(r => 
-      r.id === returnId ? { ...r, status: newStatus, resolution: resolution } : r
-    ));
+    setReturns(returns.map(r => r.id === returnId ? { ...r, status: newStatus } : r));
     alert(`Return ${returnId} ${newStatus === 'approved' ? 'approved' : 'rejected'}`);
   };
 
@@ -74,7 +64,6 @@ function VendorReturns() {
       case 'approved': return 'bg-green-100 text-green-700';
       case 'rejected': return 'bg-red-100 text-red-700';
       case 'pending': return 'bg-yellow-100 text-yellow-700';
-      case 'processing': return 'bg-blue-100 text-blue-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -84,7 +73,6 @@ function VendorReturns() {
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
       case 'pending': return 'Pending Review';
-      case 'processing': return 'Processing';
       default: return status;
     }
   };
@@ -125,16 +113,29 @@ function VendorReturns() {
             </div>
           </div>
 
-          {/* Stats Cards - Amazon Style */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"><p className="text-xs text-gray-500">Total Returns</p><p className="text-2xl font-bold">{stats.total}</p></div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"><p className="text-xs text-gray-500">Pending</p><p className="text-2xl font-bold text-yellow-600">{stats.pending}</p></div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"><p className="text-xs text-gray-500">Approved</p><p className="text-2xl font-bold text-green-600">{stats.approved}</p></div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"><p className="text-xs text-gray-500">Rejected</p><p className="text-2xl font-bold text-red-600">{stats.rejected}</p></div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"><p className="text-xs text-gray-500">Total Refund Amount</p><p className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString()}</p></div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <p className="text-xs text-gray-500">Total Returns</p>
+              <p className="text-2xl font-bold">{stats.total}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <p className="text-xs text-gray-500">Pending</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <p className="text-xs text-gray-500">Approved</p>
+              <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <p className="text-xs text-gray-500">Rejected</p>
+              <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+              <p className="text-xs text-gray-500">Total Refund Amount</p>
+              <p className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString()}</p>
+            </div>
           </div>
 
-          {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
               <div className="flex gap-2">
@@ -149,7 +150,6 @@ function VendorReturns() {
               </div>
             </div>
 
-            {/* Returns Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
@@ -167,7 +167,9 @@ function VendorReturns() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredReturns.length === 0 ? (
-                    <tr><td colSpan="9" className="px-4 py-8 text-center text-gray-500">No return requests found</td></tr>
+                    <tr className="hover:bg-gray-50">
+                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">No return requests found</td>
+                    </tr>
                   ) : (
                     filteredReturns.map(returnReq => (
                       <tr key={returnReq.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedReturn(returnReq); setShowDetails(true); }}>
@@ -178,7 +180,9 @@ function VendorReturns() {
                         <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{returnReq.reason}</td>
                         <td className="px-4 py-3 text-right font-medium">₹{returnReq.amount}</td>
                         <td className="px-4 py-3 text-center text-gray-500">{returnReq.requestedDate}</td>
-                        <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(returnReq.status)}`}>{getStatusText(returnReq.status)}</span></td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(returnReq.status)}`}>{getStatusText(returnReq.status)}</span>
+                        </td>
                         <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           {returnReq.status === 'pending' && (
                             <div className="flex gap-2 justify-center">
@@ -187,7 +191,7 @@ function VendorReturns() {
                             </div>
                           )}
                         </td>
-                      </table>
+                      </tr>
                     ))
                   )}
                 </tbody>
@@ -197,7 +201,6 @@ function VendorReturns() {
         </div>
       </main>
 
-      {/* Return Details Modal */}
       {showDetails && selectedReturn && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetails(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -214,7 +217,10 @@ function VendorReturns() {
               </div>
               <div><p className="text-xs text-gray-400">Product</p><p className="font-medium">{selectedReturn.product}</p></div>
               <div><p className="text-xs text-gray-400">Reason for Return</p><p className="text-sm bg-gray-50 p-3 rounded-lg">{selectedReturn.reason}</p></div>
-              <div className="grid grid-cols-2 gap-4"><div><p className="text-xs text-gray-400">Refund Amount</p><p className="text-xl font-bold text-pink-600">₹{selectedReturn.amount}</p></div><div><p className="text-xs text-gray-400">Return Type</p><p className="capitalize">{selectedReturn.returnType}</p></div></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-xs text-gray-400">Refund Amount</p><p className="text-xl font-bold text-pink-600">₹{selectedReturn.amount}</p></div>
+                <div><p className="text-xs text-gray-400">Return Type</p><p className="capitalize">{selectedReturn.returnType}</p></div>
+              </div>
               {selectedReturn.status === 'pending' && (
                 <div className="flex gap-3 pt-4 border-t">
                   <button onClick={() => { updateReturnStatus(selectedReturn.id, 'approved'); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">Approve Return</button>
