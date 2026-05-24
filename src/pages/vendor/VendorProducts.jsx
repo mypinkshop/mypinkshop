@@ -7,23 +7,28 @@ function VendorProducts() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const token = localStorage.getItem('vendorToken');
 
   useEffect(() => {
-    if (!token) {
+    const token = localStorage.getItem('vendorToken');
+    const vendorData = localStorage.getItem('vendor');
+    
+    if (!token || !vendorData) {
       navigate('/vendor/login');
       return;
     }
 
-    // Mock products data
-    setProducts([
-      { id: 1, name: 'Glass Skin Serum', price: 1299, stock: 45, status: 'active', image: '💧', sales: 234 },
-      { id: 2, name: 'Rice Water Toner', price: 899, stock: 12, status: 'lowstock', image: '🌸', sales: 189 },
-      { id: 3, name: 'Cherry Lip Tint', price: 599, stock: 0, status: 'outofstock', image: '🍒', sales: 567 },
-      { id: 4, name: 'Satin Slip Dress', price: 2499, stock: 25, status: 'active', image: '👗', sales: 89 },
-    ]);
+    const vendor = JSON.parse(vendorData);
+    const vendorName = vendor.brandName || vendor.name;
+    
+    // Get all products from localStorage (adminProductsList)
+    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
+    
+    // Filter products by this vendor
+    const myProducts = allProducts.filter(p => p.vendor === vendorName);
+    
+    setProducts(myProducts);
     setLoading(false);
-  }, [token, navigate]);
+  }, [navigate]);
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -41,6 +46,18 @@ function VendorProducts() {
       outofstock: 'Out of Stock',
     };
     return texts[status] || status;
+  };
+
+  const deleteProduct = (productId) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
+      const updatedProducts = allProducts.filter(p => p.id !== productId);
+      localStorage.setItem('adminProductsList', JSON.stringify(updatedProducts));
+      
+      // Update local state
+      setProducts(products.filter(p => p.id !== productId));
+      alert('Product deleted successfully!');
+    }
   };
 
   if (loading) {
@@ -68,46 +85,55 @@ function VendorProducts() {
             </Link>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-pink-100">
-            <table className="w-full text-sm">
-              <thead className="bg-pink-50">
-                <tr className="border-b border-pink-100">
-                  <th className="px-6 py-3 text-left text-gray-600">Product</th>
-                  <th className="px-6 py-3 text-left text-gray-600">Price</th>
-                  <th className="px-6 py-3 text-left text-gray-600">Stock</th>
-                  <th className="px-6 py-3 text-left text-gray-600">Sales</th>
-                  <th className="px-6 py-3 text-left text-gray-600">Status</th>
-                  <th className="px-6 py-3 text-left text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-pink-50">
-                {products.map(product => (
-                  <tr key={product.id} className="hover:bg-pink-50/50">
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center text-xl">{product.image}</div>
-                        <span className="font-medium">{product.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3">₹{product.price}</td>
-                    <td className="px-6 py-3">{product.stock}</td>
-                    <td className="px-6 py-3">{product.sales}</td>
-                    <td className="px-6 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(product.status)}`}>
-                        {getStatusText(product.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex gap-2">
-                        <button className="p-1 text-blue-500 hover:bg-blue-50 rounded">✏️</button>
-                        <button className="p-1 text-red-500 hover:bg-red-50 rounded">🗑️</button>
-                      </div>
-                    </td>
+          {products.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-pink-100">
+              <div className="text-6xl mb-4">📦</div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No products yet</h3>
+              <p className="text-gray-500 mb-4">Start adding your first product to sell on MyPinkShop</p>
+              <Link to="/vendor/add-product" className="bg-pink-500 text-white px-6 py-2 rounded-lg inline-block">Add Product</Link>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-pink-100">
+              <table className="w-full text-sm">
+                <thead className="bg-pink-50">
+                  <tr className="border-b border-pink-100">
+                    <th className="px-6 py-3 text-left text-gray-600">Product</th>
+                    <th className="px-6 py-3 text-left text-gray-600">Price</th>
+                    <th className="px-6 py-3 text-left text-gray-600">Stock</th>
+                    <th className="px-6 py-3 text-left text-gray-600">Sales</th>
+                    <th className="px-6 py-3 text-left text-gray-600">Status</th>
+                    <th className="px-6 py-3 text-left text-gray-600">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-pink-50">
+                  {products.map(product => (
+                    <tr key={product.id} className="hover:bg-pink-50/50">
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-pink-100 flex items-center justify-center text-xl">{product.image || '📦'}</div>
+                          <span className="font-medium">{product.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">₹{product.price}</td>
+                      <td className="px-6 py-3">{product.stock}</td>
+                      <td className="px-6 py-3">{product.sales || 0}</td>
+                      <td className="px-6 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(product.status)}`}>
+                          {getStatusText(product.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex gap-2">
+                          <Link to={`/vendor/edit-product/${product.id}`} className="p-1 text-blue-500 hover:bg-blue-50 rounded">✏️</Link>
+                          <button onClick={() => deleteProduct(product.id)} className="p-1 text-red-500 hover:bg-red-50 rounded">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              <table>
+            </div>
+          )}
         </div>
       </main>
     </div>
