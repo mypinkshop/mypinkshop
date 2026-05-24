@@ -39,6 +39,13 @@ import VendorShipping from './pages/vendor/VendorShipping';
 import VendorTax from './pages/vendor/VendorTax';
 import VendorReports from './pages/vendor/VendorReports';
 import VendorSettings from './pages/vendor/VendorSettings';
+import VendorAccountHealth from './pages/vendor/VendorAccountHealth';
+import VendorReturns from './pages/vendor/VendorReturns';
+import VendorCoupons from './pages/vendor/VendorCoupons';
+import VendorOrderReports from './pages/vendor/VendorOrderReports';
+import VendorUserPermissions from './pages/vendor/VendorUserPermissions';
+import VendorFBA from './pages/vendor/VendorFBA';
+import VendorStoreBuilder from './pages/vendor/VendorStoreBuilder';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -96,6 +103,13 @@ function App() {
               <Route path="/vendor/tax" element={<VendorTax />} />
               <Route path="/vendor/reports" element={<VendorReports />} />
               <Route path="/vendor/settings" element={<VendorSettings />} />
+              <Route path="/vendor/account-health" element={<VendorAccountHealth />} />
+              <Route path="/vendor/returns" element={<VendorReturns />} />
+              <Route path="/vendor/coupons" element={<VendorCoupons />} />
+              <Route path="/vendor/order-reports" element={<VendorOrderReports />} />
+              <Route path="/vendor/permissions" element={<VendorUserPermissions />} />
+              <Route path="/vendor/fba" element={<VendorFBA />} />
+              <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
             </Routes>
           </ReviewProvider>
         </CartProvider>
