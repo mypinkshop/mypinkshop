@@ -167,7 +167,7 @@ function VendorEarnings() {
                     transactions.map(tx => (
                       <tr key={tx.id} className="hover:bg-gray-50">
                         <td className="px-5 py-3">{tx.date}</td>
-                        <d className="px-5 py-3 font-medium">{tx.orderId}</td>
+                        <td className="px-5 py-3 font-medium">{tx.orderId}</td>
                         <td className="px-5 py-3 text-right">₹{Math.round(tx.amount / 0.85).toLocaleString()}</td>
                         <td className="px-5 py-3 text-right text-red-500">-₹{Math.round(tx.commission).toLocaleString()}</td>
                         <td className="px-5 py-3 text-right font-semibold text-green-600">₹{Math.round(tx.amount).toLocaleString()}</td>
@@ -176,7 +176,7 @@ function VendorEarnings() {
                             {tx.status === 'settled' ? 'Settled' : 'Pending'}
                           </span>
                         </td>
-                       </tr>
+                      </tr>
                     ))
                   )}
                 </tbody>
