@@ -15,6 +15,7 @@ function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const targetDate = new Date();
@@ -39,31 +40,33 @@ function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load products from localStorage (synced with admin panel)
+  // Load only approved products from localStorage
   useEffect(() => {
-    const storedProducts = localStorage.getItem('homepageProducts');
-    if (storedProducts && JSON.parse(storedProducts).length > 0) {
-      setProducts(JSON.parse(storedProducts));
+    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
+    const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
+    
+    if (approvedProducts.length > 0) {
+      setProducts(approvedProducts);
     } else {
-      // Default products
+      // Default products (approved by default)
       const defaultProducts = [
-        { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, badge: "Bestseller", isNew: true },
-        { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, badge: "Trending", isNew: false },
-        { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, badge: "Viral", isNew: true },
-        { id: 4, name: "Satin Slip Dress", category: "clothing", price: 2499, originalPrice: 3999, rating: 4.9, badge: "Best Seller", isNew: false },
-        { id: 5, name: "Baby Pink Blush", category: "makeup", price: 799, originalPrice: 1299, rating: 4.5, badge: "Trending", isNew: true },
-        { id: 6, name: "Coquette Bow Dress", category: "clothing", price: 2999, originalPrice: 4499, rating: 4.8, badge: "New Arrival", isNew: true },
-        { id: 7, name: "Vitamin C Drops", category: "skincare", price: 1499, originalPrice: 2299, rating: 4.9, badge: "Bestseller", isNew: true },
-        { id: 8, name: "Y2K Mesh Top", category: "clothing", price: 1599, originalPrice: 2499, rating: 4.6, badge: "Trending", isNew: false },
-        { id: 9, name: "Pearl Hair Clips", category: "accessories", price: 299, originalPrice: 599, rating: 4.7, badge: "Cute", isNew: true },
-        { id: 10, name: "Pink Tote Bag", category: "accessories", price: 899, originalPrice: 1499, rating: 4.5, badge: "Trendy", isNew: false },
+        { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, badge: "Bestseller", isNew: true, adminApproved: true, status: 'active' },
+        { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, badge: "Trending", isNew: false, adminApproved: true, status: 'active' },
+        { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, badge: "Viral", isNew: true, adminApproved: true, status: 'active' },
+        { id: 4, name: "Satin Slip Dress", category: "clothing", price: 2499, originalPrice: 3999, rating: 4.9, badge: "Best Seller", isNew: false, adminApproved: true, status: 'active' },
+        { id: 5, name: "Baby Pink Blush", category: "makeup", price: 799, originalPrice: 1299, rating: 4.5, badge: "Trending", isNew: true, adminApproved: true, status: 'active' },
+        { id: 6, name: "Coquette Bow Dress", category: "clothing", price: 2999, originalPrice: 4499, rating: 4.8, badge: "New Arrival", isNew: true, adminApproved: true, status: 'active' },
+        { id: 7, name: "Vitamin C Drops", category: "skincare", price: 1499, originalPrice: 2299, rating: 4.9, badge: "Bestseller", isNew: true, adminApproved: true, status: 'active' },
+        { id: 8, name: "Y2K Mesh Top", category: "clothing", price: 1599, originalPrice: 2499, rating: 4.6, badge: "Trending", isNew: false, adminApproved: true, status: 'active' },
+        { id: 9, name: "Pearl Hair Clips", category: "accessories", price: 299, originalPrice: 599, rating: 4.7, badge: "Cute", isNew: true, adminApproved: true, status: 'active' },
+        { id: 10, name: "Pink Tote Bag", category: "accessories", price: 899, originalPrice: 1499, rating: 4.5, badge: "Trendy", isNew: false, adminApproved: true, status: 'active' },
       ];
       setProducts(defaultProducts);
-      localStorage.setItem('homepageProducts', JSON.stringify(defaultProducts));
+      localStorage.setItem('adminProductsList', JSON.stringify(defaultProducts));
     }
+    setLoading(false);
   }, []);
 
-  // Handle search
   const handleSearch = () => {
     if (searchTerm.trim()) {
       const results = products.filter(p => 
@@ -83,11 +86,8 @@ function Home() {
     }
   };
 
-  // Display products based on search or category filter
   const getDisplayProducts = () => {
-    if (searchResults.length > 0) {
-      return searchResults;
-    }
+    if (searchResults.length > 0) return searchResults;
     let filtered = products;
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => p.category === selectedCategory);
@@ -96,11 +96,12 @@ function Home() {
   };
 
   const displayProducts = getDisplayProducts();
+  
   const categories = [
-    { name: "Skincare", icon: "🧴", value: "skincare" },
-    { name: "Makeup", icon: "💄", value: "makeup" },
-    { name: "Clothing", icon: "👗", value: "clothing" },
-    { name: "Accessories", icon: "👜", value: "accessories" },
+    { name: "Skincare", value: "skincare" },
+    { name: "Makeup", value: "makeup" },
+    { name: "Clothing", value: "clothing" },
+    { name: "Accessories", value: "accessories" },
   ];
 
   const offers = [
@@ -108,6 +109,14 @@ function Home() {
     { title: "Flat 20% Off", subtitle: "On first order", bg: "from-rose-500 to-pink-600", link: "/shop?offer=first" },
     { title: "Free Shipping", subtitle: "On orders above ₹999", bg: "from-pink-400 to-rose-400", link: "/shop" },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -138,7 +147,6 @@ function Home() {
               </div>
             </Link>
 
-            {/* Search Bar */}
             <div className="flex-1 max-w-md">
               <div className="relative">
                 <input 
@@ -149,16 +157,12 @@ function Home() {
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   className="w-full px-5 py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-400 bg-gray-50"
                 />
-                <button 
-                  onClick={handleSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-pink-600 transition"
-                >
+                <button onClick={handleSearch} className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-pink-600 transition">
                   Search
                 </button>
               </div>
             </div>
 
-            {/* Icons */}
             <div className="flex items-center gap-6">
               <button onClick={() => navigate('/wishlist')} className="relative text-gray-600 hover:text-pink-500 transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,7 +206,7 @@ function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12"><p className="text-pink-500 text-sm font-medium tracking-wider mb-2">SHOP BY CATEGORY</p><h2 className="text-3xl md:text-4xl font-bold text-gray-900">Find Your Perfect Match</h2><div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {categories.map((cat, idx) => (<button key={idx} onClick={() => { setSelectedCategory(cat.value); setSearchResults([]); setSearchTerm(''); }} className="group bg-white rounded-2xl p-8 text-center border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"><div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">{cat.icon}</div><h3 className="font-semibold text-gray-900 text-lg">{cat.name}</h3><p className="text-sm text-pink-500 mt-2">Shop Now →</p></button>))}
+            {categories.map((cat, idx) => (<button key={idx} onClick={() => { setSelectedCategory(cat.value); setSearchResults([]); setSearchTerm(''); }} className="group bg-white rounded-2xl p-8 text-center border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"><div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">🏪</div><h3 className="font-semibold text-gray-900 text-lg">{cat.name}</h3><p className="text-sm text-pink-500 mt-2">Shop Now →</p></button>))}
           </div>
         </div>
       </section>
