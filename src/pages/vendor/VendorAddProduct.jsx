@@ -12,33 +12,25 @@ function VendorAddProduct() {
   const fileInputRef = useRef(null);
   
   const [formData, setFormData] = useState({
-    // Vital Info
     productName: '',
     brand: '',
     category: '',
     subCategory: '',
-    // Pricing
     mrp: '',
     sellingPrice: '',
     tax: 5,
-    // Inventory
     sku: '',
     quantity: '',
     lowStockThreshold: 10,
-    // Variations
     hasVariations: false,
     variations: [],
-    // Description
     shortDescription: '',
     fullDescription: '',
     keyFeatures: [],
-    // Specifications
     specifications: {},
-    // Shipping
     weight: '',
     dimensions: '',
     shippingCharges: '',
-    // SEO
     seoTitle: '',
     seoDescription: '',
   });
@@ -111,7 +103,7 @@ function VendorAddProduct() {
   };
 
   const removeVariation = (index) => {
-    setFormData({ ...formData, variations: formData.variations.filter((_, i) => i !== index) });
+    setFormData({ ...formData, variations: formData.variations.filter((_, i) !== index) });
   };
 
   const submitProduct = () => {
@@ -135,6 +127,7 @@ function VendorAddProduct() {
       originalPrice: parseInt(formData.mrp) || parseInt(formData.sellingPrice),
       stock: parseInt(formData.quantity),
       status: 'active',
+      adminApproved: false,
       vendor: vendorData.brandName || vendorData.name,
       images: imagePreview,
       description: formData.fullDescription,
@@ -157,7 +150,7 @@ function VendorAddProduct() {
     
     setTimeout(() => {
       setLoading(false);
-      alert('Product added successfully!');
+      alert('Product submitted for admin approval!');
       navigate('/vendor/products');
     }, 500);
   };
@@ -175,7 +168,6 @@ function VendorAddProduct() {
               <p className="text-sm text-gray-500">List your product on MyPinkShop</p>
             </div>
             
-            {/* Progress Steps */}
             <div className="flex border-b border-gray-200 bg-white px-6 py-3">
               {['Vital Info', 'Images', 'Pricing', 'Inventory', 'Variations', 'Description', 'Shipping', 'SEO'].map((label, idx) => (
                 <div key={idx} className="flex items-center">
@@ -187,7 +179,6 @@ function VendorAddProduct() {
             </div>
             
             <div className="p-6">
-              {/* Step 1: Vital Info */}
               {step === 1 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Basic Information</h2>
@@ -197,11 +188,10 @@ function VendorAddProduct() {
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Category *</label><select name="category" value={formData.category} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="">Select Category</option>{Object.keys(categories).map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Sub Category</label><select name="subCategory" value={formData.subCategory} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" disabled={!formData.category}><option value="">Select Sub Category</option>{formData.category && categories[formData.category]?.map(sub => <option key={sub} value={sub}>{sub}</option>)}</select></div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-4"><button onClick={() => setStep(2)} className="bg-pink-600 text-white px-5 py-2 rounded-lg">Continue</button></div>
+                  <div className="flex justify-end pt-4"><button onClick={() => setStep(2)} className="bg-pink-600 text-white px-5 py-2 rounded-lg">Continue</button></div>
                 </div>
               )}
               
-              {/* Step 2: Images */}
               {step === 2 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Product Images</h2>
@@ -215,7 +205,6 @@ function VendorAddProduct() {
                 </div>
               )}
               
-              {/* Step 3: Pricing */}
               {step === 3 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Pricing</h2>
@@ -228,7 +217,6 @@ function VendorAddProduct() {
                 </div>
               )}
               
-              {/* Step 4: Inventory */}
               {step === 4 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Inventory</h2>
@@ -241,29 +229,26 @@ function VendorAddProduct() {
                 </div>
               )}
               
-              {/* Step 5: Variations */}
               {step === 5 && (
                 <div className="space-y-5">
-                  <h2 className="text-lg font-semibold">Product Variations (Optional)</h2>
+                  <h2 className="text-lg font-semibold">Product Variations</h2>
                   <div className="flex items-center gap-3 mb-4"><input type="checkbox" checked={formData.hasVariations} onChange={(e) => setFormData({ ...formData, hasVariations: e.target.checked })} className="w-4 h-4" /><label>This product has variations (Size, Color, etc.)</label></div>
                   {formData.hasVariations && (<div className="border rounded-lg p-4 space-y-4"><div className="flex gap-3"><select value={variationType} onChange={(e) => setVariationType(e.target.value)} className="px-3 py-2 border rounded-lg"><option value="size">Size</option><option value="color">Color</option><option value="weight">Weight</option></select><input type="text" placeholder="Value (e.g., S, M, L)" value={variationValue} onChange={(e) => setVariationValue(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg" /><button onClick={addVariation} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div><div className="flex flex-wrap gap-2">{formData.variations.map((v, idx) => (<span key={idx} className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-full text-sm">{v.type}: {v.value}<button onClick={() => removeVariation(idx)} className="text-red-500 ml-1">✕</button></span>))}</div></div>)}
                   <div className="flex justify-between pt-4"><button onClick={() => setStep(4)} className="px-5 py-2 border border-gray-300 rounded-lg">Back</button><button onClick={() => setStep(6)} className="bg-pink-600 text-white px-5 py-2 rounded-lg">Continue</button></div>
                 </div>
               )}
               
-              {/* Step 6: Description */}
               {step === 6 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Product Description</h2>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label><textarea name="shortDescription" rows="2" value={formData.shortDescription} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Brief description for search results"></textarea></div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Description</label><textarea name="fullDescription" rows="5" value={formData.fullDescription} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Detailed product description"></textarea></div>
+                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Short Description</label><textarea name="shortDescription" rows="2" value={formData.shortDescription} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea></div>
+                  <div><label className="block text-sm font-medium text-gray-700 mb-1">Full Description</label><textarea name="fullDescription" rows="5" value={formData.fullDescription} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea></div>
                   <div><label className="block text-sm font-medium text-gray-700 mb-1">Key Features</label><div className="flex flex-wrap gap-2 mb-2">{formData.keyFeatures.map((f, idx) => (<span key={idx} className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-full text-sm">{f}<button onClick={() => removeKeyFeature(idx)} className="text-red-500">✕</button></span>))}</div><div className="flex gap-2"><input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., Dermatologically tested" className="flex-1 px-3 py-2 border rounded-lg" /><button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
                   <div><label className="block text-sm font-medium text-gray-700 mb-1">Specifications</label><div className="space-y-2 mb-2">{Object.entries(formData.specifications).map(([key, value]) => (<div key={key} className="flex gap-2"><span className="w-1/3 px-3 py-1 bg-gray-50 rounded text-sm">{key}</span><span className="flex-1 px-3 py-1 bg-gray-50 rounded text-sm">{value}</span><button onClick={() => removeSpecification(key)} className="text-red-500">✕</button></div>))}</div><div className="flex gap-2"><input type="text" placeholder="Key (e.g., Material)" value={specKey} onChange={(e) => setSpecKey(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg" /><input type="text" placeholder="Value (e.g., Plastic)" value={specValue} onChange={(e) => setSpecValue(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg" /><button onClick={addSpecification} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
                   <div className="flex justify-between pt-4"><button onClick={() => setStep(5)} className="px-5 py-2 border border-gray-300 rounded-lg">Back</button><button onClick={() => setStep(7)} className="bg-pink-600 text-white px-5 py-2 rounded-lg">Continue</button></div>
                 </div>
               )}
               
-              {/* Step 7: Shipping */}
               {step === 7 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Shipping Details</h2>
@@ -276,13 +261,12 @@ function VendorAddProduct() {
                 </div>
               )}
               
-              {/* Step 8: SEO */}
               {step === 8 && (
                 <div className="space-y-5">
                   <h2 className="text-lg font-semibold">Search Engine Optimization</h2>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1">SEO Title</label><input type="text" name="seoTitle" value={formData.seoTitle} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Product title for search engines" /></div>
+                  <div><label className="block text-sm font-medium text-gray-700 mb-1">SEO Title</label><input type="text" name="seoTitle" value={formData.seoTitle} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
                   <div><label className="block text-sm font-medium text-gray-700 mb-1">SEO Description</label><textarea name="seoDescription" rows="2" value={formData.seoDescription} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div>
-                  <div className="flex justify-between pt-4"><button onClick={() => setStep(7)} className="px-5 py-2 border border-gray-300 rounded-lg">Back</button><button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-5 py-2 rounded-lg disabled:opacity-50">{loading ? 'Submitting...' : 'Submit Product'}</button></div>
+                  <div className="flex justify-between pt-4"><button onClick={() => setStep(7)} className="px-5 py-2 border border-gray-300 rounded-lg">Back</button><button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-5 py-2 rounded-lg disabled:opacity-50">{loading ? 'Submitting...' : 'Submit for Approval'}</button></div>
                 </div>
               )}
             </div>
