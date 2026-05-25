@@ -14,7 +14,6 @@ function VendorEarnings() {
     pendingClearance: 0,
   });
   const [transactions, setTransactions] = useState([]);
-  const [vendor, setVendor] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,7 +26,6 @@ function VendorEarnings() {
     }
 
     const vendorInfo = JSON.parse(vendorData);
-    setVendor(vendorInfo);
     const vendorName = vendorInfo.brandName || vendorInfo.name;
     
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
@@ -37,8 +35,7 @@ function VendorEarnings() {
     const pendingOrders = myOrders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
     
     const totalSales = deliveredOrders.reduce((sum, o) => sum + o.amount, 0);
-    const commission = totalSales * 0.15;
-    const netEarnings = totalSales - commission;
+    const netEarnings = totalSales * 0.85;
     
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -156,7 +153,7 @@ function VendorEarnings() {
                     <th className="px-5 py-3 text-left">Date</th>
                     <th className="px-5 py-3 text-left">Order ID</th>
                     <th className="px-5 py-3 text-right">Amount</th>
-                    <th className="px-5 py-3 text-right">Commission (15%)</th>
+                    <th className="px-5 py-3 text-right">Commission</th>
                     <th className="px-5 py-3 text-right">Net Earnings</th>
                     <th className="px-5 py-3 text-center">Status</th>
                   </tr>
@@ -170,7 +167,7 @@ function VendorEarnings() {
                     transactions.map(tx => (
                       <tr key={tx.id} className="hover:bg-gray-50">
                         <td className="px-5 py-3">{tx.date}</td>
-                        <td className="px-5 py-3 font-medium">{tx.orderId}</td>
+                        <d className="px-5 py-3 font-medium">{tx.orderId}</td>
                         <td className="px-5 py-3 text-right">₹{Math.round(tx.amount / 0.85).toLocaleString()}</td>
                         <td className="px-5 py-3 text-right text-red-500">-₹{Math.round(tx.commission).toLocaleString()}</td>
                         <td className="px-5 py-3 text-right font-semibold text-green-600">₹{Math.round(tx.amount).toLocaleString()}</td>
@@ -179,7 +176,7 @@ function VendorEarnings() {
                             {tx.status === 'settled' ? 'Settled' : 'Pending'}
                           </span>
                         </td>
-                      </table>
+                       </tr>
                     ))
                   )}
                 </tbody>
