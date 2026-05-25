@@ -31,12 +31,11 @@ function VendorShipping() {
       return;
     }
 
-    // Load shipping zones from localStorage
     const savedZones = JSON.parse(localStorage.getItem('vendorShippingZones') || '[]');
     if (savedZones.length === 0) {
       const defaultZones = [
-        { id: 1, zone: 'Local (Metro Cities)', cities: 'Mumbai, Delhi, Bangalore, Chennai, Kolkata, Hyderabad, Pune, Ahmedabad', rate: 49, days: '2-3 days' },
-        { id: 2, zone: 'Zone A (Tier 2 Cities)', cities: 'Jaipur, Lucknow, Nagpur, Indore, Bhopal, Surat, Vadodara', rate: 79, days: '3-5 days' },
+        { id: 1, zone: 'Local (Metro Cities)', cities: 'Mumbai, Delhi, Bangalore, Chennai, Kolkata', rate: 49, days: '2-3 days' },
+        { id: 2, zone: 'Zone A (Tier 2 Cities)', cities: 'Jaipur, Lucknow, Nagpur, Indore, Bhopal', rate: 79, days: '3-5 days' },
         { id: 3, zone: 'Zone B (Rest of India)', cities: 'All other cities and towns', rate: 99, days: '5-7 days' },
       ];
       setShippingZones(defaultZones);
@@ -45,7 +44,6 @@ function VendorShipping() {
       setShippingZones(savedZones);
     }
 
-    // Load default shipping settings
     const savedSettings = JSON.parse(localStorage.getItem('vendorShippingSettings') || '{}');
     setDefaultShipping({
       standardRate: savedSettings.standardRate || 49,
@@ -69,7 +67,10 @@ function VendorShipping() {
     }
     const newZone = {
       id: Date.now(),
-      ...zoneForm,
+      zone: zoneForm.zone,
+      cities: zoneForm.cities || '',
+      rate: zoneForm.rate,
+      days: zoneForm.days || '3-5 days',
     };
     const updatedZones = [...shippingZones, newZone];
     setShippingZones(updatedZones);
@@ -85,7 +86,7 @@ function VendorShipping() {
       return;
     }
     const updatedZones = shippingZones.map(z => 
-      z.id === editingZone.id ? { ...z, ...zoneForm } : z
+      z.id === editingZone.id ? { ...z, zone: zoneForm.zone, cities: zoneForm.cities || '', rate: zoneForm.rate, days: zoneForm.days || '3-5 days' } : z
     );
     setShippingZones(updatedZones);
     localStorage.setItem('vendorShippingZones', JSON.stringify(updatedZones));
@@ -168,7 +169,7 @@ function VendorShipping() {
               <div className="bg-gray-50 px-5 py-3 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="font-semibold text-gray-800">Shipping Zones</h2>
                 <button onClick={() => { setEditingZone(null); setZoneForm({ zone: '', cities: '', rate: '', days: '' }); setShowZoneModal(true); }} className="bg-pink-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-pink-700 transition">
-                  + Add Zone
+                  Add Zone
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -177,39 +178,32 @@ function VendorShipping() {
                     <tr className="border-b">
                       <th className="px-4 py-3 text-left">Zone Name</th>
                       <th className="px-4 py-3 text-left">Cities / Regions</th>
-                      <th className="px-4 py-3 text-right">Rate (₹)</th>
+                      <th className="px-4 py-3 text-right">Rate</th>
                       <th className="px-4 py-3 text-center">Delivery Time</th>
                       <th className="px-4 py-3 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {shippingZones.length === 0 ? (
-                      <tr className="hover:bg-gray-50">
-                        <td colSpan="5" className="px-4 py-8 text-center text-gray-500">No shipping zones configured. Add your first zone.</td>
+                    {shippingZones.map(zone => (
+                      <tr key={zone.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium">{zone.zone}</td>
+                        <td className="px-4 py-3 text-gray-500">{zone.cities}</td>
+                        <td className="px-4 py-3 text-right">₹{zone.rate}</td>
+                        <td className="px-4 py-3 text-center">{zone.days}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center gap-2">
+                            <button onClick={() => { setEditingZone(zone); setZoneForm({ zone: zone.zone, cities: zone.cities, rate: zone.rate, days: zone.days }); setShowZoneModal(true); }} className="text-blue-500 hover:text-blue-700">Edit</button>
+                            <button onClick={() => deleteZone(zone.id)} className="text-red-500 hover:text-red-700">Delete</button>
+                          </div>
+                        </td>
                       </tr>
-                    ) : (
-                      shippingZones.map(zone => (
-                        <tr key={zone.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium">{zone.zone}</td>
-                          <td className="px-4 py-3 text-gray-500">{zone.cities}</td>
-                          <td className="px-4 py-3 text-right">₹{zone.rate}</td>
-                          <td className="px-4 py-3 text-center">{zone.days}</td>
-                          <td className="px-4 py-3 text-center">
-                            <div className="flex justify-center gap-2">
-                              <button onClick={() => { setEditingZone(zone); setZoneForm(zone); setShowZoneModal(true); }} className="text-blue-500 hover:text-blue-700">Edit</button>
-                              <button onClick={() => deleteZone(zone.id)} className="text-red-500 hover:text-red-700">Delete</button>
-                            </div>
-                           </tr>
-                        ))
-                      )
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
 
-          {/* Shipping Info */}
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800 font-medium">Shipping Information</p>
             <p className="text-xs text-blue-600 mt-1">Free shipping applies automatically when order total exceeds ₹{defaultShipping.freeShippingThreshold}. Express delivery available at extra cost.</p>
@@ -217,7 +211,6 @@ function VendorShipping() {
         </div>
       </main>
 
-      {/* Add/Edit Zone Modal */}
       {showZoneModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowZoneModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
@@ -226,27 +219,10 @@ function VendorShipping() {
               <button onClick={() => setShowZoneModal(false)} className="text-gray-400 hover:text-gray-600">Close</button>
             </div>
             <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Zone Name *</label>
-                <input type="text" value={zoneForm.zone} onChange={(e) => setZoneForm({ ...zoneForm, zone: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., North India" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Cities / Regions</label>
-                <input type="text" value={zoneForm.cities} onChange={(e) => setZoneForm({ ...zoneForm, cities: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., Delhi, Chandigarh, Jaipur" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Shipping Rate (₹) *</label>
-                  <input type="number" value={zoneForm.rate} onChange={(e) => setZoneForm({ ...zoneForm, rate: e.target.value })} className="w-full px-3 py-2 border rounded-lg" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Delivery Time</label>
-                  <input type="text" value={zoneForm.days} onChange={(e) => setZoneForm({ ...zoneForm, days: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., 3-5 days" />
-                </div>
-              </div>
-              <button onClick={editingZone ? editZone : addZone} className="w-full bg-pink-600 text-white py-2 rounded-lg font-medium hover:bg-pink-700 transition">
-                {editingZone ? 'Update Zone' : 'Add Zone'}
-              </button>
+              <div><label className="block text-sm font-medium mb-1">Zone Name</label><input type="text" value={zoneForm.zone} onChange={(e) => setZoneForm({ ...zoneForm, zone: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., North India" /></div>
+              <div><label className="block text-sm font-medium mb-1">Cities / Regions</label><input type="text" value={zoneForm.cities} onChange={(e) => setZoneForm({ ...zoneForm, cities: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., Delhi, Chandigarh, Jaipur" /></div>
+              <div className="grid grid-cols-2 gap-3"><div><label className="block text-sm font-medium mb-1">Shipping Rate (₹)</label><input type="number" value={zoneForm.rate} onChange={(e) => setZoneForm({ ...zoneForm, rate: e.target.value })} className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm font-medium mb-1">Delivery Time</label><input type="text" value={zoneForm.days} onChange={(e) => setZoneForm({ ...zoneForm, days: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., 3-5 days" /></div></div>
+              <button onClick={editingZone ? editZone : addZone} className="w-full bg-pink-600 text-white py-2 rounded-lg font-medium hover:bg-pink-700 transition">{editingZone ? 'Update Zone' : 'Add Zone'}</button>
             </div>
           </div>
         </div>
