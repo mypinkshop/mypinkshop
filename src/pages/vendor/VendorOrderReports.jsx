@@ -10,7 +10,6 @@ function VendorOrderReports() {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [vendor, setVendor] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,7 +22,6 @@ function VendorOrderReports() {
     }
 
     const vendorInfo = JSON.parse(vendorData);
-    setVendor(vendorInfo);
     const vendorName = vendorInfo.brandName || vendorInfo.name;
     
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
@@ -107,10 +105,7 @@ function VendorOrderReports() {
     totalOrders: filteredOrders.length,
     totalAmount: filteredOrders.reduce((sum, o) => sum + o.amount, 0),
     averageOrderValue: filteredOrders.length > 0 ? filteredOrders.reduce((sum, o) => sum + o.amount, 0) / filteredOrders.length : 0,
-    pendingOrders: filteredOrders.filter(o => o.status === 'pending').length,
-    shippedOrders: filteredOrders.filter(o => o.status === 'shipped').length,
     deliveredOrders: filteredOrders.filter(o => o.status === 'delivered').length,
-    cancelledOrders: filteredOrders.filter(o => o.status === 'cancelled').length,
   };
 
   if (loading) {
@@ -188,7 +183,7 @@ function VendorOrderReports() {
                     <th className="px-5 py-3 text-right">Amount</th>
                     <th className="px-5 py-3 text-center">Payment</th>
                     <th className="px-5 py-3 text-center">Status</th>
-                  </td>
+                  </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredOrders.length === 0 ? (
@@ -209,7 +204,7 @@ function VendorOrderReports() {
                             {order.status}
                           </span>
                         </td>
-                       </tr>
+                      </tr>
                     ))
                   )}
                 </tbody>
