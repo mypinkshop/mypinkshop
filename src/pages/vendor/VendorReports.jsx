@@ -5,7 +5,7 @@ import VendorHeader from './components/VendorHeader';
 
 function VendorReports() {
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('last30');
+  const [dateRange, setDateRange] = useState('sales');
   const [salesData, setSalesData] = useState({
     totalOrders: 0,
     totalSales: 0,
@@ -18,7 +18,6 @@ function VendorReports() {
   });
   const [dailySales, setDailySales] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
-  const [vendor, setVendor] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,10 +30,8 @@ function VendorReports() {
     }
 
     const vendorInfo = JSON.parse(vendorData);
-    setVendor(vendorInfo);
     const vendorName = vendorInfo.brandName || vendorInfo.name;
     
-    // Get real data from localStorage
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     const myProducts = allProducts.filter(p => p.vendor === vendorName);
     
@@ -60,7 +57,6 @@ function VendorReports() {
       cancelledOrders,
     });
     
-    // Generate daily sales data (last 30 days)
     const daily = [];
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
@@ -75,10 +71,9 @@ function VendorReports() {
     }
     setDailySales(daily);
     
-    // Top products by sales
     const productSales = {};
     myOrders.forEach(order => {
-      const productName = order.productName || order.items?.[0]?.name;
+      const productName = order.productName || (order.items && order.items[0] ? order.items[0].name : null);
       if (productName) {
         productSales[productName] = (productSales[productName] || 0) + order.amount;
       }
@@ -90,7 +85,7 @@ function VendorReports() {
     setTopProducts(topProductsList);
     
     setLoading(false);
-  }, [navigate, dateRange]);
+  }, [navigate]);
 
   const downloadCSV = () => {
     let csvData = [];
@@ -143,15 +138,25 @@ function VendorReports() {
             </div>
           </div>
 
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5"><p className="text-sm text-gray-500">Total Sales</p><p className="text-2xl font-bold text-green-600">₹{salesData.totalSales.toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5"><p className="text-sm text-gray-500">Total Orders</p><p className="text-2xl font-bold">{salesData.totalOrders}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5"><p className="text-sm text-gray-500">Average Order Value</p><p className="text-2xl font-bold">₹{Math.round(salesData.averageOrderValue).toLocaleString()}</p></div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5"><p className="text-sm text-gray-500">Products Sold</p><p className="text-2xl font-bold">{salesData.totalProducts}</p></div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <p className="text-sm text-gray-500">Total Sales</p>
+              <p className="text-2xl font-bold text-green-600">₹{salesData.totalSales.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <p className="text-sm text-gray-500">Total Orders</p>
+              <p className="text-2xl font-bold">{salesData.totalOrders}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <p className="text-sm text-gray-500">Average Order Value</p>
+              <p className="text-2xl font-bold">₹{Math.round(salesData.averageOrderValue).toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <p className="text-sm text-gray-500">Products Sold</p>
+              <p className="text-2xl font-bold">{salesData.totalProducts}</p>
+            </div>
           </div>
 
-          {/* Sales Report */}
           {dateRange === 'sales' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
@@ -172,7 +177,7 @@ function VendorReports() {
                         <td className="px-5 py-3">{day.date}</td>
                         <td className="px-5 py-3 text-right">{day.orders}</td>
                         <td className="px-5 py-3 text-right font-medium">₹{day.sales.toLocaleString()}</td>
-                      <tr>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -180,7 +185,6 @@ function VendorReports() {
             </div>
           )}
 
-          {/* Product Report */}
           {dateRange === 'products' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
@@ -196,7 +200,9 @@ function VendorReports() {
                   </thead>
                   <tbody className="divide-y">
                     {topProducts.length === 0 ? (
-                      <tr><td colSpan="2" className="px-5 py-8 text-center text-gray-500">No sales data available</td></tr>
+                      <tr className="hover:bg-gray-50">
+                        <td colSpan="2" className="px-5 py-8 text-center text-gray-500">No sales data available</td>
+                      </tr>
                     ) : (
                       topProducts.map(product => (
                         <tr key={product.name} className="hover:bg-gray-50">
@@ -211,29 +217,52 @@ function VendorReports() {
             </div>
           )}
 
-          {/* Inventory Report */}
           {dateRange === 'inventory' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="font-semibold text-gray-800 mb-4">Inventory Summary</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">Total SKUs</p><p className="text-xl font-bold">{salesData.totalProducts}</p></div>
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">Low Stock</p><p className="text-xl font-bold text-yellow-600">0</p></div>
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">Out of Stock</p><p className="text-xl font-bold text-red-600">0</p></div>
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">In Stock</p><p className="text-xl font-bold text-green-600">{salesData.totalProducts}</p></div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Total SKUs</p>
+                  <p className="text-xl font-bold">{salesData.totalProducts}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Low Stock</p>
+                  <p className="text-xl font-bold text-yellow-600">0</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Out of Stock</p>
+                  <p className="text-xl font-bold text-red-600">0</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">In Stock</p>
+                  <p className="text-xl font-bold text-green-600">{salesData.totalProducts}</p>
+                </div>
               </div>
               <p className="text-sm text-gray-500">Detailed inventory report can be downloaded from the Inventory section.</p>
             </div>
           )}
 
-          {/* Tax Report */}
           {dateRange === 'tax' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h2 className="font-semibold text-gray-800 mb-4">Tax Summary</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">Total Tax Collected</p><p className="text-xl font-bold">₹{(salesData.totalSales * 0.05).toLocaleString()}</p><p className="text-xs text-gray-400">@ 5% GST</p></div>
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">CGST (2.5%)</p><p className="text-xl font-bold">₹{(salesData.totalSales * 0.025).toLocaleString()}</p></div>
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">SGST (2.5%)</p><p className="text-xl font-bold">₹{(salesData.totalSales * 0.025).toLocaleString()}</p></div>
-                <div className="bg-gray-50 rounded-lg p-4"><p className="text-sm text-gray-500">Tax Period</p><p className="text-xl font-bold">May 2025</p></div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Total Tax Collected</p>
+                  <p className="text-xl font-bold">₹{(salesData.totalSales * 0.05).toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">@ 5% GST</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">CGST (2.5%)</p>
+                  <p className="text-xl font-bold">₹{(salesData.totalSales * 0.025).toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">SGST (2.5%)</p>
+                  <p className="text-xl font-bold">₹{(salesData.totalSales * 0.025).toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-500">Tax Period</p>
+                  <p className="text-xl font-bold">May 2025</p>
+                </div>
               </div>
               <p className="text-sm text-gray-500">Tax report based on 5% GST (2.5% CGST + 2.5% SGST).</p>
             </div>
