@@ -26,6 +26,7 @@ import AdminAddProduct from './pages/admin/AdminAddProduct';
 import AdminShipping from './pages/admin/AdminShipping';
 import AdminTax from './pages/admin/AdminTax';
 import AdminCoupons from './pages/admin/AdminCoupons';
+import AdminBrandApplications from './pages/admin/AdminBrandApplications';
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -34,6 +35,7 @@ import VendorAddProduct from './pages/vendor/VendorAddProduct';
 import VendorOrders from './pages/vendor/VendorOrders';
 import VendorEarnings from './pages/vendor/VendorEarnings';
 import VendorBusinessDetails from './pages/vendor/VendorBusinessDetails';
+import VendorBrandApplication from './pages/vendor/VendorBrandApplication';
 import VendorAds from './pages/vendor/VendorAds';
 import VendorShipping from './pages/vendor/VendorShipping';
 import VendorTax from './pages/vendor/VendorTax';
@@ -75,6 +77,7 @@ function App() {
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/vendors" element={<AdminVendors />} />
+              <Route path="/admin/brand-applications" element={<AdminBrandApplications />} />
               <Route path="/admin/products" element={<AdminProducts />} />
               <Route path="/admin/categories" element={<AdminCategories />} />
               <Route path="/admin/orders" element={<AdminOrders />} />
@@ -92,6 +95,7 @@ function App() {
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
+              <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
               <Route path="/vendor/dashboard" element={<VendorDashboard />} />
               <Route path="/vendor/business-details" element={<VendorBusinessDetails />} />
               <Route path="/vendor/products" element={<VendorProducts />} />
