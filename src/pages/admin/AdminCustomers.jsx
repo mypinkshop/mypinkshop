@@ -31,21 +31,31 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
+    // ✅ Get REAL customers from localStorage
     let allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
-    if (allCustomers.length === 0) {
-      const demoCustomer = {
-        id: Date.now(),
-        name: 'Demo Customer',
-        email: 'customer@example.com',
-        phone: '9876543210',
-        password: 'customer123',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        orders: 0,
-        totalSpent: 0
-      };
-      allCustomers = [demoCustomer];
+    // ✅ Also get from user (current logged in user)
+    const currentUser = localStorage.getItem('user');
+    if (currentUser) {
+      try {
+        const user = JSON.parse(currentUser);
+        const exists = allCustomers.some(c => c.email === user.email);
+        if (!exists && user.email) {
+          allCustomers.push({
+            id: user.id || Date.now(),
+            name: user.name || 'User',
+            email: user.email,
+            phone: user.mobile || user.phone || '',
+            password: user.password,
+            status: 'active',
+            createdAt: user.createdAt || new Date().toISOString()
+          });
+        }
+      } catch(e) {}
+    }
+    
+    // ✅ Save merged data back to localStorage
+    if (allCustomers.length > 0) {
       localStorage.setItem('registeredCustomers', JSON.stringify(allCustomers));
     }
     
@@ -186,13 +196,16 @@ function AdminCustomers() {
 
   const deleteCustomer = (id) => {
     if (window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) {
+      // Remove from state
       const updatedCustomers = customers.filter(c => c.id !== id);
       setCustomers(updatedCustomers);
       
+      // Remove from localStorage
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const filteredRegistered = registered.filter(c => c.id !== id);
       localStorage.setItem('registeredCustomers', JSON.stringify(filteredRegistered));
       
+      // Update stats
       const activeCount = updatedCustomers.filter(c => c.status === 'active').length;
       const blockedCount = updatedCustomers.filter(c => c.status === 'blocked').length;
       const totalOrders = updatedCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -344,8 +357,8 @@ function AdminCustomers() {
                     <tr>
                       <td colSpan="7" className="px-5 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">👥</div>
-                        <p>No customers found</p>
-                        <button onClick={loadCustomerData} className="mt-3 text-pink-500 text-sm hover:underline">Refresh Data</button>
+                        <p>No customers found. Register a customer first.</p>
+                        <Link to="/register" className="mt-3 inline-block text-pink-500 text-sm hover:underline">Register Customer →</Link>
                       </td>
                     </tr>
                   ) : (
@@ -395,7 +408,7 @@ function AdminCustomers() {
                             <button onClick={() => deleteCustomer(customer.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
                           </div>
                         </td>
-                      </tr>
+                      </table>
                     ))
                   )}
                 </tbody>
