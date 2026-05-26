@@ -31,10 +31,8 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
-    // ✅ ONLY from registeredCustomers - NO vendors mixing
     let allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
-    // ✅ If empty, create a demo customer
     if (allCustomers.length === 0) {
       const demoCustomer = {
         id: Date.now(),
@@ -73,11 +71,9 @@ function AdminCustomers() {
       };
     });
     
-    // Sort by join date (newest first)
     customersWithStats.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
     setCustomers(customersWithStats);
     
-    // Calculate stats
     const activeCustomers = customersWithStats.filter(c => c.status === 'active').length;
     const blockedCustomers = customersWithStats.filter(c => c.status === 'blocked').length;
     const totalOrders = customersWithStats.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -190,16 +186,13 @@ function AdminCustomers() {
 
   const deleteCustomer = (id) => {
     if (window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) {
-      // Remove from state
       const updatedCustomers = customers.filter(c => c.id !== id);
       setCustomers(updatedCustomers);
       
-      // Remove from localStorage
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const filteredRegistered = registered.filter(c => c.id !== id);
       localStorage.setItem('registeredCustomers', JSON.stringify(filteredRegistered));
       
-      // Update stats
       const activeCount = updatedCustomers.filter(c => c.status === 'active').length;
       const blockedCount = updatedCustomers.filter(c => c.status === 'blocked').length;
       const totalOrders = updatedCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -402,7 +395,7 @@ function AdminCustomers() {
                             <button onClick={() => deleteCustomer(customer.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
                           </div>
                         </td>
-                      </table>
+                      </tr>
                     ))
                   )}
                 </tbody>
