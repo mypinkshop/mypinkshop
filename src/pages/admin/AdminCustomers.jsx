@@ -31,10 +31,8 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
-    // ✅ Get REAL customers from localStorage
     let allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
-    // ✅ Also get from user (current logged in user)
     const currentUser = localStorage.getItem('user');
     if (currentUser) {
       try {
@@ -54,7 +52,6 @@ function AdminCustomers() {
       } catch(e) {}
     }
     
-    // ✅ Save merged data back to localStorage
     if (allCustomers.length > 0) {
       localStorage.setItem('registeredCustomers', JSON.stringify(allCustomers));
     }
@@ -65,7 +62,6 @@ function AdminCustomers() {
       const customerOrders = allOrders.filter(order => order.customerEmail === customer.email);
       const totalSpent = customerOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
       const orderCount = customerOrders.length;
-      const lastOrder = customerOrders.length > 0 ? customerOrders[0].date : null;
       
       return {
         id: customer.id,
@@ -74,7 +70,6 @@ function AdminCustomers() {
         phone: customer.phone || '',
         orders: orderCount,
         totalSpent: totalSpent,
-        lastOrder: lastOrder,
         status: customer.status || 'active',
         joinedDate: customer.createdAt || customer.joinedDate || new Date().toISOString(),
         password: customer.password || '********'
@@ -174,6 +169,8 @@ function AdminCustomers() {
     
     alert(`Password reset successfully for ${selectedCustomer.name}`);
     setShowResetPasswordModal(false);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   const editCustomer = (customer) => {
@@ -196,16 +193,13 @@ function AdminCustomers() {
 
   const deleteCustomer = (id) => {
     if (window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) {
-      // Remove from state
       const updatedCustomers = customers.filter(c => c.id !== id);
       setCustomers(updatedCustomers);
       
-      // Remove from localStorage
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const filteredRegistered = registered.filter(c => c.id !== id);
       localStorage.setItem('registeredCustomers', JSON.stringify(filteredRegistered));
       
-      // Update stats
       const activeCount = updatedCustomers.filter(c => c.status === 'active').length;
       const blockedCount = updatedCustomers.filter(c => c.status === 'blocked').length;
       const totalOrders = updatedCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -243,11 +237,9 @@ function AdminCustomers() {
   });
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'active': return 'bg-green-100 text-green-700';
-      case 'blocked': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
+    if (status === 'active') return 'bg-green-100 text-green-700';
+    if (status === 'blocked') return 'bg-red-100 text-red-700';
+    return 'bg-gray-100 text-gray-700';
   };
 
   if (loading) {
@@ -408,7 +400,7 @@ function AdminCustomers() {
                             <button onClick={() => deleteCustomer(customer.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
                           </div>
                         </td>
-                      </table>
+                      </tr>
                     ))
                   )}
                 </tbody>
