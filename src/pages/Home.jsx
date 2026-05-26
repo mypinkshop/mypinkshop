@@ -348,10 +348,10 @@ function Home() {
             <div>
               <h4 className="font-semibold text-white mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Contact Us</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">FAQs</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Shipping Info</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Returns Policy</a></li>
+                <li><a href="/contact" className="hover:text-pink-500 transition">Contact Us</a></li>
+                <li><a href="/faqs" className="hover:text-pink-500 transition">FAQs</a></li>
+                <li><a href="/shipping" className="hover:text-pink-500 transition">Shipping Info</a></li>
+                <li><a href="/return" className="hover:text-pink-500 transition">Returns Policy</a></li>
               </ul>
             </div>
             <div>
@@ -365,7 +365,7 @@ function Home() {
             </div>
           </div>
           <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm">© 2025 MyPinkShop. All rights reserved.</p>
+            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
             <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </div>
