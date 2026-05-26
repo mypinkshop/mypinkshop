@@ -27,6 +27,7 @@ import AdminShipping from './pages/admin/AdminShipping';
 import AdminTax from './pages/admin/AdminTax';
 import AdminCoupons from './pages/admin/AdminCoupons';
 import AdminBrandApplications from './pages/admin/AdminBrandApplications';
+import AdminBanners from './pages/admin/AdminBanners';  // ✅ ADDED THIS IMPORT
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -91,6 +92,9 @@ function App() {
               <Route path="/admin/shipping" element={<AdminShipping />} />
               <Route path="/admin/tax" element={<AdminTax />} />
               <Route path="/admin/coupons" element={<AdminCoupons />} />
+              
+              {/* ✅ ADDED: Admin Banners Route */}
+              <Route path="/admin/banners" element={<AdminBanners />} />
               
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
