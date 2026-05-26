@@ -53,6 +53,9 @@ import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+
 
 function App() {
   return (
@@ -73,6 +76,9 @@ function App() {
               <Route path="/shop" element={<Shop />} />
               <Route path="/track-order/:orderId" element={<TrackOrder />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+
               
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
