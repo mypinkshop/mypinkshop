@@ -31,51 +31,25 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
-    // ✅ Get customers from ALL sources
-    let allCustomers = [];
+    // ✅ ONLY from registeredCustomers - NO vendors mixing
+    let allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
-    // Source 1: registeredCustomers
-    const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-    allCustomers = [...allCustomers, ...registered];
-    
-    // Source 2: current logged in user
-    const currentUser = localStorage.getItem('user');
-    if (currentUser) {
-      try {
-        const user = JSON.parse(currentUser);
-        const exists = allCustomers.some(c => c.email === user.email);
-        if (!exists && user.email) {
-          allCustomers.push({
-            id: user.id || Date.now(),
-            name: user.name || 'User',
-            email: user.email,
-            phone: user.mobile || user.phone || '',
-            password: user.password,
-            status: 'active',
-            createdAt: user.createdAt || new Date().toISOString(),
-            role: 'customer'
-          });
-        }
-      } catch(e) {}
+    // ✅ If empty, create a demo customer
+    if (allCustomers.length === 0) {
+      const demoCustomer = {
+        id: Date.now(),
+        name: 'Demo Customer',
+        email: 'customer@example.com',
+        phone: '9876543210',
+        password: 'customer123',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        orders: 0,
+        totalSpent: 0
+      };
+      allCustomers = [demoCustomer];
+      localStorage.setItem('registeredCustomers', JSON.stringify(allCustomers));
     }
-    
-    // Source 3: registeredVendors
-    const vendors = JSON.parse(localStorage.getItem('registeredVendors') || '[]');
-    vendors.forEach(v => {
-      const exists = allCustomers.some(c => c.email === v.email);
-      if (!exists && v.email) {
-        allCustomers.push({
-          id: v.id,
-          name: v.businessName || v.name || 'Vendor',
-          email: v.email,
-          phone: v.phone,
-          password: v.password,
-          status: v.vendorStatus === 'approved' ? 'active' : 'pending',
-          createdAt: v.createdAt || new Date().toISOString(),
-          role: 'vendor'
-        });
-      }
-    });
     
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     
@@ -86,8 +60,10 @@ function AdminCustomers() {
       const lastOrder = customerOrders.length > 0 ? customerOrders[0].date : null;
       
       return {
-        ...customer,
-        name: customer.name || customer.fullName || 'Guest',
+        id: customer.id,
+        name: customer.name || 'Customer',
+        email: customer.email || 'no-email@example.com',
+        phone: customer.phone || '',
         orders: orderCount,
         totalSpent: totalSpent,
         lastOrder: lastOrder,
@@ -97,27 +73,18 @@ function AdminCustomers() {
       };
     });
     
-    // Remove duplicates by email
-    const uniqueCustomers = [];
-    const emailSet = new Set();
-    for (const customer of customersWithStats) {
-      if (customer.email && !emailSet.has(customer.email)) {
-        emailSet.add(customer.email);
-        uniqueCustomers.push(customer);
-      }
-    }
-    
-    uniqueCustomers.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
-    setCustomers(uniqueCustomers);
+    // Sort by join date (newest first)
+    customersWithStats.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
+    setCustomers(customersWithStats);
     
     // Calculate stats
-    const activeCustomers = uniqueCustomers.filter(c => c.status === 'active').length;
-    const blockedCustomers = uniqueCustomers.filter(c => c.status === 'blocked').length;
-    const totalOrders = uniqueCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
-    const totalSpent = uniqueCustomers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+    const activeCustomers = customersWithStats.filter(c => c.status === 'active').length;
+    const blockedCustomers = customersWithStats.filter(c => c.status === 'blocked').length;
+    const totalOrders = customersWithStats.reduce((sum, c) => sum + (c.orders || 0), 0);
+    const totalSpent = customersWithStats.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
     
     setStats({
-      totalCustomers: uniqueCustomers.length,
+      totalCustomers: customersWithStats.length,
       activeCustomers,
       blockedCustomers,
       totalOrders,
@@ -134,7 +101,6 @@ function AdminCustomers() {
       );
       setCustomers(updatedCustomers);
       
-      // Also update in registeredCustomers
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const updatedRegistered = registered.map(c => 
         c.id === id ? { ...c, status: 'blocked' } : c
@@ -200,18 +166,6 @@ function AdminCustomers() {
     );
     localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
     
-    // Also update current user if it's the same
-    const currentUser = localStorage.getItem('user');
-    if (currentUser) {
-      try {
-        const user = JSON.parse(currentUser);
-        if (user.email === selectedCustomer.email) {
-          user.password = newPassword;
-          localStorage.setItem('user', JSON.stringify(user));
-        }
-      } catch(e) {}
-    }
-    
     alert(`Password reset successfully for ${selectedCustomer.name}`);
     setShowResetPasswordModal(false);
   };
@@ -236,16 +190,16 @@ function AdminCustomers() {
 
   const deleteCustomer = (id) => {
     if (window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) {
-      // ✅ Remove from state
+      // Remove from state
       const updatedCustomers = customers.filter(c => c.id !== id);
       setCustomers(updatedCustomers);
       
-      // ✅ Remove from registeredCustomers localStorage
+      // Remove from localStorage
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const filteredRegistered = registered.filter(c => c.id !== id);
       localStorage.setItem('registeredCustomers', JSON.stringify(filteredRegistered));
       
-      // ✅ Update stats
+      // Update stats
       const activeCount = updatedCustomers.filter(c => c.status === 'active').length;
       const blockedCount = updatedCustomers.filter(c => c.status === 'blocked').length;
       const totalOrders = updatedCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -410,29 +364,29 @@ function AdminCustomers() {
                               {customer.name ? customer.name.charAt(0).toUpperCase() : 'U'}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">{customer.name || 'Guest User'}</p>
+                              <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">{customer.name}</p>
                               <p className="text-[10px] sm:text-xs text-gray-400">ID: {customer.id ? customer.id.toString().slice(-6) : 'N/A'}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div>
-                            <p className="text-gray-600 text-[11px] sm:text-sm truncate max-w-[120px] sm:max-w-none">{customer.email || 'No email'}</p>
+                            <p className="text-gray-600 text-[11px] sm:text-sm truncate max-w-[120px] sm:max-w-none">{customer.email}</p>
                             <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{customer.phone || 'No phone'}</p>
                           </div>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
-                          <span className="font-semibold text-gray-800">{customer.orders || 0}</span>
+                          <span className="font-semibold text-gray-800">{customer.orders}</span>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-right">
                           <span className="font-semibold text-pink-600 text-xs sm:text-sm">₹{(customer.totalSpent || 0).toLocaleString()}</span>
                         </td>
                         <td className="hidden md:table-cell px-3 sm:px-5 py-2 sm:py-3 text-center">
-                          <span className="text-[10px] sm:text-xs text-gray-500">{customer.joinedDate ? new Date(customer.joinedDate).toLocaleDateString() : 'N/A'}</span>
+                          <span className="text-[10px] sm:text-xs text-gray-500">{new Date(customer.joinedDate).toLocaleDateString()}</span>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getStatusColor(customer.status)}`}>
-                            {customer.status || 'active'}
+                            {customer.status}
                           </span>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
@@ -448,7 +402,7 @@ function AdminCustomers() {
                             <button onClick={() => deleteCustomer(customer.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
                           </div>
                         </td>
-                      </tr>
+                      </table>
                     ))
                   )}
                 </tbody>
@@ -476,25 +430,25 @@ function AdminCustomers() {
                   {selectedCustomer.name ? selectedCustomer.name.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">{selectedCustomer.name || 'Guest User'}</h2>
-                  <p className="text-xs text-gray-500">Since {selectedCustomer.joinedDate ? new Date(selectedCustomer.joinedDate).toLocaleDateString() : 'N/A'}</p>
-                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>{selectedCustomer.status || 'active'}</span>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">{selectedCustomer.name}</h2>
+                  <p className="text-xs text-gray-500">Since {new Date(selectedCustomer.joinedDate).toLocaleDateString()}</p>
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>{selectedCustomer.status}</span>
                 </div>
               </div>
 
               <div className="mb-6">
                 <h4 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">📞 Contact Information</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
-                  <div><p className="text-gray-500 text-xs">Email</p><p className="font-medium text-gray-800 text-sm break-all">{selectedCustomer.email || 'N/A'}</p></div>
+                  <div><p className="text-gray-500 text-xs">Email</p><p className="font-medium text-gray-800 text-sm break-all">{selectedCustomer.email}</p></div>
                   <div><p className="text-gray-500 text-xs">Phone</p><p className="font-medium text-gray-800 text-sm">{selectedCustomer.phone || 'Not provided'}</p></div>
-                  <div><p className="text-gray-500 text-xs">Customer ID</p><p className="font-mono text-sm text-gray-600">{selectedCustomer.id || 'N/A'}</p></div>
+                  <div><p className="text-gray-500 text-xs">Customer ID</p><p className="font-mono text-sm text-gray-600">{selectedCustomer.id}</p></div>
                 </div>
               </div>
 
               <div className="mb-6">
                 <h4 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">📊 Order Statistics</h4>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-                  <div className="bg-pink-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-pink-600">{selectedCustomer.orders || 0}</p><p className="text-[10px] sm:text-xs text-gray-500">Orders</p></div>
+                  <div className="bg-pink-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-pink-600">{selectedCustomer.orders}</p><p className="text-[10px] sm:text-xs text-gray-500">Orders</p></div>
                   <div className="bg-green-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-green-600">₹{(selectedCustomer.totalSpent || 0).toLocaleString()}</p><p className="text-[10px] sm:text-xs text-gray-500">Total Spent</p></div>
                   <div className="bg-blue-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-blue-600">₹{selectedCustomer.orders ? Math.round(selectedCustomer.totalSpent / selectedCustomer.orders).toLocaleString() : 0}</p><p className="text-[10px] sm:text-xs text-gray-500">Avg Order</p></div>
                 </div>
@@ -524,7 +478,7 @@ function AdminCustomers() {
               <button onClick={() => setShowResetPasswordModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div className="p-4 sm:p-5 space-y-4">
-              <p className="text-sm text-gray-600">Resetting password for: <span className="font-semibold text-pink-600">{selectedCustomer.name || 'User'}</span></p>
+              <p className="text-sm text-gray-600">Resetting password for: <span className="font-semibold text-pink-600">{selectedCustomer.name}</span></p>
               <p className="text-xs text-gray-500 break-all">Email: {selectedCustomer.email}</p>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500" placeholder="Min 6 characters" /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500" placeholder="Confirm password" /></div>
