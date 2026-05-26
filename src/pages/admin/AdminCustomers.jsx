@@ -9,6 +9,9 @@ function AdminCustomers() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [stats, setStats] = useState({
     totalCustomers: 0,
     activeCustomers: 0,
@@ -29,7 +32,30 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
-    const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+    // Get all customers from multiple sources
+    let allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+    
+    // Also get current logged in user if not in list
+    const currentUser = localStorage.getItem('user');
+    if (currentUser) {
+      try {
+        const user = JSON.parse(currentUser);
+        const exists = allCustomers.some(c => c.email === user.email);
+        if (!exists && user.email) {
+          allCustomers.push({
+            id: user.id || Date.now(),
+            name: user.name || 'User',
+            email: user.email,
+            phone: user.mobile || user.phone || '',
+            password: user.password,
+            status: 'active',
+            createdAt: user.createdAt || new Date().toISOString(),
+            role: 'customer'
+          });
+        }
+      } catch(e) {}
+    }
+    
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     
     // Calculate customer stats from orders
@@ -45,22 +71,33 @@ function AdminCustomers() {
         totalSpent: totalSpent,
         lastOrder: lastOrder,
         status: customer.status || 'active',
-        joinedDate: customer.createdAt || new Date().toISOString()
+        joinedDate: customer.createdAt || customer.joinedDate || new Date().toISOString(),
+        password: customer.password || '********'
       };
     });
     
+    // Remove duplicates by email
+    const uniqueCustomers = [];
+    const emailSet = new Set();
+    for (const customer of customersWithStats) {
+      if (customer.email && !emailSet.has(customer.email)) {
+        emailSet.add(customer.email);
+        uniqueCustomers.push(customer);
+      }
+    }
+    
     // Sort by join date (newest first)
-    customersWithStats.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
-    setCustomers(customersWithStats);
+    uniqueCustomers.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
+    setCustomers(uniqueCustomers);
     
     // Calculate overall stats
-    const activeCustomers = customersWithStats.filter(c => c.status === 'active').length;
-    const blockedCustomers = customersWithStats.filter(c => c.status === 'blocked').length;
-    const totalOrders = customersWithStats.reduce((sum, c) => sum + (c.orders || 0), 0);
-    const totalSpent = customersWithStats.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+    const activeCustomers = uniqueCustomers.filter(c => c.status === 'active').length;
+    const blockedCustomers = uniqueCustomers.filter(c => c.status === 'blocked').length;
+    const totalOrders = uniqueCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
+    const totalSpent = uniqueCustomers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
     
     setStats({
-      totalCustomers: customersWithStats.length,
+      totalCustomers: uniqueCustomers.length,
       activeCustomers,
       blockedCustomers,
       totalOrders,
@@ -74,11 +111,12 @@ function AdminCustomers() {
     if (window.confirm('Are you sure you want to block this customer?')) {
       const updated = customers.map(c => c.id === id ? { ...c, status: 'blocked' } : c);
       setCustomers(updated);
+      
+      // Update in registeredCustomers
       const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const updatedAll = allCustomers.map(c => c.id === id ? { ...c, status: 'blocked' } : c);
       localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
       
-      // Update stats
       setStats(prev => ({
         ...prev,
         activeCustomers: prev.activeCustomers - 1,
@@ -92,6 +130,7 @@ function AdminCustomers() {
   const unblockCustomer = (id) => {
     const updated = customers.map(c => c.id === id ? { ...c, status: 'active' } : c);
     setCustomers(updated);
+    
     const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     const updatedAll = allCustomers.map(c => c.id === id ? { ...c, status: 'active' } : c);
     localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
@@ -105,10 +144,78 @@ function AdminCustomers() {
     alert('Customer unblocked successfully');
   };
 
+  const resetPassword = (customer) => {
+    setSelectedCustomer(customer);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowResetPasswordModal(true);
+  };
+
+  const handleResetPassword = () => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    
+    // Update password in customers list
+    const updated = customers.map(c => 
+      c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
+    );
+    setCustomers(updated);
+    
+    // Update in registeredCustomers
+    const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+    const updatedAll = allCustomers.map(c => 
+      c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
+    );
+    localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
+    
+    // Also update current user if it's the same
+    const currentUser = localStorage.getItem('user');
+    if (currentUser) {
+      try {
+        const user = JSON.parse(currentUser);
+        if (user.email === selectedCustomer.email) {
+          user.password = newPassword;
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      } catch(e) {}
+    }
+    
+    alert(`Password reset successfully for ${selectedCustomer.name}`);
+    setShowResetPasswordModal(false);
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const editCustomer = (customer) => {
+    const newName = prompt('Enter new name:', customer.name);
+    if (newName && newName.trim()) {
+      const updated = customers.map(c => 
+        c.id === customer.id ? { ...c, name: newName.trim() } : c
+      );
+      setCustomers(updated);
+      
+      const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+      const updatedAll = allCustomers.map(c => 
+        c.id === customer.id ? { ...c, name: newName.trim() } : c
+      );
+      localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
+      
+      alert('Customer name updated successfully');
+    }
+  };
+
   const deleteCustomer = (id) => {
     if (window.confirm('⚠️ Are you sure you want to permanently delete this customer? This action cannot be undone.')) {
+      const customerToDelete = customers.find(c => c.id === id);
       const updated = customers.filter(c => c.id !== id);
       setCustomers(updated);
+      
       const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const updatedAll = allCustomers.filter(c => c.id !== id);
       localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
@@ -116,8 +223,8 @@ function AdminCustomers() {
       setStats(prev => ({
         ...prev,
         totalCustomers: prev.totalCustomers - 1,
-        activeCustomers: prev.activeCustomers - (customers.find(c => c.id === id)?.status === 'active' ? 1 : 0),
-        blockedCustomers: prev.blockedCustomers - (customers.find(c => c.id === id)?.status === 'blocked' ? 1 : 0)
+        activeCustomers: prev.activeCustomers - (customerToDelete?.status === 'active' ? 1 : 0),
+        blockedCustomers: prev.blockedCustomers - (customerToDelete?.status === 'blocked' ? 1 : 0)
       }));
       
       alert('Customer deleted successfully');
@@ -136,7 +243,8 @@ function AdminCustomers() {
       return (
         c.name?.toLowerCase().includes(searchLower) ||
         c.email?.toLowerCase().includes(searchLower) ||
-        c.phone?.includes(searchTerm)
+        c.phone?.includes(searchTerm) ||
+        c.id?.toString().includes(searchTerm)
       );
     }
     return true;
@@ -170,13 +278,13 @@ function AdminCustomers() {
         <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Customer Management</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Manage and monitor customer accounts</p>
+            <p className="text-xs text-gray-400 mt-0.5">Manage, monitor, and control customer accounts</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
               <input 
                 type="text" 
-                placeholder="Search by name, email or phone..." 
+                placeholder="Search by name, email, phone or ID..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-64 lg:w-80 pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-gray-50"
@@ -305,7 +413,7 @@ function AdminCustomers() {
                           <p className="text-gray-600 text-sm">{customer.email}</p>
                           <p className="text-xs text-gray-400 mt-0.5">{customer.phone || 'No phone'}</p>
                         </div>
-                       </td>
+                        </td>
                       <td className="px-5 py-3 text-center">
                         <span className="font-semibold text-gray-800">{customer.orders || 0}</span>
                         {customer.lastOrder && (
@@ -313,30 +421,44 @@ function AdminCustomers() {
                             Last: {new Date(customer.lastOrder).toLocaleDateString()}
                           </p>
                         )}
-                       </td>
+                        </td>
                       <td className="px-5 py-3 text-right">
                         <span className="font-semibold text-pink-600">
                           ₹{(customer.totalSpent || 0).toLocaleString()}
                         </span>
-                       </td>
+                        </td>
                       <td className="px-5 py-3 text-center">
                         <span className="text-xs text-gray-500">
                           {new Date(customer.joinedDate).toLocaleDateString()}
                         </span>
-                       </td>
+                        </td>
                       <td className="px-5 py-3 text-center">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(customer.status)}`}>
                           {customer.status || 'active'}
                         </span>
-                       </td>
+                        </td>
                       <td className="px-5 py-3 text-center">
-                        <div className="flex justify-center gap-2">
+                        <div className="flex justify-center gap-1 flex-wrap">
                           <button
                             onClick={() => viewCustomerDetails(customer)}
                             className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
                             title="View Details"
                           >
                             👁️
+                          </button>
+                          <button
+                            onClick={() => editCustomer(customer)}
+                            className="p-1.5 text-purple-500 hover:bg-purple-50 rounded-lg transition"
+                            title="Edit Customer"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => resetPassword(customer)}
+                            className="p-1.5 text-yellow-500 hover:bg-yellow-50 rounded-lg transition"
+                            title="Reset Password"
+                          >
+                            🔑
                           </button>
                           {customer.status === 'active' ? (
                             <button
@@ -363,7 +485,7 @@ function AdminCustomers() {
                             🗑️
                           </button>
                         </div>
-                       </td>
+                        </td>
                     </tr>
                   ))
                 )}
@@ -417,6 +539,14 @@ function AdminCustomers() {
                     <p className="text-gray-500">Phone</p>
                     <p className="font-medium text-gray-800">{selectedCustomer.phone || 'Not provided'}</p>
                   </div>
+                  <div>
+                    <p className="text-gray-500">Customer ID</p>
+                    <p className="font-mono text-sm text-gray-600">{selectedCustomer.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Password</p>
+                    <p className="font-mono text-sm text-gray-600">••••••••</p>
+                  </div>
                 </div>
               </div>
 
@@ -444,28 +574,92 @@ function AdminCustomers() {
               </div>
 
               {/* Quick Actions */}
-              <div className="flex gap-3 pt-4 border-t border-gray-100">
+              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
                 <Link
                   to={`/admin/orders?customer=${selectedCustomer.email}`}
-                  className="flex-1 text-center bg-pink-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-pink-600 transition"
+                  className="text-center bg-pink-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-pink-600 transition"
                 >
                   View Orders
                 </Link>
+                <button
+                  onClick={() => { editCustomer(selectedCustomer); setShowDetailsModal(false); }}
+                  className="text-center bg-purple-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-purple-600 transition"
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => { resetPassword(selectedCustomer); setShowDetailsModal(false); }}
+                  className="text-center bg-yellow-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-yellow-600 transition"
+                >
+                  Reset Password
+                </button>
                 {selectedCustomer.status === 'active' ? (
                   <button
                     onClick={() => { blockCustomer(selectedCustomer.id); setShowDetailsModal(false); }}
-                    className="flex-1 text-center bg-orange-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-orange-600 transition"
+                    className="text-center bg-orange-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-orange-600 transition"
                   >
                     Block Customer
                   </button>
                 ) : (
                   <button
                     onClick={() => { unblockCustomer(selectedCustomer.id); setShowDetailsModal(false); }}
-                    className="flex-1 text-center bg-green-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-green-600 transition"
+                    className="text-center bg-green-500 text-white py-2 rounded-xl text-sm font-medium hover:bg-green-600 transition"
                   >
                     Unblock Customer
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetPasswordModal && selectedCustomer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowResetPasswordModal(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-100 p-5 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">Reset Password</h3>
+              <button onClick={() => setShowResetPasswordModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Resetting password for: <span className="font-semibold text-pink-600">{selectedCustomer.name}</span>
+              </p>
+              <p className="text-xs text-gray-500">Email: {selectedCustomer.email}</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                  placeholder="Enter new password (min 6 characters)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                  placeholder="Confirm new password"
+                />
+              </div>
+              <div className="flex gap-3 pt-3">
+                <button
+                  onClick={() => setShowResetPasswordModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetPassword}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition"
+                >
+                  Reset Password
+                </button>
               </div>
             </div>
           </div>
