@@ -38,11 +38,11 @@ function ReturnsPolicy() {
   ];
 
   const refundTimeline = [
-    { method: 'Credit/Debit Card', time: '5-7 business days', icon: '💳' },
-    { method: 'UPI', time: '3-5 business days', icon: '📱' },
-    { method: 'Net Banking', time: '5-7 business days', icon: '🏦' },
-    { method: 'Cash on Delivery', time: '7-10 business days', icon: '💵' },
-    { method: 'Store Credit', time: 'Immediately', icon: '🎫' },
+    { method: 'Credit/Debit Card', time: '5-7 business days', icon: '💳', note: 'After quality check' },
+    { method: 'UPI', time: '3-5 business days', icon: '📱', note: 'After quality check' },
+    { method: 'Net Banking', time: '5-7 business days', icon: '🏦', note: 'After quality check' },
+    { method: 'Cash on Delivery', time: '7-10 business days', icon: '💵', note: 'Bank transfer required' },
+    { method: 'Store Credit', time: 'Immediately', icon: '🎫', note: 'Instant credit to wallet' },
   ];
 
   return (
@@ -201,7 +201,6 @@ function ReturnsPolicy() {
         {/* Return Process Tab */}
         {activeTab === 'returns' && (
           <>
-            {/* Steps */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
               {returnSteps.map((step) => (
                 <div key={step.step} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center border border-pink-100 hover:shadow-md transition">
@@ -215,18 +214,17 @@ function ReturnsPolicy() {
               ))}
             </div>
 
-            {/* How to Return Video/Guide */}
             <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-6 border border-pink-100 mb-8">
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="text-6xl">📝</div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-2">How to Initiate a Return?</h3>
                   <ul className="space-y-2 text-sm text-gray-600">
-                    <li className="flex items-center gap-2">1️⃣ Go to <Link to="/my-orders" className="text-pink-500 hover:underline">My Orders</Link> section</li>
-                    <li className="flex items-center gap-2">2️⃣ Select the order you want to return</li>
-                    <li className="flex items-center gap-2">3️⃣ Click on "Return Item" button</li>
-                    <li className="flex items-center gap-2">4️⃣ Select reason for return and upload images (if damaged)</li>
-                    <li className="flex items-center gap-2">5️⃣ Confirm return request</li>
+                    <li>1️⃣ Go to <Link to="/my-orders" className="text-pink-500 hover:underline">My Orders</Link> section</li>
+                    <li>2️⃣ Select the order you want to return</li>
+                    <li>3️⃣ Click on "Return Item" button</li>
+                    <li>4️⃣ Select reason for return and upload images (if damaged)</li>
+                    <li>5️⃣ Confirm return request</li>
                   </ul>
                 </div>
               </div>
@@ -237,7 +235,6 @@ function ReturnsPolicy() {
         {/* Return Conditions Tab */}
         {activeTab === 'conditions' && (
           <>
-            {/* Eligible/Non-Eligible Table */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden mb-8">
               <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-6 py-4 border-b border-pink-100">
                 <h2 className="text-lg font-semibold text-gray-800">Return Eligibility Criteria</h2>
@@ -260,7 +257,7 @@ function ReturnsPolicy() {
                             <span className="text-xl">{item.icon}</span>
                             <span className="font-medium text-gray-800">{item.condition}</span>
                           </div>
-                         </td>
+                        </td>
                         <td className="px-6 py-3 text-gray-600">{item.detail}</td>
                         <td className="px-6 py-3 text-center">
                           {item.eligible ? (
@@ -272,15 +269,14 @@ function ReturnsPolicy() {
                               ✗ No
                             </span>
                           )}
-                         </td>
-                      </table>
+                        </td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Non-Returnable Items */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-pink-100">
               <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <span>🚫</span> Non-Returnable Items
@@ -328,21 +324,18 @@ function ReturnsPolicy() {
                             <span className="text-xl">{method.icon}</span>
                             <span className="font-medium text-gray-800">{method.method}</span>
                           </div>
-                         </td>
+                        </td>
                         <td className="px-6 py-3">
                           <span className="text-green-600 font-medium">{method.time}</span>
-                         </td>
-                        <td className="px-6 py-3 text-gray-500 text-xs">
-                          {method.method === 'Store Credit' ? 'Instant credit to wallet' : 'After quality check'}
-                         </td>
-                      </td>
+                        </td>
+                        <td className="px-6 py-3 text-gray-500 text-xs">{method.note}</td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Refund Info Box */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">💡</span>
@@ -439,6 +432,8 @@ function ReturnsPolicy() {
                 <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
                 <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
                 <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                <li><Link to="/terms" className="hover:text-pink-500 transition">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="hover:text-pink-500 transition">Privacy Policy</Link></li>
               </ul>
             </div>
             <div>
