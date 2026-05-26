@@ -1,206 +1,305 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminSidebar from './components/AdminSidebar';
 
 function AdminBanners() {
+  const navigate = useNavigate();
   const [banners, setBanners] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
-    image: '',
-    mobileImage: '',
-    link: '',
     buttonText: 'Shop Now',
+    link: '/shop',
+    image: '',
     order: 0,
-    active: true,
+    active: true
   });
-  const navigate = useNavigate();
+  const [imagePreview, setImagePreview] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  // Check admin auth
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
+    const admin = localStorage.getItem('adminLoggedIn');
+    if (admin !== 'true') {
       navigate('/admin/login');
-      return;
     }
-
-    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
-    if (savedBanners.length === 0) {
-      const defaultBanners = [
-        { 
-          id: 1, 
-          title: 'Summer Sale', 
-          subtitle: 'Up to 50% off on skincare', 
-          image: 'https://images.unsplash.com/photo-1596462502278-27bfdc1e2e7c?w=1200&h=400&fit=crop',
-          mobileImage: '',
-          link: '/shop', 
-          buttonText: 'Shop Now',
-          order: 1, 
-          active: true 
-        },
-        { 
-          id: 2, 
-          title: 'New Arrivals', 
-          subtitle: 'Fresh collection just landed', 
-          image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=1200&h=400&fit=crop',
-          mobileImage: '',
-          link: '/shop', 
-          buttonText: 'Explore',
-          order: 2, 
-          active: true 
-        },
-      ];
-      setBanners(defaultBanners);
-      localStorage.setItem('homepage_banners', JSON.stringify(defaultBanners));
-    } else {
-      setBanners(savedBanners);
-    }
-    setLoading(false);
   }, [navigate]);
 
-  const saveBanners = (updated) => {
-    setBanners(updated);
-    localStorage.setItem('homepage_banners', JSON.stringify(updated));
+  // Load banners from localStorage
+  useEffect(() => {
+    loadBanners();
+  }, []);
+
+  const loadBanners = () => {
+    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
+    setBanners(savedBanners.sort((a, b) => a.order - b.order));
   };
 
-  const handleSubmit = () => {
+  const saveBanners = (updatedBanners) => {
+    localStorage.setItem('homepage_banners', JSON.stringify(updatedBanners));
+    setBanners(updatedBanners.sort((a, b) => a.order - b.order));
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result;
+        setFormData({ ...formData, image: base64String });
+        setImagePreview(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
     if (!formData.title || !formData.image) {
-      alert('Please fill title and image URL');
+      alert('Please fill title and upload image');
       return;
     }
+
     if (editingBanner) {
-      const updated = banners.map(b => b.id === editingBanner.id ? { ...b, ...formData } : b);
-      saveBanners(updated);
-      alert('Banner updated');
+      // Update existing banner
+      const updatedBanners = banners.map(b => 
+        b.id === editingBanner.id ? { ...formData, id: editingBanner.id } : b
+      );
+      saveBanners(updatedBanners);
+      alert('Banner updated successfully!');
     } else {
-      const newBanner = { id: Date.now(), ...formData };
+      // Add new banner
+      const newBanner = {
+        ...formData,
+        id: Date.now(),
+        createdAt: new Date().toISOString()
+      };
       saveBanners([...banners, newBanner]);
-      alert('Banner added');
+      alert('Banner added successfully!');
     }
-    setShowModal(false);
-    setEditingBanner(null);
-    setFormData({ title: '', subtitle: '', image: '', mobileImage: '', link: '', buttonText: 'Shop Now', order: 0, active: true });
+    
+    resetForm();
   };
 
-  const deleteBanner = (id) => {
-    if (window.confirm('Delete this banner?')) {
-      saveBanners(banners.filter(b => b.id !== id));
+  const resetForm = () => {
+    setEditingBanner(null);
+    setFormData({
+      title: '',
+      subtitle: '',
+      buttonText: 'Shop Now',
+      link: '/shop',
+      image: '',
+      order: banners.length,
+      active: true
+    });
+    setImagePreview('');
+  };
+
+  const handleEdit = (banner) => {
+    setEditingBanner(banner);
+    setFormData({
+      title: banner.title,
+      subtitle: banner.subtitle || '',
+      buttonText: banner.buttonText || 'Shop Now',
+      link: banner.link || '/shop',
+      image: banner.image,
+      order: banner.order,
+      active: banner.active
+    });
+    setImagePreview(banner.image);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this banner?')) {
+      const updatedBanners = banners.filter(b => b.id !== id);
+      saveBanners(updatedBanners);
+      alert('Banner deleted!');
+      if (editingBanner?.id === id) resetForm();
     }
   };
 
   const toggleActive = (id) => {
-    const updated = banners.map(b => b.id === id ? { ...b, active: !b.active } : b);
-    saveBanners(updated);
-  };
-
-  const moveUp = (index) => {
-    if (index === 0) return;
-    const reordered = [...banners];
-    [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]];
-    reordered.forEach((b, idx) => b.order = idx + 1);
-    saveBanners(reordered);
-  };
-
-  const moveDown = (index) => {
-    if (index === banners.length - 1) return;
-    const reordered = [...banners];
-    [reordered[index + 1], reordered[index]] = [reordered[index], reordered[index + 1]];
-    reordered.forEach((b, idx) => b.order = idx + 1);
-    saveBanners(reordered);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
-      </div>
+    const updatedBanners = banners.map(b => 
+      b.id === id ? { ...b, active: !b.active } : b
     );
-  }
+    saveBanners(updatedBanners);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminLoggedIn');
+    navigate('/admin/login');
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <AdminSidebar />
-      <div className="ml-64">
-        <div className="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-40">
-          <h1 className="text-xl font-semibold text-gray-800">Hero Banners</h1>
-        </div>
-        <div className="p-6">
-          <div className="flex justify-end mb-4">
-            <button onClick={() => { setEditingBanner(null); setFormData({ title: '', subtitle: '', image: '', mobileImage: '', link: '', buttonText: 'Shop Now', order: 0, active: true }); setShowModal(true); }} className="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700 transition">
-              + Add Banner
+      {/* Admin Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-800">Banner Management</h1>
+            <span className="text-sm text-gray-500">MyPinkShop Admin</span>
+          </div>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => navigate('/admin/dashboard')}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            >
+              Dashboard
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+            >
+              Logout
             </button>
           </div>
+        </div>
+      </header>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left w-16">Order</th>
-                  <th className="px-4 py-3 text-left">Image</th>
-                  <th className="px-4 py-3 text-left">Title</th>
-                  <th className="px-4 py-3 text-left">Subtitle</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {banners.map((banner, idx) => (
-                  <tr key={banner.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        <button onClick={() => moveUp(idx)} disabled={idx === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">↑</button>
-                        <span className="text-xs text-gray-500">{banner.order}</span>
-                        <button onClick={() => moveDown(idx)} disabled={idx === banners.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">↓</button>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Banner Form */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">
+              {editingBanner ? 'Edit Banner' : 'Add New Banner'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Subtitle</label>
+                <input
+                  type="text"
+                  value={formData.subtitle}
+                  onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Button Text</label>
+                <input
+                  type="text"
+                  value={formData.buttonText}
+                  onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Link URL</label>
+                <input
+                  type="text"
+                  value={formData.link}
+                  onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Order (1=first)</label>
+                <input
+                  type="number"
+                  value={formData.order}
+                  onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
+                  className="w-full border rounded-md px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Banner Image *</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="w-full border rounded-md px-3 py-2"
+                />
+                {imagePreview && (
+                  <div className="mt-2">
+                    <img src={imagePreview} alt="Preview" className="h-32 w-full object-cover rounded-md" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.active}
+                    onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                  />
+                  <span className="text-sm font-medium">Active (show on homepage)</span>
+                </label>
+              </div>
+              <div className="flex gap-3">
+                <button type="submit" className="bg-pink-500 text-white px-4 py-2 rounded-md hover:bg-pink-600">
+                  {editingBanner ? 'Update Banner' : 'Add Banner'}
+                </button>
+                {editingBanner && (
+                  <button type="button" onClick={resetForm} className="bg-gray-300 px-4 py-2 rounded-md hover:bg-gray-400">
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Banners List */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold mb-4">Active Banners</h2>
+            {banners.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No banners yet. Add your first banner!</p>
+            ) : (
+              <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                {banners.map((banner) => (
+                  <div key={banner.id} className="border rounded-lg p-4">
+                    <img src={banner.image} alt={banner.title} className="h-32 w-full object-cover rounded-md mb-3" />
+                    <h3 className="font-semibold">{banner.title}</h3>
+                    <p className="text-sm text-gray-500">{banner.subtitle}</p>
+                    <div className="flex justify-between items-center mt-3">
+                      <div className="flex gap-2">
+                        <button onClick={() => handleEdit(banner)} className="text-blue-500 text-sm">Edit</button>
+                        <button onClick={() => handleDelete(banner.id)} className="text-red-500 text-sm">Delete</button>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <img src={banner.image} alt={banner.title} className="w-20 h-12 object-cover rounded" />
-                    </td>
-                    <td className="px-4 py-3 font-medium">{banner.title}</td>
-                    <td className="px-4 py-3 text-gray-500">{banner.subtitle}</td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => toggleActive(banner.id)} className={`px-2 py-1 rounded-full text-xs ${banner.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                      <button onClick={() => toggleActive(banner.id)} className={`text-sm px-2 py-1 rounded ${banner.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                         {banner.active ? 'Active' : 'Inactive'}
                       </button>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-2">
-                        <button onClick={() => { setEditingBanner(banner); setFormData(banner); setShowModal(true); }} className="text-blue-500 hover:text-blue-700">Edit</button>
-                        <button onClick={() => deleteBanner(banner.id)} className="text-red-500 hover:text-red-700">Delete</button>
-                      </div>
-                     </td>
-                   </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-             </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Live Preview */}
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Live Preview (Homepage Carousel)</h2>
+          <div className="relative overflow-hidden rounded-lg">
+            <div className="flex transition-transform duration-500">
+              {banners.filter(b => b.active).slice(0, 3).map((banner, idx) => (
+                <div key={idx} className="w-full flex-shrink-0 relative">
+                  <img src={banner.image} alt={banner.title} className="w-full h-48 md:h-64 object-cover" />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <div className="text-center text-white">
+                      <h3 className="text-xl md:text-2xl font-bold">{banner.title}</h3>
+                      <p className="text-sm">{banner.subtitle}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {banners.filter(b => b.active).length === 0 && (
+              <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500">
+                No active banners to preview
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Add/Edit Banner Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b p-5 flex justify-between items-center sticky top-0 bg-white">
-              <h3 className="text-xl font-bold">{editingBanner ? 'Edit Banner' : 'Add New Banner'}</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div><label className="block text-sm font-medium mb-1">Title *</label><input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium mb-1">Subtitle</label><input type="text" value={formData.subtitle} onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium mb-1">Desktop Image URL *</label><input type="text" value={formData.image} onChange={(e) => setFormData({ ...formData, image: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="https://..." /></div>
-              <div><label className="block text-sm font-medium mb-1">Mobile Image URL (optional)</label><input type="text" value={formData.mobileImage} onChange={(e) => setFormData({ ...formData, mobileImage: e.target.value })} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium mb-1">Link URL</label><input type="text" value={formData.link} onChange={(e) => setFormData({ ...formData, link: e.target.value })} className="w-full px-3 py-2 border rounded-lg" placeholder="/shop" /></div>
-              <div><label className="block text-sm font-medium mb-1">Button Text</label><input type="text" value={formData.buttonText} onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div><label className="block text-sm font-medium mb-1">Order</label><input type="number" value={formData.order} onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })} className="w-full px-3 py-2 border rounded-lg" /></div>
-              <div className="flex items-center gap-2"><input type="checkbox" checked={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="w-4 h-4" /><label>Active</label></div>
-              <button onClick={handleSubmit} className="w-full bg-pink-600 text-white py-2 rounded-lg font-medium hover:bg-pink-700 transition">{editingBanner ? 'Update Banner' : 'Add Banner'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
