@@ -10,74 +10,40 @@ function Home() {
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
   const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
-  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [loading, setLoading] = useState(true);
+  const [banners, setBanners] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [settings, setSettings] = useState({ showBrandStrip: true, showNewsletter: true, featuredProductsCount: 8 });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 3);
-    targetDate.setHours(23, 59, 59, 999);
+    // Load homepage data from localStorage (admin settings)
+    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
+    const activeBanners = savedBanners.filter(b => b.active).sort((a, b) => a.order - b.order);
+    setBanners(activeBanners);
 
-    const interval = setInterval(() => {
-      const now = new Date();
-      const diff = targetDate - now;
-      if (diff <= 0) {
-        clearInterval(interval);
-        setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
-      setCountdown({
-        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((diff % (86400000)) / (1000 * 60 * 60)),
-        minutes: Math.floor((diff % (3600000)) / (1000 * 60)),
-        seconds: Math.floor((diff % (60000)) / 1000),
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    const savedCategories = JSON.parse(localStorage.getItem('homepage_categories') || '[]');
+    const activeCategories = savedCategories.filter(c => c.active).sort((a, b) => a.order - b.order);
+    setCategories(activeCategories);
 
-  // Load only approved products from localStorage
-  useEffect(() => {
+    const savedOffers = JSON.parse(localStorage.getItem('homepage_offers') || '[]');
+    const activeOffers = savedOffers.filter(o => o.active).sort((a, b) => a.order - b.order);
+    setOffers(activeOffers);
+
+    const savedSettings = JSON.parse(localStorage.getItem('homepage_settings') || '{}');
+    setSettings({ showBrandStrip: true, showNewsletter: true, featuredProductsCount: 8, ...savedSettings });
+
+    // Load approved products
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
+    setProducts(approvedProducts);
     
-    if (approvedProducts.length > 0) {
-      setProducts(approvedProducts);
-    } else {
-      // Default approved products
-      const defaultProducts = [
-        { id: 1, name: "Glass Skin Serum", category: "skincare", price: 1299, originalPrice: 1999, rating: 4.8, badge: "Bestseller", isNew: true, adminApproved: true, status: 'active' },
-        { id: 2, name: "Rice Water Toner", category: "skincare", price: 899, originalPrice: 1299, rating: 4.6, badge: "Trending", isNew: false, adminApproved: true, status: 'active' },
-        { id: 3, name: "Cherry Lip Tint", category: "makeup", price: 599, originalPrice: 999, rating: 4.7, badge: "Viral", isNew: true, adminApproved: true, status: 'active' },
-        { id: 4, name: "Satin Slip Dress", category: "clothing", price: 2499, originalPrice: 3999, rating: 4.9, badge: "Best Seller", isNew: false, adminApproved: true, status: 'active' },
-      ];
-      setProducts(defaultProducts);
-    }
     setLoading(false);
   }, []);
-
-  const handleSearch = () => {
-    if (searchTerm.trim()) {
-      const results = products.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const handleWishlistToggle = (product) => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-    } else {
-      addToWishlist(product);
-    }
-  };
 
   const getDisplayProducts = () => {
     if (searchResults.length > 0) return searchResults;
@@ -85,23 +51,19 @@ function Home() {
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => p.category === selectedCategory);
     }
-    return filtered;
+    return filtered.slice(0, settings.featuredProductsCount);
+  };
+
+  const handleSearch = () => {
+    if (searchTerm.trim()) {
+      const results = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
   };
 
   const displayProducts = getDisplayProducts();
-  
-  const categories = [
-    { name: "Skincare", value: "skincare" },
-    { name: "Makeup", value: "makeup" },
-    { name: "Clothing", value: "clothing" },
-    { name: "Accessories", value: "accessories" },
-  ];
-
-  const offers = [
-    { title: "Buy 1 Get 1 Free", subtitle: "On selected skincare", link: "/shop?offer=bogo" },
-    { title: "Flat 20% Off", subtitle: "On first order", link: "/shop?offer=first" },
-    { title: "Free Shipping", subtitle: "On orders above ₹999", link: "/shop" },
-  ];
 
   if (loading) {
     return (
@@ -113,16 +75,10 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-white">
-      
       {/* Top Bar */}
       <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-3 text-center">
         <div className="container mx-auto px-4">
-          <p className="text-sm font-medium tracking-wide">
-            LIMITED TIME OFFER — Sale ends in: 
-            <span className="font-bold mx-2 bg-white/20 px-2 py-1 rounded-lg">
-              {String(countdown.days).padStart(2, '0')}d {String(countdown.hours).padStart(2, '0')}h {String(countdown.minutes).padStart(2, '0')}m {String(countdown.seconds).padStart(2, '0')}s
-            </span>
-          </p>
+          <p className="text-sm font-medium tracking-wide">FREE SHIPPING on orders above ₹999 | EXTRA 10% off on first order</p>
         </div>
       </div>
 
@@ -131,188 +87,90 @@ function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition">
-              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">M</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-gray-800">MyPinkShop</h1>
-                <p className="text-[10px] text-gray-400 tracking-wider">LUXURY BEAUTY & FASHION</p>
-              </div>
+              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center"><span className="text-white font-bold text-lg">M</span></div>
+              <div><h1 className="text-2xl font-bold tracking-tight text-gray-800">MyPinkShop</h1><p className="text-[10px] text-gray-400 tracking-wider">LUXURY BEAUTY & FASHION</p></div>
             </Link>
-
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search for products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full px-5 py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-400 bg-gray-50"
-                />
-                <button onClick={handleSearch} className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-pink-600 transition">
-                  Search
-                </button>
-              </div>
-            </div>
-
+            <div className="flex-1 max-w-md"><div className="relative"><input type="text" placeholder="Search for products..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSearch()} className="w-full px-5 py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-400 bg-gray-50" /><button onClick={handleSearch} className="absolute right-2 top-1/2 -translate-y-1/2 bg-pink-500 text-white px-5 py-1.5 rounded-full text-sm font-medium hover:bg-pink-600 transition">Search</button></div></div>
             <div className="flex items-center gap-6">
-              <button onClick={() => navigate('/wishlist')} className="relative text-gray-600 hover:text-pink-500 transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                {wishlistCount > 0 && <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{wishlistCount}</span>}
-              </button>
-              <Link to="/cart" className="relative text-gray-600 hover:text-pink-500 transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cartCount}</span>}
-              </Link>
+              <button onClick={() => navigate('/wishlist')} className="relative text-gray-600 hover:text-pink-500 transition"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>{wishlistCount > 0 && <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{wishlistCount}</span>}</button>
+              <Link to="/cart" className="relative text-gray-600 hover:text-pink-500 transition"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>{cartCount > 0 && <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cartCount}</span>}</Link>
               {user ? <Avatar user={user} onLogout={logout} /> : <Link to="/login" className="text-gray-600 hover:text-pink-500 transition"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></Link>}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-pink-50 to-white">
-        <div className="container mx-auto px-4 py-16 md:py-20">
-          <div className="max-w-2xl">
-            <div className="inline-block px-4 py-1 bg-pink-100 rounded-full text-pink-600 text-sm font-medium mb-6">New Collection</div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight text-gray-900">Glow Up <span className="text-pink-600">This Summer</span></h1>
-            <p className="text-gray-600 text-lg mb-8 max-w-lg">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
-            <div className="flex gap-4"><Link to="/shop" className="bg-pink-500 text-white px-8 py-3 rounded-full font-medium hover:bg-pink-600 transition shadow-md">Shop Now</Link><button className="border border-pink-300 hover:bg-pink-50 px-8 py-3 rounded-full font-medium transition text-gray-700">Explore Collection</button></div>
-          </div>
-        </div>
-      </section>
-
-      {/* Brand Strip */}
-      <div className="border-y border-gray-100 py-4 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-around items-center flex-wrap gap-6">
-            <span className="text-base font-medium text-gray-500">LANCÔME</span>
-            <span className="text-base font-medium text-gray-500">NYkaa</span>
-            <span className="text-base font-medium text-gray-500">Mamaearth</span>
-            <span className="text-base font-medium text-gray-500">HUDA BEAUTY</span>
-            <span className="text-base font-medium text-gray-500">SUGAR</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Categories */}
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <p className="text-pink-500 text-sm font-medium tracking-wider mb-2">SHOP BY CATEGORY</p>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Find Your Perfect Match</h2>
-            <div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {categories.map((cat, idx) => (
-              <button key={idx} onClick={() => { setSelectedCategory(cat.value); setSearchResults([]); setSearchTerm(''); }} className="group bg-white rounded-2xl p-8 text-center border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">🏪</div>
-                <h3 className="font-semibold text-gray-900 text-lg">{cat.name}</h3>
-                <p className="text-sm text-pink-500 mt-2">Shop Now →</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Offer Banners */}
-      <section className="py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {offers.map((offer, idx) => (
-              <Link key={idx} to={offer.link} className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-6 text-white hover:shadow-xl transition hover:-translate-y-1">
-                <div className="flex items-center justify-between">
-                  <div><h3 className="text-xl font-bold">{offer.title}</h3><p className="text-white/80 text-sm mt-1">{offer.subtitle}</p></div>
-                  <div className="text-3xl">→</div>
+      {/* Hero Banners - Dynamic from Admin */}
+      {banners.length > 0 && (
+        <div className="overflow-hidden">
+          <div className="flex transition-transform duration-500">
+            {banners.map(banner => (
+              <Link key={banner.id} to={banner.link} className="block w-full flex-shrink-0">
+                <div className="relative h-64 md:h-80 bg-cover bg-center rounded-xl mx-4" style={{ backgroundImage: `url(${banner.image})` }}>
+                  <div className="absolute inset-0 bg-black/30 rounded-xl flex items-center justify-center">
+                    <div className="text-center text-white">
+                      <h2 className="text-3xl md:text-5xl font-bold mb-2">{banner.title}</h2>
+                      <p className="text-lg">{banner.subtitle}</p>
+                      <button className="mt-4 bg-white text-pink-600 px-6 py-2 rounded-full font-medium">Shop Now →</button>
+                    </div>
+                  </div>
                 </div>
               </Link>
             ))}
           </div>
         </div>
-      </section>
+      )}
 
-      {/* Products */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <p className="text-pink-500 text-sm font-medium tracking-wider mb-2">CUSTOMER FAVORITES</p>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-              {searchResults.length > 0 ? 'Search Results' : (selectedCategory === 'all' ? 'Bestsellers' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1))}
-            </h2>
-            <div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div>
-            {searchResults.length > 0 && <button onClick={() => { setSearchResults([]); setSearchTerm(''); }} className="mt-4 text-pink-500 text-sm hover:underline">Clear Search → Show All</button>}
-          </div>
-          
-          {displayProducts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No products found</p>
-              <button onClick={() => { setSelectedCategory('all'); setSearchResults([]); setSearchTerm(''); }} className="mt-3 text-pink-500 hover:underline">Clear filters</button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {displayProducts.slice(0, 8).map(product => (
-                <div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
-                  <Link to={`/product/${product.id}`}>
-                    <div className="relative h-64 bg-gray-50 flex items-center justify-center text-7xl">
-                      <span className="text-7xl">✨</span>
-                      <span className="absolute top-3 left-3 bg-pink-500 text-white text-xs px-3 py-1 rounded-full">{product.badge}</span>
-                      {product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-3 py-1 rounded-full">NEW</span>}
-                    </div>
-                  </Link>
-                  <div className="p-5">
-                    <Link to={`/product/${product.id}`}>
-                      <h3 className="font-semibold text-gray-900 mb-1 hover:text-pink-500 transition">{product.name}</h3>
-                    </Link>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex text-yellow-400 text-sm">
-                        {"★".repeat(Math.floor(product.rating))}{"☆".repeat(5 - Math.floor(product.rating))}
-                      </div>
-                      <span className="text-xs text-gray-400">({product.rating})</span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
-                      <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={() => addToCart(product)} className="flex-1 bg-pink-500 text-white py-2 rounded-full font-medium hover:bg-pink-600 transition">Add to Cart</button>
-                      <button onClick={() => handleWishlistToggle(product)} className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-pink-50 transition">
-                        <svg className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+      {/* Categories Section - Dynamic */}
+      {categories.length > 0 && (
+        <section className="py-16 bg-gray-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12"><p className="text-pink-500 text-sm font-medium tracking-wider mb-2">SHOP BY CATEGORY</p><h2 className="text-3xl md:text-4xl font-bold text-gray-900">Shop by Category</h2><div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div></div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {categories.map(cat => (
+                <Link key={cat.id} to={cat.link} className="group bg-white rounded-2xl p-8 text-center border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center text-4xl mb-4 group-hover:scale-110 transition">{cat.image}</div>
+                  <h3 className="font-semibold text-gray-900 text-lg">{cat.name}</h3>
+                  <p className="text-sm text-pink-500 mt-2">Shop Now →</p>
+                </Link>
               ))}
             </div>
-          )}
-          
-          {selectedCategory !== 'all' && displayProducts.length > 0 && (
-            <div className="text-center mt-8">
-              <button onClick={() => setSelectedCategory('all')} className="text-pink-500 hover:text-pink-600 text-sm font-medium">Clear Filter → Show All Products</button>
+          </div>
+        </section>
+      )}
+
+      {/* Offer Banners - Dynamic */}
+      {offers.length > 0 && (
+        <section className="py-12">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {offers.map(offer => (
+                <Link key={offer.id} to={offer.link} className={`bg-gradient-to-r ${offer.bg} rounded-2xl p-6 text-white hover:shadow-xl transition hover:-translate-y-1`}>
+                  <div className="flex items-center justify-between">
+                    <div><h3 className="text-xl font-bold">{offer.title}</h3><p className="text-white/80 text-sm mt-1">{offer.subtitle}</p></div>
+                    <div className="text-3xl">→</div>
+                  </div>
+                </Link>
+              ))}
             </div>
-          )}
+          </div>
+        </section>
+      )}
+
+      {/* Featured Products */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12"><p className="text-pink-500 text-sm font-medium tracking-wider mb-2">CUSTOMER FAVORITES</p><h2 className="text-3xl md:text-4xl font-bold text-gray-900">Bestsellers</h2><div className="w-20 h-0.5 bg-gradient-to-r from-pink-500 to-rose-500 mx-auto mt-4"></div></div>
+          {displayProducts.length === 0 ? (<div className="text-center py-12"><p className="text-gray-500">No products found</p></div>) : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{displayProducts.map(product => (<div key={product.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300"><Link to={`/product/${product.id}`}><div className="relative h-64 bg-gray-50 flex items-center justify-center text-7xl"><span className="text-7xl">✨</span><span className="absolute top-3 left-3 bg-pink-500 text-white text-xs px-3 py-1 rounded-full">{product.badge}</span>{product.isNew && <span className="absolute top-3 right-3 bg-rose-500 text-white text-xs px-3 py-1 rounded-full">NEW</span>}</div></Link><div className="p-5"><Link to={`/product/${product.id}`}><h3 className="font-semibold text-gray-900 mb-1 hover:text-pink-500 transition">{product.name}</h3></Link><div className="flex items-center gap-2 mb-2"><div className="flex text-yellow-400 text-sm">{"★".repeat(Math.floor(product.rating))}{"☆".repeat(5 - Math.floor(product.rating))}</div><span className="text-xs text-gray-400">({product.rating})</span></div><div className="flex items-center gap-2 mb-4"><span className="text-xl font-bold text-pink-600">₹{product.price}</span><span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span></div><div className="flex gap-3"><button onClick={() => addToCart(product)} className="flex-1 bg-pink-500 text-white py-2 rounded-full font-medium hover:bg-pink-600 transition">Add to Cart</button><button onClick={() => handleWishlistToggle(product)} className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center hover:bg-pink-50 transition"><svg className={`w-5 h-5 ${isInWishlist(product.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-400'}`} fill={isInWishlist(product.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg></button></div></div></div>))}</div>)}
         </div>
       </section>
 
       {/* Newsletter */}
-      <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
-            <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
-            <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" />
-              <button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button>
-            </div>
-          </div>
-        </div>
-      </section>
+      {settings.showNewsletter && (
+        <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
+          <div className="container mx-auto px-4 text-center"><div className="max-w-2xl mx-auto"><h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2><p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p><div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"><input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" /><button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button></div></div></div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 pt-12 pb-8">
