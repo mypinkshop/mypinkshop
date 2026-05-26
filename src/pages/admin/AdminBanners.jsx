@@ -15,31 +15,16 @@ function AdminBanners() {
     active: true
   });
   const [imagePreview, setImagePreview] = useState('');
-  const [isAuth, setIsAuth] = useState(false);
 
-  // Check admin auth - FIXED
+  // ✅ SAME AUTH CHECK AS YOUR DASHBOARD
   useEffect(() => {
-    // Check both possible auth methods
-    const adminToken = localStorage.getItem('adminToken');
-    const adminLoggedIn = localStorage.getItem('adminLoggedIn');
-    const adminEmail = localStorage.getItem('adminEmail');
-    
-    // Admin is logged in if any of these conditions match
-    const isAdminLoggedIn = adminToken === 'true' || adminLoggedIn === 'true' || adminEmail === 'admin@mypinkshop.com';
-    
-    if (!isAdminLoggedIn) {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
       navigate('/admin/login');
-    } else {
-      setIsAuth(true);
+      return;
     }
+    loadBanners();
   }, [navigate]);
-
-  // Load banners from localStorage
-  useEffect(() => {
-    if (isAuth) {
-      loadBanners();
-    }
-  }, [isAuth]);
 
   const loadBanners = () => {
     const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
@@ -54,16 +39,14 @@ function AdminBanners() {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert('Image size should be less than 2MB');
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64String = reader.result;
-        setFormData({ ...formData, image: base64String });
-        setImagePreview(base64String);
+        setFormData({ ...formData, image: reader.result });
+        setImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -77,23 +60,16 @@ function AdminBanners() {
     }
 
     if (editingBanner) {
-      // Update existing banner
       const updatedBanners = banners.map(b => 
         b.id === editingBanner.id ? { ...formData, id: editingBanner.id } : b
       );
       saveBanners(updatedBanners);
       alert('Banner updated successfully!');
     } else {
-      // Add new banner
-      const newBanner = {
-        ...formData,
-        id: Date.now(),
-        createdAt: new Date().toISOString()
-      };
+      const newBanner = { ...formData, id: Date.now(), createdAt: new Date().toISOString() };
       saveBanners([...banners, newBanner]);
       alert('Banner added successfully!');
     }
-    
     resetForm();
   };
 
@@ -126,156 +102,80 @@ function AdminBanners() {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this banner?')) {
-      const updatedBanners = banners.filter(b => b.id !== id);
-      saveBanners(updatedBanners);
-      alert('Banner deleted!');
+    if (window.confirm('Delete this banner?')) {
+      saveBanners(banners.filter(b => b.id !== id));
       if (editingBanner?.id === id) resetForm();
     }
   };
 
   const toggleActive = (id) => {
-    const updatedBanners = banners.map(b => 
-      b.id === id ? { ...b, active: !b.active } : b
-    );
-    saveBanners(updatedBanners);
+    saveBanners(banners.map(b => b.id === id ? { ...b, active: !b.active } : b));
   };
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminLoggedIn');
-    localStorage.removeItem('adminEmail');
     navigate('/admin/login');
   };
 
-  // Show loading while checking auth
-  if (!isAuth) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Admin Header - Fixed with sidebar adjustment */}
       <div className="ml-64">
         <header className="bg-white shadow-sm">
           <div className="px-6 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-bold text-gray-800">Banner Management</h1>
-              <span className="text-sm text-gray-500">MyPinkShop Admin</span>
-            </div>
+            <h1 className="text-xl font-bold text-gray-800">Banner Management</h1>
             <div className="flex gap-3">
-              <button 
-                onClick={() => navigate('/admin/dashboard')}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Dashboard
-              </button>
-              <button 
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
-              >
-                Logout
-              </button>
+              <button onClick={() => navigate('/admin/dashboard')} className="px-4 py-2 text-gray-600">Dashboard</button>
+              <button onClick={handleLogout} className="px-4 py-2 bg-red-500 text-white rounded-md">Logout</button>
             </div>
           </div>
         </header>
 
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Banner Form */}
+            {/* Form */}
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">
-                {editingBanner ? 'Edit Banner' : 'Add New Banner'}
-              </h2>
+              <h2 className="text-lg font-semibold mb-4">{editingBanner ? 'Edit Banner' : 'Add New Banner'}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Title *</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full border rounded-md px-3 py-2"
-                    required
-                  />
+                  <input type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full border rounded-md px-3 py-2" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Subtitle</label>
-                  <input
-                    type="text"
-                    value={formData.subtitle}
-                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-                    className="w-full border rounded-md px-3 py-2"
-                  />
+                  <input type="text" value={formData.subtitle} onChange={(e) => setFormData({...formData, subtitle: e.target.value})} className="w-full border rounded-md px-3 py-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Button Text</label>
-                  <input
-                    type="text"
-                    value={formData.buttonText}
-                    onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })}
-                    className="w-full border rounded-md px-3 py-2"
-                  />
+                  <input type="text" value={formData.buttonText} onChange={(e) => setFormData({...formData, buttonText: e.target.value})} className="w-full border rounded-md px-3 py-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Link URL</label>
-                  <input
-                    type="text"
-                    value={formData.link}
-                    onChange={(e) => setFormData({ ...formData, link: e.target.value })}
-                    className="w-full border rounded-md px-3 py-2"
-                  />
+                  <input type="text" value={formData.link} onChange={(e) => setFormData({...formData, link: e.target.value})} className="w-full border rounded-md px-3 py-2" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Order (smaller = first)</label>
-                  <input
-                    type="number"
-                    value={formData.order}
-                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
-                    className="w-full border rounded-md px-3 py-2"
-                  />
+                  <label className="block text-sm font-medium mb-1">Order</label>
+                  <input type="number" value={formData.order} onChange={(e) => setFormData({...formData, order: parseInt(e.target.value)})} className="w-full border rounded-md px-3 py-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Banner Image *</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="w-full border rounded-md px-3 py-2"
-                  />
-                  {imagePreview && (
-                    <div className="mt-2">
-                      <img src={imagePreview} alt="Preview" className="h-32 w-full object-cover rounded-md" />
-                    </div>
-                  )}
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full border rounded-md px-3 py-2" />
+                  {imagePreview && <img src={imagePreview} alt="Preview" className="mt-2 h-32 w-full object-cover rounded-md" />}
                 </div>
                 <div>
                   <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.active}
-                      onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                    />
-                    <span className="text-sm font-medium">Active (show on homepage)</span>
+                    <input type="checkbox" checked={formData.active} onChange={(e) => setFormData({...formData, active: e.target.checked})} />
+                    <span>Active (show on homepage)</span>
                   </label>
                 </div>
                 <div className="flex gap-3">
-                  <button type="submit" className="bg-pink-500 text-white px-4 py-2 rounded-md hover:bg-pink-600">
-                    {editingBanner ? 'Update Banner' : 'Add Banner'}
-                  </button>
-                  {editingBanner && (
-                    <button type="button" onClick={resetForm} className="bg-gray-300 px-4 py-2 rounded-md hover:bg-gray-400">
-                      Cancel
-                    </button>
-                  )}
+                  <button type="submit" className="bg-pink-500 text-white px-4 py-2 rounded-md">{editingBanner ? 'Update' : 'Add'} Banner</button>
+                  {editingBanner && <button type="button" onClick={resetForm} className="bg-gray-300 px-4 py-2 rounded-md">Cancel</button>}
                 </div>
               </form>
             </div>
 
-            {/* Banners List */}
+            {/* List */}
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold mb-4">All Banners</h2>
               {banners.length === 0 ? (
@@ -303,35 +203,22 @@ function AdminBanners() {
             </div>
           </div>
 
-          {/* Live Preview */}
+          {/* Preview */}
           <div className="mt-8 bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Live Preview (Homepage Carousel)</h2>
-            <div className="relative overflow-hidden rounded-lg">
+            <h2 className="text-lg font-semibold mb-4">Live Preview</h2>
+            {banners.filter(b => b.active).length > 0 ? (
               <div className="relative">
-                {banners.filter(b => b.active).slice(0, 1).map((banner, idx) => (
-                  <div key={idx} className="relative">
-                    <img src={banner.image} alt={banner.title} className="w-full h-48 md:h-64 object-cover rounded-lg" />
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-lg">
-                      <div className="text-center text-white">
-                        <h3 className="text-xl md:text-2xl font-bold">{banner.title}</h3>
-                        <p className="text-sm">{banner.subtitle}</p>
-                        <button className="mt-2 bg-white text-pink-600 px-4 py-1 rounded-md text-sm">
-                          {banner.buttonText}
-                        </button>
-                      </div>
-                    </div>
+                <img src={banners.filter(b => b.active)[0]?.image} className="w-full h-48 md:h-64 object-cover rounded-lg" />
+                <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-lg">
+                  <div className="text-center text-white">
+                    <h3 className="text-xl font-bold">{banners.filter(b => b.active)[0]?.title}</h3>
+                    <p className="text-sm">{banners.filter(b => b.active)[0]?.subtitle}</p>
                   </div>
-                ))}
-              </div>
-              {banners.filter(b => b.active).length === 0 && (
-                <div className="bg-gray-200 h-48 flex items-center justify-center text-gray-500 rounded-lg">
-                  No active banners to preview
                 </div>
-              )}
-            </div>
-            <p className="text-xs text-gray-400 mt-3 text-center">
-              Note: Homepage shows carousel with all active banners (auto-slides every 5 seconds)
-            </p>
+              </div>
+            ) : (
+              <div className="bg-gray-200 h-48 flex items-center justify-center rounded-lg">No active banners</div>
+            )}
           </div>
         </div>
       </div>
