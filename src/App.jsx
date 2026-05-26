@@ -55,6 +55,8 @@ import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import ContactUs from './pages/ContactUs';
+
 
 
 function App() {
@@ -78,6 +80,8 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/contact" element={<ContactUs />} />
+
 
               
               {/* Admin Routes */}
