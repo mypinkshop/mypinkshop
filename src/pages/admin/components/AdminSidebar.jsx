@@ -12,6 +12,7 @@ function AdminSidebar() {
     { name: 'Orders', icon: '🛒', path: '/admin/orders' },
     { name: 'Customers', icon: '👥', path: '/admin/customers' },
     { name: 'Categories', icon: '📁', path: '/admin/categories' },
+    { name: 'Banner Management', icon: '🎨', path: '/admin/banners' },  // ✅ ADDED THIS
     { name: 'Coupons', icon: '🎫', path: '/admin/coupons' },
     { name: 'Reports', icon: '📈', path: '/admin/reports' },
     { name: 'Settings', icon: '⚙️', path: '/admin/settings' },
