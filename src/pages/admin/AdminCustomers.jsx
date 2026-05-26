@@ -37,7 +37,7 @@ function AdminCustomers() {
     const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     allCustomers = [...allCustomers, ...registered];
     
-    // Source 2: current logged in user
+    // Source 2: current logged in user (only if not already in list)
     const currentUser = localStorage.getItem('user');
     if (currentUser) {
       try {
@@ -58,24 +58,6 @@ function AdminCustomers() {
       } catch(e) {}
     }
     
-    // Source 3: registeredVendors
-    const vendors = JSON.parse(localStorage.getItem('registeredVendors') || '[]');
-    vendors.forEach(v => {
-      const exists = allCustomers.some(c => c.email === v.email);
-      if (!exists && v.email) {
-        allCustomers.push({
-          id: v.id,
-          name: v.businessName || v.name,
-          email: v.email,
-          phone: v.phone,
-          password: v.password,
-          status: v.vendorStatus === 'approved' ? 'active' : 'pending',
-          createdAt: v.createdAt || new Date().toISOString(),
-          role: 'vendor'
-        });
-      }
-    });
-    
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     
     const customersWithStats = allCustomers.map(customer => {
@@ -86,6 +68,7 @@ function AdminCustomers() {
       
       return {
         ...customer,
+        name: customer.name || customer.fullName || 'Guest',  // ✅ FIX: Default name if undefined
         orders: orderCount,
         totalSpent: totalSpent,
         lastOrder: lastOrder,
@@ -95,7 +78,7 @@ function AdminCustomers() {
       };
     });
     
-    // Remove duplicates
+    // Remove duplicates by email (keep first occurrence)
     const uniqueCustomers = [];
     const emailSet = new Set();
     for (const customer of customersWithStats) {
@@ -105,9 +88,14 @@ function AdminCustomers() {
       }
     }
     
+    // Sort by join date (newest first)
     uniqueCustomers.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
     setCustomers(uniqueCustomers);
     
+    // Save to localStorage to maintain consistency
+    localStorage.setItem('registeredCustomers', JSON.stringify(uniqueCustomers));
+    
+    // Calculate stats
     const activeCustomers = uniqueCustomers.filter(c => c.status === 'active').length;
     const blockedCustomers = uniqueCustomers.filter(c => c.status === 'blocked').length;
     const totalOrders = uniqueCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -126,12 +114,11 @@ function AdminCustomers() {
 
   const blockCustomer = (id) => {
     if (window.confirm('Are you sure you want to block this customer?')) {
-      const updated = customers.map(c => c.id === id ? { ...c, status: 'blocked' } : c);
-      setCustomers(updated);
-      
-      const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-      const updatedAll = allCustomers.map(c => c.id === id ? { ...c, status: 'blocked' } : c);
-      localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
+      const updatedCustomers = customers.map(c => 
+        c.id === id ? { ...c, status: 'blocked' } : c
+      );
+      setCustomers(updatedCustomers);
+      localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
       
       setStats(prev => ({
         ...prev,
@@ -144,12 +131,11 @@ function AdminCustomers() {
   };
 
   const unblockCustomer = (id) => {
-    const updated = customers.map(c => c.id === id ? { ...c, status: 'active' } : c);
-    setCustomers(updated);
-    
-    const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-    const updatedAll = allCustomers.map(c => c.id === id ? { ...c, status: 'active' } : c);
-    localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
+    const updatedCustomers = customers.map(c => 
+      c.id === id ? { ...c, status: 'active' } : c
+    );
+    setCustomers(updatedCustomers);
+    localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
     
     setStats(prev => ({
       ...prev,
@@ -177,17 +163,13 @@ function AdminCustomers() {
       return;
     }
     
-    const updated = customers.map(c => 
+    const updatedCustomers = customers.map(c => 
       c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
     );
-    setCustomers(updated);
+    setCustomers(updatedCustomers);
+    localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
     
-    const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-    const updatedAll = allCustomers.map(c => 
-      c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
-    );
-    localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
-    
+    // Also update current user if it's the same
     const currentUser = localStorage.getItem('user');
     if (currentUser) {
       try {
@@ -201,42 +183,41 @@ function AdminCustomers() {
     
     alert(`Password reset successfully for ${selectedCustomer.name}`);
     setShowResetPasswordModal(false);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   const editCustomer = (customer) => {
     const newName = prompt('Enter new name:', customer.name);
     if (newName && newName.trim()) {
-      const updated = customers.map(c => 
+      const updatedCustomers = customers.map(c => 
         c.id === customer.id ? { ...c, name: newName.trim() } : c
       );
-      setCustomers(updated);
-      
-      const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-      const updatedAll = allCustomers.map(c => 
-        c.id === customer.id ? { ...c, name: newName.trim() } : c
-      );
-      localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
-      
+      setCustomers(updatedCustomers);
+      localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
       alert('Customer name updated successfully');
     }
   };
 
   const deleteCustomer = (id) => {
-    if (window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) {
-      const customerToDelete = customers.find(c => c.id === id);
-      const updated = customers.filter(c => c.id !== id);
-      setCustomers(updated);
+    if (window.confirm('⚠️ Are you sure you want to permanently delete this customer? This action cannot be undone.')) {
+      const updatedCustomers = customers.filter(c => c.id !== id);
+      setCustomers(updatedCustomers);
+      localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
       
-      const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-      const updatedAll = allCustomers.filter(c => c.id !== id);
-      localStorage.setItem('registeredCustomers', JSON.stringify(updatedAll));
+      // Update stats
+      const activeCount = updatedCustomers.filter(c => c.status === 'active').length;
+      const blockedCount = updatedCustomers.filter(c => c.status === 'blocked').length;
+      const totalOrders = updatedCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
+      const totalSpent = updatedCustomers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
       
-      setStats(prev => ({
-        ...prev,
-        totalCustomers: prev.totalCustomers - 1,
-        activeCustomers: prev.activeCustomers - (customerToDelete?.status === 'active' ? 1 : 0),
-        blockedCustomers: prev.blockedCustomers - (customerToDelete?.status === 'blocked' ? 1 : 0)
-      }));
+      setStats({
+        totalCustomers: updatedCustomers.length,
+        activeCustomers: activeCount,
+        blockedCustomers: blockedCount,
+        totalOrders,
+        totalSpent
+      });
       
       alert('Customer deleted successfully');
     }
@@ -252,10 +233,10 @@ function AdminCustomers() {
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       return (
-        c.name?.toLowerCase().includes(searchLower) ||
-        c.email?.toLowerCase().includes(searchLower) ||
+        (c.name && c.name.toLowerCase().includes(searchLower)) ||
+        (c.email && c.email.toLowerCase().includes(searchLower)) ||
         (c.phone && c.phone.includes(searchTerm)) ||
-        c.id?.toString().includes(searchTerm)
+        (c.id && c.id.toString().includes(searchTerm))
       );
     }
     return true;
@@ -284,7 +265,7 @@ function AdminCustomers() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <AdminSidebar />
       
-      {/* Header - Fixed with proper z-index */}
+      {/* Header */}
       <div className="bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
@@ -306,11 +287,11 @@ function AdminCustomers() {
         </div>
       </div>
 
-      {/* Main Content - Fixed padding for header */}
+      {/* Main Content */}
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Stats Cards - Responsive Grid */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
             <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
@@ -349,7 +330,7 @@ function AdminCustomers() {
             </div>
           </div>
 
-          {/* Filter Tabs - Responsive */}
+          {/* Filter Tabs */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setFilterStatus('all')}
@@ -383,7 +364,7 @@ function AdminCustomers() {
             </button>
           </div>
 
-          {/* Customers Table - Responsive */}
+          {/* Customers Table */}
           <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm">
@@ -418,87 +399,59 @@ function AdminCustomers() {
                         <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div className="flex items-center gap-2 sm:gap-3">
                             <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-semibold text-xs sm:text-base shadow-sm">
-                              {customer.name?.charAt(0).toUpperCase() || 'U'}
+                              {customer.name && customer.name !== 'undefined' ? customer.name.charAt(0).toUpperCase() : 'U'}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">{customer.name || 'N/A'}</p>
-                              <p className="text-[10px] sm:text-xs text-gray-400">ID: {customer.id?.toString().slice(-6)}</p>
+                              <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">
+                                {customer.name && customer.name !== 'undefined' ? customer.name : 'Guest User'}
+                              </p>
+                              <p className="text-[10px] sm:text-xs text-gray-400">
+                                ID: {customer.id ? customer.id.toString().slice(-6) : 'N/A'}
+                              </p>
                             </div>
                           </div>
-                         </td>
+                        </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div>
-                            <p className="text-gray-600 text-[11px] sm:text-sm truncate max-w-[120px] sm:max-w-none">{customer.email}</p>
-                            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{customer.phone || 'No phone'}</p>
+                            <p className="text-gray-600 text-[11px] sm:text-sm truncate max-w-[120px] sm:max-w-none">
+                              {customer.email || 'No email'}
+                            </p>
+                            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                              {customer.phone || 'No phone'}
+                            </p>
                           </div>
-                         </td>
+                        </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className="font-semibold text-gray-800">{customer.orders || 0}</span>
-                         </td>
+                        </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-right">
                           <span className="font-semibold text-pink-600 text-xs sm:text-sm">
                             ₹{(customer.totalSpent || 0).toLocaleString()}
                           </span>
-                         </td>
+                        </td>
                         <td className="hidden md:table-cell px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className="text-[10px] sm:text-xs text-gray-500">
-                            {new Date(customer.joinedDate).toLocaleDateString()}
+                            {customer.joinedDate ? new Date(customer.joinedDate).toLocaleDateString() : 'N/A'}
                           </span>
-                         </td>
+                        </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getStatusColor(customer.status)}`}>
                             {customer.status || 'active'}
                           </span>
-                         </td>
+                        </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <div className="flex justify-center gap-1">
-                            <button
-                              onClick={() => viewCustomerDetails(customer)}
-                              className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                              title="View Details"
-                            >
-                              👁️
-                            </button>
-                            <button
-                              onClick={() => editCustomer(customer)}
-                              className="p-1 text-purple-500 hover:bg-purple-50 rounded-lg transition"
-                              title="Edit"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => resetPassword(customer)}
-                              className="p-1 text-yellow-500 hover:bg-yellow-50 rounded-lg transition"
-                              title="Reset Password"
-                            >
-                              🔑
-                            </button>
+                            <button onClick={() => viewCustomerDetails(customer)} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="View Details">👁️</button>
+                            <button onClick={() => editCustomer(customer)} className="p-1 text-purple-500 hover:bg-purple-50 rounded-lg transition" title="Edit">✏️</button>
+                            <button onClick={() => resetPassword(customer)} className="p-1 text-yellow-500 hover:bg-yellow-50 rounded-lg transition" title="Reset Password">🔑</button>
                             {customer.status === 'active' ? (
-                              <button
-                                onClick={() => blockCustomer(customer.id)}
-                                className="p-1 text-orange-500 hover:bg-orange-50 rounded-lg transition"
-                                title="Block"
-                              >
-                                🔒
-                              </button>
+                              <button onClick={() => blockCustomer(customer.id)} className="p-1 text-orange-500 hover:bg-orange-50 rounded-lg transition" title="Block">🔒</button>
                             ) : (
-                              <button
-                                onClick={() => unblockCustomer(customer.id)}
-                                className="p-1 text-green-500 hover:bg-green-50 rounded-lg transition"
-                                title="Unblock"
-                              >
-                                🔓
-                              </button>
+                              <button onClick={() => unblockCustomer(customer.id)} className="p-1 text-green-500 hover:bg-green-50 rounded-lg transition" title="Unblock">🔓</button>
                             )}
-                            <button
-                              onClick={() => deleteCustomer(customer.id)}
-                              className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition"
-                              title="Delete"
-                            >
-                              🗑️
-                            </button>
+                            <button onClick={() => deleteCustomer(customer.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
                           </div>
-                         </td>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -516,7 +469,7 @@ function AdminCustomers() {
         </div>
       </div>
 
-      {/* Customer Details Modal - Responsive */}
+      {/* Customer Details Modal */}
       {showDetailsModal && selectedCustomer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -525,83 +478,47 @@ function AdminCustomers() {
               <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div className="p-4 sm:p-6">
-              {/* Profile Header */}
               <div className="flex items-center gap-3 sm:gap-4 mb-6 pb-4 border-b border-gray-100">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg">
-                  {selectedCustomer.name?.charAt(0).toUpperCase() || 'U'}
+                  {selectedCustomer.name && selectedCustomer.name !== 'undefined' ? selectedCustomer.name.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">{selectedCustomer.name || 'N/A'}</h2>
-                  <p className="text-xs text-gray-500">Since {new Date(selectedCustomer.joinedDate).toLocaleDateString()}</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+                    {selectedCustomer.name && selectedCustomer.name !== 'undefined' ? selectedCustomer.name : 'Guest User'}
+                  </h2>
+                  <p className="text-xs text-gray-500">Since {selectedCustomer.joinedDate ? new Date(selectedCustomer.joinedDate).toLocaleDateString() : 'N/A'}</p>
                   <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>
                     {selectedCustomer.status || 'active'}
                   </span>
                 </div>
               </div>
 
-              {/* Contact Information */}
               <div className="mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                  <span>📞</span> Contact Information
-                </h4>
+                <h4 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">📞 Contact Information</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-500 text-xs">Email</p>
-                    <p className="font-medium text-gray-800 text-sm break-all">{selectedCustomer.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs">Phone</p>
-                    <p className="font-medium text-gray-800 text-sm">{selectedCustomer.phone || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-xs">Customer ID</p>
-                    <p className="font-mono text-sm text-gray-600">{selectedCustomer.id}</p>
-                  </div>
+                  <div><p className="text-gray-500 text-xs">Email</p><p className="font-medium text-gray-800 text-sm break-all">{selectedCustomer.email || 'N/A'}</p></div>
+                  <div><p className="text-gray-500 text-xs">Phone</p><p className="font-medium text-gray-800 text-sm">{selectedCustomer.phone || 'Not provided'}</p></div>
+                  <div><p className="text-gray-500 text-xs">Customer ID</p><p className="font-mono text-sm text-gray-600">{selectedCustomer.id || 'N/A'}</p></div>
                 </div>
               </div>
 
-              {/* Order Statistics */}
               <div className="mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                  <span>📊</span> Order Statistics
-                </h4>
+                <h4 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">📊 Order Statistics</h4>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-                  <div className="bg-pink-50 rounded-xl p-2 sm:p-3">
-                    <p className="text-xl sm:text-2xl font-bold text-pink-600">{selectedCustomer.orders || 0}</p>
-                    <p className="text-[10px] sm:text-xs text-gray-500">Orders</p>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-2 sm:p-3">
-                    <p className="text-xl sm:text-2xl font-bold text-green-600">₹{(selectedCustomer.totalSpent || 0).toLocaleString()}</p>
-                    <p className="text-[10px] sm:text-xs text-gray-500">Total Spent</p>
-                  </div>
-                  <div className="bg-blue-50 rounded-xl p-2 sm:p-3">
-                    <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                      ₹{selectedCustomer.orders ? Math.round(selectedCustomer.totalSpent / selectedCustomer.orders).toLocaleString() : 0}
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-gray-500">Avg Order</p>
-                  </div>
+                  <div className="bg-pink-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-pink-600">{selectedCustomer.orders || 0}</p><p className="text-[10px] sm:text-xs text-gray-500">Orders</p></div>
+                  <div className="bg-green-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-green-600">₹{(selectedCustomer.totalSpent || 0).toLocaleString()}</p><p className="text-[10px] sm:text-xs text-gray-500">Total Spent</p></div>
+                  <div className="bg-blue-50 rounded-xl p-2 sm:p-3"><p className="text-xl sm:text-2xl font-bold text-blue-600">₹{selectedCustomer.orders ? Math.round(selectedCustomer.totalSpent / selectedCustomer.orders).toLocaleString() : 0}</p><p className="text-[10px] sm:text-xs text-gray-500">Avg Order</p></div>
                 </div>
               </div>
 
-              {/* Quick Actions */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-4 border-t border-gray-100">
-                <Link to={`/admin/orders?customer=${selectedCustomer.email}`} className="text-center bg-pink-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-pink-600 transition">
-                  View Orders
-                </Link>
-                <button onClick={() => { editCustomer(selectedCustomer); setShowDetailsModal(false); }} className="text-center bg-purple-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-purple-600 transition">
-                  Edit Profile
-                </button>
-                <button onClick={() => { resetPassword(selectedCustomer); setShowDetailsModal(false); }} className="text-center bg-yellow-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-yellow-600 transition">
-                  Reset Password
-                </button>
+                <Link to={`/admin/orders?customer=${selectedCustomer.email}`} className="text-center bg-pink-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-pink-600 transition">View Orders</Link>
+                <button onClick={() => { editCustomer(selectedCustomer); setShowDetailsModal(false); }} className="text-center bg-purple-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-purple-600 transition">Edit Profile</button>
+                <button onClick={() => { resetPassword(selectedCustomer); setShowDetailsModal(false); }} className="text-center bg-yellow-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-yellow-600 transition">Reset Password</button>
                 {selectedCustomer.status === 'active' ? (
-                  <button onClick={() => { blockCustomer(selectedCustomer.id); setShowDetailsModal(false); }} className="text-center bg-orange-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-orange-600 transition">
-                    Block
-                  </button>
+                  <button onClick={() => { blockCustomer(selectedCustomer.id); setShowDetailsModal(false); }} className="text-center bg-orange-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-orange-600 transition">Block</button>
                 ) : (
-                  <button onClick={() => { unblockCustomer(selectedCustomer.id); setShowDetailsModal(false); }} className="text-center bg-green-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-green-600 transition">
-                    Unblock
-                  </button>
+                  <button onClick={() => { unblockCustomer(selectedCustomer.id); setShowDetailsModal(false); }} className="text-center bg-green-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-green-600 transition">Unblock</button>
                 )}
               </div>
             </div>
@@ -618,18 +535,10 @@ function AdminCustomers() {
               <button onClick={() => setShowResetPasswordModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div className="p-4 sm:p-5 space-y-4">
-              <p className="text-sm text-gray-600">
-                Resetting password for: <span className="font-semibold text-pink-600">{selectedCustomer.name}</span>
-              </p>
+              <p className="text-sm text-gray-600">Resetting password for: <span className="font-semibold text-pink-600">{selectedCustomer.name || 'User'}</span></p>
               <p className="text-xs text-gray-500 break-all">Email: {selectedCustomer.email}</p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500" placeholder="Min 6 characters" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500" placeholder="Confirm password" />
-              </div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">New Password</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500" placeholder="Min 6 characters" /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500" placeholder="Confirm password" /></div>
               <div className="flex gap-3 pt-3">
                 <button onClick={() => setShowResetPasswordModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition">Cancel</button>
                 <button onClick={handleResetPassword} className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition">Reset</button>
