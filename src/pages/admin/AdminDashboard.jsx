@@ -11,12 +11,15 @@ function AdminDashboard() {
     totalVendors: 0,
     totalCustomers: 0,
     pendingVendors: 0,
+    pendingProducts: 0,
     lowStockProducts: 0,
     todaySales: 0,
     todayOrders: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
   const [salesData, setSalesData] = useState([]);
+  const [selectedPeriod, setSelectedPeriod] = useState('weekly');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,23 +29,70 @@ function AdminDashboard() {
       return;
     }
 
+    loadDashboardData();
+  }, [navigate, selectedPeriod]);
+
+  const loadDashboardData = () => {
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     const allVendors = JSON.parse(localStorage.getItem('registeredVendors') || '[]');
     const allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
+    // Revenue calculation
     const deliveredOrders = allOrders.filter(o => o.status === 'delivered');
-    const totalRevenue = deliveredOrders.reduce((sum, o) => sum + o.amount, 0);
-    const pendingVendors = allVendors.filter(v => v.vendorStatus === 'pending').length;
-    const lowStockProducts = allProducts.filter(p => p.stock < 10).length;
+    const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (o.total || o.amount || 0), 0);
     
+    // Pending items
+    const pendingVendors = allVendors.filter(v => v.vendorStatus === 'pending').length;
+    const pendingProducts = allProducts.filter(p => p.adminApproved === false).length;
+    const lowStockProducts = allProducts.filter(p => (p.stock || 0) < 10).length;
+    
+    // Today's data
     const today = new Date().toISOString().split('T')[0];
     const todayOrders = allOrders.filter(o => o.date === today);
-    const todaySales = todayOrders.reduce((sum, o) => sum + o.amount, 0);
+    const todaySales = todayOrders.reduce((sum, o) => sum + (o.total || o.amount || 0), 0);
     
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const monthlyData = months.map(month => ({ month, sales: Math.floor(Math.random() * 50000) + 20000 }));
-    setSalesData(monthlyData);
+    // Generate sales data based on selected period
+    let salesChartData = [];
+    if (selectedPeriod === 'weekly') {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      salesChartData = days.map(day => ({
+        name: day,
+        sales: Math.floor(Math.random() * 50000) + 10000,
+        orders: Math.floor(Math.random() * 50) + 10
+      }));
+    } else if (selectedPeriod === 'monthly') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      salesChartData = months.map(month => ({
+        name: month,
+        sales: Math.floor(Math.random() * 80000) + 20000,
+        orders: Math.floor(Math.random() * 100) + 20
+      }));
+    } else {
+      const years = ['2022', '2023', '2024', '2025'];
+      salesChartData = years.map(year => ({
+        name: year,
+        sales: Math.floor(Math.random() * 500000) + 100000,
+        orders: Math.floor(Math.random() * 500) + 100
+      }));
+    }
+    
+    setSalesData(salesChartData);
+    
+    // Top products by sales
+    const productSales = {};
+    allOrders.forEach(order => {
+      if (order.items) {
+        order.items.forEach(item => {
+          productSales[item.id] = (productSales[item.id] || 0) + (item.quantity || 1);
+        });
+      }
+    });
+    const topProductsList = allProducts
+      .map(p => ({ ...p, totalSold: productSales[p.id] || 0 }))
+      .sort((a, b) => b.totalSold - a.totalSold)
+      .slice(0, 5);
+    setTopProducts(topProductsList);
     
     setStats({
       totalRevenue,
@@ -51,88 +101,319 @@ function AdminDashboard() {
       totalVendors: allVendors.length,
       totalCustomers: allCustomers.length,
       pendingVendors,
+      pendingProducts,
       lowStockProducts,
       todaySales,
       todayOrders: todayOrders.length,
     });
     
-    setRecentOrders(allOrders.slice(-5).reverse());
+    setRecentOrders(allOrders.slice(-8).reverse());
     setLoading(false);
-  }, [navigate]);
+  };
+
+  const getStatusColor = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'delivered': return 'bg-green-100 text-green-700';
+      case 'shipped': return 'bg-blue-100 text-blue-700';
+      case 'processing': return 'bg-purple-100 text-purple-700';
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const maxSales = Math.max(...salesData.map(d => d.sales), 1);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  const maxSales = Math.max(...salesData.map(d => d.sales), 1);
-
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <AdminSidebar />
       
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 fixed top-0 right-0 left-64 z-40">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
-          <div className="flex items-center gap-4">
+      {/* Premium Header */}
+      <div className="bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-4 fixed top-0 right-0 left-64 z-40 shadow-sm">
+        <div className="flex justify-between items-center flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Dashboard</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Welcome back, Super Admin</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select 
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
+            >
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
             <div className="relative">
-              <input type="text" placeholder="Search" className="w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded text-sm" />
+              <input type="text" placeholder="Search..." className="w-48 lg:w-64 pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-gray-50" />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold">SA</div>
+            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-bold shadow-md">SA</div>
           </div>
         </div>
       </div>
 
-      <main className="ml-64 pt-16 p-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Today's Sales</p><p className="text-xl font-bold text-green-600">₹{stats.todaySales.toLocaleString()}</p></div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Today's Orders</p><p className="text-xl font-bold">{stats.todayOrders}</p></div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Total Revenue</p><p className="text-xl font-bold">₹{stats.totalRevenue.toLocaleString()}</p></div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Total Orders</p><p className="text-xl font-bold">{stats.totalOrders}</p></div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Products</p><p className="text-xl font-bold">{stats.totalProducts}</p></div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Vendors</p><p className="text-xl font-bold">{stats.totalVendors}</p>{stats.pendingVendors > 0 && <p className="text-xs text-yellow-600">{stats.pendingVendors} pending</p>}</div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"><p className="text-xs text-gray-500">Customers</p><p className="text-xl font-bold">{stats.totalCustomers}</p></div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-8">
-          <h3 className="font-semibold text-gray-800 mb-4">Sales Overview</h3>
-          <div className="flex items-end gap-4 h-48">
-            {salesData.map((item, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full bg-pink-100 rounded-t-lg" style={{ height: `${(item.sales / maxSales) * 100}%`, minHeight: '20px' }}>
-                  <div className="w-full bg-pink-500 rounded-t-lg" style={{ height: `${(item.sales / maxSales) * 100}%` }}></div>
-                </div>
-                <span className="text-xs text-gray-500">{item.month}</span>
-                <span className="text-xs font-medium">₹{Math.round(item.sales / 1000)}k</span>
-              </div>
-            ))}
+      <main className="ml-64 pt-20 p-4 sm:p-6">
+        
+        {/* Stats Cards - Premium Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition group">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Today's Sales</p>
+              <span className="text-lg">💰</span>
+            </div>
+            <p className="text-xl font-bold text-green-600">₹{stats.todaySales.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1">{stats.todayOrders} orders</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Total Revenue</p>
+              <span className="text-lg">📊</span>
+            </div>
+            <p className="text-xl font-bold text-gray-800">₹{stats.totalRevenue.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1">Lifetime</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Total Orders</p>
+              <span className="text-lg">📦</span>
+            </div>
+            <p className="text-xl font-bold text-gray-800">{stats.totalOrders}</p>
+            <p className="text-xs text-gray-400 mt-1">All time</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Products</p>
+              <span className="text-lg">✨</span>
+            </div>
+            <p className="text-xl font-bold text-gray-800">{stats.totalProducts}</p>
+            {stats.pendingProducts > 0 && <p className="text-xs text-yellow-600 mt-1">{stats.pendingProducts} pending</p>}
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Vendors</p>
+              <span className="text-lg">🏪</span>
+            </div>
+            <p className="text-xl font-bold text-gray-800">{stats.totalVendors}</p>
+            {stats.pendingVendors > 0 && <p className="text-xs text-yellow-600 mt-1">{stats.pendingVendors} pending</p>}
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Customers</p>
+              <span className="text-lg">👥</span>
+            </div>
+            <p className="text-xl font-bold text-gray-800">{stats.totalCustomers}</p>
+            <p className="text-xs text-gray-400 mt-1">Registered users</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-500">Low Stock</p>
+              <span className="text-lg">⚠️</span>
+            </div>
+            <p className="text-xl font-bold text-orange-600">{stats.lowStockProducts}</p>
+            <p className="text-xs text-gray-400 mt-1">Below 10 units</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-5 py-3 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="font-semibold text-gray-800">Recent Orders</h3>
-            <Link to="/admin/orders" className="text-sm text-pink-600 hover:underline">View All</Link>
+        {/* Charts Section - Premium */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Sales Chart */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="font-semibold text-gray-800">Sales Overview</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{selectedPeriod === 'weekly' ? 'Last 7 days' : selectedPeriod === 'monthly' ? 'This year' : 'Yearly trend'}</p>
+              </div>
+              <div className="flex gap-3 text-xs">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-pink-500 rounded-full"></span> Sales (₹)</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-400 rounded-full"></span> Orders</span>
+              </div>
+            </div>
+            <div className="relative h-64">
+              <div className="flex items-end gap-2 h-full">
+                {salesData.map((item, idx) => (
+                  <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
+                    <div className="relative w-full">
+                      <div 
+                        className="w-full bg-pink-100 rounded-t-lg transition-all duration-500"
+                        style={{ height: `${Math.max((item.sales / maxSales) * 100, 5)}%`, minHeight: '20px' }}
+                      >
+                        <div 
+                          className="w-full bg-gradient-to-t from-pink-500 to-rose-500 rounded-t-lg transition-all duration-500"
+                          style={{ height: `${(item.sales / maxSales) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
+                        ₹{Math.round(item.sales / 1000)}k
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500">{item.name}</span>
+                    <span className="text-xs font-medium text-gray-700">{Math.round(item.sales / 1000)}k</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Top Products */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>🏆</span> Top Selling Products
+            </h3>
+            <div className="space-y-3">
+              {topProducts.length === 0 ? (
+                <p className="text-gray-400 text-center py-8">No sales yet</p>
+              ) : (
+                topProducts.map((product, idx) => (
+                  <div key={product.id} className="flex items-center gap-3 p-2 hover:bg-pink-50 rounded-xl transition">
+                    <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center text-sm font-bold text-pink-600">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-800 line-clamp-1">{product.name}</p>
+                      <p className="text-xs text-gray-400">Sold: {product.totalSold || 0}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-pink-600">₹{product.price}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Orders Table - Premium */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-5 py-4 border-b border-gray-200 flex justify-between items-center flex-wrap gap-3">
+            <div>
+              <h3 className="font-semibold text-gray-800">Recent Orders</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Latest 8 orders</p>
+            </div>
+            <Link to="/admin/orders" className="text-sm text-pink-600 hover:underline flex items-center gap-1">
+              View All Orders →
+            </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50"><tr className="border-b"><th className="px-4 py-2 text-left">Order ID</th><th className="px-4 py-2 text-left">Customer</th><th className="px-4 py-2 text-right">Amount</th><th className="px-4 py-2 text-center">Status</th></tr></thead>
-              <tbody className="divide-y">{recentOrders.map(order => (<tr key={order.id} className="hover:bg-gray-50"><td className="px-4 py-2 font-medium">{order.id}</td><td className="px-4 py-2">{order.customer}</td><td className="px-4 py-2 text-right">₹{order.amount}</td><td className="px-4 py-2 text-center"><span className={`px-2 py-1 rounded-full text-xs ${order.status === 'delivered' ? 'bg-green-100 text-green-700' : order.status === 'shipped' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span></td></tr>))}</tbody>
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-5 py-3 text-left">Order ID</th>
+                  <th className="px-5 py-3 text-left">Customer</th>
+                  <th className="px-5 py-3 text-right">Amount</th>
+                  <th className="px-5 py-3 text-center">Status</th>
+                  <th className="px-5 py-3 text-center">Date</th>
+                  <th className="px-5 py-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-5 py-8 text-center text-gray-400">
+                      No orders yet
+                    </td>
+                  </tr>
+                ) : (
+                  recentOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-pink-50/30 transition">
+                      <td className="px-5 py-3 font-mono text-sm font-medium text-gray-800">
+                        {order.id}
+                      </td>
+                      <td className="px-5 py-3 text-gray-600">
+                        {order.customerEmail || order.customer || 'Guest'}
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold text-gray-800">
+                        ₹{(order.total || order.amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                          {order.status || 'pending'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-center text-gray-500 text-xs">
+                        {order.date ? new Date(order.date).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <Link to={`/admin/orders`} className="text-pink-500 hover:text-pink-600 text-xs">
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
         </div>
 
-        {stats.pendingVendors > 0 && (
-          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex justify-between items-center">
-            <div><p className="text-sm font-medium text-yellow-800">⚠️ {stats.pendingVendors} vendors pending approval</p><p className="text-xs text-yellow-600">Review and approve vendor registrations</p></div>
-            <Link to="/admin/vendors?tab=pending" className="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm">Review</Link>
-          </div>
-        )}
+        {/* Alerts Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          {stats.pendingVendors > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5 flex justify-between items-center">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <p className="text-sm font-semibold text-yellow-800">{stats.pendingVendors} vendors pending approval</p>
+                  <p className="text-xs text-yellow-600 mt-0.5">Review and approve vendor registrations</p>
+                </div>
+              </div>
+              <Link to="/admin/vendors?tab=pending" className="bg-yellow-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-yellow-700 transition">
+                Review Now
+              </Link>
+            </div>
+          )}
+          
+          {stats.pendingProducts > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex justify-between items-center">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">📦</span>
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">{stats.pendingProducts} products pending approval</p>
+                  <p className="text-xs text-blue-600 mt-0.5">Review and approve product listings</p>
+                </div>
+              </div>
+              <Link to="/admin/products?tab=pending" className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition">
+                Review Now
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Link to="/admin/add-product" className="bg-white rounded-2xl p-4 text-center border border-gray-100 hover:shadow-md transition group">
+            <div className="text-2xl mb-1 group-hover:scale-110 transition">➕</div>
+            <p className="text-sm font-medium text-gray-700">Add Product</p>
+          </Link>
+          <Link to="/admin/orders" className="bg-white rounded-2xl p-4 text-center border border-gray-100 hover:shadow-md transition group">
+            <div className="text-2xl mb-1 group-hover:scale-110 transition">📦</div>
+            <p className="text-sm font-medium text-gray-700">View Orders</p>
+          </Link>
+          <Link to="/admin/vendors" className="bg-white rounded-2xl p-4 text-center border border-gray-100 hover:shadow-md transition group">
+            <div className="text-2xl mb-1 group-hover:scale-110 transition">🏪</div>
+            <p className="text-sm font-medium text-gray-700">Manage Vendors</p>
+          </Link>
+          <Link to="/admin/banners" className="bg-white rounded-2xl p-4 text-center border border-gray-100 hover:shadow-md transition group">
+            <div className="text-2xl mb-1 group-hover:scale-110 transition">🎨</div>
+            <p className="text-sm font-medium text-gray-700">Manage Banners</p>
+          </Link>
+        </div>
       </main>
     </div>
   );
