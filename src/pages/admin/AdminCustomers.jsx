@@ -31,13 +31,14 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
+    // ✅ Get customers from ALL sources
     let allCustomers = [];
     
     // Source 1: registeredCustomers
     const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     allCustomers = [...allCustomers, ...registered];
     
-    // Source 2: current logged in user (only if not already in list)
+    // Source 2: current logged in user
     const currentUser = localStorage.getItem('user');
     if (currentUser) {
       try {
@@ -58,6 +59,24 @@ function AdminCustomers() {
       } catch(e) {}
     }
     
+    // Source 3: registeredVendors
+    const vendors = JSON.parse(localStorage.getItem('registeredVendors') || '[]');
+    vendors.forEach(v => {
+      const exists = allCustomers.some(c => c.email === v.email);
+      if (!exists && v.email) {
+        allCustomers.push({
+          id: v.id,
+          name: v.businessName || v.name || 'Vendor',
+          email: v.email,
+          phone: v.phone,
+          password: v.password,
+          status: v.vendorStatus === 'approved' ? 'active' : 'pending',
+          createdAt: v.createdAt || new Date().toISOString(),
+          role: 'vendor'
+        });
+      }
+    });
+    
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     
     const customersWithStats = allCustomers.map(customer => {
@@ -68,7 +87,7 @@ function AdminCustomers() {
       
       return {
         ...customer,
-        name: customer.name || customer.fullName || 'Guest',  // ✅ FIX: Default name if undefined
+        name: customer.name || customer.fullName || 'Guest',
         orders: orderCount,
         totalSpent: totalSpent,
         lastOrder: lastOrder,
@@ -78,7 +97,7 @@ function AdminCustomers() {
       };
     });
     
-    // Remove duplicates by email (keep first occurrence)
+    // Remove duplicates by email
     const uniqueCustomers = [];
     const emailSet = new Set();
     for (const customer of customersWithStats) {
@@ -88,12 +107,8 @@ function AdminCustomers() {
       }
     }
     
-    // Sort by join date (newest first)
     uniqueCustomers.sort((a, b) => new Date(b.joinedDate) - new Date(a.joinedDate));
     setCustomers(uniqueCustomers);
-    
-    // Save to localStorage to maintain consistency
-    localStorage.setItem('registeredCustomers', JSON.stringify(uniqueCustomers));
     
     // Calculate stats
     const activeCustomers = uniqueCustomers.filter(c => c.status === 'active').length;
@@ -118,7 +133,13 @@ function AdminCustomers() {
         c.id === id ? { ...c, status: 'blocked' } : c
       );
       setCustomers(updatedCustomers);
-      localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
+      
+      // Also update in registeredCustomers
+      const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+      const updatedRegistered = registered.map(c => 
+        c.id === id ? { ...c, status: 'blocked' } : c
+      );
+      localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
       
       setStats(prev => ({
         ...prev,
@@ -135,7 +156,12 @@ function AdminCustomers() {
       c.id === id ? { ...c, status: 'active' } : c
     );
     setCustomers(updatedCustomers);
-    localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
+    
+    const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+    const updatedRegistered = registered.map(c => 
+      c.id === id ? { ...c, status: 'active' } : c
+    );
+    localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
     
     setStats(prev => ({
       ...prev,
@@ -167,7 +193,12 @@ function AdminCustomers() {
       c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
     );
     setCustomers(updatedCustomers);
-    localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
+    
+    const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+    const updatedRegistered = registered.map(c => 
+      c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
+    );
+    localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
     
     // Also update current user if it's the same
     const currentUser = localStorage.getItem('user');
@@ -183,8 +214,6 @@ function AdminCustomers() {
     
     alert(`Password reset successfully for ${selectedCustomer.name}`);
     setShowResetPasswordModal(false);
-    setNewPassword('');
-    setConfirmPassword('');
   };
 
   const editCustomer = (customer) => {
@@ -194,18 +223,29 @@ function AdminCustomers() {
         c.id === customer.id ? { ...c, name: newName.trim() } : c
       );
       setCustomers(updatedCustomers);
-      localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
+      
+      const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+      const updatedRegistered = registered.map(c => 
+        c.id === customer.id ? { ...c, name: newName.trim() } : c
+      );
+      localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
+      
       alert('Customer name updated successfully');
     }
   };
 
   const deleteCustomer = (id) => {
-    if (window.confirm('⚠️ Are you sure you want to permanently delete this customer? This action cannot be undone.')) {
+    if (window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) {
+      // ✅ Remove from state
       const updatedCustomers = customers.filter(c => c.id !== id);
       setCustomers(updatedCustomers);
-      localStorage.setItem('registeredCustomers', JSON.stringify(updatedCustomers));
       
-      // Update stats
+      // ✅ Remove from registeredCustomers localStorage
+      const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+      const filteredRegistered = registered.filter(c => c.id !== id);
+      localStorage.setItem('registeredCustomers', JSON.stringify(filteredRegistered));
+      
+      // ✅ Update stats
       const activeCount = updatedCustomers.filter(c => c.status === 'active').length;
       const blockedCount = updatedCustomers.filter(c => c.status === 'blocked').length;
       const totalOrders = updatedCustomers.reduce((sum, c) => sum + (c.orders || 0), 0);
@@ -332,36 +372,9 @@ function AdminCustomers() {
 
           {/* Filter Tabs */}
           <div className="flex flex-wrap gap-2 mb-6">
-            <button
-              onClick={() => setFilterStatus('all')}
-              className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${
-                filterStatus === 'all'
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              All ({stats.totalCustomers})
-            </button>
-            <button
-              onClick={() => setFilterStatus('active')}
-              className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${
-                filterStatus === 'active'
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              Active ({stats.activeCustomers})
-            </button>
-            <button
-              onClick={() => setFilterStatus('blocked')}
-              className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${
-                filterStatus === 'blocked'
-                  ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              Blocked ({stats.blockedCustomers})
-            </button>
+            <button onClick={() => setFilterStatus('all')} className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${filterStatus === 'all' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>All ({stats.totalCustomers})</button>
+            <button onClick={() => setFilterStatus('active')} className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${filterStatus === 'active' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>Active ({stats.activeCustomers})</button>
+            <button onClick={() => setFilterStatus('blocked')} className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-all ${filterStatus === 'blocked' ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>Blocked ({stats.blockedCustomers})</button>
           </div>
 
           {/* Customers Table */}
@@ -385,13 +398,8 @@ function AdminCustomers() {
                       <td colSpan="7" className="px-5 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">👥</div>
                         <p>No customers found</p>
-                        <button 
-                          onClick={loadCustomerData}
-                          className="mt-3 text-pink-500 text-sm hover:underline"
-                        >
-                          Refresh Data
-                        </button>
-                       </td>
+                        <button onClick={loadCustomerData} className="mt-3 text-pink-500 text-sm hover:underline">Refresh Data</button>
+                      </td>
                     </tr>
                   ) : (
                     filteredCustomers.map((customer) => (
@@ -399,40 +407,28 @@ function AdminCustomers() {
                         <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div className="flex items-center gap-2 sm:gap-3">
                             <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-semibold text-xs sm:text-base shadow-sm">
-                              {customer.name && customer.name !== 'undefined' ? customer.name.charAt(0).toUpperCase() : 'U'}
+                              {customer.name ? customer.name.charAt(0).toUpperCase() : 'U'}
                             </div>
                             <div>
-                              <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">
-                                {customer.name && customer.name !== 'undefined' ? customer.name : 'Guest User'}
-                              </p>
-                              <p className="text-[10px] sm:text-xs text-gray-400">
-                                ID: {customer.id ? customer.id.toString().slice(-6) : 'N/A'}
-                              </p>
+                              <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">{customer.name || 'Guest User'}</p>
+                              <p className="text-[10px] sm:text-xs text-gray-400">ID: {customer.id ? customer.id.toString().slice(-6) : 'N/A'}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3">
                           <div>
-                            <p className="text-gray-600 text-[11px] sm:text-sm truncate max-w-[120px] sm:max-w-none">
-                              {customer.email || 'No email'}
-                            </p>
-                            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-                              {customer.phone || 'No phone'}
-                            </p>
+                            <p className="text-gray-600 text-[11px] sm:text-sm truncate max-w-[120px] sm:max-w-none">{customer.email || 'No email'}</p>
+                            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{customer.phone || 'No phone'}</p>
                           </div>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className="font-semibold text-gray-800">{customer.orders || 0}</span>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-right">
-                          <span className="font-semibold text-pink-600 text-xs sm:text-sm">
-                            ₹{(customer.totalSpent || 0).toLocaleString()}
-                          </span>
+                          <span className="font-semibold text-pink-600 text-xs sm:text-sm">₹{(customer.totalSpent || 0).toLocaleString()}</span>
                         </td>
                         <td className="hidden md:table-cell px-3 sm:px-5 py-2 sm:py-3 text-center">
-                          <span className="text-[10px] sm:text-xs text-gray-500">
-                            {customer.joinedDate ? new Date(customer.joinedDate).toLocaleDateString() : 'N/A'}
-                          </span>
+                          <span className="text-[10px] sm:text-xs text-gray-500">{customer.joinedDate ? new Date(customer.joinedDate).toLocaleDateString() : 'N/A'}</span>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getStatusColor(customer.status)}`}>
@@ -460,11 +456,8 @@ function AdminCustomers() {
             </div>
           </div>
 
-          {/* Results Count */}
           <div className="mt-4 text-center">
-            <p className="text-xs text-gray-400">
-              Showing {filteredCustomers.length} of {customers.length} customers
-            </p>
+            <p className="text-xs text-gray-400">Showing {filteredCustomers.length} of {customers.length} customers</p>
           </div>
         </div>
       </div>
@@ -480,16 +473,12 @@ function AdminCustomers() {
             <div className="p-4 sm:p-6">
               <div className="flex items-center gap-3 sm:gap-4 mb-6 pb-4 border-b border-gray-100">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg">
-                  {selectedCustomer.name && selectedCustomer.name !== 'undefined' ? selectedCustomer.name.charAt(0).toUpperCase() : 'U'}
+                  {selectedCustomer.name ? selectedCustomer.name.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">
-                    {selectedCustomer.name && selectedCustomer.name !== 'undefined' ? selectedCustomer.name : 'Guest User'}
-                  </h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">{selectedCustomer.name || 'Guest User'}</h2>
                   <p className="text-xs text-gray-500">Since {selectedCustomer.joinedDate ? new Date(selectedCustomer.joinedDate).toLocaleDateString() : 'N/A'}</p>
-                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>
-                    {selectedCustomer.status || 'active'}
-                  </span>
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>{selectedCustomer.status || 'active'}</span>
                 </div>
               </div>
 
