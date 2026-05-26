@@ -13,6 +13,10 @@ function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
+  
+  // ✅ ADDED: Banner states
+  const [banners, setBanners] = useState([]);
+  const [currentBanner, setCurrentBanner] = useState(0);
 
   // Countdown timer
   useEffect(() => {
@@ -39,6 +43,22 @@ function Home() {
     setProducts(approvedProducts);
     setLoading(false);
   }, []);
+
+  // ✅ ADDED: Load banners from localStorage
+  useEffect(() => {
+    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
+    const activeBanners = savedBanners.filter(b => b.active).sort((a, b) => a.order - b.order);
+    setBanners(activeBanners);
+  }, []);
+
+  // ✅ ADDED: Auto slide for carousel
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBanner((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
 
   const featuredProducts = products.slice(0, 4);
   const bestsellerProducts = products.slice(4, 12);
@@ -132,22 +152,66 @@ function Home() {
         </div>
       </div>
 
-      {/* Hero Banner */}
-      <div className="relative bg-gradient-to-r from-pink-100 to-rose-100">
-        <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <div>
-              <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
-              <p className="text-gray-600 text-lg mb-6">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
-              <Link to="/shop" className="inline-block bg-pink-500 text-white px-8 py-3 rounded-md font-semibold hover:bg-pink-600 transition shadow-md">Shop Now →</Link>
+      {/* ✅ REPLACED: Hero Banner with Carousel */}
+      {banners.length > 0 ? (
+        <div className="relative overflow-hidden">
+          <div 
+            className="flex transition-transform duration-500 ease-out" 
+            style={{ transform: `translateX(-${currentBanner * 100}%)` }}
+          >
+            {banners.map((banner) => (
+              <Link key={banner.id} to={banner.link} className="w-full flex-shrink-0">
+                <div className="relative">
+                  <img 
+                    src={banner.image} 
+                    alt={banner.title}
+                    className="w-full h-64 md:h-80 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <div className="text-center text-white px-4">
+                      <h2 className="text-3xl md:text-5xl font-bold mb-2">{banner.title}</h2>
+                      <p className="text-lg mb-4">{banner.subtitle}</p>
+                      <button className="bg-white text-pink-600 px-6 py-2 rounded-md font-semibold hover:bg-gray-100 transition">
+                        {banner.buttonText}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          
+          {/* Carousel Dots */}
+          {banners.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {banners.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentBanner(idx)}
+                  className={`w-2 h-2 rounded-full transition-all ${currentBanner === idx ? 'w-6 bg-white' : 'bg-white/50'}`}
+                />
+              ))}
             </div>
-            <div className="hidden md:block text-center">
-              <div className="text-8xl animate-bounce">🎀</div>
+          )}
+        </div>
+      ) : (
+        // Fallback banner if no banners in localStorage
+        <div className="relative bg-gradient-to-r from-pink-100 to-rose-100">
+          <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div>
+                <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
+                <p className="text-gray-600 text-lg mb-6">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
+                <Link to="/shop" className="inline-block bg-pink-500 text-white px-8 py-3 rounded-md font-semibold hover:bg-pink-600 transition shadow-md">Shop Now →</Link>
+              </div>
+              <div className="hidden md:block text-center">
+                <div className="text-8xl animate-bounce">🎀</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Categories Grid */}
       <section className="py-12 bg-white">
