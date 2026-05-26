@@ -3,7 +3,6 @@ import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import SignupWithOTP from './pages/SignupWithOTP';
 import MyOrders from './pages/MyOrders';
 import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
@@ -50,19 +49,18 @@ import VendorOrderReports from './pages/vendor/VendorOrderReports';
 import VendorUserPermissions from './pages/vendor/VendorUserPermissions';
 import VendorFBA from './pages/vendor/VendorFBA';
 import VendorStoreBuilder from './pages/vendor/VendorStoreBuilder';
-
-// ✅ INFO PAGES IMPORTS
-import Terms from './pages/Terms';
-import Privacy from './pages/Privacy';
-import ContactUs from './pages/ContactUs';
-import FAQs from './pages/FAQs';
-import ShippingInfo from './pages/ShippingInfo';
-import ReturnsPolicy from './pages/ReturnsPolicy';
-
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import ContactUs from './pages/ContactUs';
+import ShippingInfo from './pages/ShippingInfo';
+import ReturnsPolicy from './pages/ReturnsPolicy';
+import FAQs from './pages/FAQs';  // ✅ YEH IMPORT MISSING THA
+
+
 
 function App() {
   return (
@@ -71,12 +69,11 @@ function App() {
         <CartProvider>
           <ReviewProvider>
             <Routes>
-              {/* ==================== CUSTOMER ROUTES ==================== */}
+              {/* Customer Routes */}
               <Route path="/" element={<Home />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/signup" element={<SignupWithOTP />} />
               <Route path="/my-orders" element={<MyOrders />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/checkout" element={<Checkout />} />
@@ -84,16 +81,15 @@ function App() {
               <Route path="/shop" element={<Shop />} />
               <Route path="/track-order/:orderId" element={<TrackOrder />} />
               <Route path="/profile" element={<Profile />} />
-
-              {/* ==================== INFO PAGES (ADDED) ==================== */}
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/contact" element={<ContactUs />} />
-              <Route path="/faqs" element={<FAQs />} />
               <Route path="/shipping" element={<ShippingInfo />} />
               <Route path="/returns" element={<ReturnsPolicy />} />
+              <Route path="/faqs" element={<FAQs />} />  {/* ✅ YEH ROUTE BHI ADD KIYA */}
 
-              {/* ==================== ADMIN ROUTES ==================== */}
+              
+              {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/vendors" element={<AdminVendors />} />
@@ -112,8 +108,8 @@ function App() {
               <Route path="/admin/tax" element={<AdminTax />} />
               <Route path="/admin/coupons" element={<AdminCoupons />} />
               <Route path="/admin/banners" element={<AdminBanners />} />
-
-              {/* ==================== VENDOR ROUTES ==================== */}
+              
+              {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
               <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
