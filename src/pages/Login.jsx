@@ -116,7 +116,7 @@ function Login() {
       <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
         <div className="max-w-md w-full">
           {!showForgotPassword ? (
-            /* Login Form - Premium */
+            /* Login Form - Premium (No Demo Section) */
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -220,23 +220,14 @@ function Login() {
                 Create your account
               </Link>
 
-              {/* Demo Credentials */}
-              <div className="mt-6 p-3 bg-pink-50 rounded-xl border border-pink-100">
-                <p className="text-xs text-center text-gray-500 mb-2">✨ Demo Account ✨</p>
-                <div className="flex justify-center gap-4 text-xs">
-                  <span className="text-gray-600">📧 customer@mypinkshop.com</span>
-                  <span className="text-gray-600">🔑 password123</span>
-                </div>
-              </div>
-
               <p className="text-center text-xs text-gray-400 mt-6">
                 By continuing, you agree to MyPinkShop's{' '}
-                <a href="#" className="text-pink-600 hover:underline">Terms</a> and{' '}
-                <a href="#" className="text-pink-600 hover:underline">Privacy</a>.
+                <Link to="/terms" className="text-pink-600 hover:underline">Terms of Service</Link> and{' '}
+                <Link to="/privacy" className="text-pink-600 hover:underline">Privacy Policy</Link>.
               </p>
             </div>
           ) : (
-            /* Forgot Password Form - Premium */
+            /* Forgot Password Form */
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -295,8 +286,8 @@ function Login() {
       <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
-            <a href="#" className="hover:text-pink-500 transition">Conditions of Use</a>
-            <a href="#" className="hover:text-pink-500 transition">Privacy Notice</a>
+            <Link to="/terms" className="hover:text-pink-500 transition">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-pink-500 transition">Privacy Policy</Link>
             <a href="#" className="hover:text-pink-500 transition">Help</a>
             <a href="#" className="hover:text-pink-500 transition">Contact Us</a>
           </div>
