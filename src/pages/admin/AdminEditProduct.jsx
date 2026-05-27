@@ -15,7 +15,7 @@ function AdminEditProduct() {
     stock: '',
     description: '',
     images: []
-  ]);
+  });
 
   useEffect(() => {
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
