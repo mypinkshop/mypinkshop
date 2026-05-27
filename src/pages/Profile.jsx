@@ -53,7 +53,6 @@ function Profile() {
       return;
     }
 
-    // Load REAL user data from localStorage
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
@@ -70,13 +69,11 @@ function Profile() {
       setNewMobile(parsed.mobile || '');
     }
 
-    // Load REAL addresses from localStorage
     const savedAddresses = localStorage.getItem('userAddresses');
     if (savedAddresses) {
       setAddresses(JSON.parse(savedAddresses));
     }
 
-    // Load REAL orders from adminOrdersList (filter by user email)
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     const userOrders = allOrders.filter(order => order.customerEmail === user?.email);
     userOrders.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -84,7 +81,6 @@ function Profile() {
     setFilteredOrders(userOrders);
   }, [user, navigate]);
 
-  // Filter orders
   useEffect(() => {
     let filtered = orders;
     if (searchOrder) {
@@ -234,32 +230,24 @@ function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+    <div className="min-h-screen bg-gray-50">
       
-      {/* Premium Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Easy Returns</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Secure Shopping</span>
-          <span>✨</span>
-        </div>
+      {/* Top Bar */}
+      <div className="bg-gray-900 text-white py-2 text-center text-sm">
+        Free Shipping on ₹999+ | Easy Returns | Secure Shopping
       </div>
 
-      {/* Premium Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            <Link to="/" className="flex items-center gap-2 shrink-0 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+            <Link to="/" className="flex items-center gap-2 shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-pink-600 rounded flex items-center justify-center">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">MyPinkShop</h1>
+                <p className="text-[9px] sm:text-[10px] text-gray-400">FOR THE GIRLIES</p>
               </div>
             </Link>
 
@@ -268,26 +256,28 @@ function Profile() {
                 <input 
                   type="text" 
                   placeholder="Search for products..."
-                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-300 rounded focus:outline-none focus:border-pink-500 text-sm sm:text-base"
                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+                <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-pink-600 text-white px-4 sm:px-6 py-1.5 rounded text-sm font-medium hover:bg-pink-700 transition">
+                  Search
+                </button>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-              <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+              <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
               </Link>
               
-              <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+              <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
               </Link>
               
               <Avatar user={user} onLogout={logout} />
@@ -298,41 +288,38 @@ function Profile() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium">My Account</span>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <Link to="/" className="hover:text-pink-600">Home</Link>
+          <span>/</span>
+          <span className="text-gray-700">My Account</span>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <span>👤</span> Your Account
-        </h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Your Account</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Left Sidebar - Premium */}
+          {/* Left Sidebar */}
           <div className="md:col-span-1">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
-              <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                 <h2 className="font-semibold text-gray-800">Account Settings</h2>
               </div>
-              <div className="divide-y divide-pink-50">
+              <div className="divide-y divide-gray-100">
                 {[
-                  { id: 'orders', label: 'Your Orders', icon: '📦' },
-                  { id: 'addresses', label: 'Your Addresses', icon: '📍' },
-                  { id: 'security', label: 'Login & Security', icon: '🔒' },
-                  { id: 'payments', label: 'Payment Methods', icon: '💳' },
+                  { id: 'orders', label: 'Your Orders' },
+                  { id: 'addresses', label: 'Your Addresses' },
+                  { id: 'security', label: 'Login & Security' },
+                  { id: 'payments', label: 'Payment Methods' },
                 ].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full text-left px-4 py-3 hover:bg-pink-50 transition flex items-center gap-3 ${
+                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition ${
                       activeTab === tab.id ? 'text-pink-600 font-medium bg-pink-50' : 'text-gray-600'
                     }`}
                   >
-                    <span className="text-lg">{tab.icon}</span>
-                    <span>{tab.label}</span>
+                    {tab.label}
                   </button>
                 ))}
               </div>
@@ -343,11 +330,11 @@ function Profile() {
           <div className="md:col-span-3">
             {/* Orders Tab */}
             {activeTab === 'orders' && (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100">
+              <div className="bg-white border border-gray-200 rounded-lg">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                   <h2 className="font-semibold text-gray-800">Your Orders</h2>
                 </div>
-                <div className="p-4 border-b border-pink-100">
+                <div className="p-4 border-b border-gray-200">
                   <div className="flex flex-wrap gap-4">
                     <div className="flex-1 min-w-[200px]">
                       <input
@@ -355,13 +342,13 @@ function Profile() {
                         placeholder="Search orders by ID..."
                         value={searchOrder}
                         onChange={(e) => setSearchOrder(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
                       />
                     </div>
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 bg-white"
                     >
                       <option value="all">All Orders</option>
                       <option value="delivered">Delivered</option>
@@ -375,12 +362,12 @@ function Profile() {
                   <div className="p-8 text-center">
                     <div className="text-5xl mb-3">📦</div>
                     <p className="text-gray-500">No orders found</p>
-                    <Link to="/shop" className="inline-block mt-3 text-pink-500 hover:underline">Start Shopping →</Link>
+                    <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
                   </div>
                 ) : (
-                  <div className="divide-y divide-pink-50">
+                  <div className="divide-y divide-gray-100">
                     {filteredOrders.map(order => (
-                      <div key={order.id} className="p-4 hover:bg-pink-50/30 transition">
+                      <div key={order.id} className="p-4 hover:bg-gray-50 transition">
                         <div className="flex flex-wrap justify-between items-start gap-3">
                           <div>
                             <p className="font-semibold text-gray-800">{order.id}</p>
@@ -403,11 +390,6 @@ function Profile() {
                           <Link to={`/track-order/${order.id}`} className="text-sm text-pink-600 hover:underline">
                             Track Order
                           </Link>
-                          {order.status === 'shipped' && (
-                            <button className="text-sm text-pink-600 hover:underline">
-                              Track Package
-                            </button>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -418,8 +400,8 @@ function Profile() {
 
             {/* Addresses Tab */}
             {activeTab === 'addresses' && (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 flex justify-between items-center">
+              <div className="bg-white border border-gray-200 rounded-lg">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                   <h2 className="font-semibold text-gray-800">Your Addresses</h2>
                   <button
                     onClick={() => {
@@ -438,7 +420,7 @@ function Profile() {
                     <p className="text-gray-500">No addresses saved</p>
                     <button
                       onClick={() => setShowAddressModal(true)}
-                      className="mt-3 text-pink-500 hover:underline"
+                      className="mt-3 text-pink-600 hover:underline"
                     >
                       Add your first address →
                     </button>
@@ -446,9 +428,9 @@ function Profile() {
                 ) : (
                   <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {addresses.map(addr => (
-                      <div key={addr.id} className="border border-pink-100 rounded-xl p-4 hover:shadow-sm transition">
+                      <div key={addr.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition">
                         {addr.isDefault && (
-                          <span className="text-xs bg-gradient-to-r from-pink-500 to-rose-500 text-white px-2 py-0.5 rounded-full mb-2 inline-block">
+                          <span className="text-xs bg-pink-600 text-white px-2 py-0.5 rounded-full mb-2 inline-block">
                             Default
                           </span>
                         )}
@@ -456,7 +438,7 @@ function Profile() {
                         <p className="text-sm text-gray-600 mt-1">{addr.addressLine1}</p>
                         {addr.addressLine2 && <p className="text-sm text-gray-600">{addr.addressLine2}</p>}
                         <p className="text-sm text-gray-600">{addr.city}, {addr.state} - {addr.pincode}</p>
-                        <p className="text-sm text-gray-500 mt-1">📞 {addr.mobile}</p>
+                        <p className="text-sm text-gray-500 mt-1">{addr.mobile}</p>
                         <div className="flex gap-4 mt-3">
                           <button
                             onClick={() => {
@@ -486,11 +468,11 @@ function Profile() {
 
             {/* Security Tab */}
             {activeTab === 'security' && (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100">
+              <div className="bg-white border border-gray-200 rounded-lg">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                   <h2 className="font-semibold text-gray-800">Login & Security</h2>
                 </div>
-                <div className="divide-y divide-pink-50">
+                <div className="divide-y divide-gray-100">
                   {/* Name */}
                   <div className="p-4 flex flex-wrap justify-between items-center gap-3">
                     <div>
@@ -499,7 +481,7 @@ function Profile() {
                     </div>
                     {showNameEdit ? (
                       <div className="flex gap-2">
-                        <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="border rounded-xl px-3 py-1 text-sm" />
+                        <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1 text-sm" />
                         <button onClick={handleNameUpdate} className="text-green-600 text-sm">Save</button>
                         <button onClick={() => setShowNameEdit(false)} className="text-gray-500 text-sm">Cancel</button>
                       </div>
@@ -521,7 +503,7 @@ function Profile() {
                       )}
                       {showEmailEdit ? (
                         <div className="flex gap-2">
-                          <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border rounded-xl px-3 py-1 text-sm" />
+                          <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1 text-sm" />
                           <button onClick={handleEmailUpdate} className="text-green-600 text-sm">Save</button>
                           <button onClick={() => setShowEmailEdit(false)} className="text-gray-500 text-sm">Cancel</button>
                         </div>
@@ -544,7 +526,7 @@ function Profile() {
                       )}
                       {showMobileEdit ? (
                         <div className="flex gap-2">
-                          <input type="tel" value={newMobile} onChange={(e) => setNewMobile(e.target.value)} placeholder="10-digit mobile" className="border rounded-xl px-3 py-1 text-sm" />
+                          <input type="tel" value={newMobile} onChange={(e) => setNewMobile(e.target.value)} placeholder="10-digit mobile" className="border border-gray-300 rounded-lg px-3 py-1 text-sm" />
                           <button onClick={handleMobileUpdate} className="text-green-600 text-sm">Save</button>
                           <button onClick={() => setShowMobileEdit(false)} className="text-gray-500 text-sm">Cancel</button>
                         </div>
@@ -562,9 +544,9 @@ function Profile() {
                     </div>
                     {showPasswordEdit ? (
                       <div className="flex flex-col gap-2">
-                        <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="border rounded-xl px-3 py-1 text-sm w-48" />
-                        <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border rounded-xl px-3 py-1 text-sm w-48" />
-                        <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border rounded-xl px-3 py-1 text-sm w-48" />
+                        <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1 text-sm w-48" />
+                        <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1 text-sm w-48" />
+                        <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-1 text-sm w-48" />
                         <div className="flex gap-2">
                           <button onClick={handlePasswordUpdate} className="text-green-600 text-sm">Save</button>
                           <button onClick={() => setShowPasswordEdit(false)} className="text-gray-500 text-sm">Cancel</button>
@@ -580,8 +562,8 @@ function Profile() {
 
             {/* Payments Tab */}
             {activeTab === 'payments' && (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100">
+              <div className="bg-white border border-gray-200 rounded-lg">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                   <h2 className="font-semibold text-gray-800">Payment Methods</h2>
                 </div>
                 <div className="p-8 text-center">
@@ -598,8 +580,8 @@ function Profile() {
       {/* Address Modal */}
       {showAddressModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddressModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-pink-100 p-4 flex justify-between items-center sticky top-0 bg-white">
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 p-4 flex justify-between items-center sticky top-0 bg-white">
               <h3 className="text-lg font-semibold text-gray-800">{editingAddress ? 'Edit Address' : 'Add New Address'}</h3>
               <button onClick={() => setShowAddressModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
@@ -609,7 +591,7 @@ function Profile() {
                 placeholder="Full Name"
                 value={addressForm.fullName}
                 onChange={(e) => setAddressForm({ ...addressForm, fullName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
                 required
               />
               <input
@@ -617,7 +599,7 @@ function Profile() {
                 placeholder="Mobile Number"
                 value={addressForm.mobile}
                 onChange={(e) => setAddressForm({ ...addressForm, mobile: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 required
               />
               <input
@@ -625,7 +607,7 @@ function Profile() {
                 placeholder="Pincode"
                 value={addressForm.pincode}
                 onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 required
               />
               <input
@@ -633,7 +615,7 @@ function Profile() {
                 placeholder="Address Line 1"
                 value={addressForm.addressLine1}
                 onChange={(e) => setAddressForm({ ...addressForm, addressLine1: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 required
               />
               <input
@@ -641,7 +623,7 @@ function Profile() {
                 placeholder="Address Line 2 (Optional)"
                 value={addressForm.addressLine2}
                 onChange={(e) => setAddressForm({ ...addressForm, addressLine2: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
               <div className="grid grid-cols-2 gap-3">
                 <input
@@ -649,7 +631,7 @@ function Profile() {
                   placeholder="City"
                   value={addressForm.city}
                   onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   required
                 />
                 <input
@@ -657,7 +639,7 @@ function Profile() {
                   placeholder="State"
                   value={addressForm.state}
                   onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   required
                 />
               </div>
@@ -666,11 +648,11 @@ function Profile() {
                   type="checkbox"
                   checked={addressForm.isDefault}
                   onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
-                  className="w-4 h-4 text-pink-500 rounded"
+                  className="w-4 h-4 text-pink-600 rounded"
                 />
                 <span className="text-sm text-gray-600">Make this my default address</span>
               </label>
-              <button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-xl font-medium hover:shadow-lg transition mt-2">
+              <button type="submit" className="w-full bg-pink-600 text-white py-2 rounded-lg font-medium hover:bg-pink-700 transition mt-2">
                 {editingAddress ? 'Update Address' : 'Add Address'}
               </button>
             </form>
@@ -678,17 +660,50 @@ function Profile() {
         </div>
       )}
 
-      {/* Premium Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
+      {/* Footer */}
+      <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
-            <Link to="/terms" className="hover:text-pink-500 transition">Terms of Service</Link>
-            <Link to="/privacy" className="hover:text-pink-500 transition">Privacy Policy</Link>
-            <a href="#" className="hover:text-pink-500 transition">Help</a>
-            <a href="#" className="hover:text-pink-500 transition">Contact Us</a>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 bg-pink-600 rounded flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">M</span>
+                </div>
+                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+              </div>
+              <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-white mb-4">Shop</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                <li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-white mb-4">Support</h4>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+              </ul>
+            </div>
           </div>
-          <p className="text-center text-xs text-gray-500">© 2026 MyPinkShop. All rights reserved.</p>
-          <p className="text-center text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+          <div className="text-center pt-8 border-t border-gray-800">
+            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
