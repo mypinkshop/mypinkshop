@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ Product Card Component - FIXED for all devices
+// ✅ ProductCard Component - MUST BE HERE (outside Home function)
 const ProductCard = ({ product, addToCart, isInWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -19,7 +19,7 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
       <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-56 lg:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
@@ -29,7 +29,7 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
+            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl">
               {product.emoji || '✨'}
             </div>
           )}
@@ -43,16 +43,11 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
               NEW
             </span>
           )}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
-            </div>
-          )}
         </div>
       </Link>
       <div className="p-4">
         <Link to={`/product/${product.id}`}>
-          <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
+          <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition">
             {product.name}
           </h3>
         </Link>
@@ -71,12 +66,7 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
         </div>
         <button 
           onClick={handleAddToCart} 
-          disabled={product.stock === 0}
-          className={`w-full py-2 rounded-full text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
-            product.stock > 0 
-              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
+          className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
         >
           {isAdded ? 'Added! ✓' : 'Add to Cart'}
         </button>
@@ -96,7 +86,6 @@ function Home() {
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
 
-  // Countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
@@ -114,32 +103,27 @@ function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load approved products
   useEffect(() => {
     try {
       const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
       const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
       setProducts(approvedProducts);
     } catch (error) {
-      console.error('Error loading products:', error);
       setProducts([]);
     }
     setLoading(false);
   }, []);
 
-  // Load banners from localStorage
   useEffect(() => {
     try {
       const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
       const activeBanners = savedBanners.filter(b => b.active).sort((a, b) => a.order - b.order);
       setBanners(activeBanners);
     } catch (error) {
-      console.error('Error loading banners:', error);
       setBanners([]);
     }
   }, []);
 
-  // Auto slide for carousel
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -164,7 +148,7 @@ function Home() {
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading your paradise...</p>
+          <p className="text-gray-500">Loading...</p>
         </div>
       </div>
     );
@@ -173,64 +157,50 @@ function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Premium Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Extra 10% off on first order</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Cash on Delivery Available</span>
-          <span>✨</span>
-        </div>
+      {/* Top Bar */}
+      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm">
+        ✨ Free Shipping on ₹999+ | Extra 10% off on first order | Cash on Delivery Available ✨
       </div>
 
-      {/* Premium Header */}
+      {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            {/* Logo */}
             <Link to="/" className="flex items-center gap-2 shrink-0 group">
               <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">MyPinkShop</h1>
+                <p className="text-[9px] sm:text-[10px] text-gray-400">FOR THE GIRLIES</p>
               </div>
             </Link>
 
-            {/* Search Bar - Responsive */}
             <div className="flex-1 max-w-md lg:max-w-2xl">
               <div className="relative">
                 <input 
                   type="text" 
-                  placeholder="Search for products, brands and more..."
-                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                  placeholder="Search for products..."
+                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50"
                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                 />
-                <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all">
-                  <span className="hidden sm:inline">Search</span>
-                  <span className="sm:hidden">🔍</span>
-                </button>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
               </div>
             </div>
 
-            {/* Right Icons - Responsive */}
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
               <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[10px] sm:text-xs">{wishlistCount}</span>}
+                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5">{wishlistCount}</span>}
               </button>
               
               <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[10px] sm:text-xs">{cartCount}</span>}
+                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5">{cartCount}</span>}
               </Link>
               
               {user ? <Avatar user={user} onLogout={logout} /> : 
@@ -245,147 +215,54 @@ function Home() {
         </div>
       </header>
 
-      {/* Premium Category Navigation */}
-      <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
-            {['All', 'Skincare', 'Makeup', 'Clothing', 'Accessories', 'Sale', 'New Arrivals', 'Bestsellers'].map((item, idx) => (
-              <Link 
-                key={idx} 
-                to={item === 'All' ? '/shop' : `/shop?category=${item.toLowerCase().replace(/ /g, '')}`}
-                className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors"
-              >
-                {item}
-              </Link>
-            ))}
+      {/* Category Nav */}
+      <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-6 overflow-x-auto py-3">
+            <Link to="/shop" className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap">All</Link>
+            <Link to="/shop?category=skincare" className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap">Skincare</Link>
+            <Link to="/shop?category=makeup" className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap">Makeup</Link>
+            <Link to="/shop?category=clothing" className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap">Clothing</Link>
+            <Link to="/shop?category=accessories" className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap">Accessories</Link>
+            <Link to="/shop?offer=sale" className="text-sm font-medium text-red-500 hover:text-pink-500 whitespace-nowrap">Sale</Link>
           </div>
         </div>
       </div>
 
-      {/* Premium Hero Carousel */}
-      {banners.length > 0 ? (
-        <div className="relative overflow-hidden group">
-          <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
-            {banners.map((banner) => (
-              <Link key={banner.id} to={banner.link} className="w-full flex-shrink-0">
-                <div className="relative">
-                  <img 
-                    src={banner.image} 
-                    alt={banner.title}
-                    className="w-full h-[250px] sm:h-[350px] md:h-[450px] lg:h-[550px] object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
-                    <div className="text-center text-white px-4 animate-fade-in-up">
-                      <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 drop-shadow-lg">{banner.title}</h2>
-                      <p className="text-sm sm:text-base md:text-lg mb-3 sm:mb-4 drop-shadow">{banner.subtitle}</p>
-                      <button className="bg-white text-pink-600 px-5 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
-                        {banner.buttonText}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-          
-          {/* Navigation Arrows */}
-          {banners.length > 1 && (
-            <>
-              <button 
-                onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)}
-                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)}
-                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </>
-          )}
-          
-          {/* Carousel Dots */}
-          {banners.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-              {banners.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentBanner(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${currentBanner === idx ? 'w-6 bg-white' : 'w-3 bg-white/50'}`}
-                />
-              ))}
-            </div>
-          )}
+      {/* Hero Banner */}
+      <div className="relative bg-gradient-to-r from-pink-100 to-rose-100 py-12 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4">Glow Up This Summer</h1>
+          <p className="text-gray-600 text-lg mb-6">Discover our premium skincare, makeup, and fashion collection.</p>
+          <Link to="/shop" className="inline-block bg-pink-500 text-white px-8 py-3 rounded-full font-semibold hover:bg-pink-600 transition">
+            Shop Now →
+          </Link>
         </div>
-      ) : (
-        /* Premium Fallback Banner */
-        <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 md:py-20">
-            <div className="text-center">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4">Glow Up This Summer</h1>
-              <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection.</p>
-              <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:shadow-xl transition-all">
-                Shop Now →
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
-      {/* Premium Categories Section */}
-      <section className="py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Shop by Category</h2>
-            <p className="text-gray-500 text-sm sm:text-base">Discover your favorite products</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      {/* Categories */}
+      <section className="py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Shop by Category</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {categories.map((cat, idx) => (
-              <Link key={idx} to={cat.link} className="group bg-white/80 backdrop-blur-sm rounded-2xl p-5 sm:p-6 text-center hover:shadow-xl transition-all hover:-translate-y-2 border border-pink-100">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-pink-50 to-rose-50 rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition">
+              <Link key={idx} to={cat.link} className="bg-white rounded-xl p-6 text-center hover:shadow-md transition border border-pink-100">
+                <div className="w-16 h-16 mx-auto bg-pink-50 rounded-full flex items-center justify-center text-3xl mb-3">
                   {cat.image}
                 </div>
-                <h3 className="font-semibold text-gray-800 text-sm sm:text-base">{cat.name}</h3>
-                <p className="text-xs text-gray-500 mt-1">Shop Now →</p>
+                <h3 className="font-semibold text-gray-800">{cat.name}</h3>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Premium Deals Section */}
+      {/* Featured Products */}
       {featuredProducts.length > 0 && (
-        <section className="py-12 sm:py-16 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">⏰ Deals of the Day</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-500 text-sm">Ends in:</span>
-                <div className="flex gap-1">
-                  <div className="bg-gray-800 text-white px-2 sm:px-3 py-1 rounded-lg text-center min-w-[50px]">
-                    <span className="text-lg sm:text-xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
-                    <span className="text-xs block">Hours</span>
-                  </div>
-                  <span className="text-gray-700 text-xl">:</span>
-                  <div className="bg-gray-800 text-white px-2 sm:px-3 py-1 rounded-lg text-center min-w-[50px]">
-                    <span className="text-lg sm:text-xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                    <span className="text-xs block">Mins</span>
-                  </div>
-                  <span className="text-gray-700 text-xl">:</span>
-                  <div className="bg-gray-800 text-white px-2 sm:px-3 py-1 rounded-lg text-center min-w-[50px]">
-                    <span className="text-lg sm:text-xl font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                    <span className="text-xs block">Secs</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+        <section className="py-12 bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Featured Products</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               {featuredProducts.map(product => (
                 <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
               ))}
@@ -394,125 +271,13 @@ function Home() {
         </section>
       )}
 
-      {/* Bestsellers Section */}
-      {bestsellerProducts.length > 0 && (
-        <section className="py-12 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">⭐ Bestsellers</h2>
-              <Link to="/shop?sort=bestseller" className="text-pink-500 text-sm hover:underline">View All →</Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {bestsellerProducts.slice(0, 4).map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* New Arrivals */}
-      {newArrivals.length > 0 && (
-        <section className="py-12 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">🆕 New Arrivals</h2>
-              <Link to="/shop?sort=newest" className="text-pink-500 text-sm hover:underline">View All →</Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {newArrivals.map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Newsletter */}
-      <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
-        <div className="max-w-2xl mx-auto text-center px-4">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2">Join the Pink Club</h2>
-          <p className="text-white/80 mb-6 text-sm sm:text-base">Subscribe to get 15% off on your first order + exclusive updates</p>
-          <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" />
-            <button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">M</span>
-                </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-              </div>
-              <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p>© 2026 MyPinkShop. All rights reserved.</p>
+          <p className="text-sm mt-2">Made with 💖 for the girlies</p>
         </div>
       </footer>
-
-      <style jsx>{`
-        @keyframes fade-in-up {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        
-        .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out;
-        }
-        
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 }
