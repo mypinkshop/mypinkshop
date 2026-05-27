@@ -5,6 +5,114 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
+// ✅ Product Card Component
+const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
+  const [isAdded, setIsAdded] = useState(false);
+
+  const handleAddToCart = () => {
+    addToCart(product);
+    setIsAdded(true);
+    setTimeout(() => setIsAdded(false), 1500);
+  };
+
+  const handleWishlistToggle = () => {
+    if (isInWishlist(product.id)) {
+      removeFromWishlist(product.id);
+    } else {
+      addToWishlist(product);
+    }
+  };
+
+  return (
+    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
+      <Link to={`/product/${product.id}`}>
+        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+          {/* ✅ Product Image - Sab devices pe kaam karega */}
+          {product.images && product.images[0] ? (
+            <img 
+              src={product.images[0]} 
+              alt={product.name} 
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center text-5xl">' + (product.emoji || '✨') + '</div>';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
+              {product.emoji || '✨'}
+            </div>
+          )}
+          {product.badge && (
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+              {product.badge}
+            </span>
+          )}
+          {product.isNew && (
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+              NEW
+            </span>
+          )}
+          {product.stock === 0 && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
+            </div>
+          )}
+        </div>
+      </Link>
+      
+      <div className="p-4">
+        <Link to={`/product/${product.id}`}>
+          <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">
+            {product.name}
+          </h3>
+        </Link>
+        
+        <div className="flex items-center gap-1 mb-2">
+          <div className="flex text-yellow-400 text-sm">
+            {'★'.repeat(Math.floor(product.rating || 4))}
+            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+          </div>
+          <span className="text-xs text-gray-400">({product.rating || 4})</span>
+        </div>
+        
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
+          {product.originalPrice && product.originalPrice > product.price && (
+            <>
+              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+              <span className="text-xs text-green-500">
+                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
+              </span>
+            </>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <button 
+            onClick={handleAddToCart} 
+            disabled={product.stock === 0}
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+              product.stock > 0 
+                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5' 
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {isAdded ? 'Added! ✓' : 'Add to Cart'}
+          </button>
+          
+          <button 
+            onClick={handleWishlistToggle}
+            className="w-10 py-2 border border-pink-200 rounded-xl text-center hover:bg-pink-50 transition transform hover:-translate-y-0.5"
+          >
+            {isInWishlist(product.id) ? '❤️' : '🤍'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function Shop() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -22,7 +130,6 @@ function Shop() {
   const [selectedRating, setSelectedRating] = useState(0);
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
-  const [priceRange, setPriceRange] = useState([0, 5000]);
 
   // Get category from URL
   useEffect(() => {
@@ -30,9 +137,13 @@ function Shop() {
     const category = params.get('category');
     const offer = params.get('offer');
     const sort = params.get('sort');
+    const search = params.get('search');
     
     if (category && category !== 'all') {
       setSelectedCategory(category);
+    }
+    if (search) {
+      setSearchTerm(search);
     }
     if (sort === 'newest') {
       setSortBy('newest');
@@ -103,7 +214,6 @@ function Shop() {
     setMaxPrice('');
     setSelectedRating(0);
     setSortBy('default');
-    setPriceRange([0, 5000]);
   };
 
   const categories = [
@@ -262,7 +372,7 @@ function Shop() {
                     placeholder="Min ₹" 
                     value={minPrice} 
                     onChange={(e) => setMinPrice(e.target.value)} 
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
                   />
                 </div>
                 <div className="flex-1">
@@ -271,7 +381,7 @@ function Shop() {
                     placeholder="Max ₹" 
                     value={maxPrice} 
                     onChange={(e) => setMaxPrice(e.target.value)} 
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
                   />
                 </div>
               </div>
@@ -420,108 +530,5 @@ function Shop() {
     </div>
   );
 }
-
-// Premium Product Card Component
-const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
-  const [isAdded, setIsAdded] = useState(false);
-
-  const handleAddToCart = () => {
-    addToCart(product);
-    setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 1500);
-  };
-
-  const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
-    } else {
-      addToWishlist(product);
-    }
-  };
-
-  return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-          {product.images && product.images[0] ? (
-            <img 
-              src={product.images[0]} 
-              alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
-              {product.emoji || '✨'}
-            </div>
-          )}
-          {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
-              {product.badge}
-            </span>
-          )}
-          {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
-              NEW
-            </span>
-          )}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
-            </div>
-          )}
-        </div>
-      </Link>
-      
-      <div className="p-4">
-        <Link to={`/product/${product.id}`}>
-          <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">
-            {product.name}
-          </h3>
-        </Link>
-        
-        <div className="flex items-center gap-1 mb-2">
-          <div className="flex text-yellow-400 text-sm">
-            {'★'.repeat(Math.floor(product.rating || 4))}
-            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-          </div>
-          <span className="text-xs text-gray-400">({product.rating || 4})</span>
-        </div>
-        
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <>
-              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-              <span className="text-xs text-green-500">
-                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
-              </span>
-            </>
-          )}
-        </div>
-        
-        <div className="flex gap-2">
-          <button 
-            onClick={handleAddToCart} 
-            disabled={product.stock === 0}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-              product.stock > 0 
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5' 
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {isAdded ? 'Added! ✓' : 'Add to Cart'}
-          </button>
-          
-          <button 
-            onClick={handleWishlistToggle}
-            className="w-10 py-2 border border-pink-200 rounded-xl text-center hover:bg-pink-50 transition transform hover:-translate-y-0.5"
-          >
-            {isInWishlist(product.id) ? '❤️' : '🤍'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default Shop;
