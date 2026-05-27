@@ -10,6 +10,7 @@ function AdminProducts() {
   const [activeTab, setActiveTab] = useState('approved');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStockStatus, setFilterStockStatus] = useState('all');
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [productToDelete, setProductToDelete] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -88,7 +89,6 @@ function AdminProducts() {
     alert(`Product status updated to ${newStatus}`);
   };
 
-  // ✅ EDIT PRODUCT FUNCTION
   const editProduct = (productId) => {
     navigate(`/admin/edit-product/${productId}`);
   };
@@ -124,9 +124,15 @@ function AdminProducts() {
     return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">In Stock</span>;
   };
 
+  // ✅ Filter products with stock status
   const filteredApproved = products.filter(p => {
     if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase()) && !p.sku?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (filterCategory !== 'all' && p.category !== filterCategory) return false;
+    if (filterStockStatus !== 'all') {
+      if (filterStockStatus === 'instock' && p.stock === 0) return false;
+      if (filterStockStatus === 'lowstock' && (p.stock >= 10 || p.stock === 0)) return false;
+      if (filterStockStatus === 'outofstock' && p.stock > 0) return false;
+    }
     return true;
   });
 
@@ -137,6 +143,35 @@ function AdminProducts() {
     { value: 'clothing', label: 'Clothing' },
     { value: 'accessories', label: 'Accessories' },
   ];
+
+  // Stats for cards
+  const totalProducts = products.length + pendingProducts.length;
+  const activeCount = products.filter(p => p.status === 'active').length;
+  const pendingCount = pendingProducts.length;
+  const lowStockCount = products.filter(p => p.stock < 10 && p.stock > 0).length;
+  const outOfStockCount = products.filter(p => p.stock === 0).length;
+
+  // ✅ Click handlers for stats cards
+  const handleStatsClick = (type) => {
+    setActiveTab('approved');
+    setSearchTerm('');
+    if (type === 'pending') {
+      setActiveTab('pending');
+    } else if (type === 'active') {
+      setFilterStockStatus('all');
+      setFilterCategory('all');
+    } else if (type === 'lowstock') {
+      setFilterStockStatus('lowstock');
+      setFilterCategory('all');
+    } else if (type === 'outofstock') {
+      setFilterStockStatus('outofstock');
+      setFilterCategory('all');
+    } else if (type === 'all') {
+      setFilterStockStatus('all');
+      setFilterCategory('all');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   if (loading) {
     return (
@@ -172,48 +207,74 @@ function AdminProducts() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          {/* Stats Cards - Clickable */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div 
+              onClick={() => handleStatsClick('all')}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition hover:border-pink-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Products</p>
                 <span className="text-lg text-gray-400">📦</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800">{products.length + pendingProducts.length}</p>
+              <p className="text-2xl font-bold text-gray-800">{totalProducts}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            
+            <div 
+              onClick={() => handleStatsClick('active')}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition hover:border-green-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Active</p>
                 <span className="text-lg text-green-500">✓</span>
               </div>
-              <p className="text-2xl font-bold text-green-600">{products.filter(p => p.status === 'active').length}</p>
+              <p className="text-2xl font-bold text-green-600">{activeCount}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            
+            <div 
+              onClick={() => handleStatsClick('pending')}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition hover:border-yellow-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Pending Approval</p>
                 <span className="text-lg text-yellow-500">⏳</span>
               </div>
-              <p className="text-2xl font-bold text-yellow-600">{pendingProducts.length}</p>
+              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            
+            <div 
+              onClick={() => handleStatsClick('lowstock')}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition hover:border-orange-300"
+            >
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-gray-500">Low/Out Stock</p>
-                <span className="text-lg text-red-500">⚠</span>
+                <p className="text-xs text-gray-500">Low Stock</p>
+                <span className="text-lg text-orange-500">⚠</span>
               </div>
-              <p className="text-2xl font-bold text-red-600">{products.filter(p => p.stock < 10).length}</p>
+              <p className="text-2xl font-bold text-orange-600">{lowStockCount}</p>
+            </div>
+            
+            <div 
+              onClick={() => handleStatsClick('outofstock')}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition hover:border-red-300"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-500">Out of Stock</p>
+                <span className="text-lg text-red-500">✗</span>
+              </div>
+              <p className="text-2xl font-bold text-red-600">{outOfStockCount}</p>
             </div>
           </div>
 
           {/* Tabs */}
           <div className="flex flex-wrap gap-4 border-b border-gray-200 mb-6">
             <button
-              onClick={() => { setActiveTab('approved'); setSelectedProducts([]); setSearchTerm(''); }}
+              onClick={() => { setActiveTab('approved'); setSelectedProducts([]); setSearchTerm(''); setFilterStockStatus('all'); }}
               className={`px-5 py-2 text-sm font-medium transition-all ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Approved Products ({products.length})
             </button>
             <button
-              onClick={() => { setActiveTab('pending'); setSelectedProducts([]); setSearchTerm(''); }}
+              onClick={() => { setActiveTab('pending'); setSelectedProducts([]); setSearchTerm(''); setFilterStockStatus('all'); }}
               className={`px-5 py-2 text-sm font-medium transition-all ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Pending Approval ({pendingProducts.length})
@@ -242,6 +303,16 @@ function AdminProducts() {
                   >
                     {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
+                  <select 
+                    value={filterStockStatus} 
+                    onChange={(e) => setFilterStockStatus(e.target.value)} 
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="all">All Stock</option>
+                    <option value="instock">In Stock (&gt;10)</option>
+                    <option value="lowstock">Low Stock (1-10)</option>
+                    <option value="outofstock">Out of Stock (0)</option>
+                  </select>
                 </div>
                 {selectedProducts.length > 0 && (
                   <button onClick={bulkDelete} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition">
@@ -252,7 +323,7 @@ function AdminProducts() {
             </div>
           )}
 
-          {/* Products Table - WITH EDIT BUTTON & CLICKABLE ROWS */}
+          {/* Products Table */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -282,9 +353,9 @@ function AdminProducts() {
                     </tr>
                   ) : (
                     currentProducts.map(product => (
-                      <tr key={product.id} className="hover:bg-gray-50 transition cursor-pointer" onClick={() => editProduct(product.id)}>
+                      <tr key={product.id} className="hover:bg-gray-50 transition">
                         {activeTab === 'approved' && (
-                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-4 py-3">
                             <input 
                               type="checkbox" 
                               checked={selectedProducts.includes(product.id)} 
@@ -321,7 +392,7 @@ function AdminProducts() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
-                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-3 text-center">
                           <div className="flex justify-center gap-2">
                             {activeTab === 'pending' ? (
                               <>
@@ -330,7 +401,6 @@ function AdminProducts() {
                               </>
                             ) : (
                               <>
-                                {/* ✅ EDIT BUTTON ADDED */}
                                 <button 
                                   onClick={() => editProduct(product.id)} 
                                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
