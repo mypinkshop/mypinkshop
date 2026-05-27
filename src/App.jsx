@@ -59,6 +59,8 @@ import ContactUs from './pages/ContactUs';
 import ShippingInfo from './pages/ShippingInfo';
 import ReturnsPolicy from './pages/ReturnsPolicy';
 import FAQs from './pages/FAQs';  // ✅ YEH IMPORT MISSING THA
+import AdminEditProduct from './pages/admin/AdminEditProduct';
+
 
 
 
@@ -109,6 +111,7 @@ function App() {
               <Route path="/admin/coupons" element={<AdminCoupons />} />
               <Route path="/admin/banners" element={<AdminBanners />} />
               <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
+              
 
               
               {/* Vendor Routes */}
