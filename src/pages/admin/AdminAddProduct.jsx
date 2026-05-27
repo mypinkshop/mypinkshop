@@ -44,6 +44,7 @@ function AdminAddProduct() {
   const [specKey, setSpecKey] = useState('');
   const [specValue, setSpecValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   // Load brands from localStorage
   useEffect(() => {
@@ -57,6 +58,57 @@ function AdminAddProduct() {
   const saveBrands = (updatedBrands) => {
     setBrands(updatedBrands);
     localStorage.setItem('brandsList', JSON.stringify(updatedBrands));
+  };
+
+  // ✅ Base64 conversion function
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // ✅ FIXED: Image upload with Base64 conversion
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    
+    if (formData.images.length + files.length > 5) {
+      alert('You can upload maximum 5 images');
+      return;
+    }
+    
+    setUploadingImages(true);
+    const newImages = [];
+    
+    for (const file of files) {
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert(`Image ${file.name} is larger than 2MB. Please compress and upload.`);
+        continue;
+      }
+      
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert(`File ${file.name} is not an image.`);
+        continue;
+      }
+      
+      try {
+        const base64 = await convertToBase64(file);
+        newImages.push(base64);
+      } catch (error) {
+        console.error('Error converting image:', error);
+      }
+    }
+    
+    setFormData({ ...formData, images: [...formData.images, ...newImages] });
+    setUploadingImages(false);
+  };
+
+  const removeImage = (index) => {
+    setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
   };
 
   const handleAddNewBrand = () => {
@@ -83,16 +135,6 @@ function AdminAddProduct() {
     'Makeup': ['Lipsticks', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter'],
     'Clothing': ['Dresses', 'Tops', 'Jeans', 'Skirts', 'Ethnic Wear', 'Kurtis', 'Sarees', 'Jackets'],
     'Accessories': ['Bags', 'Jewelry', 'Hair Accessories', 'Watches', 'Sunglasses', 'Belts', 'Scarves'],
-  };
-
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const newImages = files.map(file => URL.createObjectURL(file));
-    setFormData({ ...formData, images: [...formData.images, ...newImages] });
-  };
-
-  const removeImage = (index) => {
-    setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
   };
 
   const addKeyFeature = () => {
@@ -144,7 +186,7 @@ function AdminAddProduct() {
       stock: parseInt(formData.quantity),
       sku: formData.sku || `SKU-${Date.now()}`,
       lowStockThreshold: parseInt(formData.lowStockThreshold),
-      images: formData.images,
+      images: formData.images, // ✅ Now stores Base64 strings
       shortDescription: formData.shortDescription,
       description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
@@ -197,16 +239,10 @@ function AdminAddProduct() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Icons as SVG components
+  // SVG Icons
   const IconBack = () => (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-    </svg>
-  );
-
-  const IconCheck = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
     </svg>
   );
 
@@ -265,7 +301,7 @@ function AdminAddProduct() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* Progress Steps - Professional */}
+        {/* Progress Steps */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-8">
           <div className="flex items-center justify-between">
             {[
@@ -298,7 +334,7 @@ function AdminAddProduct() {
           </div>
         </div>
 
-        {/* Step 1: Vital Info with Brand Search & Add */}
+        {/* Step 1: Vital Info */}
         {step === 1 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
@@ -315,13 +351,12 @@ function AdminAddProduct() {
                     type="text"
                     value={formData.productName}
                     onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 transition"
                     placeholder="e.g., Glass Skin Vitamin C Serum"
                   />
-                  <p className="text-xs text-gray-400 mt-1">Help customers find your product with a clear, descriptive name</p>
                 </div>
                 
-                {/* Brand Selection with Search */}
+                {/* Brand Selection */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Brand / Vendor <span className="text-red-500">*</span>
@@ -332,11 +367,10 @@ function AdminAddProduct() {
                       placeholder="Search or select brand..."
                       value={brandSearch}
                       onChange={(e) => setBrandSearch(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
                     />
                   </div>
                   
-                  {/* Brand Dropdown */}
                   {brandSearch && (
                     <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto bg-white shadow-lg">
                       {filteredBrands.length > 0 ? (
@@ -366,7 +400,6 @@ function AdminAddProduct() {
                     </div>
                   )}
                   
-                  {/* Selected Brand Display */}
                   {formData.brand && !brandSearch && (
                     <div className="mt-2 flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
                       <span className="text-sm font-medium text-gray-700">{formData.brand}</span>
@@ -407,7 +440,7 @@ function AdminAddProduct() {
                   <select
                     value={formData.subCategory}
                     onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
                     disabled={!formData.category}
                   >
                     <option value="">Select Sub Category</option>
@@ -459,14 +492,14 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 2: Images */}
+        {/* Step 2: Images - FIXED with Base64 */}
         {step === 2 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Product Images</h2>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50/50">
               <div className="flex flex-wrap gap-4 mb-4">
                 {formData.images.map((img, idx) => (
-                  <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden group">
+                  <div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden group shadow-sm">
                     <img src={img} alt={`Product ${idx}`} className="w-full h-full object-cover" />
                     <button
                       onClick={() => removeImage(idx)}
@@ -476,12 +509,17 @@ function AdminAddProduct() {
                     </button>
                   </div>
                 ))}
+                {formData.images.length === 0 && (
+                  <div className="w-full text-center py-8 text-gray-400">
+                    No images uploaded yet
+                  </div>
+                )}
               </div>
               <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" />
               <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer hover:bg-pink-50 transition text-pink-600 font-medium">
-                <IconUpload /> Upload Images
+                <IconUpload /> {uploadingImages ? 'Converting...' : 'Upload Images'}
               </label>
-              <p className="text-xs text-gray-400 mt-3">Upload up to 5 images. First image will be the main product image.</p>
+              <p className="text-xs text-gray-400 mt-3">Upload up to 5 images. Max 2MB each. First image will be the main product image.</p>
             </div>
             <div className="flex justify-between mt-6">
               <button onClick={() => setStep(1)} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">Back</button>
@@ -501,7 +539,7 @@ function AdminAddProduct() {
                   type="number"
                   value={formData.mrp}
                   onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
                   placeholder="₹"
                 />
               </div>
@@ -511,7 +549,7 @@ function AdminAddProduct() {
                   type="number"
                   value={formData.sellingPrice}
                   onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
                   placeholder="₹"
                 />
               </div>
@@ -539,7 +577,7 @@ function AdminAddProduct() {
             <h2 className="text-lg font-semibold text-gray-800">Inventory</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Stock Keeping Unit)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
                 <input
                   type="text"
                   value={formData.sku}
