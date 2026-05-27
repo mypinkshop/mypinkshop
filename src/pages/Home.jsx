@@ -5,11 +5,91 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
+// ✅ Product Card Component - FIXED for all devices
+const ProductCard = ({ product, addToCart, isInWishlist }) => {
+  const [isAdded, setIsAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const handleAddToCart = () => {
+    addToCart(product);
+    setIsAdded(true);
+    setTimeout(() => setIsAdded(false), 1500);
+  };
+
+  return (
+    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
+      <Link to={`/product/${product.id}`}>
+        <div className="relative h-48 sm:h-52 md:h-56 lg:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+          {product.images && product.images[0] && !imgError ? (
+            <img 
+              src={product.images[0]} 
+              alt={product.name} 
+              className="w-full h-full object-contain object-center p-2 group-hover:scale-105 transition-transform duration-500"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
+              {product.emoji || '✨'}
+            </div>
+          )}
+          {product.badge && (
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+              {product.badge}
+            </span>
+          )}
+          {product.isNew && (
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+              NEW
+            </span>
+          )}
+          {product.stock === 0 && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
+            </div>
+          )}
+        </div>
+      </Link>
+      <div className="p-4">
+        <Link to={`/product/${product.id}`}>
+          <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
+            {product.name}
+          </h3>
+        </Link>
+        <div className="flex items-center gap-1 mb-2">
+          <div className="flex text-yellow-400 text-xs sm:text-sm">
+            {'★'.repeat(Math.floor(product.rating || 4))}
+            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+          </div>
+          <span className="text-xs text-gray-400">({product.rating || 4})</span>
+        </div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base sm:text-lg font-bold text-pink-600">₹{product.price}</span>
+          {product.originalPrice && product.originalPrice > product.price && (
+            <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+          )}
+        </div>
+        <button 
+          onClick={handleAddToCart} 
+          disabled={product.stock === 0}
+          className={`w-full py-2 rounded-full text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+            product.stock > 0 
+              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {isAdded ? 'Added! ✓' : 'Add to Cart'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { wishlistCount, isInWishlist } = useWishlist();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
@@ -36,17 +116,27 @@ function Home() {
 
   // Load approved products
   useEffect(() => {
-    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
-    setProducts(approvedProducts);
+    try {
+      const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
+      const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
+      setProducts(approvedProducts);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      setProducts([]);
+    }
     setLoading(false);
   }, []);
 
   // Load banners from localStorage
   useEffect(() => {
-    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
-    const activeBanners = savedBanners.filter(b => b.active).sort((a, b) => a.order - b.order);
-    setBanners(activeBanners);
+    try {
+      const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
+      const activeBanners = savedBanners.filter(b => b.active).sort((a, b) => a.order - b.order);
+      setBanners(activeBanners);
+    } catch (error) {
+      console.error('Error loading banners:', error);
+      setBanners([]);
+    }
   }, []);
 
   // Auto slide for carousel
@@ -63,10 +153,10 @@ function Home() {
   const newArrivals = products.filter(p => p.isNew).slice(0, 4);
 
   const categories = [
-    { name: 'Skincare', image: '🧴', link: '/shop?category=skincare', gradient: 'from-rose-100 to-pink-100' },
-    { name: 'Makeup', image: '💄', link: '/shop?category=makeup', gradient: 'from-pink-100 to-fuchsia-100' },
-    { name: 'Clothing', image: '👗', link: '/shop?category=clothing', gradient: 'from-fuchsia-100 to-purple-100' },
-    { name: 'Accessories', image: '👜', link: '/shop?category=accessories', gradient: 'from-purple-100 to-rose-100' },
+    { name: 'Skincare', image: '🧴', link: '/shop?category=skincare' },
+    { name: 'Makeup', image: '💄', link: '/shop?category=makeup' },
+    { name: 'Clothing', image: '👗', link: '/shop?category=clothing' },
+    { name: 'Accessories', image: '👜', link: '/shop?category=accessories' },
   ];
 
   if (loading) {
@@ -118,6 +208,7 @@ function Home() {
                   type="text" 
                   placeholder="Search for products, brands and more..."
                   className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                  onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                 />
                 <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all">
                   <span className="hidden sm:inline">Search</span>
@@ -158,10 +249,10 @@ function Home() {
       <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
-            {['All', 'Skincare', 'Makeup', 'Clothing', 'Accessories', 'Sale 🔥', 'New Arrivals', 'Bestsellers'].map((item, idx) => (
+            {['All', 'Skincare', 'Makeup', 'Clothing', 'Accessories', 'Sale', 'New Arrivals', 'Bestsellers'].map((item, idx) => (
               <Link 
                 key={idx} 
-                to={item === 'All' ? '/shop' : `/shop?category=${item.toLowerCase().replace(' 🔥', '').replace(' ', '')}`}
+                to={item === 'All' ? '/shop' : `/shop?category=${item.toLowerCase().replace(/ /g, '')}`}
                 className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors"
               >
                 {item}
@@ -181,13 +272,13 @@ function Home() {
                   <img 
                     src={banner.image} 
                     alt={banner.title}
-                    className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] object-cover"
+                    className="w-full h-[250px] sm:h-[350px] md:h-[450px] lg:h-[550px] object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
                     <div className="text-center text-white px-4 animate-fade-in-up">
-                      <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 sm:mb-4 drop-shadow-lg">{banner.title}</h2>
-                      <p className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 drop-shadow">{banner.subtitle}</p>
-                      <button className="bg-white text-pink-600 px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
+                      <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 drop-shadow-lg">{banner.title}</h2>
+                      <p className="text-sm sm:text-base md:text-lg mb-3 sm:mb-4 drop-shadow">{banner.subtitle}</p>
+                      <button className="bg-white text-pink-600 px-5 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
                         {banner.buttonText}
                       </button>
                     </div>
@@ -202,17 +293,17 @@ function Home() {
             <>
               <button 
                 onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)}
-                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
               >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
               <button 
                 onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)}
-                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
               >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
@@ -235,37 +326,29 @@ function Home() {
       ) : (
         /* Premium Fallback Banner */
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-10 left-10 text-7xl">🎀</div>
-            <div className="absolute bottom-10 right-10 text-7xl">✨</div>
-          </div>
-          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-              <div className="text-center lg:text-left">
-                <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
-                <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
-                <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 sm:px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all transform hover:-translate-y-1">Shop Now →</Link>
-              </div>
-              <div className="hidden lg:block text-center">
-                <div className="text-8xl animate-bounce">🛍️</div>
-              </div>
+          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 md:py-20">
+            <div className="text-center">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4">Glow Up This Summer</h1>
+              <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection.</p>
+              <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:shadow-xl transition-all">
+                Shop Now →
+              </Link>
             </div>
           </div>
         </div>
       )}
 
       {/* Premium Categories Section */}
-      <section className="py-12 sm:py-16 lg:py-20">
+      <section className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Shop by Category</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Shop by Category</h2>
             <p className="text-gray-500 text-sm sm:text-base">Discover your favorite products</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
             {categories.map((cat, idx) => (
-              <Link key={idx} to={cat.link} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.gradient} p-6 text-center hover:shadow-xl transition-all hover:-translate-y-2">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition shadow-md">
+              <Link key={idx} to={cat.link} className="group bg-white/80 backdrop-blur-sm rounded-2xl p-5 sm:p-6 text-center hover:shadow-xl transition-all hover:-translate-y-2 border border-pink-100">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-pink-50 to-rose-50 rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition">
                   {cat.image}
                 </div>
                 <h3 className="font-semibold text-gray-800 text-sm sm:text-base">{cat.name}</h3>
@@ -281,21 +364,21 @@ function Home() {
         <section className="py-12 sm:py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">⏰ Deals of the Day</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">⏰ Deals of the Day</h2>
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 text-sm">Ends in:</span>
                 <div className="flex gap-1">
-                  <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
+                  <div className="bg-gray-800 text-white px-2 sm:px-3 py-1 rounded-lg text-center min-w-[50px]">
                     <span className="text-lg sm:text-xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
                     <span className="text-xs block">Hours</span>
                   </div>
-                  <span className="text-gray-800 text-xl">:</span>
-                  <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
+                  <span className="text-gray-700 text-xl">:</span>
+                  <div className="bg-gray-800 text-white px-2 sm:px-3 py-1 rounded-lg text-center min-w-[50px]">
                     <span className="text-lg sm:text-xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
                     <span className="text-xs block">Mins</span>
                   </div>
-                  <span className="text-gray-800 text-xl">:</span>
-                  <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
+                  <span className="text-gray-700 text-xl">:</span>
+                  <div className="bg-gray-800 text-white px-2 sm:px-3 py-1 rounded-lg text-center min-w-[50px]">
                     <span className="text-lg sm:text-xl font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
                     <span className="text-xs block">Secs</span>
                   </div>
@@ -348,8 +431,8 @@ function Home() {
       {/* Newsletter */}
       <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
         <div className="max-w-2xl mx-auto text-center px-4">
-          <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
-          <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2">Join the Pink Club</h2>
+          <p className="text-white/80 mb-6 text-sm sm:text-base">Subscribe to get 15% off on your first order + exclusive updates</p>
           <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
             <input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" />
             <button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button>
@@ -360,7 +443,7 @@ function Home() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
@@ -399,7 +482,8 @@ function Home() {
             </div>
           </div>
           <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm text-gray-500">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </div>
       </footer>
@@ -432,49 +516,5 @@ function Home() {
     </div>
   );
 }
-
-// ✅ Product Card Component - WITH REAL IMAGES
-const ProductCard = ({ product, addToCart, isInWishlist }) => (
-  <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
-    <Link to={`/product/${product.id}`}>
-      <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-        {product.images && product.images[0] ? (
-          <img 
-            src={product.images[0]} 
-            alt={product.name} 
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
-            {product.emoji || '✨'}
-          </div>
-        )}
-        {product.badge && <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">{product.badge}</span>}
-        {product.isNew && <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">NEW</span>}
-      </div>
-    </Link>
-    <div className="p-4">
-      <Link to={`/product/${product.id}`}>
-        <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">{product.name}</h3>
-      </Link>
-      <div className="flex items-center gap-1 mb-2">
-        <div className="flex text-yellow-400 text-sm">
-          {'★'.repeat(Math.floor(product.rating || 4))}
-          {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-        </div>
-        <span className="text-xs text-gray-400">({product.rating || 4})</span>
-      </div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-        {product.originalPrice && product.originalPrice > product.price && (
-          <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-        )}
-      </div>
-      <button onClick={() => addToCart(product)} className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5">
-        Add to Cart
-      </button>
-    </div>
-  </div>
-);
 
 export default Home;
