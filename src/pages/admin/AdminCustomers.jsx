@@ -31,30 +31,11 @@ function AdminCustomers() {
   }, [navigate]);
 
   const loadCustomerData = () => {
+    // ✅ ONLY from registeredCustomers - NO mixing with vendors
     let allCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
-    const currentUser = localStorage.getItem('user');
-    if (currentUser) {
-      try {
-        const user = JSON.parse(currentUser);
-        const exists = allCustomers.some(c => c.email === user.email);
-        if (!exists && user.email) {
-          allCustomers.push({
-            id: user.id || Date.now(),
-            name: user.name || 'User',
-            email: user.email,
-            phone: user.mobile || user.phone || '',
-            password: user.password,
-            status: 'active',
-            createdAt: user.createdAt || new Date().toISOString()
-          });
-        }
-      } catch(e) {}
-    }
-    
-    if (allCustomers.length > 0) {
-      localStorage.setItem('registeredCustomers', JSON.stringify(allCustomers));
-    }
+    // ✅ Filter: Only customers (role !== 'vendor')
+    allCustomers = allCustomers.filter(c => c.role !== 'vendor');
     
     const allOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
     
@@ -67,7 +48,7 @@ function AdminCustomers() {
         id: customer.id,
         name: customer.name || 'Customer',
         email: customer.email || 'no-email@example.com',
-        phone: customer.phone || '',
+        phone: customer.mobile || customer.phone || '',
         orders: orderCount,
         totalSpent: totalSpent,
         status: customer.status || 'active',
@@ -104,7 +85,7 @@ function AdminCustomers() {
       
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const updatedRegistered = registered.map(c => 
-        c.id === id ? { ...c, status: 'blocked' } : c
+        c.id === id ? { ...c, status: 'blocked', role: 'customer' } : c
       );
       localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
       
@@ -126,7 +107,7 @@ function AdminCustomers() {
     
     const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     const updatedRegistered = registered.map(c => 
-      c.id === id ? { ...c, status: 'active' } : c
+      c.id === id ? { ...c, status: 'active', role: 'customer' } : c
     );
     localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
     
@@ -163,7 +144,7 @@ function AdminCustomers() {
     
     const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     const updatedRegistered = registered.map(c => 
-      c.id === selectedCustomer.id ? { ...c, password: newPassword } : c
+      c.id === selectedCustomer.id ? { ...c, password: newPassword, role: 'customer' } : c
     );
     localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
     
@@ -183,7 +164,7 @@ function AdminCustomers() {
       
       const registered = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
       const updatedRegistered = registered.map(c => 
-        c.id === customer.id ? { ...c, name: newName.trim() } : c
+        c.id === customer.id ? { ...c, name: newName.trim(), role: 'customer' } : c
       );
       localStorage.setItem('registeredCustomers', JSON.stringify(updatedRegistered));
       
@@ -349,9 +330,8 @@ function AdminCustomers() {
                     <tr>
                       <td colSpan="7" className="px-5 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">👥</div>
-                        <p>No customers found. Register a customer first.</p>
-                        <Link to="/register" className="mt-3 inline-block text-pink-500 text-sm hover:underline">Register Customer →</Link>
-                      </td>
+                        <p>No customers found.</p>
+                       </td>
                     </tr>
                   ) : (
                     filteredCustomers.map((customer) => (
@@ -363,7 +343,7 @@ function AdminCustomers() {
                             </div>
                             <div>
                               <p className="font-medium text-gray-800 text-xs sm:text-sm line-clamp-1">{customer.name}</p>
-                              <p className="text-[10px] sm:text-xs text-gray-400">ID: {customer.id ? customer.id.toString().slice(-6) : 'N/A'}</p>
+                              <p className="text-[10px] sm:text-xs text-gray-400">ID: {customer.id?.toString().slice(-6)}</p>
                             </div>
                           </div>
                         </td>
@@ -425,7 +405,7 @@ function AdminCustomers() {
             <div className="p-4 sm:p-6">
               <div className="flex items-center gap-3 sm:gap-4 mb-6 pb-4 border-b border-gray-100">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg">
-                  {selectedCustomer.name ? selectedCustomer.name.charAt(0).toUpperCase() : 'U'}
+                  {selectedCustomer.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-gray-800">{selectedCustomer.name}</h2>
