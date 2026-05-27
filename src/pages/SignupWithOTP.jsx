@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
+import Avatar from '../components/Avatar';
 
 function SignupWithOTP() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { cartCount } = useCart();
+  const { wishlistCount } = useWishlist();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -19,9 +25,6 @@ function SignupWithOTP() {
   const [resendTimer, setResendTimer] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { cartCount } = useCart();
-  const { wishlistCount } = useWishlist();
-  const navigate = useNavigate();
 
   useEffect(() => {
     let timer;
@@ -47,15 +50,11 @@ function SignupWithOTP() {
     
     setLoading(true);
     
-    // Generate 6-digit OTP
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setSentOtp(generatedOtp);
     
-    // Log for demo (in production, send via SMS API)
     console.log(`📱 OTP for ${formData.mobile}: ${generatedOtp}`);
-    
-    // Show OTP in alert for demo purposes
-    alert(`✨ Your OTP is: ${generatedOtp}\n\n(In production, this will be sent via SMS to ${formData.mobile})`);
+    alert(`✨ Your OTP is: ${generatedOtp}\n\n(Use this OTP to verify your mobile number)`);
     
     setLoading(false);
     setResendTimer(30);
@@ -91,7 +90,7 @@ function SignupWithOTP() {
     
     setLoading(true);
     
-    // Create user object
+    // ✅ Create customer user object
     const newUser = {
       id: Date.now(),
       name: formData.name,
@@ -100,27 +99,29 @@ function SignupWithOTP() {
       password: formData.password,
       mobileVerified: true,
       emailVerified: false,
-      role: 'buyer',
+      role: 'customer',
       createdAt: new Date().toISOString(),
     };
     
-    // Get existing users or initialize empty array
-    const existingUsers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
+    // Get existing customers
+    const existingCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
     
-    // Check if user already exists
-    const userExists = existingUsers.some(u => u.email === formData.email || u.mobile === formData.mobile);
+    // ✅ Check if customer already exists (email ya mobile duplicate)
+    const userExists = existingCustomers.some(u => u.email === formData.email || u.mobile === formData.mobile);
     
     if (userExists) {
-      setError('User with this email or mobile already exists. Please login.');
+      setError('Customer account already exists with this email or mobile. Please login.');
       setLoading(false);
       return;
     }
     
-    // Add new user
-    existingUsers.push(newUser);
-    localStorage.setItem('registeredCustomers', JSON.stringify(existingUsers));
+    // ✅ NO VENDOR CHECK - Same email se vendor account already ho sakta hai
     
-    // Auto login after registration
+    // Add new customer
+    existingCustomers.push(newUser);
+    localStorage.setItem('registeredCustomers', JSON.stringify(existingCustomers));
+    
+    // Auto login
     localStorage.setItem('user', JSON.stringify(newUser));
     localStorage.setItem('isLoggedIn', 'true');
     
@@ -148,6 +149,11 @@ function SignupWithOTP() {
     setError('');
     await sendOTP();
   };
+
+  if (user) {
+    navigate('/');
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -215,7 +221,7 @@ function SignupWithOTP() {
         <div className="flex items-center gap-2 text-sm">
           <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
           <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium">Sign Up</span>
+          <span className="text-pink-600 font-medium">Customer Sign Up</span>
         </div>
       </div>
 
@@ -230,8 +236,8 @@ function SignupWithOTP() {
                   <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <span className="text-white text-2xl">📝</span>
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club!</h1>
-                  <p className="text-gray-500 text-sm mt-1">Create your account with mobile verification</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club! 🎀</h1>
+                  <p className="text-gray-500 text-sm mt-1">Create your customer account with mobile verification</p>
                 </div>
 
                 {error && (
@@ -265,6 +271,7 @@ function SignupWithOTP() {
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
                       required
                     />
+                    <p className="text-xs text-gray-400 mt-1">Note: Same email can be used for vendor account separately</p>
                   </div>
 
                   <div>
@@ -357,7 +364,16 @@ function SignupWithOTP() {
                   Sign In
                 </Link>
 
-                <p className="text-center text-xs text-gray-400 mt-6">
+                <div className="mt-4 text-center">
+                  <p className="text-xs text-gray-400">
+                    Want to sell with us?{' '}
+                    <Link to="/vendor/register" className="text-pink-600 hover:underline font-medium">
+                      Register as Vendor →
+                    </Link>
+                  </p>
+                </div>
+
+                <p className="text-center text-xs text-gray-400 mt-4">
                   By creating an account, you agree to MyPinkShop's{' '}
                   <Link to="/terms" className="text-pink-600 hover:underline">Terms</Link> and{' '}
                   <Link to="/privacy" className="text-pink-600 hover:underline">Privacy</Link>.
@@ -453,8 +469,8 @@ function SignupWithOTP() {
           <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
             <Link to="/terms" className="hover:text-pink-500 transition">Terms of Service</Link>
             <Link to="/privacy" className="hover:text-pink-500 transition">Privacy Policy</Link>
-            <a href="#" className="hover:text-pink-500 transition">Help</a>
-            <a href="#" className="hover:text-pink-500 transition">Contact Us</a>
+            <Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link>
+            <Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link>
           </div>
           <p className="text-center text-xs text-gray-500">
             © 2026 MyPinkShop. All rights reserved.
