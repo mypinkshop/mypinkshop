@@ -5,9 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ ProductCard Component - DEFINED INSIDE Shop.jsx only
+// ✅ ProductCard Component - MUST BE HERE
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const handleAddToCart = () => {
     addToCart(product);
@@ -27,11 +28,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
       <Link to={`/product/${product.id}`}>
         <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-          {product.images && product.images[0] ? (
+          {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-contain object-center p-2 group-hover:scale-105 transition-transform duration-500"
+              onError={() => setImgError(true)}
+              loading="lazy"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl">
@@ -47,11 +50,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
               NEW
             </span>
-          )}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
-            </div>
           )}
         </div>
       </Link>
@@ -86,12 +84,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         <div className="flex gap-2">
           <button 
             onClick={handleAddToCart} 
-            disabled={product.stock === 0}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-              product.stock > 0 
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5' 
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+            className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5"
           >
             {isAdded ? 'Added! ✓' : 'Add to Cart'}
           </button>
@@ -193,11 +186,11 @@ function Shop() {
   };
 
   const categories = [
-    { id: 'all', name: 'All Products', icon: '✨', count: products.length },
-    { id: 'skincare', name: 'Skincare', icon: '🧴', count: products.filter(p => p.category === 'skincare').length },
-    { id: 'makeup', name: 'Makeup', icon: '💄', count: products.filter(p => p.category === 'makeup').length },
-    { id: 'clothing', name: 'Clothing', icon: '👗', count: products.filter(p => p.category === 'clothing').length },
-    { id: 'accessories', name: 'Accessories', icon: '👜', count: products.filter(p => p.category === 'accessories').length },
+    { id: 'all', name: 'All Products', count: products.length },
+    { id: 'skincare', name: 'Skincare', count: products.filter(p => p.category === 'skincare').length },
+    { id: 'makeup', name: 'Makeup', count: products.filter(p => p.category === 'makeup').length },
+    { id: 'clothing', name: 'Clothing', count: products.filter(p => p.category === 'clothing').length },
+    { id: 'accessories', name: 'Accessories', count: products.filter(p => p.category === 'accessories').length },
   ];
 
   if (loading) {
@@ -224,7 +217,7 @@ function Shop() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
             <Link to="/" className="flex items-center gap-2 shrink-0 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
               </div>
               <div className="hidden sm:block">
@@ -278,24 +271,16 @@ function Shop() {
         <div className="flex items-center gap-2 text-sm">
           <Link to="/" className="text-gray-500 hover:text-pink-500">Home</Link>
           <span>/</span>
-          <Link to="/shop" className="text-gray-500 hover:text-pink-500">Shop</Link>
+          <span className="text-pink-600">Shop</span>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         
-        {/* Mobile Filter */}
-        <button 
-          onClick={() => setShowFilters(!showFilters)} 
-          className="md:hidden w-full bg-white/80 border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2"
-        >
-          Filters & Sorting
-        </button>
-
-        <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
+        <div className="flex flex-col md:flex-row gap-6">
           
           {/* Sidebar */}
-          <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 space-y-5`}>
+          <div className="md:w-80 space-y-5">
             <div className="bg-white/80 rounded-2xl p-5 border border-pink-100">
               <h3 className="font-semibold mb-3">Categories</h3>
               {categories.map(cat => (
@@ -322,25 +307,21 @@ function Shop() {
               {[4, 3].map(r => (
                 <label key={r} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-pink-50 rounded-lg">
                   <input type="radio" name="rating" checked={selectedRating === r} onChange={() => setSelectedRating(selectedRating === r ? 0 : r)} />
-                  <div className="flex text-yellow-400 text-sm">{'★'.repeat(r)}{'☆'.repeat(5 - r)}</div>
+                  <div className="flex text-yellow-400">{'★'.repeat(r)}{'☆'.repeat(5 - r)}</div>
                   <span>& above</span>
                 </label>
               ))}
-              <label className="flex items-center gap-2 cursor-pointer p-2">
-                <input type="radio" name="rating" checked={selectedRating === 0} onChange={() => setSelectedRating(0)} />
-                <span>All ratings</span>
-              </label>
             </div>
 
             <button onClick={clearFilters} className="w-full bg-pink-500 text-white py-2 rounded-xl hover:bg-pink-600">
-              Clear All Filters
+              Clear Filters
             </button>
           </div>
 
           {/* Products */}
           <div className="flex-1">
             <div className="bg-white/80 rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3">
-              <div className="text-sm">Showing {filteredProducts.length} of {products.length} products</div>
+              <div>Showing {filteredProducts.length} of {products.length} products</div>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border rounded-xl">
                 <option value="default">Sort by: Default</option>
                 <option value="price_low">Price: Low to High</option>
@@ -356,7 +337,7 @@ function Shop() {
                 <button onClick={clearFilters} className="bg-pink-500 text-white px-6 py-2 rounded-full">Clear Filters</button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredProducts.map(product => (
                   <ProductCard 
                     key={product.id} 
