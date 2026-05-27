@@ -48,7 +48,7 @@ function AdminProducts() {
       p.id === productId ? { ...p, adminApproved: true, status: 'active', approvedDate: new Date().toISOString().split('T')[0] } : p
     );
     saveProducts(updated);
-    alert('✅ Product approved and now visible on website');
+    alert('✓ Product approved and now visible on website');
   };
 
   const rejectProduct = (productId) => {
@@ -56,7 +56,7 @@ function AdminProducts() {
       const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
       const updated = allProducts.filter(p => p.id !== productId);
       saveProducts(updated);
-      alert('❌ Product rejected and removed');
+      alert('✗ Product rejected and removed');
     }
   };
 
@@ -66,7 +66,7 @@ function AdminProducts() {
     saveProducts(updated);
     setShowDeleteModal(false);
     setProductToDelete(null);
-    alert('🗑️ Product deleted successfully');
+    alert('🗑 Product deleted successfully');
   };
 
   const bulkDelete = () => {
@@ -126,12 +126,19 @@ function AdminProducts() {
   });
 
   const categories = [
-    { value: 'all', label: 'All Categories', icon: '✨' },
-    { value: 'skincare', label: 'Skincare', icon: '🧴' },
-    { value: 'makeup', label: 'Makeup', icon: '💄' },
-    { value: 'clothing', label: 'Clothing', icon: '👗' },
-    { value: 'accessories', label: 'Accessories', icon: '👜' },
+    { value: 'all', label: 'All Categories' },
+    { value: 'skincare', label: 'Skincare' },
+    { value: 'makeup', label: 'Makeup' },
+    { value: 'clothing', label: 'Clothing' },
+    { value: 'accessories', label: 'Accessories' },
   ];
+
+  // ✅ SVG Icons
+  const IconCheckbox = () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
 
   if (loading) {
     return (
@@ -157,7 +164,7 @@ function AdminProducts() {
             <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Product Management</h1>
             <p className="text-xs text-gray-400 mt-0.5">Manage your product catalog</p>
           </div>
-          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:shadow-lg transition">
             + Add Product
           </Link>
         </div>
@@ -169,31 +176,31 @@ function AdminProducts() {
           
           {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Products</p>
-                <span className="text-lg">📦</span>
+                <span className="text-lg text-gray-400">📦</span>
               </div>
               <p className="text-2xl font-bold text-gray-800">{products.length + pendingProducts.length}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Active</p>
-                <span className="text-lg">✅</span>
+                <span className="text-lg text-green-500">✓</span>
               </div>
               <p className="text-2xl font-bold text-green-600">{products.filter(p => p.status === 'active').length}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Pending Approval</p>
-                <span className="text-lg">⏳</span>
+                <span className="text-lg text-yellow-500">⏳</span>
               </div>
               <p className="text-2xl font-bold text-yellow-600">{pendingProducts.length}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Low/Out Stock</p>
-                <span className="text-lg">⚠️</span>
+                <span className="text-lg text-red-500">⚠</span>
               </div>
               <p className="text-2xl font-bold text-red-600">{products.filter(p => p.stock < 10).length}</p>
             </div>
@@ -215,10 +222,10 @@ function AdminProducts() {
             </button>
           </div>
 
-          {/* Filters (only for approved tab) */}
+          {/* Filters */}
           {activeTab === 'approved' && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3">
                 <div className="flex flex-wrap gap-3">
                   <div className="relative">
                     <input 
@@ -226,34 +233,34 @@ function AdminProducts() {
                       placeholder="Search by name or SKU..." 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-64 pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
+                      className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                   </div>
                   <select 
                     value={filterCategory} 
                     onChange={(e) => setFilterCategory(e.target.value)} 
-                    className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
                   >
-                    {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>)}
+                    {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
                 </div>
                 {selectedProducts.length > 0 && (
-                  <button onClick={bulkDelete} className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-600 transition">
-                    🗑️ Delete Selected ({selectedProducts.length})
+                  <button onClick={bulkDelete} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition">
+                    Delete Selected ({selectedProducts.length})
                   </button>
                 )}
               </div>
             </div>
           )}
 
-          {/* Products Table */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Products Table - WITH IMAGES */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-xs sm:text-sm">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                  <tr className="border-b">
-                    {activeTab === 'approved' && <th className="px-4 py-3 w-8"><input type="checkbox" onChange={handleSelectAll} checked={selectedProducts.length === currentProducts.length && currentProducts.length > 0} className="rounded border-gray-300 text-pink-500 focus:ring-pink-500" /></th>}
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {activeTab === 'approved' && <th className="px-4 py-3 w-8"><input type="checkbox" onChange={handleSelectAll} checked={selectedProducts.length === currentProducts.length && currentProducts.length > 0} className="rounded border-gray-300" /></th>}
                     <th className="px-4 py-3 text-left">Product</th>
                     <th className="px-4 py-3 text-left">SKU</th>
                     <th className="px-4 py-3 text-right">Price</th>
@@ -262,14 +269,14 @@ function AdminProducts() {
                     <th className="px-4 py-3 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100">
                   {currentProducts.length === 0 ? (
-                    <tr className="hover:bg-pink-50/30">
+                    <tr>
                       <td colSpan={activeTab === 'approved' ? 7 : 6} className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">📦</div>
                         <p>{activeTab === 'pending' ? 'No products pending approval' : 'No products found'}</p>
                         {activeTab === 'approved' && (
-                          <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">
+                          <Link to="/admin/add-product" className="mt-3 inline-block text-pink-600 text-sm hover:underline">
                             Add your first product →
                           </Link>
                         )}
@@ -277,22 +284,31 @@ function AdminProducts() {
                     </tr>
                   ) : (
                     currentProducts.map(product => (
-                      <tr key={product.id} className="hover:bg-pink-50/30 transition">
+                      <tr key={product.id} className="hover:bg-gray-50 transition">
                         {activeTab === 'approved' && (
                           <td className="px-4 py-3">
                             <input 
                               type="checkbox" 
                               checked={selectedProducts.includes(product.id)} 
                               onChange={() => handleSelectProduct(product.id)} 
-                              className="rounded border-gray-300 text-pink-500 focus:ring-pink-500"
+                              className="rounded border-gray-300"
                             />
                           </td>
                         )}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center text-xl shadow-sm">
-                              {product.emoji || '✨'}
-                            </div>
+                            {/* ✅ PRODUCT IMAGE */}
+                            {product.images && product.images[0] ? (
+                              <img 
+                                src={product.images[0]} 
+                                alt={product.name} 
+                                className="w-10 h-10 rounded-lg object-cover border border-gray-200"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                                No img
+                              </div>
+                            )}
                             <div>
                               <p className="font-medium text-gray-800">{product.name}</p>
                               <p className="text-xs text-gray-400 capitalize">{product.category || 'General'}</p>
@@ -312,24 +328,24 @@ function AdminProducts() {
                           <div className="flex justify-center gap-2">
                             {activeTab === 'pending' ? (
                               <>
-                                <button onClick={() => approveProduct(product.id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition" title="Approve">✅</button>
-                                <button onClick={() => rejectProduct(product.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Reject">❌</button>
+                                <button onClick={() => approveProduct(product.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition" title="Approve">✓</button>
+                                <button onClick={() => rejectProduct(product.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Reject">✗</button>
                               </>
                             ) : (
                               <>
                                 <button 
                                   onClick={() => toggleProductStatus(product.id, product.status)} 
-                                  className={`p-1.5 rounded-lg transition ${product.status === 'active' ? 'text-orange-500 hover:bg-orange-50' : 'text-green-500 hover:bg-green-50'}`}
+                                  className={`p-1.5 rounded-lg transition ${product.status === 'active' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}`}
                                   title={product.status === 'active' ? 'Disable' : 'Enable'}
                                 >
                                   {product.status === 'active' ? '🔒' : '🔓'}
                                 </button>
                                 <button 
                                   onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} 
-                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
                                   title="Delete"
                                 >
-                                  🗑️
+                                  🗑
                                 </button>
                               </>
                             )}
@@ -354,14 +370,18 @@ function AdminProducts() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-100 p-5 flex justify-between items-center">
+          <div className="bg-white rounded-lg max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 p-5 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Delete Product</h3>
-              <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
             </div>
             <div className="p-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-2xl">⚠️</div>
+                {productToDelete.images && productToDelete.images[0] ? (
+                  <img src={productToDelete.images[0]} alt={productToDelete.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                ) : (
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">No img</div>
+                )}
                 <div>
                   <p className="font-semibold text-gray-800">{productToDelete.name}</p>
                   <p className="text-xs text-gray-500">ID: {productToDelete.id}</p>
@@ -369,8 +389,8 @@ function AdminProducts() {
               </div>
               <p className="text-gray-500 text-sm mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition">Cancel</button>
-                <button onClick={() => deleteProduct(productToDelete.id)} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition">Delete</button>
+                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={() => deleteProduct(productToDelete.id)} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition">Delete</button>
               </div>
             </div>
           </div>
