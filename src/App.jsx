@@ -108,6 +108,8 @@ function App() {
               <Route path="/admin/tax" element={<AdminTax />} />
               <Route path="/admin/coupons" element={<AdminCoupons />} />
               <Route path="/admin/banners" element={<AdminBanners />} />
+              <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
+
               
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
