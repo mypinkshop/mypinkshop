@@ -88,6 +88,11 @@ function AdminProducts() {
     alert(`Product status updated to ${newStatus}`);
   };
 
+  // ✅ EDIT PRODUCT FUNCTION
+  const editProduct = (productId) => {
+    navigate(`/admin/edit-product/${productId}`);
+  };
+
   const handleSelectAll = (e) => {
     const currentProducts = activeTab === 'approved' ? filteredApproved : pendingProducts;
     if (e.target.checked) {
@@ -132,13 +137,6 @@ function AdminProducts() {
     { value: 'clothing', label: 'Clothing' },
     { value: 'accessories', label: 'Accessories' },
   ];
-
-  // ✅ SVG Icons
-  const IconCheckbox = () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
 
   if (loading) {
     return (
@@ -254,7 +252,7 @@ function AdminProducts() {
             </div>
           )}
 
-          {/* Products Table - WITH IMAGES */}
+          {/* Products Table - WITH EDIT BUTTON & CLICKABLE ROWS */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -271,7 +269,7 @@ function AdminProducts() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {currentProducts.length === 0 ? (
-                    <tr>
+                    <tr className="hover:bg-gray-50">
                       <td colSpan={activeTab === 'approved' ? 7 : 6} className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">📦</div>
                         <p>{activeTab === 'pending' ? 'No products pending approval' : 'No products found'}</p>
@@ -284,9 +282,9 @@ function AdminProducts() {
                     </tr>
                   ) : (
                     currentProducts.map(product => (
-                      <tr key={product.id} className="hover:bg-gray-50 transition">
+                      <tr key={product.id} className="hover:bg-gray-50 transition cursor-pointer" onClick={() => editProduct(product.id)}>
                         {activeTab === 'approved' && (
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             <input 
                               type="checkbox" 
                               checked={selectedProducts.includes(product.id)} 
@@ -297,7 +295,6 @@ function AdminProducts() {
                         )}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            {/* ✅ PRODUCT IMAGE */}
                             {product.images && product.images[0] ? (
                               <img 
                                 src={product.images[0]} 
@@ -324,7 +321,7 @@ function AdminProducts() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-center gap-2">
                             {activeTab === 'pending' ? (
                               <>
@@ -333,6 +330,14 @@ function AdminProducts() {
                               </>
                             ) : (
                               <>
+                                {/* ✅ EDIT BUTTON ADDED */}
+                                <button 
+                                  onClick={() => editProduct(product.id)} 
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                  title="Edit Product"
+                                >
+                                  ✏️
+                                </button>
                                 <button 
                                   onClick={() => toggleProductStatus(product.id, product.status)} 
                                   className={`p-1.5 rounded-lg transition ${product.status === 'active' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}`}
