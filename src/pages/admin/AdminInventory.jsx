@@ -22,10 +22,8 @@ function AdminInventory() {
   }, [navigate]);
 
   const loadInventory = () => {
-    // Load REAL products from localStorage
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     
-    // Calculate status based on stock
     const productsWithStatus = allProducts.map(product => {
       let status = 'active';
       if (product.stock === 0) status = 'outofstock';
@@ -34,8 +32,7 @@ function AdminInventory() {
       
       return {
         ...product,
-        status: product.status === 'active' ? status : 'inactive',
-        emoji: product.emoji || '✨'
+        status: product.status === 'active' ? status : 'inactive'
       };
     });
     
@@ -57,7 +54,6 @@ function AdminInventory() {
     });
     setProducts(updatedProducts);
     
-    // Update in localStorage
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     const updatedAllProducts = allProducts.map(product => {
       if (product.id === productId) {
@@ -67,7 +63,7 @@ function AdminInventory() {
     });
     localStorage.setItem('adminProductsList', JSON.stringify(updatedAllProducts));
     
-    alert(`✅ Stock updated to ${newStock}`);
+    alert(`✓ Stock updated to ${newStock}`);
   };
 
   const deleteProduct = (productId) => {
@@ -80,7 +76,7 @@ function AdminInventory() {
     
     setShowDeleteModal(false);
     setProductToDelete(null);
-    alert('🗑️ Product deleted successfully');
+    alert('🗑 Product deleted successfully');
   };
 
   const getStatusBadge = (status, stock) => {
@@ -91,18 +87,18 @@ function AdminInventory() {
   };
 
   const categories = [
-    { value: 'all', label: 'All Categories', icon: '✨' },
-    { value: 'skincare', label: 'Skincare', icon: '🧴' },
-    { value: 'makeup', label: 'Makeup', icon: '💄' },
-    { value: 'clothing', label: 'Clothing', icon: '👗' },
-    { value: 'accessories', label: 'Accessories', icon: '👜' },
+    { value: 'all', label: 'All Categories' },
+    { value: 'skincare', label: 'Skincare' },
+    { value: 'makeup', label: 'Makeup' },
+    { value: 'clothing', label: 'Clothing' },
+    { value: 'accessories', label: 'Accessories' },
   ];
 
   const statusOptions = [
-    { value: 'all', label: 'All', icon: '📋' },
-    { value: 'active', label: 'In Stock', icon: '✅' },
-    { value: 'lowstock', label: 'Low Stock', icon: '⚠️' },
-    { value: 'outofstock', label: 'Out of Stock', icon: '❌' },
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'In Stock' },
+    { value: 'lowstock', label: 'Low Stock' },
+    { value: 'outofstock', label: 'Out of Stock' },
   ];
 
   const filteredProducts = products.filter(p => {
@@ -139,7 +135,7 @@ function AdminInventory() {
             <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Inventory Management</h1>
             <p className="text-xs text-gray-400 mt-0.5">Track and manage product stock levels</p>
           </div>
-          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:shadow-lg transition">
             + Add Product
           </Link>
         </div>
@@ -151,39 +147,39 @@ function AdminInventory() {
           
           {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Products</p>
-                <span className="text-lg">📦</span>
+                <span className="text-lg text-gray-400">📦</span>
               </div>
               <p className="text-2xl font-bold text-gray-800">{totalProducts}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">In Stock</p>
-                <span className="text-lg">✅</span>
+                <span className="text-lg text-green-500">✓</span>
               </div>
               <p className="text-2xl font-bold text-green-600">{activeCount}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Low Stock</p>
-                <span className="text-lg">⚠️</span>
+                <span className="text-lg text-yellow-500">⚠</span>
               </div>
               <p className="text-2xl font-bold text-yellow-600">{lowStockCount}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Out of Stock</p>
-                <span className="text-lg">❌</span>
+                <span className="text-lg text-red-500">✗</span>
               </div>
               <p className="text-2xl font-bold text-red-600">{outOfStockCount}</p>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-3">
               <div className="flex flex-wrap gap-2">
                 {statusOptions.map(opt => (
                   <button
@@ -191,11 +187,11 @@ function AdminInventory() {
                     onClick={() => setFilterStatus(opt.value)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       filterStatus === opt.value
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                        ? 'bg-pink-600 text-white shadow-sm'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {opt.icon} {opt.label}
+                    {opt.label}
                   </button>
                 ))}
               </div>
@@ -203,9 +199,9 @@ function AdminInventory() {
                 <select 
                   value={filterCategory} 
                   onChange={(e) => setFilterCategory(e.target.value)} 
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
                 >
-                  {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>)}
+                  {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                 </select>
                 <div className="relative">
                   <input 
@@ -213,17 +209,17 @@ function AdminInventory() {
                     placeholder="Search by name or SKU..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-64 pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
+                    className="w-64 pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
                   />
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                 </div>
               </div>
             </div>
 
-            {/* Inventory Table */}
+            {/* Inventory Table - WITH REAL IMAGES */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr className="border-b">
                     <th className="px-4 py-3 text-left">Product</th>
                     <th className="px-4 py-3 text-left">SKU</th>
@@ -234,25 +230,34 @@ function AdminInventory() {
                     <th className="px-4 py-3 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100">
                   {filteredProducts.length === 0 ? (
-                    <tr className="hover:bg-pink-50/30">
+                    <tr className="hover:bg-gray-50">
                       <td colSpan="7" className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">📦</div>
                         <p>No products found</p>
-                        <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">
+                        <Link to="/admin/add-product" className="mt-3 inline-block text-pink-600 text-sm hover:underline">
                           Add your first product →
                         </Link>
                       </td>
                     </tr>
                   ) : (
                     filteredProducts.map(product => (
-                      <tr key={product.id} className="hover:bg-pink-50/30 transition">
+                      <tr key={product.id} className="hover:bg-gray-50 transition">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center text-xl shadow-sm">
-                              {product.emoji || '✨'}
-                            </div>
+                            {/* ✅ PRODUCT IMAGE */}
+                            {product.images && product.images[0] ? (
+                              <img 
+                                src={product.images[0]} 
+                                alt={product.name} 
+                                className="w-10 h-10 rounded-lg object-cover border border-gray-200"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                                No img
+                              </div>
+                            )}
                             <div>
                               <p className="font-medium text-gray-800">{product.name}</p>
                               <p className="text-xs text-gray-400 capitalize">{product.category}</p>
@@ -288,15 +293,15 @@ function AdminInventory() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex justify-center gap-2">
-                            <Link to={`/admin/edit-product/${product.id}`} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
+                            <Link to={`/admin/edit-product/${product.id}`} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
                               ✏️
                             </Link>
                             <button 
                               onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} 
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" 
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" 
                               title="Delete"
                             >
-                              🗑️
+                              🗑
                             </button>
                           </div>
                         </td>
@@ -319,14 +324,18 @@ function AdminInventory() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-100 p-5 flex justify-between items-center">
+          <div className="bg-white rounded-lg max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 p-5 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Delete Product</h3>
-              <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
             </div>
             <div className="p-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-2xl">⚠️</div>
+                {productToDelete.images && productToDelete.images[0] ? (
+                  <img src={productToDelete.images[0]} alt={productToDelete.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                ) : (
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">No img</div>
+                )}
                 <div>
                   <p className="font-semibold text-gray-800">{productToDelete.name}</p>
                   <p className="text-xs text-gray-500">SKU: {productToDelete.sku || 'N/A'}</p>
@@ -334,8 +343,8 @@ function AdminInventory() {
               </div>
               <p className="text-gray-500 text-sm mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
               <div className="flex gap-3">
-                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition">Cancel</button>
-                <button onClick={() => deleteProduct(productToDelete.id)} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition">Delete</button>
+                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={() => deleteProduct(productToDelete.id)} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition">Delete</button>
               </div>
             </div>
           </div>
