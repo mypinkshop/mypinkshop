@@ -5,11 +5,74 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
+// ✅ Product Card Component - Consistent for all devices
+const ProductCard = ({ product, addToCart, isInWishlist }) => {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-gray-100">
+      <Link to={`/product/${product.id}`}>
+        <div className="relative aspect-square w-full bg-gray-50 overflow-hidden">
+          {product.images && product.images[0] && !imgError ? (
+            <img 
+              src={product.images[0]} 
+              alt={product.name} 
+              className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-5xl">
+              {product.emoji || '✨'}
+            </div>
+          )}
+          {product.badge && (
+            <span className="absolute top-2 left-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-0.5 rounded-full shadow-md">
+              {product.badge}
+            </span>
+          )}
+          {product.isNew && (
+            <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full shadow-md">
+              NEW
+            </span>
+          )}
+        </div>
+      </Link>
+      <div className="p-3">
+        <Link to={`/product/${product.id}`}>
+          <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 min-h-[40px] hover:text-pink-500 transition">
+            {product.name}
+          </h3>
+        </Link>
+        <div className="flex items-center gap-1 mt-1">
+          <div className="flex text-yellow-400 text-xs">
+            {'★'.repeat(Math.floor(product.rating || 4))}
+            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+          </div>
+          <span className="text-xs text-gray-400">({product.rating || 4})</span>
+        </div>
+        <div className="mt-2">
+          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
+          {product.originalPrice && product.originalPrice > product.price && (
+            <span className="text-xs text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
+          )}
+        </div>
+        <button 
+          onClick={() => addToCart(product)} 
+          className="w-full mt-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-lg text-sm font-medium hover:shadow-md transition-all"
+        >
+          Add to Cart
+        </button>
+      </div>
+    </div>
+  );
+};
+
 function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { wishlistCount, isInWishlist } = useWishlist();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
@@ -63,10 +126,10 @@ function Home() {
   const newArrivals = products.filter(p => p.isNew).slice(0, 4);
 
   const categories = [
-    { name: 'Skincare', image: '🧴', link: '/shop?category=skincare', gradient: 'from-rose-100 to-pink-100' },
-    { name: 'Makeup', image: '💄', link: '/shop?category=makeup', gradient: 'from-pink-100 to-fuchsia-100' },
-    { name: 'Clothing', image: '👗', link: '/shop?category=clothing', gradient: 'from-fuchsia-100 to-purple-100' },
-    { name: 'Accessories', image: '👜', link: '/shop?category=accessories', gradient: 'from-purple-100 to-rose-100' },
+    { name: 'Skincare', image: '🧴', link: '/shop?category=skincare' },
+    { name: 'Makeup', image: '💄', link: '/shop?category=makeup' },
+    { name: 'Clothing', image: '👗', link: '/shop?category=clothing' },
+    { name: 'Accessories', image: '👜', link: '/shop?category=accessories' },
   ];
 
   if (loading) {
@@ -111,13 +174,14 @@ function Home() {
               </div>
             </Link>
 
-            {/* Search Bar - Responsive */}
+            {/* Search Bar */}
             <div className="flex-1 max-w-md lg:max-w-2xl">
               <div className="relative">
                 <input 
                   type="text" 
                   placeholder="Search for products, brands and more..."
                   className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                  onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                 />
                 <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all">
                   <span className="hidden sm:inline">Search</span>
@@ -126,7 +190,7 @@ function Home() {
               </div>
             </div>
 
-            {/* Right Icons - Responsive */}
+            {/* Right Icons */}
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
               <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,14 +218,14 @@ function Home() {
         </div>
       </header>
 
-      {/* Premium Category Navigation */}
+      {/* Category Navigation */}
       <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
-            {['All', 'Skincare', 'Makeup', 'Clothing', 'Accessories', 'Sale 🔥', 'New Arrivals', 'Bestsellers'].map((item, idx) => (
+            {['All', 'Skincare', 'Makeup', 'Clothing', 'Accessories', 'Sale', 'New Arrivals', 'Bestsellers'].map((item, idx) => (
               <Link 
                 key={idx} 
-                to={item === 'All' ? '/shop' : `/shop?category=${item.toLowerCase().replace(' 🔥', '').replace(' ', '')}`}
+                to={item === 'All' ? '/shop' : `/shop?category=${item.toLowerCase().replace(/ /g, '')}`}
                 className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors"
               >
                 {item}
@@ -171,7 +235,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Premium Hero Carousel */}
+      {/* Hero Banner */}
       {banners.length > 0 ? (
         <div className="relative overflow-hidden group">
           <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
@@ -181,13 +245,13 @@ function Home() {
                   <img 
                     src={banner.image} 
                     alt={banner.title}
-                    className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] object-cover"
+                    className="w-full h-[200px] sm:h-[300px] md:h-[400px] lg:h-[500px] object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
                     <div className="text-center text-white px-4 animate-fade-in-up">
-                      <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 sm:mb-4 drop-shadow-lg">{banner.title}</h2>
-                      <p className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 drop-shadow">{banner.subtitle}</p>
-                      <button className="bg-white text-pink-600 px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 drop-shadow-lg">{banner.title}</h2>
+                      <p className="text-sm sm:text-base md:text-lg mb-3 sm:mb-4 drop-shadow">{banner.subtitle}</p>
+                      <button className="bg-white text-pink-600 px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-sm sm:text-base font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
                         {banner.buttonText}
                       </button>
                     </div>
@@ -197,112 +261,83 @@ function Home() {
             ))}
           </div>
           
-          {/* Navigation Arrows */}
           {banners.length > 1 && (
             <>
-              <button 
-                onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)}
-                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)} className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <button 
-                onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)}
-                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)} className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-1.5 sm:p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
             </>
           )}
           
-          {/* Carousel Dots */}
           {banners.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
               {banners.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentBanner(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${currentBanner === idx ? 'w-6 bg-white' : 'w-3 bg-white/50'}`}
-                />
+                <button key={idx} onClick={() => setCurrentBanner(idx)} className={`h-1.5 rounded-full transition-all duration-300 ${currentBanner === idx ? 'w-6 bg-white' : 'w-3 bg-white/50'}`} />
               ))}
             </div>
           )}
         </div>
       ) : (
-        /* Premium Fallback Banner */
-        <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-10 left-10 text-7xl">🎀</div>
-            <div className="absolute bottom-10 right-10 text-7xl">✨</div>
-          </div>
-          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-              <div className="text-center lg:text-left">
-                <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
-                <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
-                <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 sm:px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all transform hover:-translate-y-1">Shop Now →</Link>
-              </div>
-              <div className="hidden lg:block text-center">
-                <div className="text-8xl animate-bounce">🛍️</div>
-              </div>
-            </div>
+        <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 py-12 sm:py-16 md:py-20">
+          <div className="max-w-7xl mx-auto px-4 text-center">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">Glow Up This Summer</h1>
+            <p className="text-gray-600 text-sm sm:text-base md:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection.</p>
+            <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:shadow-xl transition-all">Shop Now →</Link>
           </div>
         </div>
       )}
 
-      {/* Premium Categories Section */}
-      <section className="py-12 sm:py-16 lg:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Shop by Category</h2>
-            <p className="text-gray-500 text-sm sm:text-base">Discover your favorite products</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      {/* Categories Section */}
+      <section className="py-8 sm:py-12 lg:py-16">
+        <div className="max-w-7xl mx-auto px-4">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-6 text-center">Shop by Category</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {categories.map((cat, idx) => (
-              <Link key={idx} to={cat.link} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.gradient} p-6 text-center hover:shadow-xl transition-all hover:-translate-y-2">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition shadow-md">
+              <Link key={idx} to={cat.link} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 text-center hover:shadow-md transition border border-pink-100">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto bg-gradient-to-br from-pink-50 to-rose-50 rounded-full flex items-center justify-center text-2xl sm:text-3xl mb-2 sm:mb-3">
                   {cat.image}
                 </div>
                 <h3 className="font-semibold text-gray-800 text-sm sm:text-base">{cat.name}</h3>
-                <p className="text-xs text-gray-500 mt-1">Shop Now →</p>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Premium Deals Section */}
+      {/* Deals of the Day */}
       {featuredProducts.length > 0 && (
-        <section className="py-12 sm:py-16 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">⏰ Deals of the Day</h2>
+        <section className="py-8 sm:py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">⏰ Deals of the Day</h2>
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 text-sm">Ends in:</span>
                 <div className="flex gap-1">
-                  <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
-                    <span className="text-lg sm:text-xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
-                    <span className="text-xs block">Hours</span>
+                  <div className="bg-gray-800 text-white px-2 py-1 rounded-lg text-center min-w-[45px]">
+                    <span className="text-base sm:text-lg font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
+                    <span className="text-[10px] block">Hours</span>
                   </div>
-                  <span className="text-gray-800 text-xl">:</span>
-                  <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
-                    <span className="text-lg sm:text-xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                    <span className="text-xs block">Mins</span>
+                  <span className="text-gray-700 text-lg">:</span>
+                  <div className="bg-gray-800 text-white px-2 py-1 rounded-lg text-center min-w-[45px]">
+                    <span className="text-base sm:text-lg font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                    <span className="text-[10px] block">Mins</span>
                   </div>
-                  <span className="text-gray-800 text-xl">:</span>
-                  <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
-                    <span className="text-lg sm:text-xl font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                    <span className="text-xs block">Secs</span>
+                  <span className="text-gray-700 text-lg">:</span>
+                  <div className="bg-gray-800 text-white px-2 py-1 rounded-lg text-center min-w-[45px]">
+                    <span className="text-base sm:text-lg font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                    <span className="text-[10px] block">Secs</span>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {featuredProducts.map(product => (
                 <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
               ))}
@@ -311,68 +346,34 @@ function Home() {
         </section>
       )}
 
-      {/* Bestsellers Section */}
-      {bestsellerProducts.length > 0 && (
-        <section className="py-12 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">⭐ Bestsellers</h2>
-              <Link to="/shop?sort=bestseller" className="text-pink-500 text-sm hover:underline">View All →</Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {bestsellerProducts.slice(0, 4).map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* New Arrivals */}
-      {newArrivals.length > 0 && (
-        <section className="py-12 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">🆕 New Arrivals</h2>
-              <Link to="/shop?sort=newest" className="text-pink-500 text-sm hover:underline">View All →</Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {newArrivals.map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Newsletter */}
-      <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
+      <section className="py-12 sm:py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
         <div className="max-w-2xl mx-auto text-center px-4">
-          <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
-          <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">Join the Pink Club</h2>
+          <p className="text-white/80 mb-6 text-sm sm:text-base">Subscribe to get 15% off on your first order + exclusive updates</p>
           <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input type="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" />
-            <button className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button>
+            <input type="email" placeholder="Your email address" className="flex-1 px-4 sm:px-5 py-2.5 rounded-full text-gray-900 focus:outline-none text-sm sm:text-base" />
+            <button className="bg-white text-pink-600 px-5 sm:px-6 py-2.5 rounded-full font-semibold hover:shadow-lg transition">Subscribe</button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12">
+      <footer className="bg-gray-900 text-gray-400 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                <h3 className="font-bold text-white text-base sm:text-lg">MyPinkShop</h3>
               </div>
-              <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+              <p className="text-xs sm:text-sm">Luxury beauty and fashion for the modern woman.</p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="font-semibold text-white mb-3 text-sm sm:text-base">Shop</h4>
+              <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                 <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
                 <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
                 <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
@@ -380,8 +381,8 @@ function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="font-semibold text-white mb-3 text-sm sm:text-base">Support</h4>
+              <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                 <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
                 <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
                 <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
@@ -389,8 +390,8 @@ function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="font-semibold text-white mb-3 text-sm sm:text-base">Follow Us</h4>
+              <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                 <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
                 <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
                 <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
@@ -398,83 +399,24 @@ function Home() {
               </ul>
             </div>
           </div>
-          <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm text-gray-500">© 2026 MyPinkShop. All rights reserved.</p>
+          <div className="text-center pt-6 sm:pt-8 border-t border-gray-800">
+            <p className="text-xs sm:text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-[10px] sm:text-xs text-gray-600 mt-1">Made with 💖 for the girlies</p>
           </div>
         </div>
       </footer>
 
       <style jsx>{`
         @keyframes fade-in-up {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-        
-        .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out;
-        }
-        
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .animate-fade-in-up { animation: fade-in-up 0.6s ease-out; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
 }
-
-// ✅ Product Card Component - WITH REAL IMAGES
-const ProductCard = ({ product, addToCart, isInWishlist }) => (
-  <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
-    <Link to={`/product/${product.id}`}>
-      <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-        {product.images && product.images[0] ? (
-          <img 
-            src={product.images[0]} 
-            alt={product.name} 
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
-            {product.emoji || '✨'}
-          </div>
-        )}
-        {product.badge && <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">{product.badge}</span>}
-        {product.isNew && <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">NEW</span>}
-      </div>
-    </Link>
-    <div className="p-4">
-      <Link to={`/product/${product.id}`}>
-        <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">{product.name}</h3>
-      </Link>
-      <div className="flex items-center gap-1 mb-2">
-        <div className="flex text-yellow-400 text-sm">
-          {'★'.repeat(Math.floor(product.rating || 4))}
-          {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-        </div>
-        <span className="text-xs text-gray-400">({product.rating || 4})</span>
-      </div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-        {product.originalPrice && product.originalPrice > product.price && (
-          <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-        )}
-      </div>
-      <button onClick={() => addToCart(product)} className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5">
-        Add to Cart
-      </button>
-    </div>
-  </div>
-);
 
 export default Home;
