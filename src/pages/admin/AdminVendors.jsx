@@ -17,9 +17,11 @@ function AdminVendors() {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
     if (tab === 'pending') setActiveTab('pending');
+    if (tab === 'approved') setActiveTab('approved');
+    if (tab === 'blocked') setActiveTab('blocked');
   }, [location]);
 
-  // Load vendors from localStorage
+  // Load vendors from localStorage (ONLY REAL DATA)
   const loadVendors = () => {
     const registeredVendors = localStorage.getItem('registeredVendors');
     let registeredList = registeredVendors ? JSON.parse(registeredVendors) : [];
@@ -90,6 +92,16 @@ function AdminVendors() {
     }
   };
 
+  // ✅ Click handlers for stats cards
+  const handleStatsClick = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'all') {
+      navigate('/admin/vendors');
+    } else {
+      navigate(`/admin/vendors?tab=${tab}`);
+    }
+  };
+
   const filteredVendors = vendors.filter(v => {
     if (activeTab !== 'all' && v.vendorStatus !== activeTab) return false;
     if (searchTerm && !v.brandName?.toLowerCase().includes(searchTerm.toLowerCase()) && !v.name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -141,30 +153,42 @@ function AdminVendors() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Stats Cards */}
+          {/* Stats Cards - CLICKABLE */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div 
+              onClick={() => handleStatsClick('all')}
+              className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm cursor-pointer hover:shadow-md transition hover:border-pink-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Vendors</p>
                 <span className="text-lg">🏪</span>
               </div>
               <p className="text-2xl font-bold text-gray-800">{vendors.length}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div 
+              onClick={() => handleStatsClick('approved')}
+              className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm cursor-pointer hover:shadow-md transition hover:border-green-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Approved</p>
                 <span className="text-lg">✅</span>
               </div>
               <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div 
+              onClick={() => handleStatsClick('pending')}
+              className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm cursor-pointer hover:shadow-md transition hover:border-yellow-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Pending</p>
                 <span className="text-lg">⏳</span>
               </div>
               <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
             </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div 
+              onClick={() => handleStatsClick('blocked')}
+              className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm cursor-pointer hover:shadow-md transition hover:border-red-300"
+            >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Blocked</p>
                 <span className="text-lg">🚫</span>
@@ -181,7 +205,7 @@ function AdminVendors() {
             <button onClick={() => setActiveTab('blocked')} className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'blocked' ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`}>Blocked ({blockedCount})</button>
           </div>
 
-          {/* Vendors Table */}
+          {/* Vendors Table - ONLY REAL DATA */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm">
@@ -198,11 +222,11 @@ function AdminVendors() {
                 </thead>
                 <tbody className="divide-y">
                   {filteredVendors.length === 0 ? (
-                    <tr>
+                    <tr className="hover:bg-gray-50">
                       <td colSpan="7" className="px-5 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">🏪</div>
                         <p>No vendors found</p>
-                        <p className="text-xs mt-1">Try adjusting your search or filters</p>
+                        <p className="text-xs mt-1">Vendors will appear here after registration</p>
                       </td>
                     </tr>
                   ) : (
