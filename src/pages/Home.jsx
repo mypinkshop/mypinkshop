@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ Product Card Component - DEFINED BEFORE Home function (MUST)
+// ✅ Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -112,11 +112,26 @@ function Home() {
   const bestsellerProducts = products.slice(4, 12);
   const newArrivals = products.filter(p => p.isNew).slice(0, 4);
 
+  // ✅ UPDATED CATEGORIES - Now links to separate pages (not shop with query params)
   const categories = [
-    { name: 'Skincare', image: '🧴', link: '/shop?category=skincare' },
-    { name: 'Makeup', image: '💄', link: '/shop?category=makeup' },
-    { name: 'Clothing', image: '👗', link: '/shop?category=clothing' },
-    { name: 'Accessories', image: '👜', link: '/shop?category=accessories' },
+    { name: 'Skincare', image: '🧴', link: '/skincare' },
+    { name: 'Makeup', image: '💄', link: '/makeup' },
+    { name: 'Hair', image: '💇‍♀️', link: '/hair' },
+    { name: 'Clothing', image: '👗', link: '/clothing' },
+    { name: 'Accessories', image: '👜', link: '/accessories' },
+  ];
+
+  // ✅ UPDATED NAVIGATION LINKS - Separate pages
+  const navLinks = [
+    { name: 'All', link: '/shop' },
+    { name: 'Skincare', link: '/skincare' },
+    { name: 'Makeup', link: '/makeup' },
+    { name: 'Hair', link: '/hair' },
+    { name: 'Clothing', link: '/clothing' },
+    { name: 'Accessories', link: '/accessories' },
+    { name: 'Sale 🔥', link: '/shop?offer=sale' },
+    { name: 'New Arrivals', link: '/shop?sort=newest' },
+    { name: 'Bestsellers', link: '/shop?sort=bestseller' },
   ];
 
   if (loading) {
@@ -161,7 +176,7 @@ function Home() {
               </div>
             </Link>
 
-            {/* Search Bar - Responsive */}
+            {/* Search Bar */}
             <div className="flex-1 max-w-md lg:max-w-2xl">
               <div className="relative">
                 <input 
@@ -176,7 +191,7 @@ function Home() {
               </div>
             </div>
 
-            {/* Right Icons - Responsive */}
+            {/* Right Icons */}
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
               <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,24 +219,24 @@ function Home() {
         </div>
       </header>
 
-      {/* Premium Category Navigation */}
+      {/* ✅ UPDATED Premium Category Navigation - Now links to separate pages */}
       <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
-            {['All', 'Skincare', 'Makeup', 'Clothing', 'Accessories', 'Sale 🔥', 'New Arrivals', 'Bestsellers'].map((item, idx) => (
+            {navLinks.map((item, idx) => (
               <Link 
                 key={idx} 
-                to={item === 'All' ? '/shop' : `/shop?category=${item.toLowerCase().replace(' 🔥', '').replace(' ', '')}`}
+                to={item.link}
                 className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors"
               >
-                {item}
+                {item.name}
               </Link>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Premium Hero Carousel */}
+      {/* Hero Carousel */}
       {banners.length > 0 ? (
         <div className="relative overflow-hidden group">
           <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
@@ -283,7 +298,7 @@ function Home() {
           )}
         </div>
       ) : (
-        /* Premium Fallback Banner */
+        /* Fallback Banner */
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-10 left-10 text-7xl">🎀</div>
@@ -305,14 +320,14 @@ function Home() {
         </div>
       )}
 
-      {/* Premium Categories Section */}
+      {/* ✅ UPDATED Categories Section - 5 categories with Hair */}
       <section className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 sm:mb-12">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Shop by Category</h2>
             <p className="text-gray-500 text-sm sm:text-base">Discover your favorite products</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
             {categories.map((cat, idx) => (
               <Link key={idx} to={cat.link} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-100 to-rose-100 p-6 text-center hover:shadow-xl transition-all hover:-translate-y-2">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition shadow-md">
@@ -326,7 +341,7 @@ function Home() {
         </div>
       </section>
 
-      {/* Premium Deals Section */}
+      {/* Deals of the Day Section */}
       {featuredProducts.length > 0 && (
         <section className="py-12 sm:py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -423,10 +438,11 @@ function Home() {
             <div>
               <h4 className="font-semibold text-white mb-4">Shop</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
               </ul>
             </div>
             <div>
