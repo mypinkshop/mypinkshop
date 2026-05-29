@@ -92,11 +92,24 @@ function Home() {
     setLoading(false);
   }, []);
 
-  // Load banners from localStorage
+  // ✅ FIXED: Load banners from localStorage - NO DUMMY BANNERS
   useEffect(() => {
-    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
-    const activeBanners = savedBanners.filter(b => b.active).sort((a, b) => a.order - b.order);
-    setBanners(activeBanners);
+    try {
+      const savedBanners = localStorage.getItem('homepage_banners');
+      
+      if (savedBanners && savedBanners !== '[]') {
+        const parsed = JSON.parse(savedBanners);
+        const activeBanners = parsed.filter(b => b.active).sort((a, b) => a.order - b.order);
+        setBanners(activeBanners);
+        console.log("✅ Loaded banners from localStorage:", activeBanners.length);
+      } else {
+        console.log("No banners found in localStorage");
+        setBanners([]);
+      }
+    } catch (error) {
+      console.error("Error loading banners:", error);
+      setBanners([]);
+    }
   }, []);
 
   // Auto slide for carousel
@@ -112,7 +125,7 @@ function Home() {
   const bestsellerProducts = products.slice(4, 12);
   const newArrivals = products.filter(p => p.isNew).slice(0, 4);
 
-  // ✅ UPDATED CATEGORIES - Now links to separate pages (not shop with query params)
+  // Categories - links to separate pages
   const categories = [
     { name: 'Skincare', image: '🧴', link: '/skincare' },
     { name: 'Makeup', image: '💄', link: '/makeup' },
@@ -121,7 +134,7 @@ function Home() {
     { name: 'Accessories', image: '👜', link: '/accessories' },
   ];
 
-  // ✅ UPDATED NAVIGATION LINKS - Separate pages
+  // Navigation links
   const navLinks = [
     { name: 'All', link: '/shop' },
     { name: 'Skincare', link: '/skincare' },
@@ -219,7 +232,7 @@ function Home() {
         </div>
       </header>
 
-      {/* ✅ UPDATED Premium Category Navigation - Now links to separate pages */}
+      {/* Premium Category Navigation */}
       <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
@@ -236,18 +249,34 @@ function Home() {
         </div>
       </div>
 
-      {/* Hero Carousel */}
+      {/* Hero Carousel - FIXED: Shows real banners from admin or fallback */}
       {banners.length > 0 ? (
         <div className="relative overflow-hidden group">
           <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
             {banners.map((banner) => (
               <Link key={banner.id} to={banner.link} className="w-full flex-shrink-0">
                 <div className="relative">
-                  <img 
-                    src={banner.image} 
-                    alt={banner.title}
-                    className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] object-cover"
-                  />
+                  {banner.images && banner.images[0] ? (
+                    <img 
+                      src={banner.images[0]} 
+                      alt={banner.title}
+                      className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] object-cover"
+                    />
+                  ) : banner.image ? (
+                    <img 
+                      src={banner.image} 
+                      alt={banner.title}
+                      className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] bg-gradient-to-r from-pink-400 to-rose-400 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <span className="text-6xl mb-4 block">🌸</span>
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">{banner.title}</h2>
+                        {banner.subtitle && <p className="text-lg mt-2">{banner.subtitle}</p>}
+                      </div>
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
                     <div className="text-center text-white px-4 animate-fade-in-up">
                       <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 sm:mb-4 drop-shadow-lg">{banner.title}</h2>
@@ -298,7 +327,7 @@ function Home() {
           )}
         </div>
       ) : (
-        /* Fallback Banner */
+        /* Fallback Banner - Jab admin se koi banner add nahi kiya */
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-10 left-10 text-7xl">🎀</div>
@@ -320,7 +349,7 @@ function Home() {
         </div>
       )}
 
-      {/* ✅ UPDATED Categories Section - 5 categories with Hair */}
+      {/* Categories Section */}
       <section className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 sm:mb-12">
