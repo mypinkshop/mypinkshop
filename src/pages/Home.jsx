@@ -346,6 +346,40 @@ function Home() {
         </section>
       )}
 
+      {/* Bestsellers Section */}
+      {bestsellerProducts.length > 0 && (
+        <section className="py-8 sm:py-12 bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">⭐ Bestsellers</h2>
+              <Link to="/shop?sort=bestseller" className="text-pink-500 text-sm hover:underline">View All →</Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+              {bestsellerProducts.slice(0, 4).map(product => (
+                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* New Arrivals */}
+      {newArrivals.length > 0 && (
+        <section className="py-8 sm:py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">🆕 New Arrivals</h2>
+              <Link to="/shop?sort=newest" className="text-pink-500 text-sm hover:underline">View All →</Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+              {newArrivals.map(product => (
+                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Newsletter */}
       <section className="py-12 sm:py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
         <div className="max-w-2xl mx-auto text-center px-4">
