@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import { useReviews } from '../../context/ReviewContext';
 
@@ -22,12 +22,8 @@ function AdminReviews() {
   const [selectedReview, setSelectedReview] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterBrand, setFilterBrand] = useState('all');
-  const [filterProduct, setFilterProduct] = useState('all');
   const [filterRating, setFilterRating] = useState('all');
-  const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
 
   useEffect(() => {
@@ -37,18 +33,12 @@ function AdminReviews() {
       return;
     }
     loadReviews();
-    loadProductsAndBrands();
+    loadProducts();
   }, [navigate]);
 
-  const loadProductsAndBrands = () => {
+  const loadProducts = () => {
     const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
-    
-    // Get unique brands
-    const uniqueBrands = [...new Set(approvedProducts.map(p => p.brand).filter(Boolean))];
-    setBrands(uniqueBrands);
-    
-    // Get all products for filter
     setProducts(approvedProducts);
   };
 
@@ -62,11 +52,9 @@ function AdminReviews() {
     setLoading(false);
   };
 
-  // Apply filters
   useEffect(() => {
     let filtered = [...(activeTab === 'pending' ? pendingReviews : approvedReviews)];
     
-    // Search by customer name or email
     if (searchTerm) {
       filtered = filtered.filter(r => 
         r.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,14 +63,8 @@ function AdminReviews() {
       );
     }
     
-    // Filter by rating
     if (filterRating !== 'all') {
       filtered = filtered.filter(r => r.rating === parseInt(filterRating));
-    }
-    
-    // Filter by product (need to get product name)
-    if (filterProduct !== 'all') {
-      filtered = filtered.filter(r => r.productId == filterProduct);
     }
     
     if (activeTab === 'pending') {
@@ -90,7 +72,7 @@ function AdminReviews() {
     } else {
       setFilteredApproved(filtered);
     }
-  }, [searchTerm, filterRating, filterProduct, activeTab, pendingReviews, approvedReviews]);
+  }, [searchTerm, filterRating, activeTab, pendingReviews, approvedReviews]);
 
   const getProductName = (productId) => {
     const product = products.find(p => p.id == productId);
@@ -143,8 +125,6 @@ function AdminReviews() {
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilterBrand('all');
-    setFilterProduct('all');
     setFilterRating('all');
   };
 
@@ -266,7 +246,7 @@ function AdminReviews() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
-                  <tr className="border-b">
+                  <tr>
                     <th className="px-4 py-3 text-left">Product / Brand</th>
                     <th className="px-4 py-3 text-left">Customer</th>
                     <th className="px-4 py-3 text-center">Rating</th>
@@ -278,12 +258,14 @@ function AdminReviews() {
                 </thead>
                 <tbody className="divide-y">
                   {currentData.length === 0 ? (
-                    <tr className="hover:bg-gray-50">
+                    <tr>
                       <td colSpan={activeTab === 'approved' ? 7 : 6} className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">⭐</div>
                         <p>No {activeTab} reviews found</p>
-                        {searchTerm && <button onClick={clearFilters} className="mt-2 text-pink-500 text-sm hover:underline">Clear filters</button>}
-                      </table>
+                        {(searchTerm || filterRating !== 'all') && (
+                          <button onClick={clearFilters} className="mt-2 text-pink-500 text-sm hover:underline">Clear filters</button>
+                        )}
+                      </td>
                     </tr>
                   ) : (
                     currentData.map((review) => (
@@ -328,18 +310,18 @@ function AdminReviews() {
                           <div className="flex justify-center gap-2">
                             {activeTab === 'pending' ? (
                               <>
-                                <button onClick={() => handleApprove(review.id)} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition" title="Approve">✓ Approve</button>
-                                <button onClick={() => handleReject(review.id)} className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition" title="Reject">✗ Reject</button>
-                                <button onClick={() => { setSelectedReview(review); setShowDetails(true); }} className="px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition" title="View Details">👁️ View</button>
+                                <button onClick={() => handleApprove(review.id)} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition" title="Approve">✓</button>
+                                <button onClick={() => handleReject(review.id)} className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition" title="Reject">✗</button>
+                                <button onClick={() => { setSelectedReview(review); setShowDetails(true); }} className="px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition" title="View">👁️</button>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => handleDelete(review.productId, review.id)} className="text-red-500 hover:text-red-700 transition" title="Delete">🗑️ Delete</button>
-                                <button onClick={() => { setSelectedReview(review); setShowDetails(true); }} className="text-blue-500 hover:text-blue-700 transition" title="View Details">👁️ View</button>
+                                <button onClick={() => handleDelete(review.productId, review.id)} className="text-red-500 hover:text-red-700 transition" title="Delete">🗑️</button>
+                                <button onClick={() => { setSelectedReview(review); setShowDetails(true); }} className="text-blue-500 hover:text-blue-700 transition" title="View">👁️</button>
                               </>
                             )}
                           </div>
-                        </table>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -348,7 +330,6 @@ function AdminReviews() {
             </div>
           </div>
 
-          {/* Pagination Info */}
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-400">
               Showing {currentData.length} of {activeTab === 'pending' ? pendingReviews.length : approvedReviews.length} reviews
@@ -406,11 +387,11 @@ function AdminReviews() {
               <div className="flex gap-3 pt-4 border-t">
                 {activeTab === 'pending' ? (
                   <>
-                    <button onClick={() => { handleApprove(selectedReview.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">✓ Approve</button>
-                    <button onClick={() => { handleReject(selectedReview.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">✗ Reject</button>
+                    <button onClick={() => { handleApprove(selectedReview.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">Approve</button>
+                    <button onClick={() => { handleReject(selectedReview.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">Reject</button>
                   </>
                 ) : (
-                  <button onClick={() => { handleDelete(selectedReview.productId, selectedReview.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">🗑 Delete Review</button>
+                  <button onClick={() => { handleDelete(selectedReview.productId, selectedReview.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">Delete</button>
                 )}
                 <button onClick={() => setShowDetails(false)} className="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50">Close</button>
               </div>
