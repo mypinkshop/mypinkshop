@@ -74,7 +74,7 @@ function Cart() {
                   {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
                 </button>
                 
-                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
@@ -260,20 +260,22 @@ function Cart() {
 
               {cart.map((item) => (
                 <div key={item.id} className="group grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 md:px-6 py-5 border-b border-pink-100 hover:bg-pink-50/30 transition">
-                  {/* Product Info */}
+                  {/* Product Info - CLICKABLE IMAGE */}
                   <div className="md:col-span-6 flex gap-4">
-                    {item.image && !imgErrors[item.id] ? (
-                      <img 
-                        src={item.image} 
-                        alt={item.name} 
-                        className="w-16 h-16 rounded-xl object-cover border border-pink-100"
-                        onError={() => handleImageError(item.id)}
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl shadow-sm">
-                        {item.emoji || '✨'}
-                      </div>
-                    )}
+                    <Link to={`/product/${item.id}`} className="block">
+                      {item.image && !imgErrors[item.id] ? (
+                        <img 
+                          src={item.image} 
+                          alt={item.name} 
+                          className="w-16 h-16 rounded-xl object-cover border border-pink-100 hover:scale-105 transition-transform cursor-pointer"
+                          onError={() => handleImageError(item.id)}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl shadow-sm hover:scale-105 transition-transform cursor-pointer">
+                          {item.emoji || '✨'}
+                        </div>
+                      )}
+                    </Link>
                     <div>
                       <Link to={`/product/${item.id}`}>
                         <h3 className="font-semibold text-gray-800 hover:text-pink-500 transition line-clamp-1">{item.name}</h3>
