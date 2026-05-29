@@ -28,7 +28,7 @@ import AdminTax from './pages/admin/AdminTax';
 import AdminCoupons from './pages/admin/AdminCoupons';
 import AdminBrandApplications from './pages/admin/AdminBrandApplications';
 import AdminBanners from './pages/admin/AdminBanners';
-import AdminReviews from './pages/admin/AdminReviews';  // ✅ ADDED
+import AdminReviews from './pages/admin/AdminReviews';
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -62,6 +62,13 @@ import ReturnsPolicy from './pages/ReturnsPolicy';
 import FAQs from './pages/FAQs';
 import AdminEditProduct from './pages/admin/AdminEditProduct';
 
+// ✅ NEW IMPORTS - Category Pages
+import SkincarePage from './pages/SkincarePage';
+import MakeupPage from './pages/MakeupPage';
+import ClothingPage from './pages/ClothingPage';
+import AccessoriesPage from './pages/AccessoriesPage';
+import HairPage from './pages/HairPage';
+
 function App() {
   return (
     <AuthProvider>
@@ -88,6 +95,13 @@ function App() {
               <Route path="/returns" element={<ReturnsPolicy />} />
               <Route path="/faqs" element={<FAQs />} />
 
+              {/* ✅ NEW - Category Pages */}
+              <Route path="/skincare" element={<SkincarePage />} />
+              <Route path="/makeup" element={<MakeupPage />} />
+              <Route path="/clothing" element={<ClothingPage />} />
+              <Route path="/accessories" element={<AccessoriesPage />} />
+              <Route path="/hair" element={<HairPage />} />
+
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -108,7 +122,7 @@ function App() {
               <Route path="/admin/coupons" element={<AdminCoupons />} />
               <Route path="/admin/banners" element={<AdminBanners />} />
               <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
-              <Route path="/admin/reviews" element={<AdminReviews />} />  {/* ✅ ADDED */}
+              <Route path="/admin/reviews" element={<AdminReviews />} />
 
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
