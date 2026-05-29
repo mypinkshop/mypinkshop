@@ -28,6 +28,7 @@ import AdminTax from './pages/admin/AdminTax';
 import AdminCoupons from './pages/admin/AdminCoupons';
 import AdminBrandApplications from './pages/admin/AdminBrandApplications';
 import AdminBanners from './pages/admin/AdminBanners';
+import AdminReviews from './pages/admin/AdminReviews';  // ✅ ADDED
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -58,11 +59,8 @@ import Privacy from './pages/Privacy';
 import ContactUs from './pages/ContactUs';
 import ShippingInfo from './pages/ShippingInfo';
 import ReturnsPolicy from './pages/ReturnsPolicy';
-import FAQs from './pages/FAQs';  // ✅ YEH IMPORT MISSING THA
+import FAQs from './pages/FAQs';
 import AdminEditProduct from './pages/admin/AdminEditProduct';
-
-
-
 
 function App() {
   return (
@@ -88,9 +86,8 @@ function App() {
               <Route path="/contact" element={<ContactUs />} />
               <Route path="/shipping" element={<ShippingInfo />} />
               <Route path="/returns" element={<ReturnsPolicy />} />
-              <Route path="/faqs" element={<FAQs />} />  {/* ✅ YEH ROUTE BHI ADD KIYA */}
+              <Route path="/faqs" element={<FAQs />} />
 
-              
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -111,9 +108,8 @@ function App() {
               <Route path="/admin/coupons" element={<AdminCoupons />} />
               <Route path="/admin/banners" element={<AdminBanners />} />
               <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
-              
+              <Route path="/admin/reviews" element={<AdminReviews />} />  {/* ✅ ADDED */}
 
-              
               {/* Vendor Routes */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
