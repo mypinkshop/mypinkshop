@@ -11,6 +11,7 @@ function Cart() {
   const { user, logout } = useAuth();
   const { wishlistCount } = useWishlist();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [imgErrors, setImgErrors] = useState({});
 
   const handleCheckout = () => {
     setIsCheckingOut(true);
@@ -19,25 +20,37 @@ function Cart() {
     }, 500);
   };
 
+  const handleImageError = (itemId) => {
+    setImgErrors(prev => ({ ...prev, [itemId]: true }));
+  };
+
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Top Bar */}
-        <div className="bg-gray-900 text-white py-2 text-center text-sm">
-          Free Shipping on ₹999+ | Extra 10% off on first order | Cash on Delivery Available
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+        {/* Premium Top Bar */}
+        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
+          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
+            <span>✨</span>
+            <span>Free Shipping on ₹999+</span>
+            <span className="hidden sm:inline">•</span>
+            <span>Extra 10% off on first order</span>
+            <span className="hidden sm:inline">•</span>
+            <span>Cash on Delivery Available</span>
+            <span>✨</span>
+          </div>
         </div>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+        {/* Premium Header */}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-              <Link to="/" className="flex items-center gap-2 shrink-0">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-pink-600 rounded flex items-center justify-center">
+              <Link to="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-800">MyPinkShop</h1>
-                  <p className="text-[9px] sm:text-[10px] text-gray-400">FOR THE GIRLIES</p>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
                 </div>
               </Link>
 
@@ -46,31 +59,29 @@ function Cart() {
                   <input 
                     type="text" 
                     placeholder="Search for products..."
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-300 rounded focus:outline-none focus:border-pink-500 text-sm sm:text-base"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                     onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                   />
-                  <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-pink-600 text-white px-4 sm:px-6 py-1.5 rounded text-sm font-medium hover:bg-pink-700 transition">
-                    Search
-                  </button>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
+                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
                 </button>
                 
-                <Link to="/cart" className="relative p-1.5 sm:p-2 text-pink-600 transition">
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                 </Link>
                 
                 {user ? <Avatar user={user} onLogout={logout} /> : 
-                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
+                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -83,23 +94,23 @@ function Cart() {
 
         {/* Empty Cart */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <div className="bg-white rounded-lg p-12 max-w-md mx-auto shadow-sm border border-gray-200">
-            <div className="text-6xl mb-6">🛒</div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
+            <div className="text-8xl mb-6 animate-bounce">🛒</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-3">Your cart is empty</h2>
             <p className="text-gray-500 mb-6">Looks like you haven't added anything to your cart yet.</p>
-            <Link to="/shop" className="inline-block bg-pink-600 text-white px-8 py-3 rounded font-semibold hover:bg-pink-700 transition">
+            <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all transform hover:-translate-y-1">
               Start Shopping →
             </Link>
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-pink-600 rounded flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">M</span>
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
@@ -136,6 +147,7 @@ function Cart() {
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
               <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
             </div>
           </div>
         </footer>
@@ -145,28 +157,35 @@ function Cart() {
 
   const subtotal = cartTotal();
   const shipping = subtotal > 999 ? 0 : 99;
-  const tax = Math.round(subtotal * 0.05);
-  const total = subtotal + shipping + tax;
+  const total = subtotal + shipping;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Top Bar */}
-      <div className="bg-gray-900 text-white py-2 text-center text-sm">
-        Free Shipping on ₹999+ | Extra 10% off on first order | Cash on Delivery Available
+      {/* Premium Top Bar */}
+      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
+        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
+          <span>✨</span>
+          <span>Free Shipping on ₹999+</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Extra 10% off on first order</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Cash on Delivery Available</span>
+          <span>✨</span>
+        </div>
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+      {/* Premium Header */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            <Link to="/" className="flex items-center gap-2 shrink-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-pink-600 rounded flex items-center justify-center">
+            <Link to="/" className="flex items-center gap-2 shrink-0 group">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">MyPinkShop</h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-400">FOR THE GIRLIES</p>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
               </div>
             </Link>
 
@@ -175,34 +194,32 @@ function Cart() {
                 <input 
                   type="text" 
                   placeholder="Search for products..."
-                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-300 rounded focus:outline-none focus:border-pink-500 text-sm sm:text-base"
+                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                 />
-                <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-pink-600 text-white px-4 sm:px-6 py-1.5 rounded text-sm font-medium hover:bg-pink-700 transition">
-                  Search
-                </button>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
+              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
               </button>
               
-              <Link to="/cart" className="relative p-1.5 sm:p-2 text-pink-600 transition">
+              <Link to="/cart" className="relative p-1.5 sm:p-2 text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                   {cart.reduce((sum, i) => sum + i.quantity, 0)}
                 </span>
               </Link>
               
               {user ? <Avatar user={user} onLogout={logout} /> : 
-                <Link to="/login" className="p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
+                <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -215,25 +232,26 @@ function Cart() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Link to="/" className="hover:text-pink-600">Home</Link>
-          <span>/</span>
-          <span className="text-gray-700">Cart</span>
+        <div className="flex items-center gap-2 text-sm">
+          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+          <span className="text-gray-400">/</span>
+          <span className="text-pink-600 font-medium">Cart</span>
         </div>
       </div>
 
       {/* Cart Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">
-          Shopping Cart ({cart.reduce((sum, i) => sum + i.quantity, 0)} items)
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          <span>🛒</span> Shopping Cart
+          <span className="text-sm font-normal text-gray-400">({cart.reduce((sum, i) => sum + i.quantity, 0)} items)</span>
         </h1>
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Cart Items */}
           <div className="flex-1">
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
               {/* Header Row */}
-              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 text-sm font-semibold text-gray-600 border-b border-gray-200">
+              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gradient-to-r from-pink-50 to-rose-50 text-sm font-semibold text-gray-600 border-b border-pink-100">
                 <div className="col-span-6">Product</div>
                 <div className="col-span-2 text-center">Price</div>
                 <div className="col-span-2 text-center">Quantity</div>
@@ -241,31 +259,31 @@ function Cart() {
               </div>
 
               {cart.map((item) => (
-                <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 md:px-6 py-5 border-b border-gray-200 hover:bg-gray-50 transition">
+                <div key={item.id} className="group grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 md:px-6 py-5 border-b border-pink-100 hover:bg-pink-50/30 transition">
                   {/* Product Info */}
                   <div className="md:col-span-6 flex gap-4">
-                    {/* ✅ PRODUCT IMAGE */}
-                    {item.image ? (
+                    {item.image && !imgErrors[item.id] ? (
                       <img 
                         src={item.image} 
                         alt={item.name} 
-                        className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                        className="w-16 h-16 rounded-xl object-cover border border-pink-100"
+                        onError={() => handleImageError(item.id)}
                       />
                     ) : (
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl text-gray-400">
-                        🛍️
+                      <div className="w-16 h-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl shadow-sm">
+                        {item.emoji || '✨'}
                       </div>
                     )}
                     <div>
                       <Link to={`/product/${item.id}`}>
-                        <h3 className="font-semibold text-gray-800 hover:text-pink-600 transition line-clamp-1">{item.name}</h3>
+                        <h3 className="font-semibold text-gray-800 hover:text-pink-500 transition line-clamp-1">{item.name}</h3>
                       </Link>
                       <p className="text-xs text-gray-400 mt-1 capitalize">{item.category}</p>
                       <button 
                         onClick={() => removeFromCart(item.id)}
-                        className="text-xs text-red-500 mt-2 hover:text-red-700 transition"
+                        className="text-xs text-red-400 mt-2 hover:text-red-600 transition flex items-center gap-1"
                       >
-                        Remove
+                        <span>🗑️</span> Remove
                       </button>
                     </div>
                   </div>
@@ -278,17 +296,17 @@ function Cart() {
 
                   {/* Quantity */}
                   <div className="md:col-span-2 flex justify-center">
-                    <div className="flex items-center gap-3 border border-gray-300 rounded px-3 py-1 bg-white">
+                    <div className="flex items-center gap-3 border border-pink-200 rounded-full px-3 py-1 bg-white shadow-sm">
                       <button 
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="w-7 h-7 rounded hover:bg-gray-100 text-gray-600 font-bold transition"
+                        className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition"
                       >
                         -
                       </button>
                       <span className="w-8 text-center font-medium">{item.quantity}</span>
                       <button 
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="w-7 h-7 rounded hover:bg-gray-100 text-gray-600 font-bold transition"
+                        className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition"
                       >
                         +
                       </button>
@@ -298,22 +316,22 @@ function Cart() {
                   {/* Total */}
                   <div className="md:col-span-2 text-center">
                     <span className="md:hidden text-gray-500 text-sm mr-2">Total:</span>
-                    <span className="font-bold text-pink-600">₹{item.price * item.quantity}</span>
+                    <span className="font-bold text-pink-600 text-lg">₹{item.price * item.quantity}</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            <Link to="/shop" className="inline-flex items-center gap-2 mt-6 text-pink-600 hover:text-pink-700 font-medium transition">
-              ← Continue Shopping
+            <Link to="/shop" className="inline-flex items-center gap-2 mt-6 text-pink-500 hover:text-pink-600 font-medium transition group">
+              <span className="group-hover:-translate-x-1 transition">←</span> Continue Shopping
             </Link>
           </div>
 
-          {/* Order Summary */}
+          {/* Order Summary - Amazon Style */}
           <div className="lg:w-96">
-            <div className="bg-white border border-gray-200 rounded-lg p-6 sticky top-24">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                Order Summary
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-6 sticky top-24 shadow-sm">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-pink-100 flex items-center gap-2">
+                <span>📋</span> Order Summary
               </h3>
               
               <div className="space-y-3 mb-4">
@@ -323,32 +341,28 @@ function Cart() {
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span className={shipping === 0 ? 'text-green-600 font-medium' : ''}>
+                  <span className={shipping === 0 ? 'text-green-500 font-medium' : ''}>
                     {shipping === 0 ? 'FREE' : '₹' + shipping}
                   </span>
                 </div>
-                <div className="flex justify-between text-gray-600 pb-2 border-b border-gray-200">
-                  <span>Tax (5% GST)</span>
-                  <span>₹{tax}</span>
-                </div>
               </div>
 
-              <div className="flex justify-between text-xl font-bold text-gray-800 mb-6">
+              <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-pink-100 mb-6">
                 <span>Total</span>
-                <span className="text-pink-600">₹{total}</span>
+                <span className="text-pink-500">₹{total}</span>
               </div>
 
               {shipping > 0 && (
-                <div className="mb-4 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-700 text-center">
-                  Add ₹{999 - subtotal} more for FREE shipping!
+                <div className="mb-4 p-3 bg-amber-50 rounded-xl text-xs text-amber-700 text-center">
+                  ✨ Add ₹{999 - subtotal} more for FREE shipping!
                 </div>
               )}
 
               <button 
                 onClick={handleCheckout}
                 disabled={isCheckingOut}
-                className={`w-full bg-pink-600 text-white py-3 rounded font-semibold transition hover:bg-pink-700 ${
-                  isCheckingOut ? 'opacity-75 cursor-not-allowed' : ''
+                className={`w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-semibold transition-all transform hover:-translate-y-0.5 ${
+                  isCheckingOut ? 'opacity-75 cursor-not-allowed' : 'hover:shadow-lg'
                 }`}
               >
                 {isCheckingOut ? 'Processing...' : 'Proceed to Checkout →'}
@@ -357,19 +371,20 @@ function Cart() {
               <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-400">
                 <span>🔒</span> Secure Checkout
                 <span>💳</span> Card/UPI/COD
+                <span>🚚</span> Free Shipping on ₹999+
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+      {/* Premium Footer */}
+      <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-pink-600 rounded flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
                 <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
@@ -406,6 +421,7 @@ function Cart() {
           </div>
           <div className="text-center pt-8 border-t border-gray-800">
             <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </div>
       </footer>
