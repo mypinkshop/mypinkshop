@@ -19,6 +19,7 @@ function AdminSidebar() {
     { name: 'Inventory', icon: '📋', path: '/admin/inventory', badge: null },
     { name: 'Advertising', icon: '📢', path: '/admin/advertising', badge: null },
     { name: 'Reports', icon: '📈', path: '/admin/reports', badge: null },
+    { name: 'Reviews', icon: '⭐', path: '/admin/reviews', badge: null },  // ✅ ADDED
     { name: 'Settings', icon: '⚙️', path: '/admin/settings', badge: null },
   ];
 
