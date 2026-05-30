@@ -5,15 +5,21 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ Product Card Component - FIXED
+// ✅ Product Card Component - FINAL FIXED (No Auto Reset)
 const ProductCard = ({ product, addToCart, isInWishlist }) => {
   const [imgError, setImgError] = useState(false);
-  const [isAdded, setIsAdded] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
+  const navigate = useNavigate();
 
-  const handleAddToCart = () => {
-    addToCart(product);
-    setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 2000);
+  const handleButtonClick = () => {
+    if (addedToCart) {
+      // Already added → Go to Cart
+      navigate('/cart');
+    } else {
+      // Add to cart first
+      addToCart(product);
+      setAddedToCart(true);
+    }
   };
 
   return (
@@ -55,14 +61,14 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
           )}
         </div>
         <button 
-          onClick={handleAddToCart} 
+          onClick={handleButtonClick}
           className={`w-full py-2 rounded-full text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
-            isAdded 
+            addedToCart 
               ? 'bg-green-500 text-white hover:bg-green-600' 
               : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
           }`}
         >
-          {isAdded ? '✓ Go to Cart' : 'Add to Cart'}
+          {addedToCart ? '✓ Go to Cart' : 'Add to Cart'}
         </button>
       </div>
     </div>
@@ -210,6 +216,7 @@ function Home() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+            {/* Logo */}
             <Link to="/" className="flex items-center gap-2 shrink-0 group">
               <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
