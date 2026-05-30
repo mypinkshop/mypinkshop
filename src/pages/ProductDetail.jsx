@@ -57,11 +57,10 @@ function ProductDetail() {
     loadProduct();
   }, [id]);
 
-  // ✅ Quantity handlers - zero allowed
+  // Quantity handlers - zero allowed
   const decreaseQuantity = () => {
     if (quantity > 0) {
       setQuantity(quantity - 1);
-      // If quantity becomes zero, reset addedToCart state
       if (quantity - 1 === 0) {
         setAddedToCart(false);
       }
@@ -74,21 +73,18 @@ function ProductDetail() {
     }
   };
 
-  // ✅ Handle Add to Cart / Go to Cart (No popup)
+  // Handle Add to Cart / Go to Cart (No popup)
   const handleCartButtonClick = () => {
     if (!product) return;
     
-    // Can't add zero quantity
     if (quantity === 0) {
       alert('Please select at least 1 quantity');
       return;
     }
     
     if (addedToCart) {
-      // Already added → Go to Cart
       navigate('/cart');
     } else {
-      // Add to cart (no popup)
       addToCart({ 
         id: product._id,
         name: product.name, 
@@ -102,7 +98,7 @@ function ProductDetail() {
     }
   };
 
-  // ✅ Buy Now - direct to cart (no popup)
+  // Buy Now - direct to cart
   const handleBuyNow = () => {
     if (!product) return;
     
@@ -165,7 +161,6 @@ function ProductDetail() {
     );
   }
 
-  // Button disabled when quantity is 0 or stock is 0
   const isButtonDisabled = product.stock === 0 || quantity === 0;
 
   return (
@@ -335,25 +330,14 @@ function ProductDetail() {
               <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{product.shortDescription || product.description || 'Premium quality product crafted with care for the modern woman.'}</p>
             </div>
 
-            {/* ✅ Quantity Selector - Zero allowed */}
+            {/* Quantity Selector */}
             <div>
               <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center border border-gray-300 rounded-full">
-                  <button 
-                    onClick={decreaseQuantity}
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
-                  >
-                    -
-                  </button>
+                  <button onClick={decreaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium">-</button>
                   <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
-                  <button 
-                    onClick={increaseQuantity}
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
-                    disabled={quantity >= product.stock}
-                  >
-                    +
-                  </button>
+                  <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= product.stock}>+</button>
                 </div>
                 <span className="text-xs sm:text-sm text-gray-500">
                   {product.stock > 0 ? `${product.stock} items available` : 'Out of stock'}
@@ -362,7 +346,7 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* ✅ Action Buttons */}
+            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
                 onClick={handleCartButtonClick}
@@ -416,13 +400,7 @@ function ProductDetail() {
         <div className="mt-12">
           <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'benefits', 'specifications', 'reviews'].map(tab => (
-              <button 
-                key={tab} 
-                onClick={() => setActiveTab(tab)} 
-                className={`pb-2 sm:pb-3 text-sm sm:text-base font-medium capitalize whitespace-nowrap transition ${
-                  activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'
-                }`}
-              >
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 sm:pb-3 text-sm sm:text-base font-medium capitalize whitespace-nowrap transition ${activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'}`}>
                 {tab === 'description' ? 'Description' : tab === 'benefits' ? 'Benefits' : tab === 'specifications' ? 'Specifications' : 'Reviews'}
               </button>
             ))}
@@ -466,25 +444,12 @@ function ProductDetail() {
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm min-w-[300px]">
                   <tbody className="divide-y divide-gray-200">
-                    {Object.entries(product.specifications || {
-                      'Material': 'Premium Quality',
-                      'Country of Origin': 'India',
-                      'Suitable For': 'All Skin Types',
-                      'Shelf Life': '24 Months'
-                    }).map(([key, value], idx) => (
+                    {Object.entries(product.specifications || {}).map(([key, value], idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                         <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
-                        <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600 text-sm">{value}</td>
-                       学
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600 text-sm">{String(value)}</td>
+                      </tr>
                     ))}
-                    <tr className="bg-white">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700">Weight</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{product.weight ? `${product.weight} kg` : 'N/A'}</td>
-                    </tr>
-                    <tr className="bg-gray-50">
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700">Dimensions</td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{product.dimensions || 'N/A'}</td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
