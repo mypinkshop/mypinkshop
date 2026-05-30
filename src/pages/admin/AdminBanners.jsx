@@ -8,14 +8,16 @@ function AdminBanners() {
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
-    buttonText: 'Shop Now',
+    buttonText: '',
     link: '/shop',
-    images: [], // ✅ Changed to array for multiple images
+    images: [],
     order: 0,
-    active: true
+    active: true,
+    showTextOverlay: false  // ✅ NEW - Text overlay on/off
   });
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -37,19 +39,19 @@ function AdminBanners() {
     setBanners(updatedBanners.sort((a, b) => a.order - b.order));
   };
 
-  // ✅ Multiple images upload with compression
+  // ✅ Multiple images upload - Ek saath select karo (Ctrl+click ya Cmd+click)
   const handleMultipleImages = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
     
-    if (files.length > 5) {
-      alert('You can upload maximum 5 images per banner');
+    if (files.length > 6) {
+      alert('You can upload maximum 6 images per banner');
       return;
     }
     
     const totalSize = files.reduce((sum, f) => sum + f.size, 0);
-    if (totalSize > 3 * 1024 * 1024) {
-      alert('Total images size should be less than 3MB');
+    if (totalSize > 5 * 1024 * 1024) {
+      alert('Total images size should be less than 5MB');
       return;
     }
     
@@ -57,7 +59,7 @@ function AdminBanners() {
     const previews = [];
     let processed = 0;
     
-    files.forEach((file, index) => {
+    files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
         alert(`${file.name} is not an image file`);
         return;
@@ -72,8 +74,8 @@ function AdminBanners() {
           let width = img.width;
           let height = img.height;
           
-          // Resize for mobile optimization
-          const maxWidth = 800;
+          // Resize for better performance
+          const maxWidth = 1200;
           if (width > maxWidth) {
             height = (height * maxWidth) / width;
             width = maxWidth;
@@ -84,7 +86,7 @@ function AdminBanners() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           
-          const compressed = canvas.toDataURL('image/jpeg', 0.7);
+          const compressed = canvas.toDataURL('image/jpeg', 0.8);
           compressedImages.push(compressed);
           previews.push(compressed);
           processed++;
@@ -109,12 +111,35 @@ function AdminBanners() {
     setImagePreviews(newPreviews);
   };
 
+  // ✅ Reorder images (drag and drop style - simple up/down)
+  const moveImageUp = (index) => {
+    if (index === 0) return;
+    const newImages = [...formData.images];
+    const newPreviews = [...imagePreviews];
+    [newImages[index], newImages[index - 1]] = [newImages[index - 1], newImages[index]];
+    [newPreviews[index], newPreviews[index - 1]] = [newPreviews[index - 1], newPreviews[index]];
+    setFormData({ ...formData, images: newImages });
+    setImagePreviews(newPreviews);
+  };
+
+  const moveImageDown = (index) => {
+    if (index === formData.images.length - 1) return;
+    const newImages = [...formData.images];
+    const newPreviews = [...imagePreviews];
+    [newImages[index], newImages[index + 1]] = [newImages[index + 1], newImages[index]];
+    [newPreviews[index], newPreviews[index + 1]] = [newPreviews[index + 1], newPreviews[index]];
+    setFormData({ ...formData, images: newImages });
+    setImagePreviews(newPreviews);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.title) {
-      alert('Please fill title');
+    if (!formData.title && formData.images.length === 0) {
+      alert('Please fill title or upload at least one image');
       return;
     }
+
+    setUploading(true);
 
     if (editingBanner) {
       const updatedBanners = banners.map(b => 
@@ -137,6 +162,7 @@ function AdminBanners() {
       alert('Banner added successfully!');
     }
     resetForm();
+    setUploading(false);
   };
 
   const resetForm = () => {
@@ -144,11 +170,12 @@ function AdminBanners() {
     setFormData({
       title: '',
       subtitle: '',
-      buttonText: 'Shop Now',
+      buttonText: '',
       link: '/shop',
       images: [],
       order: banners.length,
-      active: true
+      active: true,
+      showTextOverlay: false
     });
     setImagePreviews([]);
   };
@@ -156,13 +183,14 @@ function AdminBanners() {
   const handleEdit = (banner) => {
     setEditingBanner(banner);
     setFormData({
-      title: banner.title,
+      title: banner.title || '',
       subtitle: banner.subtitle || '',
-      buttonText: banner.buttonText || 'Shop Now',
+      buttonText: banner.buttonText || '',
       link: banner.link || '/shop',
       images: banner.images || [],
       order: banner.order,
-      active: banner.active
+      active: banner.active,
+      showTextOverlay: banner.showTextOverlay || false
     });
     setImagePreviews(banner.images || []);
   };
@@ -240,32 +268,34 @@ function AdminBanners() {
               <h2 className="text-lg font-semibold mb-4">{editingBanner ? 'Edit Banner' : 'Add New Banner'}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Title *</label>
+                  <label className="block text-sm font-medium mb-1">Title (Optional)</label>
                   <input 
                     type="text" 
                     value={formData.title} 
                     onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                    placeholder="e.g., Summer Sale"
                     className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                    required 
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Subtitle</label>
+                  <label className="block text-sm font-medium mb-1">Subtitle (Optional)</label>
                   <input 
                     type="text" 
                     value={formData.subtitle} 
                     onChange={(e) => setFormData({...formData, subtitle: e.target.value})} 
+                    placeholder="e.g., Up to 50% off"
                     className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Button Text</label>
+                  <label className="block text-sm font-medium mb-1">Button Text (Optional)</label>
                   <input 
                     type="text" 
                     value={formData.buttonText} 
                     onChange={(e) => setFormData({...formData, buttonText: e.target.value})} 
+                    placeholder="e.g., Shop Now"
                     className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
                 </div>
@@ -278,6 +308,7 @@ function AdminBanners() {
                     onChange={(e) => setFormData({...formData, link: e.target.value})} 
                     className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
+                  <p className="text-xs text-gray-500 mt-1">e.g., /skincare, /makeup, /shop</p>
                 </div>
                 
                 <div>
@@ -290,32 +321,59 @@ function AdminBanners() {
                   />
                 </div>
                 
-                {/* ✅ Multiple Images Upload */}
+                {/* ✅ Multiple Images Upload - Ek saath multiple select */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Banner Images (Select multiple)</label>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    multiple
-                    onChange={handleMultipleImages} 
-                    className="w-full border rounded-md px-3 py-2 text-sm"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">You can select up to 5 images at once (max 3MB total)</p>
+                  <label className="block text-sm font-medium mb-1">Banner Images</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-pink-500 transition">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple
+                      onChange={handleMultipleImages} 
+                      className="w-full text-sm cursor-pointer"
+                      id="imageUpload"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Select multiple images at once (Ctrl+Click or Cmd+Click)
+                    </p>
+                    <p className="text-xs text-gray-400">Max 6 images, total under 5MB</p>
+                  </div>
                   
                   {imagePreviews.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 mt-3">
-                      {imagePreviews.map((preview, idx) => (
-                        <div key={idx} className="relative">
-                          <img src={preview} alt={`Preview ${idx + 1}`} className="h-20 w-full object-cover rounded-md" />
-                          <button 
-                            type="button"
-                            onClick={() => removeImage(idx)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                    <div className="mt-3">
+                      <p className="text-sm font-medium mb-2">Images ({imagePreviews.length})</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {imagePreviews.map((preview, idx) => (
+                          <div key={idx} className="relative group border rounded-lg overflow-hidden">
+                            <img src={preview} alt={`Preview ${idx + 1}`} className="h-24 w-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
+                              <button 
+                                type="button"
+                                onClick={() => moveImageUp(idx)}
+                                className="bg-white text-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-pink-500 hover:text-white"
+                                disabled={idx === 0}
+                              >
+                                ↑
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => moveImageDown(idx)}
+                                className="bg-white text-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-pink-500 hover:text-white"
+                                disabled={idx === imagePreviews.length - 1}
+                              >
+                                ↓
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => removeImage(idx)}
+                                className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -331,10 +389,23 @@ function AdminBanners() {
                     <span>Active (show on homepage)</span>
                   </label>
                 </div>
+
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.showTextOverlay} 
+                      onChange={(e) => setFormData({...formData, showTextOverlay: e.target.checked})} 
+                      className="w-4 h-4 text-pink-500"
+                    />
+                    <span>Show text overlay on image</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">If unchecked, only image will be shown (no title/subtitle/button on banner)</p>
+                </div>
                 
                 <div className="flex gap-3 pt-2">
-                  <button type="submit" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-md hover:shadow-lg transition">
-                    {editingBanner ? 'Update Banner' : 'Add Banner'}
+                  <button type="submit" disabled={uploading} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-md hover:shadow-lg transition disabled:opacity-50">
+                    {uploading ? 'Saving...' : (editingBanner ? 'Update Banner' : 'Add Banner')}
                   </button>
                   {editingBanner && (
                     <button type="button" onClick={resetForm} className="bg-gray-300 px-6 py-2 rounded-md hover:bg-gray-400 transition">
@@ -354,30 +425,37 @@ function AdminBanners() {
                 <div className="space-y-4 max-h-[500px] overflow-y-auto">
                   {banners.map((banner) => (
                     <div key={banner.id} className="border rounded-lg p-3 sm:p-4">
-                      {/* Image Carousel Preview */}
+                      {/* Images Preview */}
                       <div className="relative">
                         {banner.images && banner.images.length > 0 ? (
                           <>
                             <img 
                               src={banner.images[0]} 
-                              alt={banner.title} 
-                              className="h-32 w-full object-cover rounded-md mb-3" 
+                              alt={banner.title || 'Banner'} 
+                              className="h-32 w-full object-cover rounded-md mb-2" 
                             />
                             {banner.images.length > 1 && (
-                              <span className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                                +{banner.images.length - 1} more
-                              </span>
+                              <div className="flex gap-1 mt-1">
+                                {banner.images.slice(1, 4).map((img, idx) => (
+                                  <img key={idx} src={img} alt="" className="h-10 w-10 object-cover rounded-md" />
+                                ))}
+                                {banner.images.length > 4 && (
+                                  <span className="h-10 w-10 bg-gray-200 rounded-md flex items-center justify-center text-xs">
+                                    +{banner.images.length - 4}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </>
                         ) : (
-                          <div className="h-32 bg-gradient-to-r from-pink-100 to-rose-100 rounded-md mb-3 flex items-center justify-center">
+                          <div className="h-32 bg-gradient-to-r from-pink-100 to-rose-100 rounded-md mb-2 flex items-center justify-center">
                             <span className="text-3xl">🎨</span>
                           </div>
                         )}
                       </div>
                       
-                      <h3 className="font-semibold text-gray-800">{banner.title}</h3>
-                      <p className="text-sm text-gray-500 line-clamp-1">{banner.subtitle}</p>
+                      {banner.title && <h3 className="font-semibold text-gray-800 mt-2">{banner.title}</h3>}
+                      {banner.subtitle && <p className="text-sm text-gray-500">{banner.subtitle}</p>}
                       <p className="text-xs text-gray-400 mt-1">Order: {banner.order} | Images: {banner.images?.length || 0}</p>
                       
                       <div className="flex flex-wrap justify-between items-center mt-3 gap-2">
@@ -407,36 +485,51 @@ function AdminBanners() {
             </div>
           </div>
 
-          {/* Live Preview - Mobile Responsive */}
+          {/* Live Preview - Clean image only option */}
           <div className="mt-6 bg-white rounded-lg shadow p-4 sm:p-6">
             <h2 className="text-lg font-semibold mb-4">📱 Live Preview (How it looks on homepage)</h2>
             {banners.filter(b => b.active).length > 0 ? (
-              <div className="relative overflow-hidden rounded-lg">
-                {banners.filter(b => b.active)[0]?.images && banners.filter(b => b.active)[0]?.images[0] ? (
-                  <img 
-                    src={banners.filter(b => b.active)[0].images[0]} 
-                    alt="Preview" 
-                    className="w-full h-48 sm:h-56 md:h-64 object-cover" 
-                  />
-                ) : (
-                  <div className="w-full h-48 sm:h-56 md:h-64 bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center">
-                    <div className="text-center text-white">
-                      <span className="text-5xl mb-2 block">🌸</span>
-                      <h3 className="text-xl sm:text-2xl font-bold">{banners.filter(b => b.active)[0]?.title}</h3>
-                      <p className="text-sm mt-1">{banners.filter(b => b.active)[0]?.subtitle}</p>
-                      <button className="mt-3 bg-white text-pink-600 px-4 py-1.5 rounded-full text-sm font-semibold">
-                        {banners.filter(b => b.active)[0]?.buttonText || 'Shop Now'}
-                      </button>
-                    </div>
+              (() => {
+                const activeBanner = banners.filter(b => b.active)[0];
+                const showOverlay = activeBanner.showTextOverlay;
+                const hasTitle = activeBanner.title && activeBanner.title.trim() !== '';
+                
+                return (
+                  <div className="relative overflow-hidden rounded-lg">
+                    {activeBanner.images && activeBanner.images[0] ? (
+                      <img 
+                        src={activeBanner.images[0]} 
+                        alt={activeBanner.title || 'Banner'} 
+                        className="w-full h-48 sm:h-56 md:h-64 object-cover" 
+                      />
+                    ) : (
+                      <div className="w-full h-48 sm:h-56 md:h-64 bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <span className="text-5xl mb-2 block">🌸</span>
+                          {activeBanner.title && <h3 className="text-xl sm:text-2xl font-bold">{activeBanner.title}</h3>}
+                          {activeBanner.subtitle && <p className="text-sm mt-1">{activeBanner.subtitle}</p>}
+                          {activeBanner.buttonText && <button className="mt-3 bg-white text-pink-600 px-4 py-1.5 rounded-full text-sm font-semibold">{activeBanner.buttonText}</button>}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Text Overlay - Only if enabled and has content */}
+                    {showOverlay && hasTitle && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center pointer-events-none rounded-lg">
+                        <div className="text-center text-white">
+                          {activeBanner.title && <h3 className="text-xl sm:text-2xl font-bold drop-shadow-lg">{activeBanner.title}</h3>}
+                          {activeBanner.subtitle && <p className="text-sm drop-shadow-lg">{activeBanner.subtitle}</p>}
+                          {activeBanner.buttonText && (
+                            <button className="mt-2 bg-white text-pink-600 px-4 py-1.5 rounded-full text-sm font-semibold pointer-events-auto">
+                              {activeBanner.buttonText}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none rounded-lg">
-                  <div className="text-center text-white">
-                    <h3 className="text-lg sm:text-xl font-bold drop-shadow-lg">{banners.filter(b => b.active)[0]?.title}</h3>
-                    <p className="text-sm drop-shadow-lg">{banners.filter(b => b.active)[0]?.subtitle}</p>
-                  </div>
-                </div>
-              </div>
+                );
+              })()
             ) : (
               <div className="bg-gradient-to-r from-gray-200 to-gray-300 h-48 flex items-center justify-center rounded-lg">
                 <p className="text-gray-500">No active banners to preview</p>
