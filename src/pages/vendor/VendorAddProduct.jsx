@@ -41,9 +41,12 @@ function VendorAddProduct() {
   const [variationType, setVariationType] = useState('size');
   const [variationValue, setVariationValue] = useState('');
 
+  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+
   const categories = {
     'Skincare': ['Face Wash', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen'],
     'Makeup': ['Lipsticks', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush'],
+    'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask'],
     'Clothing': ['Dresses', 'Tops', 'Jeans', 'Skirts', 'Ethnic Wear'],
     'Accessories': ['Bags', 'Jewelry', 'Hair Accessories', 'Watches'],
   };
@@ -52,11 +55,65 @@ function VendorAddProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleImageUpload = (e) => {
+  // ✅ Upload image to backend (R2)
+  const uploadImageToBackend = async (file) => {
+    const formDataImg = new FormData();
+    formDataImg.append('images', file);
+    
+    const response = await fetch(`${API_URL}/api/upload`, {
+      method: 'POST',
+      body: formDataImg
+    });
+    
+    if (!response.ok) {
+      throw new Error('Image upload failed');
+    }
+    
+    const data = await response.json();
+    return data.url;
+  };
+
+  // ✅ Handle image upload - uploads directly to backend
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map(file => URL.createObjectURL(file));
-    setImages([...images, ...newImages]);
-    setImagePreview([...imagePreview, ...newImages]);
+    
+    if (images.length + files.length > 5) {
+      alert('You can upload maximum 5 images');
+      return;
+    }
+    
+    setLoading(true);
+    const uploadedUrls = [];
+    const previews = [];
+    
+    for (const file of files) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert(`Image ${file.name} is larger than 2MB. Please compress.`);
+        continue;
+      }
+      
+      if (!file.type.startsWith('image/')) {
+        alert(`File ${file.name} is not an image.`);
+        continue;
+      }
+      
+      try {
+        // Preview
+        const preview = URL.createObjectURL(file);
+        previews.push(preview);
+        
+        // Upload to backend
+        const imageUrl = await uploadImageToBackend(file);
+        uploadedUrls.push(imageUrl);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        alert(`Failed to upload ${file.name}. Please try again.`);
+      }
+    }
+    
+    setImages([...images, ...uploadedUrls]);
+    setImagePreview([...imagePreview, ...previews]);
+    setLoading(false);
   };
 
   const removeImage = (index) => {
@@ -103,10 +160,11 @@ function VendorAddProduct() {
   };
 
   const removeVariation = (index) => {
-    setFormData({ ...formData, variations: formData.variations.filter((_, i) !== index) });
+    setFormData({ ...formData, variations: formData.variations.filter((_, i) => i !== index) });
   };
 
-  const submitProduct = () => {
+  // ✅ Submit product to backend API
+  const submitProduct = async () => {
     if (!formData.productName || !formData.sellingPrice || !formData.quantity) {
       alert('Please fill all required fields');
       return;
@@ -115,44 +173,59 @@ function VendorAddProduct() {
     setLoading(true);
     
     const vendorData = JSON.parse(localStorage.getItem('vendor') || '{}');
-    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
     
-    const newProduct = {
-      id: Date.now(),
+    const productData = {
       name: formData.productName,
-      sku: formData.sku || 'SKU-' + Date.now(),
-      category: formData.category,
-      subCategory: formData.subCategory,
-      price: parseInt(formData.sellingPrice),
-      originalPrice: parseInt(formData.mrp) || parseInt(formData.sellingPrice),
+      brand: formData.brand || vendorData.brandName,
+      vendorName: vendorData.brandName || vendorData.name,
+      category: formData.subCategory || formData.category,
+      mainCategory: formData.category,
+      price: parseFloat(formData.sellingPrice),
+      originalPrice: parseFloat(formData.mrp) || parseFloat(formData.sellingPrice) * 1.2,
       stock: parseInt(formData.quantity),
-      status: 'active',
-      adminApproved: false,
-      vendor: vendorData.brandName || vendorData.name,
-      images: imagePreview,
-      description: formData.fullDescription,
+      sku: formData.sku || `SKU-${Date.now()}`,
+      images: images,
       shortDescription: formData.shortDescription,
+      description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
       specifications: formData.specifications,
       variations: formData.variations,
       weight: formData.weight,
       dimensions: formData.dimensions,
-      shippingCharges: formData.shippingCharges,
+      shippingCharges: parseFloat(formData.shippingCharges) || 0,
       seoTitle: formData.seoTitle,
       seoDescription: formData.seoDescription,
-      sales: 0,
-      rating: 0,
-      createdAt: new Date().toISOString(),
+      status: 'active',
+      adminApproved: false,  // Vendor products need admin approval
+      isNew: true,
+      rating: 0
     };
     
-    allProducts.push(newProduct);
-    localStorage.setItem('adminProductsList', JSON.stringify(allProducts));
-    
-    setTimeout(() => {
-      setLoading(false);
-      alert('Product submitted for admin approval!');
+    try {
+      const response = await fetch(`${API_URL}/api/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData)
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+      
+      const result = await response.json();
+      console.log('Product added:', result);
+      
+      alert('✓ Product submitted for admin approval!');
       navigate('/vendor/products');
-    }, 500);
+    } catch (error) {
+      console.error('Error adding product:', error);
+      alert('Failed to add product. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -168,9 +241,9 @@ function VendorAddProduct() {
               <p className="text-sm text-gray-500">List your product on MyPinkShop</p>
             </div>
             
-            <div className="flex border-b border-gray-200 bg-white px-6 py-3">
+            <div className="flex border-b border-gray-200 bg-white px-6 py-3 overflow-x-auto">
               {['Vital Info', 'Images', 'Pricing', 'Inventory', 'Variations', 'Description', 'Shipping', 'SEO'].map((label, idx) => (
-                <div key={idx} className="flex items-center">
+                <div key={idx} className="flex items-center flex-shrink-0">
                   <button onClick={() => setStep(idx + 1)} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition ${step === idx + 1 ? 'bg-pink-600 text-white' : step > idx + 1 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{idx + 1}</button>
                   <span className={`text-xs ml-1 mr-3 ${step === idx + 1 ? 'text-pink-600 font-medium' : 'text-gray-500'}`}>{label}</span>
                   {idx < 7 && <div className="w-6 h-px bg-gray-300 mr-3"></div>}
@@ -197,9 +270,9 @@ function VendorAddProduct() {
                   <h2 className="text-lg font-semibold">Product Images</h2>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <div className="flex flex-wrap gap-3 mb-4">{imagePreview.map((img, idx) => (<div key={idx} className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden"><img src={img} alt={`Product ${idx}`} className="w-full h-full object-cover" /><button onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs">✕</button></div>))}</div>
-                    <button type="button" onClick={() => fileInputRef.current.click()} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Upload Images</button>
+                    <button type="button" onClick={() => fileInputRef.current.click()} disabled={loading} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">{loading ? 'Uploading...' : 'Upload Images'}</button>
                     <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" />
-                    <p className="text-xs text-gray-400 mt-2">Upload up to 5 images. First image will be the main product image.</p>
+                    <p className="text-xs text-gray-400 mt-2">Upload up to 5 images. Max 2MB each. First image will be the main product image.</p>
                   </div>
                   <div className="flex justify-between pt-4"><button onClick={() => setStep(1)} className="px-5 py-2 border border-gray-300 rounded-lg">Back</button><button onClick={() => setStep(3)} className="bg-pink-600 text-white px-5 py-2 rounded-lg">Continue</button></div>
                 </div>
