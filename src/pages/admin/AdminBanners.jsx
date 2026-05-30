@@ -5,6 +5,7 @@ function AdminBanners() {
   const navigate = useNavigate();
   const [banners, setBanners] = useState([]);
   const [editingBanner, setEditingBanner] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
@@ -13,7 +14,7 @@ function AdminBanners() {
     images: [],
     order: 0,
     active: true,
-    showTextOverlay: false  // ✅ NEW - Text overlay on/off
+    showTextOverlay: false
   });
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -29,17 +30,86 @@ function AdminBanners() {
     loadBanners();
   }, [navigate]);
 
-  const loadBanners = () => {
-    const savedBanners = JSON.parse(localStorage.getItem('homepage_banners') || '[]');
-    setBanners(savedBanners.sort((a, b) => a.order - b.order));
+  // ✅ Load banners from BACKEND API
+  const loadBanners = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('https://mypinkshop-dr93.vercel.app/api/banners');
+      const data = await response.json();
+      setBanners(data.sort((a, b) => a.order - b.order));
+    } catch (error) {
+      console.error("Error loading banners:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const saveBanners = (updatedBanners) => {
-    localStorage.setItem('homepage_banners', JSON.stringify(updatedBanners));
-    setBanners(updatedBanners.sort((a, b) => a.order - b.order));
+  // ✅ Save banner to BACKEND API
+  const saveBannerToAPI = async (bannerData, isEdit = false) => {
+    const url = isEdit 
+      ? `https://mypinkshop-dr93.vercel.app/api/banners/${editingBanner._id || editingBanner.id}`
+      : 'https://mypinkshop-dr93.vercel.app/api/banners';
+    
+    const method = isEdit ? 'PUT' : 'POST';
+    
+    const formDataToSend = new FormData();
+    formDataToSend.append('title', bannerData.title);
+    formDataToSend.append('subtitle', bannerData.subtitle || '');
+    formDataToSend.append('buttonText', bannerData.buttonText || '');
+    formDataToSend.append('link', bannerData.link);
+    formDataToSend.append('order', bannerData.order);
+    formDataToSend.append('active', bannerData.active);
+    formDataToSend.append('showTextOverlay', bannerData.showTextOverlay);
+    
+    // Handle images - convert base64 to blob
+    if (bannerData.images && bannerData.images.length > 0) {
+      for (let i = 0; i < bannerData.images.length; i++) {
+        const image = bannerData.images[i];
+        if (typeof image === 'string' && image.startsWith('data:image')) {
+          // Convert base64 to blob
+          const blob = await fetch(image).then(res => res.blob());
+          formDataToSend.append('images', blob, `banner-${Date.now()}-${i}.jpg`);
+        }
+      }
+    }
+    
+    const response = await fetch(url, { 
+      method, 
+      body: formDataToSend 
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error);
+    }
+    
+    return response.json();
   };
 
-  // ✅ Multiple images upload - Ek saath select karo (Ctrl+click ya Cmd+click)
+  // ✅ Delete banner from BACKEND API
+  const deleteBannerFromAPI = async (id) => {
+    const response = await fetch(`https://mypinkshop-dr93.vercel.app/api/banners/${id}`, {
+      method: 'DELETE'
+    });
+    return response.json();
+  };
+
+  // ✅ Toggle active status
+  const toggleActive = async (id, currentStatus) => {
+    try {
+      const response = await fetch(`https://mypinkshop-dr93.vercel.app/api/banners/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !currentStatus })
+      });
+      if (response.ok) {
+        await loadBanners();
+      }
+    } catch (error) {
+      console.error("Error toggling banner:", error);
+    }
+  };
+
   const handleMultipleImages = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -55,9 +125,7 @@ function AdminBanners() {
       return;
     }
     
-    const compressedImages = [];
     const previews = [];
-    let processed = 0;
     
     files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
@@ -67,41 +135,16 @@ function AdminBanners() {
       
       const reader = new FileReader();
       reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          // Resize for better performance
-          const maxWidth = 1200;
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width;
-            width = maxWidth;
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          const compressed = canvas.toDataURL('image/jpeg', 0.8);
-          compressedImages.push(compressed);
-          previews.push(compressed);
-          processed++;
-          
-          if (processed === files.length) {
-            setFormData({ ...formData, images: compressedImages });
-            setImagePreviews(previews);
-          }
-        };
+        previews.push(event.target.result);
+        if (previews.length === files.length) {
+          setImagePreviews([...imagePreviews, ...previews]);
+          setFormData({ ...formData, images: [...formData.images, ...files] });
+        }
       };
       reader.readAsDataURL(file);
     });
   };
 
-  // ✅ Remove image from preview
   const removeImage = (index) => {
     const newImages = [...formData.images];
     const newPreviews = [...imagePreviews];
@@ -111,7 +154,6 @@ function AdminBanners() {
     setImagePreviews(newPreviews);
   };
 
-  // ✅ Reorder images (drag and drop style - simple up/down)
   const moveImageUp = (index) => {
     if (index === 0) return;
     const newImages = [...formData.images];
@@ -132,7 +174,7 @@ function AdminBanners() {
     setImagePreviews(newPreviews);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title && formData.images.length === 0) {
       alert('Please fill title or upload at least one image');
@@ -140,29 +182,23 @@ function AdminBanners() {
     }
 
     setUploading(true);
-
-    if (editingBanner) {
-      const updatedBanners = banners.map(b => 
-        b.id === editingBanner.id ? { 
-          ...formData, 
-          id: editingBanner.id,
-          images: formData.images || []
-        } : b
-      );
-      saveBanners(updatedBanners);
-      alert('Banner updated successfully!');
-    } else {
-      const newBanner = { 
-        ...formData, 
-        id: Date.now(), 
-        images: formData.images || [],
-        createdAt: new Date().toISOString() 
-      };
-      saveBanners([...banners, newBanner]);
-      alert('Banner added successfully!');
+    
+    try {
+      if (editingBanner) {
+        await saveBannerToAPI(formData, true);
+        alert('Banner updated successfully!');
+      } else {
+        await saveBannerToAPI(formData, false);
+        alert('Banner added successfully!');
+      }
+      await loadBanners();
+      resetForm();
+    } catch (error) {
+      console.error("Error saving banner:", error);
+      alert('Error saving banner: ' + error.message);
+    } finally {
+      setUploading(false);
     }
-    resetForm();
-    setUploading(false);
   };
 
   const resetForm = () => {
@@ -173,7 +209,7 @@ function AdminBanners() {
       buttonText: '',
       link: '/shop',
       images: [],
-      order: banners.length,
+      order: banners.length + 1,
       active: true,
       showTextOverlay: false
     });
@@ -195,15 +231,18 @@ function AdminBanners() {
     setImagePreviews(banner.images || []);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Delete this banner?')) {
-      saveBanners(banners.filter(b => b.id !== id));
-      if (editingBanner?.id === id) resetForm();
+      try {
+        await deleteBannerFromAPI(id);
+        alert('Banner deleted successfully!');
+        await loadBanners();
+        if (editingBanner?._id === id || editingBanner?.id === id) resetForm();
+      } catch (error) {
+        console.error("Error deleting banner:", error);
+        alert('Error deleting banner.');
+      }
     }
-  };
-
-  const toggleActive = (id) => {
-    saveBanners(banners.map(b => b.id === id ? { ...b, active: !b.active } : b));
   };
 
   const handleLogout = () => {
@@ -211,6 +250,14 @@ function AdminBanners() {
     localStorage.removeItem('adminLoggedIn');
     navigate('/admin/login');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -316,12 +363,12 @@ function AdminBanners() {
                   <input 
                     type="number" 
                     value={formData.order} 
-                    onChange={(e) => setFormData({...formData, order: parseInt(e.target.value)})} 
+                    onChange={(e) => setFormData({...formData, order: parseInt(e.target.value) || 0})} 
                     className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
                 </div>
                 
-                {/* ✅ Multiple Images Upload - Ek saath multiple select */}
+                {/* Multiple Images Upload */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Banner Images</label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-pink-500 transition">
@@ -331,7 +378,6 @@ function AdminBanners() {
                       multiple
                       onChange={handleMultipleImages} 
                       className="w-full text-sm cursor-pointer"
-                      id="imageUpload"
                     />
                     <p className="text-xs text-gray-500 mt-2">
                       Select multiple images at once (Ctrl+Click or Cmd+Click)
@@ -416,7 +462,7 @@ function AdminBanners() {
               </form>
             </div>
 
-            {/* List - Mobile Responsive */}
+            {/* List */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
               <h2 className="text-lg font-semibold mb-4">All Banners ({banners.length})</h2>
               {banners.length === 0 ? (
@@ -424,8 +470,7 @@ function AdminBanners() {
               ) : (
                 <div className="space-y-4 max-h-[500px] overflow-y-auto">
                   {banners.map((banner) => (
-                    <div key={banner.id} className="border rounded-lg p-3 sm:p-4">
-                      {/* Images Preview */}
+                    <div key={banner._id || banner.id} className="border rounded-lg p-3 sm:p-4">
                       <div className="relative">
                         {banner.images && banner.images.length > 0 ? (
                           <>
@@ -463,12 +508,12 @@ function AdminBanners() {
                           <button onClick={() => handleEdit(banner)} className="text-blue-500 text-sm hover:underline">
                             Edit
                           </button>
-                          <button onClick={() => handleDelete(banner.id)} className="text-red-500 text-sm hover:underline">
+                          <button onClick={() => handleDelete(banner._id || banner.id)} className="text-red-500 text-sm hover:underline">
                             Delete
                           </button>
                         </div>
                         <button 
-                          onClick={() => toggleActive(banner.id)} 
+                          onClick={() => toggleActive(banner._id || banner.id, banner.active)} 
                           className={`text-xs px-3 py-1 rounded-full transition ${
                             banner.active 
                               ? 'bg-green-100 text-green-700' 
@@ -485,9 +530,9 @@ function AdminBanners() {
             </div>
           </div>
 
-          {/* Live Preview - Clean image only option */}
+          {/* Live Preview */}
           <div className="mt-6 bg-white rounded-lg shadow p-4 sm:p-6">
-            <h2 className="text-lg font-semibold mb-4">📱 Live Preview (How it looks on homepage)</h2>
+            <h2 className="text-lg font-semibold mb-4">📱 Live Preview</h2>
             {banners.filter(b => b.active).length > 0 ? (
               (() => {
                 const activeBanner = banners.filter(b => b.active)[0];
@@ -513,7 +558,6 @@ function AdminBanners() {
                       </div>
                     )}
                     
-                    {/* Text Overlay - Only if enabled and has content */}
                     {showOverlay && hasTitle && (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center pointer-events-none rounded-lg">
                         <div className="text-center text-white">
@@ -538,15 +582,6 @@ function AdminBanners() {
           </div>
         </div>
       </div>
-
-      <style>{`
-        .line-clamp-1 {
-          display: -webkit-box;
-          -webkit-line-clamp: 1;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
     </div>
   );
 }
