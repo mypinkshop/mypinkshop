@@ -18,21 +18,36 @@ function ProductDetail() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
 
-  // Load product from localStorage
+  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+
+  // ✅ FIXED: Load product from backend API
   useEffect(() => {
-    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    const foundProduct = allProducts.find(p => p.id == id && p.adminApproved === true && p.status === 'active');
+    const loadProduct = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/api/products/${id}`);
+        
+        if (!response.ok) {
+          throw new Error('Product not found');
+        }
+        
+        const data = await response.json();
+        setProduct(data);
+        setSelectedImage(0);
+      } catch (error) {
+        console.error('Error loading product:', error);
+        setProduct(null);
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    if (foundProduct) {
-      setProduct(foundProduct);
-      setSelectedImage(0);
-    }
-    setLoading(false);
+    loadProduct();
   }, [id]);
 
   const handleAddToCart = () => {
     addToCart({ 
-      id: product.id,
+      id: product._id || product.id,
       name: product.name, 
       price: product.price,
       quantity: quantity,
@@ -44,17 +59,17 @@ function ProductDetail() {
   };
 
   const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
+    const productId = product._id || product.id;
+    if (isInWishlist(productId)) {
+      removeFromWishlist(productId);
     } else {
       addToWishlist(product);
     }
   };
 
-  // Get all product images
   const productImages = product?.images && product.images.length > 0 
     ? product.images 
-    : ['https://via.placeholder.com/500?text=No+Image'];
+    : ['https://via.placeholder.com/800x800?text=Product+Image'];
 
   if (loading) {
     return (
@@ -155,55 +170,55 @@ function ProductDetail() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-          <span className="text-gray-400">/</span>
-          <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition">Shop</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium line-clamp-1">{product.name}</span>
+        <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1">
+          <Link to="/" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Home</Link>
+          <span className="text-gray-400 whitespace-nowrap">/</span>
+          <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Shop</Link>
+          <span className="text-gray-400 whitespace-nowrap">/</span>
+          <span className="text-pink-600 font-medium truncate">{product.name}</span>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
-          {/* Left Column - Images (Full Size) */}
+          {/* Left Column - Images - FULL SIZE NO CROP */}
           <div>
-            {/* Main Image - Full size */}
-            <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100">
-              <div className="aspect-square w-full">
+            {/* Main Image - object-contain so full image visible */}
+            <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center p-4">
                 <img 
                   src={productImages[selectedImage]} 
                   alt={product.name} 
-                  className="w-full h-full object-contain p-4"
+                  className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
                 />
               </div>
               <button 
                 onClick={handleWishlistToggle} 
-                className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition"
+                className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition z-10"
               >
-                <span className="text-xl">{isInWishlist(product.id) ? '❤️' : '🤍'}</span>
+                <span className="text-xl">{isInWishlist(product._id || product.id) ? '❤️' : '🤍'}</span>
               </button>
               {product.badge && (
-                <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+                <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
                   {product.badge}
                 </span>
               )}
               {product.isNew && (
-                <span className="absolute bottom-4 left-4 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+                <span className="absolute bottom-4 left-4 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
                   NEW
                 </span>
               )}
             </div>
             
-            {/* Thumbnail Images */}
+            {/* Thumbnail Images - Responsive */}
             {productImages.length > 1 && (
-              <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
+              <div className="flex gap-2 sm:gap-3 mt-4 overflow-x-auto pb-2 scrollbar-hide">
                 {productImages.map((img, idx) => (
                   <button 
                     key={idx} 
                     onClick={() => setSelectedImage(idx)} 
-                    className={`w-16 h-16 sm:w-20 sm:h-20 border-2 rounded-lg overflow-hidden flex-shrink-0 transition ${
+                    className={`w-14 h-14 sm:w-20 sm:h-20 border-2 rounded-lg overflow-hidden flex-shrink-0 transition ${
                       selectedImage === idx ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'
                     }`}
                   >
@@ -215,13 +230,13 @@ function ProductDetail() {
           </div>
 
           {/* Right Column - Product Info */}
-          <div>
-            <div className="mb-2">
-              <span className="text-sm text-pink-600 font-medium capitalize">{product.category || 'Product'}</span>
+          <div className="space-y-4">
+            <div>
+              <span className="text-xs sm:text-sm text-pink-600 font-medium capitalize">{product.mainCategory || product.category || 'Product'}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-3">{product.name}</h1>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">{product.name}</h1>
             
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1">
                 <div className="flex text-yellow-400 text-sm sm:text-base">
                   {'★'.repeat(Math.floor(product.rating || 4))}
@@ -232,57 +247,57 @@ function ProductDetail() {
               <span className="text-gray-300">|</span>
               <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
               <span className="text-gray-300">|</span>
-              <span className="text-sm text-green-600">{product.stock > 0 ? 'In Stock' : 'Out of Stock'}</span>
+              <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
+              </span>
             </div>
 
-            <div className="mb-6">
-              <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl sm:text-4xl font-bold text-pink-600">₹{product.price}</span>
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <>
-                    <span className="text-base text-gray-400 line-through">₹{product.originalPrice}</span>
-                    <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-sm font-medium">
-                      {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
-                    </span>
-                  </>
-                )}
-              </div>
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-2xl sm:text-3xl font-bold text-pink-600">₹{product.price}</span>
+              {product.originalPrice && product.originalPrice > product.price && (
+                <>
+                  <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
+                  <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
+                    {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Short Description */}
-            <div className="mb-6 border-t border-gray-200 pt-4">
-              <p className="text-gray-600 leading-relaxed">{product.shortDescription || product.description || 'Premium quality product crafted with care for the modern woman.'}</p>
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{product.shortDescription || product.description || 'Premium quality product crafted with care for the modern woman.'}</p>
             </div>
 
             {/* Quantity Selector */}
-            <div className="mb-8">
+            <div>
               <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center border border-gray-300 rounded-full">
                   <button 
                     onClick={() => setQuantity(Math.max(1, quantity - 1))} 
-                    className="w-9 h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
                   >
                     -
                   </button>
-                  <span className="w-12 text-center font-medium">{quantity}</span>
+                  <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
                   <button 
                     onClick={() => setQuantity(Math.min(product.stock || 10, quantity + 1))} 
-                    className="w-9 h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
                   >
                     +
                   </button>
                 </div>
-                <span className="text-sm text-gray-500">{product.stock > 0 ? `${product.stock} items available` : 'Out of stock'}</span>
+                <span className="text-xs sm:text-sm text-gray-500">{product.stock > 0 ? `${product.stock} items available` : 'Out of stock'}</span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
                 onClick={handleAddToCart} 
                 disabled={product.stock === 0}
-                className={`flex-1 py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 ${
+                className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
                   product.stock > 0 
                     ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -293,7 +308,7 @@ function ProductDetail() {
               <button 
                 onClick={() => { handleAddToCart(); navigate('/cart'); }} 
                 disabled={product.stock === 0}
-                className={`flex-1 py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 ${
+                className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
                   product.stock > 0 
                     ? 'border-2 border-pink-500 text-pink-600 hover:bg-pink-50' 
                     : 'border-2 border-gray-300 text-gray-400 cursor-not-allowed'
@@ -305,38 +320,38 @@ function ProductDetail() {
 
             {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
-              <div className="flex justify-between py-1">
+              <div className="flex flex-wrap justify-between py-1 gap-2">
                 <span className="text-gray-500">Brand:</span>
-                <span className="text-gray-800 font-medium">{product.brand || 'MyPinkShop'}</span>
+                <span className="text-gray-800 font-medium text-right">{product.brand || 'MyPinkShop'}</span>
               </div>
-              <div className="flex justify-between py-1">
+              <div className="flex flex-wrap justify-between py-1 gap-2">
                 <span className="text-gray-500">Category:</span>
-                <span className="text-gray-800 capitalize">{product.category || 'General'}</span>
+                <span className="text-gray-800 capitalize text-right">{product.mainCategory || product.category || 'General'}</span>
               </div>
-              <div className="flex justify-between py-1">
+              <div className="flex flex-wrap justify-between py-1 gap-2">
                 <span className="text-gray-500">SKU:</span>
-                <span className="text-gray-800">{product.sku || 'N/A'}</span>
+                <span className="text-gray-800 text-right">{product.sku || product._id?.slice(-8) || 'N/A'}</span>
               </div>
-              <div className="flex justify-between py-1">
+              <div className="flex flex-wrap justify-between py-1 gap-2">
                 <span className="text-gray-500">Return Policy:</span>
-                <span className="text-gray-800">7 days return</span>
+                <span className="text-gray-800 text-right">7 days return</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs Section */}
+        {/* Tabs Section - Responsive */}
         <div className="mt-12">
-          <div className="flex flex-wrap gap-6 border-b border-gray-200 overflow-x-auto">
+          <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'benefits', 'specifications', 'reviews'].map(tab => (
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)} 
-                className={`pb-3 text-sm font-medium capitalize whitespace-nowrap transition ${
+                className={`pb-2 sm:pb-3 text-sm sm:text-base font-medium capitalize whitespace-nowrap transition ${
                   activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'
                 }`}
               >
-                {tab}
+                {tab === 'description' ? 'Description' : tab === 'benefits' ? 'Benefits' : tab === 'specifications' ? 'Specifications' : 'Reviews'}
               </button>
             ))}
           </div>
@@ -345,20 +360,20 @@ function ProductDetail() {
             {/* Description Tab */}
             {activeTab === 'description' && (
               <div className="space-y-6">
-                <p className="text-gray-600 leading-relaxed">{product.description || product.shortDescription || 'Premium quality product crafted with care.'}</p>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{product.description || product.shortDescription || 'Premium quality product crafted with care.'}</p>
                 {product.keyFeatures && product.keyFeatures.length > 0 && (
-                  <div className="bg-pink-50 rounded-xl p-6">
+                  <div className="bg-pink-50 rounded-xl p-4 sm:p-6">
                     <h4 className="font-medium text-gray-800 mb-3">Key Features</h4>
                     <ul className="space-y-2">
                       {product.keyFeatures.map((feature, idx) => (
-                        <li key={idx} className="flex items-center gap-2 text-gray-600">
+                        <li key={idx} className="flex items-center gap-2 text-gray-600 text-sm sm:text-base">
                           <span className="text-pink-500">✓</span> {feature}
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
-                <div className="bg-gray-50 rounded-xl p-6">
+                <div className="bg-gray-50 rounded-xl p-4 sm:p-6">
                   <h4 className="font-medium text-gray-800 mb-2">Shipping Info</h4>
                   <p className="text-gray-600 text-sm">Free shipping on orders above ₹999. Usually delivered in 3-5 business days.</p>
                 </div>
@@ -367,11 +382,11 @@ function ProductDetail() {
 
             {/* Benefits Tab */}
             {activeTab === 'benefits' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {(product.keyFeatures || ['Premium quality', 'Suitable for all', 'Dermatologically tested', 'Cruelty-free']).map((benefit, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-4 bg-pink-50 rounded-xl">
-                    <span className="text-pink-500 text-xl">✓</span>
-                    <span className="text-gray-700">{benefit}</span>
+                  <div key={idx} className="flex items-center gap-3 p-3 sm:p-4 bg-pink-50 rounded-xl">
+                    <span className="text-pink-500 text-lg sm:text-xl">✓</span>
+                    <span className="text-gray-700 text-sm sm:text-base">{benefit}</span>
                   </div>
                 ))}
               </div>
@@ -379,8 +394,8 @@ function ProductDetail() {
 
             {/* Specifications Tab */}
             {activeTab === 'specifications' && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm min-w-[300px]">
                   <tbody className="divide-y divide-gray-200">
                     {Object.entries(product.specifications || {
                       'Material': 'Premium Quality',
@@ -389,17 +404,17 @@ function ProductDetail() {
                       'Shelf Life': '24 Months'
                     }).map(([key, value], idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                        <td className="px-4 py-3 font-medium text-gray-700 w-1/3">{key}</td>
-                        <td className="px-4 py-3 text-gray-600">{value}</td>
-                      </tr>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600 text-sm">{value}</td>
+                       </tr>
                     ))}
                     <tr className="bg-white">
-                      <td className="px-4 py-3 font-medium text-gray-700">Weight</td>
-                      <td className="px-4 py-3 text-gray-600">{product.weight ? `${product.weight} kg` : 'N/A'}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700">Weight</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{product.weight ? `${product.weight} kg` : 'N/A'}</td>
                     </tr>
                     <tr className="bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-700">Dimensions</td>
-                      <td className="px-4 py-3 text-gray-600">{product.dimensions || 'N/A'}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700">Dimensions</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600">{product.dimensions || 'N/A'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -461,6 +476,16 @@ function ProductDetail() {
           </div>
         </div>
       </footer>
+
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
