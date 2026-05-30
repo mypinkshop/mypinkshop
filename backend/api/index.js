@@ -37,11 +37,14 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// ✅ FIXED: Complete product schema
 const productSchema = new mongoose.Schema({
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  vendorName: { type: String },
+  vendorName: { type: String, default: '' },
   name: { type: String, required: true },
-  category: { type: String, enum: ['skincare', 'makeup', 'hair', 'clothing', 'accessories'], required: true },
+  brand: { type: String, default: '' },
+  category: { type: String, required: true },
+  mainCategory: { type: String, default: '' },
   price: { type: Number, required: true },
   originalPrice: { type: Number, required: true },
   emoji: { type: String, default: '🛍️' },
@@ -51,6 +54,16 @@ const productSchema = new mongoose.Schema({
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   adminApproved: { type: Boolean, default: true },
   images: { type: [String], default: [] },
+  shortDescription: { type: String, default: '' },
+  description: { type: String, default: '' },
+  keyFeatures: { type: [String], default: [] },
+  specifications: { type: Object, default: {} },
+  weight: { type: String, default: '' },
+  dimensions: { type: String, default: '' },
+  shippingCharges: { type: Number, default: 0 },
+  seoTitle: { type: String, default: '' },
+  seoDescription: { type: String, default: '' },
+  seoKeywords: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -208,19 +221,31 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// Add new product
+// ✅ FIXED: Add new product with all fields
 app.post('/api/products', async (req, res) => {
   try {
     await connectDB();
     
     const product = new Product({
       name: req.body.name,
-      vendorName: req.body.vendorName || req.body.brand,
+      brand: req.body.brand || req.body.vendorName || '',
+      vendorName: req.body.vendorName || req.body.brand || '',
       category: req.body.category,
+      mainCategory: req.body.mainCategory || '',
       price: req.body.price,
       originalPrice: req.body.originalPrice || req.body.price * 1.2,
       stock: req.body.stock || 0,
       images: req.body.images || [],
+      shortDescription: req.body.shortDescription || '',
+      description: req.body.description || '',
+      keyFeatures: req.body.keyFeatures || [],
+      specifications: req.body.specifications || {},
+      weight: req.body.weight || '',
+      dimensions: req.body.dimensions || '',
+      shippingCharges: req.body.shippingCharges || 0,
+      seoTitle: req.body.seoTitle || '',
+      seoDescription: req.body.seoDescription || '',
+      seoKeywords: req.body.seoKeywords || '',
       badge: req.body.badge || '',
       rating: req.body.rating || 4.0,
       status: 'active',
