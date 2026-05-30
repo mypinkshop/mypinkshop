@@ -129,6 +129,8 @@ function Shop() {
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
 
+  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+
   // Get category from URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -145,15 +147,34 @@ function Shop() {
       setSortBy('rating');
     }
     
-    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    let approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
+    // ✅ Load products from backend API
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/api/products`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        let data = await response.json();
+        
+        // Apply offer filter if needed
+        if (offer === 'sale') {
+          data = data.filter(p => p.badge === 'Sale');
+        }
+        
+        setProducts(data);
+        console.log("✅ Loaded products from API:", data.length);
+      } catch (error) {
+        console.error("Error loading products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    if (offer === 'sale') {
-      approvedProducts = approvedProducts.filter(p => p.badge === 'Sale');
-    }
-    
-    setProducts(approvedProducts);
-    setLoading(false);
+    loadProducts();
   }, [location]);
 
   // Apply filters and sorting
@@ -161,7 +182,7 @@ function Shop() {
     let filtered = [...products];
 
     if (searchTerm) {
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      filtered = filtered.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()));
     }
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => p.category === selectedCategory);
@@ -179,8 +200,8 @@ function Shop() {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => (b.id || 0) - (a.id || 0)); break;
-      default: filtered.sort((a, b) => (a.id || 0) - (b.id || 0));
+      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
+      default: break;
     }
     
     setFilteredProducts(filtered);
@@ -195,11 +216,12 @@ function Shop() {
     setSortBy('default');
   };
 
-  // ✅ Category chips for mobile
+  // Category chips
   const categoryChips = [
     { id: 'all', name: 'All', icon: '✨' },
     { id: 'skincare', name: 'Skincare', icon: '🧴' },
     { id: 'makeup', name: 'Makeup', icon: '💄' },
+    { id: 'hair', name: 'Hair', icon: '💇‍♀️' },
     { id: 'clothing', name: 'Clothing', icon: '👗' },
     { id: 'accessories', name: 'Accessories', icon: '👜' },
   ];
@@ -208,6 +230,7 @@ function Shop() {
     { id: 'all', name: 'All Products', count: products.length },
     { id: 'skincare', name: 'Skincare', count: products.filter(p => p.category === 'skincare').length },
     { id: 'makeup', name: 'Makeup', count: products.filter(p => p.category === 'makeup').length },
+    { id: 'hair', name: 'Hair', count: products.filter(p => p.category === 'hair').length },
     { id: 'clothing', name: 'Clothing', count: products.filter(p => p.category === 'clothing').length },
     { id: 'accessories', name: 'Accessories', count: products.filter(p => p.category === 'accessories').length },
   ];
@@ -226,7 +249,7 @@ function Shop() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Premium Top Bar - Same as Homepage */}
+      {/* Premium Top Bar */}
       <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
         <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
           <span>✨</span>
@@ -239,7 +262,7 @@ function Shop() {
         </div>
       </div>
 
-      {/* Premium Header - Same as Homepage */}
+      {/* Premium Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -293,7 +316,7 @@ function Shop() {
         </div>
       </header>
 
-      {/* ✅ Category Chips - Mobile Friendly */}
+      {/* Category Chips */}
       <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-pink-100 shadow-sm overflow-x-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
@@ -497,7 +520,7 @@ function Shop() {
         </div>
       </div>
 
-      {/* Premium Footer - Same as Homepage */}
+      {/* Premium Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -513,10 +536,11 @@ function Shop() {
             <div>
               <h4 className="font-semibold text-white mb-4">Shop</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
               </ul>
             </div>
             <div>
