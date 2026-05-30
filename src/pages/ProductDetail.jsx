@@ -20,9 +20,16 @@ function ProductDetail() {
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
-  // ✅ FIXED: Load product from backend API
+  // ✅ Load product from backend API
   useEffect(() => {
     const loadProduct = async () => {
+      if (!id || id === 'undefined') {
+        console.error('Invalid product ID:', id);
+        setProduct(null);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const response = await fetch(`${API_URL}/api/products/${id}`);
@@ -32,8 +39,14 @@ function ProductDetail() {
         }
         
         const data = await response.json();
-        setProduct(data);
-        setSelectedImage(0);
+        
+        if (data && data._id) {
+          setProduct(data);
+          setSelectedImage(0);
+        } else {
+          console.error('Invalid product data received', data);
+          setProduct(null);
+        }
       } catch (error) {
         console.error('Error loading product:', error);
         setProduct(null);
@@ -46,8 +59,9 @@ function ProductDetail() {
   }, [id]);
 
   const handleAddToCart = () => {
+    if (!product) return;
     addToCart({ 
-      id: product._id || product.id,
+      id: product._id,
       name: product.name, 
       price: product.price,
       quantity: quantity,
@@ -59,7 +73,8 @@ function ProductDetail() {
   };
 
   const handleWishlistToggle = () => {
-    const productId = product._id || product.id;
+    if (!product) return;
+    const productId = product._id;
     if (isInWishlist(productId)) {
       removeFromWishlist(productId);
     } else {
@@ -182,9 +197,8 @@ function ProductDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
-          {/* Left Column - Images - FULL SIZE NO CROP */}
+          {/* Left Column - Images */}
           <div>
-            {/* Main Image - object-contain so full image visible */}
             <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex items-center justify-center">
               <div className="w-full h-full flex items-center justify-center p-4">
                 <img 
@@ -197,7 +211,7 @@ function ProductDetail() {
                 onClick={handleWishlistToggle} 
                 className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition z-10"
               >
-                <span className="text-xl">{isInWishlist(product._id || product.id) ? '❤️' : '🤍'}</span>
+                <span className="text-xl">{isInWishlist(product._id) ? '❤️' : '🤍'}</span>
               </button>
               {product.badge && (
                 <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
@@ -211,7 +225,6 @@ function ProductDetail() {
               )}
             </div>
             
-            {/* Thumbnail Images - Responsive */}
             {productImages.length > 1 && (
               <div className="flex gap-2 sm:gap-3 mt-4 overflow-x-auto pb-2 scrollbar-hide">
                 {productImages.map((img, idx) => (
@@ -264,12 +277,10 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Short Description */}
             <div className="border-t border-gray-200 pt-4">
               <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{product.shortDescription || product.description || 'Premium quality product crafted with care for the modern woman.'}</p>
             </div>
 
-            {/* Quantity Selector */}
             <div>
               <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
               <div className="flex items-center gap-4 flex-wrap">
@@ -292,7 +303,6 @@ function ProductDetail() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
                 onClick={handleAddToCart} 
@@ -318,7 +328,6 @@ function ProductDetail() {
               </button>
             </div>
 
-            {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
               <div className="flex flex-wrap justify-between py-1 gap-2">
                 <span className="text-gray-500">Brand:</span>
@@ -340,7 +349,7 @@ function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs Section - Responsive */}
+        {/* Tabs Section */}
         <div className="mt-12">
           <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'benefits', 'specifications', 'reviews'].map(tab => (
@@ -357,7 +366,6 @@ function ProductDetail() {
           </div>
 
           <div className="py-6">
-            {/* Description Tab */}
             {activeTab === 'description' && (
               <div className="space-y-6">
                 <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{product.description || product.shortDescription || 'Premium quality product crafted with care.'}</p>
@@ -380,7 +388,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Benefits Tab */}
             {activeTab === 'benefits' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {(product.keyFeatures || ['Premium quality', 'Suitable for all', 'Dermatologically tested', 'Cruelty-free']).map((benefit, idx) => (
@@ -392,7 +399,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Specifications Tab */}
             {activeTab === 'specifications' && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm min-w-[300px]">
@@ -421,7 +427,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Reviews Tab */}
             {activeTab === 'reviews' && (
               <ReviewSection productId={id} />
             )}
