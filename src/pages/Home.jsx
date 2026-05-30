@@ -92,24 +92,20 @@ function Home() {
     setLoading(false);
   }, []);
 
-  // ✅ FIXED: Load banners from localStorage - NO DUMMY BANNERS
+  // ✅ UPDATED: Load banners from backend API (not localStorage)
   useEffect(() => {
-    try {
-      const savedBanners = localStorage.getItem('homepage_banners');
-      
-      if (savedBanners && savedBanners !== '[]') {
-        const parsed = JSON.parse(savedBanners);
-        const activeBanners = parsed.filter(b => b.active).sort((a, b) => a.order - b.order);
-        setBanners(activeBanners);
-        console.log("✅ Loaded banners from localStorage:", activeBanners.length);
-      } else {
-        console.log("No banners found in localStorage");
+    const loadBanners = async () => {
+      try {
+        const response = await fetch('/api/banners/active');
+        const data = await response.json();
+        setBanners(data);
+        console.log("✅ Loaded banners from API:", data.length);
+      } catch (error) {
+        console.error("Error loading banners:", error);
         setBanners([]);
       }
-    } catch (error) {
-      console.error("Error loading banners:", error);
-      setBanners([]);
-    }
+    };
+    loadBanners();
   }, []);
 
   // Auto slide for carousel
@@ -249,7 +245,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Hero Carousel - FIXED: Shows real banners from admin or fallback */}
+      {/* Hero Carousel - Loads from backend API */}
       {banners.length > 0 ? (
         <div className="relative overflow-hidden group">
           <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
@@ -277,15 +273,20 @@ function Home() {
                       </div>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
-                    <div className="text-center text-white px-4 animate-fade-in-up">
-                      <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 sm:mb-4 drop-shadow-lg">{banner.title}</h2>
-                      <p className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 drop-shadow">{banner.subtitle}</p>
-                      <button className="bg-white text-pink-600 px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
-                        {banner.buttonText}
-                      </button>
+                  {/* Text Overlay - Only if showTextOverlay is true */}
+                  {banner.showTextOverlay !== false && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
+                      <div className="text-center text-white px-4 animate-fade-in-up">
+                        {banner.title && <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 sm:mb-4 drop-shadow-lg">{banner.title}</h2>}
+                        {banner.subtitle && <p className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 drop-shadow">{banner.subtitle}</p>}
+                        {banner.buttonText && (
+                          <button className="bg-white text-pink-600 px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:bg-gray-100 hover:scale-105 transition-all shadow-lg">
+                            {banner.buttonText}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </Link>
             ))}
@@ -327,7 +328,7 @@ function Home() {
           )}
         </div>
       ) : (
-        /* Fallback Banner - Jab admin se koi banner add nahi kiya */
+        /* Fallback Banner - Jab API se koi banner nahi aaya */
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-10 left-10 text-7xl">🎀</div>
