@@ -5,19 +5,26 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ Product Card Component
+// ✅ Product Card Component - FIXED
 const ProductCard = ({ product, addToCart, isInWishlist }) => {
   const [imgError, setImgError] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
+
+  const handleAddToCart = () => {
+    addToCart(product);
+    setIsAdded(true);
+    setTimeout(() => setIsAdded(false), 2000);
+  };
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+      <Link to={`/product/${product._id}`}>
+        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
               onError={() => setImgError(true)}
               loading="lazy"
             />
@@ -26,12 +33,12 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
               {product.emoji || '✨'}
             </div>
           )}
-          {product.badge && <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">{product.badge}</span>}
-          {product.isNew && <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">NEW</span>}
+          {product.badge && <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">{product.badge}</span>}
+          {product.isNew && <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">NEW</span>}
         </div>
       </Link>
       <div className="p-4">
-        <Link to={`/product/${product.id}`}>
+        <Link to={`/product/${product._id}`}>
           <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">{product.name}</h3>
         </Link>
         <div className="flex items-center gap-1 mb-2">
@@ -47,8 +54,15 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
             <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
           )}
         </div>
-        <button onClick={() => addToCart(product)} className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5">
-          Add to Cart
+        <button 
+          onClick={handleAddToCart} 
+          className={`w-full py-2 rounded-full text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+            isAdded 
+              ? 'bg-green-500 text-white hover:bg-green-600' 
+              : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
+          }`}
+        >
+          {isAdded ? '✓ Go to Cart' : 'Add to Cart'}
         </button>
       </div>
     </div>
@@ -84,7 +98,7 @@ function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  // ✅ FIXED: Load products from backend API (not localStorage)
+  // Load products from backend API
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -196,7 +210,6 @@ function Home() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            {/* Logo */}
             <Link to="/" className="flex items-center gap-2 shrink-0 group">
               <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
@@ -267,7 +280,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Hero Carousel - Loads from backend API */}
+      {/* Hero Carousel */}
       {banners.length > 0 ? (
         <div className="relative overflow-hidden group">
           <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
@@ -295,7 +308,6 @@ function Home() {
                       </div>
                     </div>
                   )}
-                  {/* Text Overlay - Only if showTextOverlay is true */}
                   {banner.showTextOverlay !== false && (
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
                       <div className="text-center text-white px-4 animate-fade-in-up">
@@ -350,7 +362,6 @@ function Home() {
           )}
         </div>
       ) : (
-        /* Fallback Banner */
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-10 left-10 text-7xl">🎀</div>
@@ -421,7 +432,7 @@ function Home() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
               {featuredProducts.map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
+                <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
               ))}
             </div>
           </div>
@@ -438,7 +449,7 @@ function Home() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               {bestsellerProducts.slice(0, 4).map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
+                <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
               ))}
             </div>
           </div>
@@ -455,7 +466,7 @@ function Home() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               {newArrivals.map(product => (
-                <ProductCard key={product.id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product.id)} />
+                <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
               ))}
             </div>
           </div>
