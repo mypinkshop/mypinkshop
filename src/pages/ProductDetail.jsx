@@ -17,7 +17,7 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
-  const [addedToCart, setAddedToCart] = useState(false); // ✅ NEW STATE
+  const [addedToCart, setAddedToCart] = useState(false);
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
@@ -25,7 +25,6 @@ function ProductDetail() {
   useEffect(() => {
     const loadProduct = async () => {
       if (!id || id === 'undefined') {
-        console.error('Invalid product ID:', id);
         setProduct(null);
         setLoading(false);
         return;
@@ -45,7 +44,6 @@ function ProductDetail() {
           setProduct(data);
           setSelectedImage(0);
         } else {
-          console.error('Invalid product data received', data);
           setProduct(null);
         }
       } catch (error) {
@@ -59,15 +57,38 @@ function ProductDetail() {
     loadProduct();
   }, [id]);
 
-  // ✅ NEW: Handle cart button click (same as Home.jsx)
+  // ✅ Quantity handlers - zero allowed
+  const decreaseQuantity = () => {
+    if (quantity > 0) {
+      setQuantity(quantity - 1);
+      // If quantity becomes zero, reset addedToCart state
+      if (quantity - 1 === 0) {
+        setAddedToCart(false);
+      }
+    }
+  };
+
+  const increaseQuantity = () => {
+    if (product && quantity < product.stock) {
+      setQuantity(quantity + 1);
+    }
+  };
+
+  // ✅ Handle Add to Cart / Go to Cart (No popup)
   const handleCartButtonClick = () => {
     if (!product) return;
+    
+    // Can't add zero quantity
+    if (quantity === 0) {
+      alert('Please select at least 1 quantity');
+      return;
+    }
     
     if (addedToCart) {
       // Already added → Go to Cart
       navigate('/cart');
     } else {
-      // Add to cart first
+      // Add to cart (no popup)
       addToCart({ 
         id: product._id,
         name: product.name, 
@@ -81,9 +102,15 @@ function ProductDetail() {
     }
   };
 
-  // ✅ Buy Now button - direct to cart
+  // ✅ Buy Now - direct to cart (no popup)
   const handleBuyNow = () => {
     if (!product) return;
+    
+    if (quantity === 0) {
+      alert('Please select at least 1 quantity');
+      return;
+    }
+    
     addToCart({ 
       id: product._id,
       name: product.name, 
@@ -137,6 +164,9 @@ function ProductDetail() {
       </div>
     );
   }
+
+  // Button disabled when quantity is 0 or stock is 0
+  const isButtonDisabled = product.stock === 0 || quantity === 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -285,7 +315,7 @@ function ProductDetail() {
               <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
               <span className="text-gray-300">|</span>
               <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
+                {product.stock > 0 ? `${product.stock} items available` : 'Out of Stock'}
               </span>
             </div>
 
@@ -305,56 +335,62 @@ function ProductDetail() {
               <p className="text-gray-600 leading-relaxed text-sm sm:text-base">{product.shortDescription || product.description || 'Premium quality product crafted with care for the modern woman.'}</p>
             </div>
 
+            {/* ✅ Quantity Selector - Zero allowed */}
             <div>
               <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center border border-gray-300 rounded-full">
                   <button 
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))} 
+                    onClick={decreaseQuantity}
                     className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
                   >
                     -
                   </button>
                   <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
                   <button 
-                    onClick={() => setQuantity(Math.min(product.stock || 10, quantity + 1))} 
+                    onClick={increaseQuantity}
                     className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium"
+                    disabled={quantity >= product.stock}
                   >
                     +
                   </button>
                 </div>
-                <span className="text-xs sm:text-sm text-gray-500">{product.stock > 0 ? `${product.stock} items available` : 'Out of stock'}</span>
+                <span className="text-xs sm:text-sm text-gray-500">
+                  {product.stock > 0 ? `${product.stock} items available` : 'Out of stock'}
+                  {quantity === 0 && <span className="text-amber-500 ml-2">⚠ Select quantity</span>}
+                </span>
               </div>
             </div>
 
-            {/* ✅ FIXED: Action Buttons */}
+            {/* ✅ Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
                 onClick={handleCartButtonClick}
-                disabled={product.stock === 0}
+                disabled={isButtonDisabled}
                 className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
-                  product.stock > 0 
-                    ? addedToCart
+                  isButtonDisabled
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : addedToCart
                       ? 'bg-green-500 text-white hover:bg-green-600'
                       : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 {addedToCart ? '✓ Go to Cart' : 'Add to Cart'}
               </button>
               <button 
                 onClick={handleBuyNow}
-                disabled={product.stock === 0}
+                disabled={isButtonDisabled}
                 className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
-                  product.stock > 0 
-                    ? 'border-2 border-pink-500 text-pink-600 hover:bg-pink-50' 
-                    : 'border-2 border-gray-300 text-gray-400 cursor-not-allowed'
+                  isButtonDisabled
+                    ? 'border-2 border-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'border-2 border-pink-500 text-pink-600 hover:bg-pink-50'
                 }`}
               >
                 Buy Now
               </button>
             </div>
 
+            {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
               <div className="flex flex-wrap justify-between py-1 gap-2">
                 <span className="text-gray-500">Brand:</span>
