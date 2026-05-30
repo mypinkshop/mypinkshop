@@ -17,10 +17,11 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
+  const [addedToCart, setAddedToCart] = useState(false); // ✅ NEW STATE
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
-  // ✅ Load product from backend API
+  // Load product from backend API
   useEffect(() => {
     const loadProduct = async () => {
       if (!id || id === 'undefined') {
@@ -58,7 +59,30 @@ function ProductDetail() {
     loadProduct();
   }, [id]);
 
-  const handleAddToCart = () => {
+  // ✅ NEW: Handle cart button click (same as Home.jsx)
+  const handleCartButtonClick = () => {
+    if (!product) return;
+    
+    if (addedToCart) {
+      // Already added → Go to Cart
+      navigate('/cart');
+    } else {
+      // Add to cart first
+      addToCart({ 
+        id: product._id,
+        name: product.name, 
+        price: product.price,
+        quantity: quantity,
+        image: product.images && product.images[0] ? product.images[0] : null,
+        category: product.category,
+        stock: product.stock
+      });
+      setAddedToCart(true);
+    }
+  };
+
+  // ✅ Buy Now button - direct to cart
+  const handleBuyNow = () => {
     if (!product) return;
     addToCart({ 
       id: product._id,
@@ -69,7 +93,7 @@ function ProductDetail() {
       category: product.category,
       stock: product.stock
     });
-    alert(`✓ ${product.name} added to cart!`);
+    navigate('/cart');
   };
 
   const handleWishlistToggle = () => {
@@ -303,20 +327,23 @@ function ProductDetail() {
               </div>
             </div>
 
+            {/* ✅ FIXED: Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
-                onClick={handleAddToCart} 
+                onClick={handleCartButtonClick}
                 disabled={product.stock === 0}
                 className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
                   product.stock > 0 
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
+                    ? addedToCart
+                      ? 'bg-green-500 text-white hover:bg-green-600'
+                      : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Add to Cart
+                {addedToCart ? '✓ Go to Cart' : 'Add to Cart'}
               </button>
               <button 
-                onClick={() => { handleAddToCart(); navigate('/cart'); }} 
+                onClick={handleBuyNow}
                 disabled={product.stock === 0}
                 className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
                   product.stock > 0 
@@ -412,7 +439,7 @@ function ProductDetail() {
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                         <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
                         <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600 text-sm">{value}</td>
-                       </tr>
+                       学
                     ))}
                     <tr className="bg-white">
                       <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700">Weight</td>
