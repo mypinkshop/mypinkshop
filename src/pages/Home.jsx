@@ -92,11 +92,17 @@ function Home() {
     setLoading(false);
   }, []);
 
-  // ✅ UPDATED: Load banners from backend API (not localStorage)
+  // ✅ FIXED: Load banners from backend API with full URL
   useEffect(() => {
     const loadBanners = async () => {
       try {
-        const response = await fetch('/api/banners/active');
+        const API_URL = 'https://mypinkshop-dr93.vercel.app';
+        const response = await fetch(`${API_URL}/api/banners/active`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
         setBanners(data);
         console.log("✅ Loaded banners from API:", data.length);
