@@ -53,16 +53,16 @@ const productSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// ✅ Banner Schema (NEW)
+// ✅ UPDATED Banner Schema - Title optional, images array, showTextOverlay
 const bannerSchema = new mongoose.Schema({
-  title: { type: String, required: true },
+  title: { type: String, default: '' },
   subtitle: { type: String, default: '' },
-  buttonText: { type: String, default: 'Shop Now' },
+  buttonText: { type: String, default: '' },
   link: { type: String, default: '/shop' },
-  image: { type: String, default: '' },
-  imageKey: { type: String, default: '' },
+  images: { type: [String], default: [] },
   order: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
+  showTextOverlay: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -92,7 +92,7 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -141,7 +141,7 @@ const deleteFromR2 = async (key) => {
   }
 };
 
-// MongoDB connection (cached for serverless)
+// MongoDB connection
 let isConnected = false;
 
 const connectDB = async () => {
@@ -208,9 +208,9 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// ========== BANNER ROUTES (NEW with R2) ==========
+// ========== BANNER ROUTES ==========
 
-// Get all banners (for admin)
+// Get all banners (admin)
 app.get('/api/banners', async (req, res) => {
   try {
     await connectDB();
@@ -221,7 +221,7 @@ app.get('/api/banners', async (req, res) => {
   }
 });
 
-// Get active banners (for homepage)
+// Get active banners (homepage)
 app.get('/api/banners/active', async (req, res) => {
   try {
     await connectDB();
@@ -232,44 +232,44 @@ app.get('/api/banners/active', async (req, res) => {
   }
 });
 
-// Add new banner with image
-app.post('/api/banners', upload.single('image'), async (req, res) => {
+// Add new banner - supports multiple images
+app.post('/api/banners', upload.array('images', 6), async (req, res) => {
   try {
     await connectDB();
     
-    let imageUrl = '';
-    let imageKey = '';
+    const imageUrls = [];
     
-    if (req.file) {
-      const result = await uploadToR2(req.file, 'banners');
-      if (result.success) {
-        imageUrl = result.url;
-        imageKey = result.key;
-      } else {
-        return res.status(500).json({ success: false, error: result.error });
+    // Upload all images to R2
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const result = await uploadToR2(file, 'banners');
+        if (result.success) {
+          imageUrls.push(result.url);
+        }
       }
     }
     
     const banner = new Banner({
-      title: req.body.title,
+      title: req.body.title || '',
       subtitle: req.body.subtitle || '',
-      buttonText: req.body.buttonText || 'Shop Now',
+      buttonText: req.body.buttonText || '',
       link: req.body.link || '/shop',
-      image: imageUrl,
-      imageKey: imageKey,
+      images: imageUrls,
       order: parseInt(req.body.order) || 0,
-      active: req.body.active === 'true' || req.body.active === true
+      active: req.body.active === 'true' || req.body.active === true,
+      showTextOverlay: req.body.showTextOverlay === 'true' || req.body.showTextOverlay === true
     });
     
     await banner.save();
     res.json({ success: true, banner });
   } catch (error) {
+    console.error('Add banner error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Update banner
-app.put('/api/banners/:id', upload.single('image'), async (req, res) => {
+app.put('/api/banners/:id', upload.array('images', 6), async (req, res) => {
   try {
     await connectDB();
     const banner = await Banner.findById(req.params.id);
@@ -278,27 +278,31 @@ app.put('/api/banners/:id', upload.single('image'), async (req, res) => {
       return res.status(404).json({ success: false, error: 'Banner not found' });
     }
     
-    banner.title = req.body.title || banner.title;
-    banner.subtitle = req.body.subtitle || banner.subtitle;
-    banner.buttonText = req.body.buttonText || banner.buttonText;
-    banner.link = req.body.link || banner.link;
+    // Update text fields
+    banner.title = req.body.title || '';
+    banner.subtitle = req.body.subtitle || '';
+    banner.buttonText = req.body.buttonText || '';
+    banner.link = req.body.link || '/shop';
     banner.order = parseInt(req.body.order) || banner.order;
     banner.active = req.body.active === 'true' || req.body.active === true;
+    banner.showTextOverlay = req.body.showTextOverlay === 'true' || req.body.showTextOverlay === true;
     
-    if (req.file) {
-      if (banner.imageKey) {
-        await deleteFromR2(banner.imageKey);
+    // Upload new images if provided
+    if (req.files && req.files.length > 0) {
+      const newImageUrls = [];
+      for (const file of req.files) {
+        const result = await uploadToR2(file, 'banners');
+        if (result.success) {
+          newImageUrls.push(result.url);
+        }
       }
-      const result = await uploadToR2(req.file, 'banners');
-      if (result.success) {
-        banner.image = result.url;
-        banner.imageKey = result.key;
-      }
+      banner.images = [...banner.images, ...newImageUrls];
     }
     
     await banner.save();
     res.json({ success: true, banner });
   } catch (error) {
+    console.error('Update banner error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -313,13 +317,10 @@ app.delete('/api/banners/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Banner not found' });
     }
     
-    if (banner.imageKey) {
-      await deleteFromR2(banner.imageKey);
-    }
-    
     await Banner.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (error) {
+    console.error('Delete banner error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
