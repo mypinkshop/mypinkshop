@@ -46,7 +46,9 @@ function AdminAddProduct() {
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
 
-  // Load brands from localStorage
+  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+
+  // Load brands from localStorage (keep as is)
   useEffect(() => {
     const savedBrands = localStorage.getItem('brandsList');
     if (savedBrands) {
@@ -54,13 +56,12 @@ function AdminAddProduct() {
     }
   }, []);
 
-  // Save brands to localStorage
   const saveBrands = (updatedBrands) => {
     setBrands(updatedBrands);
     localStorage.setItem('brandsList', JSON.stringify(updatedBrands));
   };
 
-  // ✅ Base64 conversion function
+  // ✅ Convert image to base64 (for preview only, will upload to Cloudinary/R2)
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -70,7 +71,25 @@ function AdminAddProduct() {
     });
   };
 
-  // ✅ FIXED: Image upload with Base64 conversion
+  // ✅ Upload image to backend (which uploads to R2/Cloudinary)
+  const uploadImageToBackend = async (file) => {
+    const formDataImg = new FormData();
+    formDataImg.append('images', file);
+    
+    const response = await fetch(`${API_URL}/api/upload`, {
+      method: 'POST',
+      body: formDataImg
+    });
+    
+    if (!response.ok) {
+      throw new Error('Image upload failed');
+    }
+    
+    const data = await response.json();
+    return data.url; // Return the uploaded image URL
+  };
+
+  // ✅ Handle image upload - uploads directly to backend
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     
@@ -80,30 +99,38 @@ function AdminAddProduct() {
     }
     
     setUploadingImages(true);
-    const newImages = [];
+    const uploadedUrls = [];
+    const previews = [];
     
     for (const file of files) {
-      // Check file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert(`Image ${file.name} is larger than 2MB. Please compress and upload.`);
         continue;
       }
       
-      // Check file type
       if (!file.type.startsWith('image/')) {
         alert(`File ${file.name} is not an image.`);
         continue;
       }
       
       try {
-        const base64 = await convertToBase64(file);
-        newImages.push(base64);
+        // For preview (base64)
+        const preview = await convertToBase64(file);
+        previews.push(preview);
+        
+        // Upload to backend
+        const imageUrl = await uploadImageToBackend(file);
+        uploadedUrls.push(imageUrl);
       } catch (error) {
-        console.error('Error converting image:', error);
+        console.error('Error uploading image:', error);
+        alert(`Failed to upload ${file.name}. Please try again.`);
       }
     }
     
-    setFormData({ ...formData, images: [...formData.images, ...newImages] });
+    setFormData({ 
+      ...formData, 
+      images: [...formData.images, ...uploadedUrls] 
+    });
     setUploadingImages(false);
   };
 
@@ -133,6 +160,7 @@ function AdminAddProduct() {
   const categories = {
     'Skincare': ['Face Wash', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen', 'Masks', 'Eye Cream'],
     'Makeup': ['Lipsticks', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter'],
+    'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Styling Products'],
     'Clothing': ['Dresses', 'Tops', 'Jeans', 'Skirts', 'Ethnic Wear', 'Kurtis', 'Sarees', 'Jackets'],
     'Accessories': ['Bags', 'Jewelry', 'Hair Accessories', 'Watches', 'Sunglasses', 'Belts', 'Scarves'],
   };
@@ -165,7 +193,8 @@ function AdminAddProduct() {
     setFormData({ ...formData, specifications: newSpecs });
   };
 
-  const submitProduct = () => {
+  // ✅ Submit product to backend API
+  const submitProduct = async () => {
     if (!formData.productName || !formData.brand || !formData.category || !formData.sellingPrice || !formData.quantity) {
       alert('Please fill all required fields');
       return;
@@ -173,11 +202,10 @@ function AdminAddProduct() {
 
     setLoading(true);
 
-    const newProduct = {
-      id: Date.now(),
+    const productData = {
       name: formData.productName,
       brand: formData.brand,
-      vendor: formData.brand,
+      vendorName: formData.brand,
       category: formData.subCategory || formData.category,
       mainCategory: formData.category,
       price: parseFloat(formData.sellingPrice),
@@ -186,7 +214,7 @@ function AdminAddProduct() {
       stock: parseInt(formData.quantity),
       sku: formData.sku || `SKU-${Date.now()}`,
       lowStockThreshold: parseInt(formData.lowStockThreshold),
-      images: formData.images, // ✅ Now stores Base64 strings
+      images: formData.images,
       shortDescription: formData.shortDescription,
       description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
@@ -199,23 +227,37 @@ function AdminAddProduct() {
       seoTitle: formData.seoTitle,
       seoDescription: formData.seoDescription,
       seoKeywords: formData.seoKeywords,
-      rating: 0,
-      reviewCount: 0,
       status: 'active',
       adminApproved: true,
       isNew: true,
-      createdAt: new Date().toISOString(),
+      rating: 4.0
     };
 
-    const existingProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    existingProducts.push(newProduct);
-    localStorage.setItem('adminProductsList', JSON.stringify(existingProducts));
+    try {
+      const response = await fetch(`${API_URL}/api/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData)
+      });
 
-    setTimeout(() => {
-      setLoading(false);
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error);
+      }
+
+      const result = await response.json();
+      console.log('Product added:', result);
+      
       alert('✓ Product listed successfully!');
       navigate('/admin/inventory');
-    }, 500);
+    } catch (error) {
+      console.error('Error adding product:', error);
+      alert('Failed to add product. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const goToNextStep = () => {
@@ -492,7 +534,7 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 2: Images - FIXED with Base64 */}
+        {/* Step 2: Images - Uploads to backend directly */}
         {step === 2 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Product Images</h2>
@@ -517,7 +559,7 @@ function AdminAddProduct() {
               </div>
               <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" />
               <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer hover:bg-pink-50 transition text-pink-600 font-medium">
-                <IconUpload /> {uploadingImages ? 'Converting...' : 'Upload Images'}
+                <IconUpload /> {uploadingImages ? 'Uploading...' : 'Upload Images'}
               </label>
               <p className="text-xs text-gray-400 mt-3">Upload up to 5 images. Max 2MB each. First image will be the main product image.</p>
             </div>
