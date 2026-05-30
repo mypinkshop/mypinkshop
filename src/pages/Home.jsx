@@ -84,15 +84,31 @@ function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load approved products
+  // ✅ FIXED: Load products from backend API (not localStorage)
   useEffect(() => {
-    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
-    setProducts(approvedProducts);
-    setLoading(false);
+    const loadProducts = async () => {
+      try {
+        const API_URL = 'https://mypinkshop-dr93.vercel.app';
+        const response = await fetch(`${API_URL}/api/products`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setProducts(data);
+        console.log("✅ Loaded products from API:", data.length);
+      } catch (error) {
+        console.error("Error loading products:", error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProducts();
   }, []);
 
-  // ✅ FIXED: Load banners from backend API with full URL
+  // Load banners from backend API
   useEffect(() => {
     const loadBanners = async () => {
       try {
@@ -334,7 +350,7 @@ function Home() {
           )}
         </div>
       ) : (
-        /* Fallback Banner - Jab API se koi banner nahi aaya */
+        /* Fallback Banner */
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-10 left-10 text-7xl">🎀</div>
