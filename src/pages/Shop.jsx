@@ -5,20 +5,29 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ Product Card Component
+// ✅ Product Card Component - FIXED
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const navigate = useNavigate();
 
-  const handleAddToCart = () => {
+  const handleCartClick = () => {
+    if (isAdded) {
+      navigate('/cart');
+    } else {
+      addToCart(product);
+      setIsAdded(true);
+    }
+  };
+
+  const handleBuyNow = () => {
     addToCart(product);
-    setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 1500);
+    navigate('/cart');
   };
 
   const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
+    if (isInWishlist(product._id || product.id)) {
+      removeFromWishlist(product._id || product.id);
     } else {
       addToWishlist(product);
     }
@@ -26,13 +35,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+      <Link to={`/product/${product._id || product.id}`}>
+        <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
               onError={() => setImgError(true)}
               loading="lazy"
             />
@@ -42,17 +51,17 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
@@ -60,7 +69,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       </Link>
       
       <div className="p-4">
-        <Link to={`/product/${product.id}`}>
+        <Link to={`/product/${product._id || product.id}`}>
           <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
             {product.name}
           </h3>
@@ -88,22 +97,29 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         
         <div className="flex gap-2">
           <button 
-            onClick={handleAddToCart} 
+            onClick={handleCartClick}
             disabled={product.stock === 0}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
               product.stock > 0 
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5' 
+                ? isAdded
+                  ? 'bg-green-500 text-white hover:bg-green-600'
+                  : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {isAdded ? 'Added! ✓' : 'Add to Cart'}
+            {isAdded ? '✓ Go to Cart' : 'Add to Cart'}
           </button>
           
           <button 
-            onClick={handleWishlistToggle}
-            className="w-10 py-2 border border-pink-200 rounded-xl text-center hover:bg-pink-50 transition transform hover:-translate-y-0.5"
+            onClick={handleBuyNow}
+            disabled={product.stock === 0}
+            className={`w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 ${
+              product.stock > 0 
+                ? 'border border-pink-200 hover:bg-pink-50' 
+                : 'border border-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
-            {isInWishlist(product.id) ? '❤️' : '🤍'}
+            {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
         </div>
       </div>
@@ -131,7 +147,7 @@ function Shop() {
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
-  // Get category from URL
+  // Get category from URL and load products
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
@@ -147,7 +163,7 @@ function Shop() {
       setSortBy('rating');
     }
     
-    // ✅ Load products from backend API
+    // Load products from backend API
     const loadProducts = async () => {
       try {
         setLoading(true);
@@ -185,7 +201,7 @@ function Shop() {
       filtered = filtered.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()));
     }
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === selectedCategory);
+      filtered = filtered.filter(p => p.mainCategory?.toLowerCase() === selectedCategory || p.category?.toLowerCase() === selectedCategory);
     }
     
     const min = minPrice ? parseInt(minPrice) : 0;
@@ -228,11 +244,11 @@ function Shop() {
 
   const categories = [
     { id: 'all', name: 'All Products', count: products.length },
-    { id: 'skincare', name: 'Skincare', count: products.filter(p => p.category === 'skincare').length },
-    { id: 'makeup', name: 'Makeup', count: products.filter(p => p.category === 'makeup').length },
-    { id: 'hair', name: 'Hair', count: products.filter(p => p.category === 'hair').length },
-    { id: 'clothing', name: 'Clothing', count: products.filter(p => p.category === 'clothing').length },
-    { id: 'accessories', name: 'Accessories', count: products.filter(p => p.category === 'accessories').length },
+    { id: 'skincare', name: 'Skincare', count: products.filter(p => p.mainCategory === 'Skincare' || p.category === 'skincare').length },
+    { id: 'makeup', name: 'Makeup', count: products.filter(p => p.mainCategory === 'Makeup' || p.category === 'makeup').length },
+    { id: 'hair', name: 'Hair', count: products.filter(p => p.mainCategory === 'Hair' || p.category === 'hair').length },
+    { id: 'clothing', name: 'Clothing', count: products.filter(p => p.mainCategory === 'Clothing' || p.category === 'clothing').length },
+    { id: 'accessories', name: 'Accessories', count: products.filter(p => p.mainCategory === 'Accessories' || p.category === 'accessories').length },
   ];
 
   if (loading) {
@@ -506,7 +522,7 @@ function Shop() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {filteredProducts.map(product => (
                   <ProductCard 
-                    key={product.id} 
+                    key={product._id || product.id} 
                     product={product} 
                     addToCart={addToCart}
                     isInWishlist={isInWishlist}
