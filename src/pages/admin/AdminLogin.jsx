@@ -16,12 +16,40 @@ function AdminLogin() {
     setError('');
     setLoading(true);
 
+    // Basic validation
+    if (!email || !password) {
+      setError('❌ Please enter both email and password');
+      setLoading(false);
+      return;
+    }
+
+    // Timeout - 10 seconds max
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError('❌ Invalid email or password. Please try again.');
+        } else if (response.status === 404) {
+          setError('❌ Server not found. Please try again later.');
+        } else if (response.status === 500) {
+          setError('❌ Server error. Please try again later.');
+        } else {
+          setError(`❌ Error ${response.status}. Please try again.`);
+        }
+        setLoading(false);
+        return;
+      }
 
       const data = await response.json();
 
@@ -30,31 +58,28 @@ function AdminLogin() {
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminRole', data.role);
         localStorage.setItem('adminEmail', data.email);
-        localStorage.setItem('adminName', data.name);
+        localStorage.setItem('adminName', data.name || 'Admin');
         localStorage.setItem('adminId', data._id);
         
-        navigate('/admin/dashboard');
+        // Small delay for better UX
+        setTimeout(() => {
+          navigate('/admin/dashboard');
+        }, 300);
       } else if (data.token && data.role !== 'admin') {
         setError('❌ You do not have admin access. Please login with admin credentials.');
       } else {
-        // User-friendly error messages
-        if (response.status === 401) {
-          if (data.message?.toLowerCase().includes('password')) {
-            setError('❌ Wrong password. Please try again.');
-          } else if (data.message?.toLowerCase().includes('account')) {
-            setError('❌ No admin account found with this email.');
-          } else {
-            setError(data.message || '❌ Invalid email or password.');
-          }
-        } else if (response.status === 500) {
-          setError('❌ Server error. Please try again later.');
-        } else {
-          setError(data.message || '❌ Login failed. Please try again.');
-        }
+        setError(data.message || '❌ Invalid email or password.');
       }
     } catch (err) {
-      console.error('Login error:', err);
-      setError('❌ Network error. Please check your connection.');
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        setError('❌ Request timeout. Server is taking too long to respond. Please try again.');
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('❌ Cannot connect to server. Please check your internet connection.');
+      } else {
+        console.error('Login error:', err);
+        setError('❌ Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -83,7 +108,7 @@ function AdminLogin() {
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl mb-6 text-sm flex items-center gap-2">
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl mb-6 text-sm flex items-center gap-2 animate-shake">
             <span>⚠️</span> {error}
           </div>
         )}
@@ -102,6 +127,7 @@ function AdminLogin() {
                 className="w-full pl-10 pr-4 py-2.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 text-white placeholder-gray-400 transition text-sm sm:text-base"
                 placeholder="admin@example.com"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -119,11 +145,13 @@ function AdminLogin() {
                 className="w-full pl-10 pr-12 py-2.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 text-white placeholder-gray-400 transition text-sm sm:text-base"
                 placeholder="Enter your password"
                 required
+                disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition"
+                disabled={loading}
               >
                 {showPassword ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,12 +170,12 @@ function AdminLogin() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none text-sm sm:text-base"
+            className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Signing in...
+                Verifying...
               </span>
             ) : (
               'Sign In'
