@@ -221,6 +221,32 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
+// ✅ UPDATE PRODUCT ROUTE (for stock, status, etc.)
+app.put('/api/products/:id', async (req, res) => {
+  try {
+    await connectDB();
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    
+    // Update fields if provided
+    if (req.body.stock !== undefined) product.stock = req.body.stock;
+    if (req.body.status !== undefined) product.status = req.body.status;
+    if (req.body.adminApproved !== undefined) product.adminApproved = req.body.adminApproved;
+    if (req.body.price !== undefined) product.price = req.body.price;
+    if (req.body.name !== undefined) product.name = req.body.name;
+    if (req.body.brand !== undefined) product.brand = req.body.brand;
+    
+    await product.save();
+    res.json({ success: true, product });
+  } catch (error) {
+    console.error('Update product error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ✅ FIXED: Add new product with all fields
 app.post('/api/products', async (req, res) => {
   try {
