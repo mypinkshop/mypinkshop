@@ -30,7 +30,7 @@ function AdminProducts() {
     loadProducts();
   }, [navigate]);
 
-  // Load products from backend API
+  // Load products from backend API (NO localStorage)
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -349,8 +349,8 @@ function AdminProducts() {
                     {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
                   
-                  {/* ✅ Brand Filter - Search + Dropdown */}
-                  <div className="relative">
+                  {/* ✅ Brand Filter - Fixed Z-Index */}
+                  <div className="relative z-50">
                     <div className="flex items-center border border-pink-200 rounded-xl bg-white overflow-hidden">
                       <input
                         type="text"
@@ -372,7 +372,7 @@ function AdminProducts() {
                     </div>
                     
                     {showBrandDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-pink-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-1 w-full min-w-[200px] bg-white border border-pink-200 rounded-xl shadow-lg z-[100] max-h-60 overflow-y-auto">
                         <button
                           onClick={() => {
                             setFilterBrand('all');
