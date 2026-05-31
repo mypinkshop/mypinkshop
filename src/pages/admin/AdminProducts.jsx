@@ -30,7 +30,7 @@ function AdminProducts() {
     loadProducts();
   }, [navigate]);
 
-  // Load products from backend API (NO localStorage)
+  // Load products from backend API
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -349,8 +349,8 @@ function AdminProducts() {
                     {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
                   
-                  {/* ✅ Brand Filter - Fixed Z-Index */}
-                  <div className="relative z-50">
+                  {/* ✅ Brand Filter - Fixed Z-Index (No Overlap) */}
+                  <div className="relative" style={{ zIndex: 60 }}>
                     <div className="flex items-center border border-pink-200 rounded-xl bg-white overflow-hidden">
                       <input
                         type="text"
@@ -372,7 +372,7 @@ function AdminProducts() {
                     </div>
                     
                     {showBrandDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-full min-w-[200px] bg-white border border-pink-200 rounded-xl shadow-lg z-[100] max-h-60 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-1 w-full min-w-[200px] bg-white border border-pink-200 rounded-xl shadow-lg max-h-60 overflow-y-auto" style={{ zIndex: 9999 }}>
                         <button
                           onClick={() => {
                             setFilterBrand('all');
@@ -391,7 +391,7 @@ function AdminProducts() {
                               setBrandSearch('');
                               setShowBrandDropdown(false);
                             }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition ${filterBrand === brand ? 'bg-pink-100 text-pink-600 font-medium' : 'text-gray-700'}`}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition"
                           >
                             {brand}
                           </button>
