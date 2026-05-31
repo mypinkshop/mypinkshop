@@ -217,60 +217,31 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// ========== AUTH ROUTES (with user-friendly messages) ==========
+// ========== AUTH ROUTES ==========
 
+// ✅ REGISTER ROUTE - DISABLED FOR SECURITY (Only admin can create users via MongoDB)
 app.post('/api/auth/register', async (req, res) => {
-  try {
-    await connectDB();
-    const { name, email, password, role } = req.body;
-    
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'This email is already registered. Please login instead.' });
-    }
-    
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role: role || 'buyer',
-    });
-    
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '365d' }
-    );
-    
-    res.status(201).json({
-      success: true,
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token,
-      message: 'Account created successfully! Welcome to MyPinkShop.'
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Something went wrong. Please try again later.' });
-  }
+  return res.status(403).json({ 
+    success: false,
+    message: 'Public registration is disabled. Please contact admin to create an account.',
+    note: 'Admin can create users via MongoDB Atlas or Admin Panel'
+  });
 });
 
+// ✅ LOGIN ROUTE - Active
 app.post('/api/auth/login', async (req, res) => {
   try {
     await connectDB();
     const { email, password } = req.body;
     
-    // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'No account found with this email. Please sign up first.' });
+      return res.status(401).json({ message: 'No account found with this email. Please contact admin.' });
     }
     
-    // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Wrong password. Please try again or click "Forgot Password".' });
+      return res.status(401).json({ message: 'Wrong password. Please try again.' });
     }
     
     const token = jwt.sign(
