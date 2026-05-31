@@ -18,6 +18,8 @@ function Login() {
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
+  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -25,15 +27,51 @@ function Login() {
 
     const isEmail = identifier.includes('@');
     const email = isEmail ? identifier : `${identifier}@phone.com`;
-    
-    const result = await login(email, password);
-    
-    if (result.success) {
-      navigate('/');
-    } else {
-      setError('Invalid email/mobile or password');
+
+    try {
+      // ✅ Call backend API directly
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (data.token) {
+        // ✅ Store JWT token
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userRole', data.role);
+        localStorage.setItem('userEmail', data.email);
+        localStorage.setItem('userName', data.name);
+        localStorage.setItem('userId', data._id);
+        
+        // ✅ For admin panel compatibility
+        localStorage.setItem('adminToken', data.token);
+        localStorage.setItem('adminRole', data.role);
+        
+        // ✅ Also update AuthContext if needed
+        if (login) {
+          await login(email, password);
+        }
+        
+        // Redirect based on role
+        if (data.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (data.role === 'vendor') {
+          navigate('/vendor/dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        setError(data.message || 'Invalid email/mobile or password');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleForgotPassword = async (e) => {
@@ -43,6 +81,7 @@ function Login() {
       return;
     }
     setLoading(true);
+    // TODO: Implement actual forgot password API
     setTimeout(() => {
       setResetSent(true);
       setLoading(false);
@@ -116,7 +155,7 @@ function Login() {
       <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
         <div className="max-w-md w-full">
           {!showForgotPassword ? (
-            /* Login Form - Premium (No Demo Section) */
+            /* Login Form */
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
