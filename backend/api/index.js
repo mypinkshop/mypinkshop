@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');  // ✅ ADD THIS LINE
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ========== SCHEMAS ==========
+// ========== SCHEMAS ========== (Same as yours - no change)
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -37,7 +38,6 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// ✅ FIXED: Complete product schema
 const productSchema = new mongoose.Schema({
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   vendorName: { type: String, default: '' },
@@ -79,7 +79,6 @@ const bannerSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// Register models
 const User = mongoose.model('User', userSchema);
 const Product = mongoose.model('Product', productSchema);
 const Banner = mongoose.model('Banner', bannerSchema);
@@ -88,7 +87,6 @@ const Banner = mongoose.model('Banner', bannerSchema);
 const AWS = require('aws-sdk');
 const multer = require('multer');
 
-// Configure R2
 const s3 = new AWS.S3({
   accessKeyId: process.env.R2_ACCESS_KEY_ID,
   secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
@@ -101,7 +99,6 @@ const s3 = new AWS.S3({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
 const PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
-// Multer setup
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage,
@@ -115,7 +112,6 @@ const upload = multer({
   }
 });
 
-// Upload to R2 function
 const uploadToR2 = async (file, folder = 'banners') => {
   try {
     const extension = file.originalname.split('.').pop();
@@ -141,7 +137,6 @@ const uploadToR2 = async (file, folder = 'banners') => {
   }
 };
 
-// Delete from R2 function
 const deleteFromR2 = async (key) => {
   try {
     await s3.deleteObject({
@@ -172,9 +167,38 @@ const connectDB = async () => {
   }
 };
 
+// ========== AUTH MIDDLEWARE (ADD THIS) ==========
+
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Access denied. No token provided.' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired. Please login again.' });
+    }
+    return res.status(401).json({ message: 'Invalid token.' });
+  }
+};
+
+const adminMiddleware = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Admin access required' });
+  }
+  next();
+};
+
 // ========== ROUTES ==========
 
-// Root route
 app.get('/', (req, res) => {
   res.json({ 
     message: '🎀 MyPinkShop API is running!',
@@ -183,7 +207,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check
 app.get('/api/health', async (req, res) => {
   await connectDB();
   const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
@@ -194,10 +217,85 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// ========== PRODUCT ROUTES ==========
+// ========== AUTH ROUTES (with token generation) ==========
 
-// Get all products
-app.get('/api/products', async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    await connectDB();
+    const { name, email, password, role } = req.body;
+    
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+    
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'buyer',
+    });
+    
+    // ✅ Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.status(201).json({
+      success: true,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token,
+      message: 'User created successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    await connectDB();
+    const { email, password } = req.body;
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    
+    // ✅ Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({
+      success: true,
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token,
+      message: 'Login successful'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== PRODUCT ROUTES (Protected) ==========
+
+app.get('/api/products', authMiddleware, async (req, res) => {
   try {
     await connectDB();
     const products = await Product.find({ status: 'active', adminApproved: true }).sort({ createdAt: -1 });
@@ -207,8 +305,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Get product by ID
-app.get('/api/products/:id', async (req, res) => {
+app.get('/api/products/:id', authMiddleware, async (req, res) => {
   try {
     await connectDB();
     const product = await Product.findById(req.params.id);
@@ -221,34 +318,11 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// ✅ UPDATE PRODUCT ROUTE (for stock, status, etc.)
-app.put('/api/products/:id', async (req, res) => {
-  try {
-    await connectDB();
-    const product = await Product.findById(req.params.id);
-    
-    if (!product) {
-      return res.status(404).json({ success: false, error: 'Product not found' });
-    }
-    
-    // Update fields if provided
-    if (req.body.stock !== undefined) product.stock = req.body.stock;
-    if (req.body.status !== undefined) product.status = req.body.status;
-    if (req.body.adminApproved !== undefined) product.adminApproved = req.body.adminApproved;
-    if (req.body.price !== undefined) product.price = req.body.price;
-    if (req.body.name !== undefined) product.name = req.body.name;
-    if (req.body.brand !== undefined) product.brand = req.body.brand;
-    
-    await product.save();
-    res.json({ success: true, product });
-  } catch (error) {
-    console.error('Update product error:', error);
-    res.status(500).json({ success: false, error: error.message });
+app.post('/api/products', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'vendor') {
+    return res.status(403).json({ message: 'Admin or vendor access required' });
   }
-});
-
-// ✅ FIXED: Add new product with all fields
-app.post('/api/products', async (req, res) => {
+  
   try {
     await connectDB();
     
@@ -275,7 +349,7 @@ app.post('/api/products', async (req, res) => {
       badge: req.body.badge || '',
       rating: req.body.rating || 4.0,
       status: 'active',
-      adminApproved: true,
+      adminApproved: req.user.role === 'admin',
       isNew: true
     });
     
@@ -287,10 +361,33 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
+app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    
+    if (req.body.stock !== undefined) product.stock = req.body.stock;
+    if (req.body.status !== undefined) product.status = req.body.status;
+    if (req.body.adminApproved !== undefined) product.adminApproved = req.body.adminApproved;
+    if (req.body.price !== undefined) product.price = req.body.price;
+    if (req.body.name !== undefined) product.name = req.body.name;
+    if (req.body.brand !== undefined) product.brand = req.body.brand;
+    
+    await product.save();
+    res.json({ success: true, product });
+  } catch (error) {
+    console.error('Update product error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== BANNER ROUTES ==========
 
-// Get all banners (admin)
-app.get('/api/banners', async (req, res) => {
+app.get('/api/banners', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
     const banners = await Banner.find().sort({ order: 1 });
@@ -300,7 +397,7 @@ app.get('/api/banners', async (req, res) => {
   }
 });
 
-// Get active banners (homepage)
+// Public - no auth required
 app.get('/api/banners/active', async (req, res) => {
   try {
     await connectDB();
@@ -311,8 +408,7 @@ app.get('/api/banners/active', async (req, res) => {
   }
 });
 
-// Add new banner
-app.post('/api/banners', upload.array('images', 6), async (req, res) => {
+app.post('/api/banners', authMiddleware, adminMiddleware, upload.array('images', 6), async (req, res) => {
   try {
     await connectDB();
     
@@ -346,8 +442,7 @@ app.post('/api/banners', upload.array('images', 6), async (req, res) => {
   }
 });
 
-// Update banner
-app.put('/api/banners/:id', upload.array('images', 6), async (req, res) => {
+app.put('/api/banners/:id', authMiddleware, adminMiddleware, upload.array('images', 6), async (req, res) => {
   try {
     await connectDB();
     const banner = await Banner.findById(req.params.id);
@@ -383,8 +478,7 @@ app.put('/api/banners/:id', upload.array('images', 6), async (req, res) => {
   }
 });
 
-// Delete banner
-app.delete('/api/banners/:id', async (req, res) => {
+app.delete('/api/banners/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
     const banner = await Banner.findById(req.params.id);
@@ -401,9 +495,9 @@ app.delete('/api/banners/:id', async (req, res) => {
   }
 });
 
-// ========== UPLOAD ROUTE (for products) ==========
+// ========== UPLOAD ROUTE ==========
 
-app.post('/api/upload', upload.array('images', 5), async (req, res) => {
+app.post('/api/upload', authMiddleware, upload.array('images', 5), async (req, res) => {
   try {
     await connectDB();
     
@@ -432,66 +526,6 @@ app.post('/api/upload', upload.array('images', 5), async (req, res) => {
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ========== AUTH ROUTES ==========
-
-// Register
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    await connectDB();
-    const { name, email, password, role } = req.body;
-    
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-    
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role: role || 'buyer',
-    });
-    
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      message: 'User created successfully'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Login
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    await connectDB();
-    const { email, password } = req.body;
-    
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-    
-    const isMatch = await user.matchPassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-    
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      message: 'Login successful'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 
