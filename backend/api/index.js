@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const jwt = require('jsonwebtoken');  // ✅ ADD THIS LINE
+const jwt = require('jsonwebtoken');
 
 dotenv.config();
 
@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ========== SCHEMAS ========== (Same as yours - no change)
+// ========== SCHEMAS ==========
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -167,13 +167,13 @@ const connectDB = async () => {
   }
 };
 
-// ========== AUTH MIDDLEWARE (ADD THIS) ==========
+// ========== AUTH MIDDLEWARE ==========
 
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Access denied. No token provided.' });
+    return res.status(401).json({ message: 'Please login to continue' });
   }
   
   const token = authHeader.split(' ')[1];
@@ -184,9 +184,9 @@ const authMiddleware = (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Token expired. Please login again.' });
+      return res.status(401).json({ message: 'Session expired. Please login again.' });
     }
-    return res.status(401).json({ message: 'Invalid token.' });
+    return res.status(401).json({ message: 'Invalid session. Please login again.' });
   }
 };
 
@@ -217,7 +217,7 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// ========== AUTH ROUTES (with token generation) ==========
+// ========== AUTH ROUTES (with user-friendly messages) ==========
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -226,7 +226,7 @@ app.post('/api/auth/register', async (req, res) => {
     
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: 'This email is already registered. Please login instead.' });
     }
     
     const user = await User.create({
@@ -236,7 +236,6 @@ app.post('/api/auth/register', async (req, res) => {
       role: role || 'buyer',
     });
     
-    // ✅ Generate JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -250,10 +249,10 @@ app.post('/api/auth/register', async (req, res) => {
       email: user.email,
       role: user.role,
       token,
-      message: 'User created successfully'
+      message: 'Account created successfully! Welcome to MyPinkShop.'
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again later.' });
   }
 });
 
@@ -262,21 +261,22 @@ app.post('/api/auth/login', async (req, res) => {
     await connectDB();
     const { email, password } = req.body;
     
+    // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'No account found with this email. Please sign up first.' });
     }
     
+    // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Wrong password. Please try again or click "Forgot Password".' });
     }
     
-    // ✅ Generate JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
     
     res.json({
@@ -286,14 +286,14 @@ app.post('/api/auth/login', async (req, res) => {
       email: user.email,
       role: user.role,
       token,
-      message: 'Login successful'
+      message: 'Login successful! Welcome back.'
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: 'Something went wrong. Please try again later.' });
   }
 });
 
-// ========== PRODUCT ROUTES (Protected) ==========
+// ========== PRODUCT ROUTES ==========
 
 app.get('/api/products', authMiddleware, async (req, res) => {
   try {
@@ -320,7 +320,7 @@ app.get('/api/products/:id', authMiddleware, async (req, res) => {
 
 app.post('/api/products', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'vendor') {
-    return res.status(403).json({ message: 'Admin or vendor access required' });
+    return res.status(403).json({ message: 'Only sellers can add products' });
   }
   
   try {
@@ -354,10 +354,10 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     });
     
     await product.save();
-    res.json({ success: true, product });
+    res.json({ success: true, product, message: 'Product added successfully!' });
   } catch (error) {
     console.error('Add product error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to add product. Please try again.' });
   }
 });
 
@@ -367,7 +367,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
     const product = await Product.findById(req.params.id);
     
     if (!product) {
-      return res.status(404).json({ success: false, error: 'Product not found' });
+      return res.status(404).json({ success: false, message: 'Product not found' });
     }
     
     if (req.body.stock !== undefined) product.stock = req.body.stock;
@@ -378,10 +378,10 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
     if (req.body.brand !== undefined) product.brand = req.body.brand;
     
     await product.save();
-    res.json({ success: true, product });
+    res.json({ success: true, product, message: 'Product updated successfully!' });
   } catch (error) {
     console.error('Update product error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to update product' });
   }
 });
 
@@ -397,7 +397,6 @@ app.get('/api/banners', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-// Public - no auth required
 app.get('/api/banners/active', async (req, res) => {
   try {
     await connectDB();
@@ -435,10 +434,10 @@ app.post('/api/banners', authMiddleware, adminMiddleware, upload.array('images',
     });
     
     await banner.save();
-    res.json({ success: true, banner });
+    res.json({ success: true, banner, message: 'Banner added successfully!' });
   } catch (error) {
     console.error('Add banner error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to add banner' });
   }
 });
 
@@ -448,7 +447,7 @@ app.put('/api/banners/:id', authMiddleware, adminMiddleware, upload.array('image
     const banner = await Banner.findById(req.params.id);
     
     if (!banner) {
-      return res.status(404).json({ success: false, error: 'Banner not found' });
+      return res.status(404).json({ success: false, message: 'Banner not found' });
     }
     
     banner.title = req.body.title || '';
@@ -471,10 +470,10 @@ app.put('/api/banners/:id', authMiddleware, adminMiddleware, upload.array('image
     }
     
     await banner.save();
-    res.json({ success: true, banner });
+    res.json({ success: true, banner, message: 'Banner updated successfully!' });
   } catch (error) {
     console.error('Update banner error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to update banner' });
   }
 });
 
@@ -484,14 +483,14 @@ app.delete('/api/banners/:id', authMiddleware, adminMiddleware, async (req, res)
     const banner = await Banner.findById(req.params.id);
     
     if (!banner) {
-      return res.status(404).json({ success: false, error: 'Banner not found' });
+      return res.status(404).json({ success: false, message: 'Banner not found' });
     }
     
     await Banner.findByIdAndDelete(req.params.id);
-    res.json({ success: true });
+    res.json({ success: true, message: 'Banner deleted successfully!' });
   } catch (error) {
     console.error('Delete banner error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to delete banner' });
   }
 });
 
@@ -515,17 +514,18 @@ app.post('/api/upload', authMiddleware, upload.array('images', 5), async (req, r
     }
     
     if (imageUrls.length === 0) {
-      return res.status(400).json({ success: false, error: 'No images uploaded' });
+      return res.status(400).json({ success: false, message: 'No images uploaded. Please select images.' });
     }
     
     res.json({ 
       success: true, 
       url: imageUrls[0],
-      urls: imageUrls
+      urls: imageUrls,
+      message: 'Images uploaded successfully!'
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to upload images' });
   }
 });
 
