@@ -24,6 +24,13 @@ function Cart() {
     setImgErrors(prev => ({ ...prev, [itemId]: true }));
   };
 
+  // ✅ Free shipping threshold changed to ₹499
+  const subtotal = cartTotal();
+  const FREE_SHIPPING_THRESHOLD = 499;
+  const shipping = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : 49;
+  const total = subtotal + shipping;
+  const remainingForFree = FREE_SHIPPING_THRESHOLD - subtotal;
+
   if (cart.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -31,7 +38,7 @@ function Cart() {
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
             <span>✨</span>
-            <span>Free Shipping on ₹999+</span>
+            <span>Free Shipping on ₹499+</span>
             <span className="hidden sm:inline">•</span>
             <span>Extra 10% off on first order</span>
             <span className="hidden sm:inline">•</span>
@@ -155,10 +162,6 @@ function Cart() {
     );
   }
 
-  const subtotal = cartTotal();
-  const shipping = subtotal > 999 ? 0 : 99;
-  const total = subtotal + shipping;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
@@ -166,7 +169,7 @@ function Cart() {
       <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
         <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
           <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
+          <span>Free Shipping on ₹499+</span>
           <span className="hidden sm:inline">•</span>
           <span>Extra 10% off on first order</span>
           <span className="hidden sm:inline">•</span>
@@ -232,25 +235,25 @@ function Cart() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium">Cart</span>
+        <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1">
+          <Link to="/" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Home</Link>
+          <span className="text-gray-400 whitespace-nowrap">/</span>
+          <span className="text-pink-600 font-medium whitespace-nowrap">Cart</span>
         </div>
       </div>
 
       {/* Cart Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex flex-wrap items-center gap-2">
           <span>🛒</span> Shopping Cart
           <span className="text-sm font-normal text-gray-400">({cart.reduce((sum, i) => sum + i.quantity, 0)} items)</span>
         </h1>
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Cart Items */}
-          <div className="flex-1">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
-              {/* Header Row */}
+          <div className="flex-1 overflow-x-auto">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm min-w-[280px]">
+              {/* Header Row - Hide on mobile */}
               <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gradient-to-r from-pink-50 to-rose-50 text-sm font-semibold text-gray-600 border-b border-pink-100">
                 <div className="col-span-6">Product</div>
                 <div className="col-span-2 text-center">Price</div>
@@ -262,12 +265,12 @@ function Cart() {
                 <div key={item.id} className="group grid grid-cols-1 md:grid-cols-12 gap-4 items-center px-4 md:px-6 py-5 border-b border-pink-100 hover:bg-pink-50/30 transition">
                   {/* Product Info - CLICKABLE IMAGE */}
                   <div className="md:col-span-6 flex gap-4">
-                    <Link to={`/product/${item.id}`} className="block">
+                    <Link to={`/product/${item.id}`} className="block flex-shrink-0">
                       {item.image && !imgErrors[item.id] ? (
                         <img 
                           src={item.image} 
                           alt={item.name} 
-                          className="w-16 h-16 rounded-xl object-cover border border-pink-100 hover:scale-105 transition-transform cursor-pointer"
+                          className="w-16 h-16 rounded-xl object-cover border border-pink-100 hover:scale-105 transition-transform cursor-pointer bg-white"
                           onError={() => handleImageError(item.id)}
                         />
                       ) : (
@@ -276,11 +279,11 @@ function Cart() {
                         </div>
                       )}
                     </Link>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <Link to={`/product/${item.id}`}>
                         <h3 className="font-semibold text-gray-800 hover:text-pink-500 transition line-clamp-1">{item.name}</h3>
                       </Link>
-                      <p className="text-xs text-gray-400 mt-1 capitalize">{item.category}</p>
+                      <p className="text-xs text-gray-400 mt-1 capitalize">{item.category || 'Product'}</p>
                       <button 
                         onClick={() => removeFromCart(item.id)}
                         className="text-xs text-red-400 mt-2 hover:text-red-600 transition flex items-center gap-1"
@@ -291,24 +294,24 @@ function Cart() {
                   </div>
 
                   {/* Price */}
-                  <div className="md:col-span-2 text-center">
-                    <span className="md:hidden text-gray-500 text-sm mr-2">Price:</span>
+                  <div className="md:col-span-2 text-left md:text-center">
+                    <span className="md:hidden text-gray-500 text-sm mr-2 inline-block">Price:</span>
                     <span className="font-semibold text-gray-800">₹{item.price}</span>
                   </div>
 
                   {/* Quantity */}
-                  <div className="md:col-span-2 flex justify-center">
+                  <div className="md:col-span-2 flex justify-start md:justify-center">
                     <div className="flex items-center gap-3 border border-pink-200 rounded-full px-3 py-1 bg-white shadow-sm">
                       <button 
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition"
+                        className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition flex items-center justify-center"
                       >
                         -
                       </button>
                       <span className="w-8 text-center font-medium">{item.quantity}</span>
                       <button 
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition"
+                        className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition flex items-center justify-center"
                       >
                         +
                       </button>
@@ -316,8 +319,8 @@ function Cart() {
                   </div>
 
                   {/* Total */}
-                  <div className="md:col-span-2 text-center">
-                    <span className="md:hidden text-gray-500 text-sm mr-2">Total:</span>
+                  <div className="md:col-span-2 text-left md:text-center">
+                    <span className="md:hidden text-gray-500 text-sm mr-2 inline-block">Total:</span>
                     <span className="font-bold text-pink-600 text-lg">₹{item.price * item.quantity}</span>
                   </div>
                 </div>
@@ -329,7 +332,7 @@ function Cart() {
             </Link>
           </div>
 
-          {/* Order Summary - Amazon Style */}
+          {/* Order Summary */}
           <div className="lg:w-96">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-6 sticky top-24 shadow-sm">
               <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b border-pink-100 flex items-center gap-2">
@@ -356,7 +359,7 @@ function Cart() {
 
               {shipping > 0 && (
                 <div className="mb-4 p-3 bg-amber-50 rounded-xl text-xs text-amber-700 text-center">
-                  ✨ Add ₹{999 - subtotal} more for FREE shipping!
+                  ✨ Add ₹{remainingForFree} more for FREE shipping!
                 </div>
               )}
 
@@ -370,10 +373,10 @@ function Cart() {
                 {isCheckingOut ? 'Processing...' : 'Proceed to Checkout →'}
               </button>
 
-              <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-400">
-                <span>🔒</span> Secure Checkout
-                <span>💳</span> Card/UPI/COD
-                <span>🚚</span> Free Shipping on ₹999+
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-gray-400">
+                <span className="flex items-center gap-1">🔒 Secure</span>
+                <span className="flex items-center gap-1">💳 Card/UPI/COD</span>
+                <span className="flex items-center gap-1">🚚 Free on ₹499+</span>
               </div>
             </div>
           </div>
