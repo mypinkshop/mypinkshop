@@ -219,43 +219,13 @@ app.get('/api/health', async (req, res) => {
 
 // ========== AUTH ROUTES ==========
 
-// ✅ TEMPORARILY ENABLED - For creating admin account
+// ✅ REGISTER ROUTE - PERMANENTLY DISABLED FOR SECURITY
 app.post('/api/auth/register', async (req, res) => {
-  try {
-    await connectDB();
-    const { name, email, password, role } = req.body;
-    
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-    
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role: role || 'buyer',
-    });
-    
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '365d' }
-    );
-    
-    res.status(201).json({
-      success: true,
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token,
-      message: 'Account created successfully!'
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: error.message });
-  }
+  return res.status(403).json({ 
+    success: false,
+    message: 'Public registration is disabled. Please contact admin to create an account.',
+    note: 'Admin can create users via MongoDB Atlas only'
+  });
 });
 
 // ✅ LOGIN ROUTE - Active
@@ -266,7 +236,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'No account found with this email.' });
+      return res.status(401).json({ message: 'No account found with this email. Please contact admin.' });
     }
     
     const isMatch = await user.matchPassword(password);
