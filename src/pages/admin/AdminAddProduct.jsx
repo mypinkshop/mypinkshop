@@ -29,12 +29,25 @@ function AdminAddProduct() {
     shortDescription: '',
     fullDescription: '',
     keyFeatures: [],
+    // Skincare specific
     skinType: 'all',
     concerns: [],
     ingredients: '',
+    // Makeup specific
     shade: '',
     finish: '',
     coverage: '',
+    // Clothing specific
+    sizes: [],
+    colors: [],
+    fabric: '',
+    // Hair specific
+    hairType: 'all',
+    hairConcerns: [],
+    // Accessories specific
+    material: '',
+    gender: 'unisex',
+    // SEO
     seoTitle: '',
     seoDescription: '',
     seoKeywords: '',
@@ -43,6 +56,8 @@ function AdminAddProduct() {
   const [keyFeature, setKeyFeature] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [sizeValue, setSizeValue] = useState('');
+  const [colorValue, setColorValue] = useState('');
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
@@ -65,7 +80,6 @@ function AdminAddProduct() {
     });
   };
 
-  // ✅ FIXED: Added Authorization token
   const uploadImageToBackend = async (file) => {
     const token = localStorage.getItem('adminToken');
     const formDataImg = new FormData();
@@ -133,14 +147,45 @@ function AdminAddProduct() {
 
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
+  // ✅ All 5 categories with subcategories
   const categories = {
     'Skincare': ['Face Wash', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen', 'Masks', 'Eye Cream', 'Cleanser'],
-    'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer']
+    'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer'],
+    'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Styling Products', 'Hair Spray'],
+    'Clothing': ['Dresses', 'Tops', 'Jeans', 'Skirts', 'Ethnic Wear', 'Kurtis', 'Sarees', 'Jackets', 'T-Shirts', 'Shorts', 'Winter Wear'],
+    'Accessories': ['Bags', 'Jewelry', 'Hair Accessories', 'Watches', 'Sunglasses', 'Belts', 'Scarves', 'Hats', 'Wallet']
   };
 
+  // Category specific options
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
   const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'];
   const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer'];
+  const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume'];
+  const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight'];
+  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+  const colors = ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Brown', 'Navy', 'Grey'];
+
+  // Size management
+  const addSize = () => {
+    if (sizeValue.trim() && !formData.sizes.includes(sizeValue.trim())) {
+      setFormData({ ...formData, sizes: [...formData.sizes, sizeValue.trim()] });
+      setSizeValue('');
+    }
+  };
+  const removeSize = (size) => {
+    setFormData({ ...formData, sizes: formData.sizes.filter(s => s !== size) });
+  };
+
+  // Color management
+  const addColor = () => {
+    if (colorValue.trim() && !formData.colors.includes(colorValue.trim())) {
+      setFormData({ ...formData, colors: [...formData.colors, colorValue.trim()] });
+      setColorValue('');
+    }
+  };
+  const removeColor = (color) => {
+    setFormData({ ...formData, colors: formData.colors.filter(c => c !== color) });
+  };
 
   const addKeyFeature = () => {
     if (keyFeature.trim()) {
@@ -174,12 +219,25 @@ function AdminAddProduct() {
       shortDescription: formData.shortDescription,
       description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
+      // Skincare
       skinType: formData.skinType,
       concerns: formData.concerns,
       ingredients: formData.ingredients,
+      // Makeup
       shade: formData.shade,
       finish: formData.finish,
       coverage: formData.coverage,
+      // Clothing
+      sizes: formData.sizes,
+      colors: formData.colors,
+      fabric: formData.fabric,
+      // Hair
+      hairType: formData.hairType,
+      hairConcerns: formData.hairConcerns,
+      // Accessories
+      material: formData.material,
+      gender: formData.gender,
+      // SEO
       seoTitle: formData.seoTitle,
       seoDescription: formData.seoDescription,
       seoKeywords: formData.seoKeywords,
@@ -243,7 +301,7 @@ function AdminAddProduct() {
             <Link to="/admin/inventory" className="text-gray-500 hover:text-gray-700"><IconBack /></Link>
             <div>
               <h1 className="text-xl font-semibold">Add Product</h1>
-              <p className="text-xs text-gray-500">Skincare & Makeup products</p>
+              <p className="text-xs text-gray-500">All Categories</p>
             </div>
           </div>
           <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-2 rounded-lg text-sm font-medium">
@@ -296,14 +354,14 @@ function AdminAddProduct() {
               <div>
                 <label className="block text-sm font-medium mb-1">Category <span className="text-red-500">*</span></label>
                 <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value, subCategory: ''})} className="w-full border rounded-lg px-4 py-2.5">
-                  <option value="">Select</option>
+                  <option value="">Select Category</option>
                   {Object.keys(categories).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Sub Category <span className="text-red-500">*</span></label>
                 <select value={formData.subCategory} onChange={(e) => setFormData({...formData, subCategory: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" disabled={!formData.category}>
-                  <option value="">Select</option>
+                  <option value="">Select Sub Category</option>
                   {formData.category && categories[formData.category]?.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -375,6 +433,7 @@ function AdminAddProduct() {
         {step === 5 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">✨ Product Details</h2>
+            
             <div className="mb-5">
               <label className="block text-sm font-medium mb-1">Short Description</label>
               <textarea rows="2" value={formData.shortDescription} onChange={(e) => setFormData({...formData, shortDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Brief description" />
@@ -383,6 +442,7 @@ function AdminAddProduct() {
               <label className="block text-sm font-medium mb-1">Full Description</label>
               <textarea rows="4" value={formData.fullDescription} onChange={(e) => setFormData({...formData, fullDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Detailed description" />
             </div>
+            
             <div className="mb-5">
               <label className="block text-sm font-medium mb-1">Key Features</label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -393,6 +453,7 @@ function AdminAddProduct() {
               <div className="flex gap-2"><input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., Dermatologically tested" className="flex-1 border rounded-lg px-4 py-2" /><button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div>
             </div>
 
+            {/* Category Specific Fields */}
             {formData.category === 'Skincare' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">🧴 Skincare Specific</h3>
@@ -408,6 +469,31 @@ function AdminAddProduct() {
                 <div><label className="block text-sm font-medium mb-1">Shade / Color</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red" /></div>
                 <div><label className="block text-sm font-medium mb-1">Finish</label><select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Finish</option>{makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
                 <div><label className="block text-sm font-medium mb-1">Coverage</label><select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Coverage</option>{makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+              </div>
+            )}
+
+            {formData.category === 'Hair' && (
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">💇‍♀️ Hair Specific</h3>
+                <div><label className="block text-sm font-medium mb-1">Hair Type</label><select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">{hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}</select></div>
+                <div><label className="block text-sm font-medium mb-1">Hair Concerns</label><div className="flex flex-wrap gap-2">{hairConcernsList.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), concern] : (formData.hairConcerns || []).filter(c => c !== concern); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
+              </div>
+            )}
+
+            {formData.category === 'Clothing' && (
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">👗 Clothing Specific</h3>
+                <div><label className="block text-sm font-medium mb-1">Sizes Available</label><div className="flex flex-wrap gap-2 mb-2">{formData.sizes.map(size => (<span key={size} className="bg-gray-100 px-2 py-1 rounded-full text-sm flex items-center gap-1">{size}<button onClick={() => removeSize(size)} className="text-red-400">×</button></span>))}</div><div className="flex gap-2"><select value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} className="border rounded-lg px-4 py-2"><option value="">Select Size</option>{sizes.map(s => <option key={s} value={s}>{s}</option>)}</select><button onClick={addSize} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
+                <div><label className="block text-sm font-medium mb-1">Colors Available</label><div className="flex flex-wrap gap-2 mb-2">{formData.colors.map(color => (<span key={color} className="bg-gray-100 px-2 py-1 rounded-full text-sm flex items-center gap-1">{color}<button onClick={() => removeColor(color)} className="text-red-400">×</button></span>))}</div><div className="flex gap-2"><select value={colorValue} onChange={(e) => setColorValue(e.target.value)} className="border rounded-lg px-4 py-2"><option value="">Select Color</option>{colors.map(c => <option key={c} value={c}>{c}</option>)}</select><button onClick={addColor} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
+                <div><label className="block text-sm font-medium mb-1">Fabric / Material</label><input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Cotton, Silk, Polyester" /></div>
+              </div>
+            )}
+
+            {formData.category === 'Accessories' && (
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">💍 Accessories Specific</h3>
+                <div><label className="block text-sm font-medium mb-1">Material</label><input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Silver, Gold, Leather" /></div>
+                <div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div>
               </div>
             )}
 
