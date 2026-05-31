@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
-import { api } from '../utils/api';
 
 function AdminProducts() {
   const navigate = useNavigate();
@@ -31,7 +30,7 @@ function AdminProducts() {
     loadProducts();
   }, [navigate]);
 
-  // ✅ Load products from backend API with token
+  // Load products from backend API
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -46,14 +45,11 @@ function AdminProducts() {
       
       if (response.status === 401) {
         localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminRole');
         navigate('/admin/login');
         return;
       }
       
-      if (!response.ok) {
-        throw new Error('Failed to load products');
-      }
+      if (!response.ok) throw new Error('Failed to load products');
       
       const data = await response.json();
       
@@ -71,7 +67,7 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Update stock in backend
+  // Update stock in backend
   const updateStock = async (productId, newStock) => {
     if (newStock < 0) return;
     
@@ -103,7 +99,7 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Approve product
+  // Approve product
   const approveProduct = async (productId) => {
     try {
       const token = localStorage.getItem('adminToken');
@@ -133,7 +129,7 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Reject product (delete)
+  // Reject product
   const rejectProduct = async (productId) => {
     if (!window.confirm('Reject and delete this product?')) return;
     
@@ -142,9 +138,7 @@ function AdminProducts() {
       
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.status === 401) {
@@ -163,16 +157,14 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Delete product
+  // Delete product
   const deleteProduct = async (productId) => {
     try {
       const token = localStorage.getItem('adminToken');
       
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.status === 401) {
@@ -194,7 +186,7 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Bulk delete
+  // Bulk delete
   const bulkDelete = async () => {
     if (selectedProducts.length === 0) return;
     if (!window.confirm(`Delete ${selectedProducts.length} products?`)) return;
@@ -217,7 +209,7 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Toggle product status
+  // Toggle product status
   const toggleProductStatus = async (productId, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     
@@ -517,16 +509,16 @@ function AdminProducts() {
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Stock</th>
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Status</th>
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
-                  </table>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
                   {currentProducts.length === 0 ? (
-                    <tr className="hover:bg-pink-50/30">
+                    <tr>
                       <td colSpan={activeTab === 'approved' ? 8 : 7} className="px-4 py-16 text-center">
                         <div className="text-6xl mb-4">📦</div>
                         <p className="text-gray-400">{activeTab === 'pending' ? 'No products pending' : 'No products found'}</p>
                         {activeTab === 'approved' && <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">Add your first product →</Link>}
-                       </td>
+                      </td>
                     </tr>
                   ) : (
                     currentProducts.map(product => (
