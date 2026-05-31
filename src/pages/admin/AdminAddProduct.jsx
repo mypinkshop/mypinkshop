@@ -29,25 +29,19 @@ function AdminAddProduct() {
     shortDescription: '',
     fullDescription: '',
     keyFeatures: [],
-    // Skincare specific
     skinType: 'all',
     concerns: [],
     ingredients: '',
-    // Makeup specific
     shade: '',
     finish: '',
     coverage: '',
-    // Clothing specific
     sizes: [],
     colors: [],
     fabric: '',
-    // Hair specific
     hairType: 'all',
     hairConcerns: [],
-    // Accessories specific
     material: '',
     gender: 'unisex',
-    // SEO
     seoTitle: '',
     seoDescription: '',
     seoKeywords: '',
@@ -71,58 +65,109 @@ function AdminAddProduct() {
     localStorage.setItem('brandsList', JSON.stringify(updatedBrands));
   };
 
-  const convertToBase64 = (file) => {
+  // ✅ Image compression function
+  const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 800;
+          
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          }, 'image/jpeg', 0.7);
+        };
+        img.onerror = reject;
+      };
       reader.onerror = reject;
     });
   };
 
+  // ✅ Upload image to backend with compression and user-friendly errors
   const uploadImageToBackend = async (file) => {
     const token = localStorage.getItem('adminToken');
-    const formDataImg = new FormData();
-    formDataImg.append('images', file);
     
-    const response = await fetch(`${API_URL}/api/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formDataImg
-    });
-    
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || 'Upload failed');
+    if (!token) {
+      throw new Error('Session expired. Please login again.');
     }
-    const data = await response.json();
-    return data.url;
+    
+    try {
+      const compressedFile = await compressImage(file);
+      const formDataImg = new FormData();
+      formDataImg.append('images', compressedFile);
+      
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataImg
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        const error = await response.text();
+        throw new Error(error || 'Upload failed');
+      }
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
+      console.error('Upload error:', error);
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        throw new Error('Network issue. Please check your internet connection.');
+      }
+      throw error;
+    }
   };
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (formData.images.length + files.length > 5) {
-      alert('Maximum 5 images');
+      alert('📸 You can upload maximum 5 images per product');
       return;
     }
     setUploadingImages(true);
     const uploadedUrls = [];
+    
     for (const file of files) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert(`${file.name} is larger than 2MB`);
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`📸 ${file.name} is larger than 5MB. Please choose a smaller image.`);
         continue;
       }
       try {
         const imageUrl = await uploadImageToBackend(file);
         uploadedUrls.push(imageUrl);
       } catch (error) {
-        console.error('Upload error:', error);
-        alert(`Failed to upload ${file.name}: ${error.message}`);
+        alert(`❌ Failed to upload ${file.name}: ${error.message}`);
       }
     }
-    setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
+    
+    if (uploadedUrls.length > 0) {
+      setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
+      alert(`✅ ${uploadedUrls.length} image(s) uploaded successfully!`);
+    }
     setUploadingImages(false);
   };
 
@@ -137,17 +182,16 @@ function AdminAddProduct() {
       setFormData({ ...formData, brand: newBrand.trim() });
       setNewBrand('');
       setShowAddBrand(false);
-      alert(`✓ Brand "${newBrand.trim()}" added!`);
+      alert(`✅ Brand "${newBrand.trim()}" added successfully!`);
     } else if (brands.includes(newBrand.trim())) {
-      alert('Brand already exists');
+      alert('⚠️ This brand already exists!');
     } else {
-      alert('Enter a valid brand name');
+      alert('Please enter a valid brand name');
     }
   };
 
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
-  // ✅ All 5 categories with subcategories
   const categories = {
     'Skincare': ['Face Wash', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen', 'Masks', 'Eye Cream', 'Cleanser'],
     'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer'],
@@ -156,7 +200,6 @@ function AdminAddProduct() {
     'Accessories': ['Bags', 'Jewelry', 'Hair Accessories', 'Watches', 'Sunglasses', 'Belts', 'Scarves', 'Hats', 'Wallet']
   };
 
-  // Category specific options
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
   const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'];
   const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer'];
@@ -165,7 +208,6 @@ function AdminAddProduct() {
   const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
   const colors = ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Brown', 'Navy', 'Grey'];
 
-  // Size management
   const addSize = () => {
     if (sizeValue.trim() && !formData.sizes.includes(sizeValue.trim())) {
       setFormData({ ...formData, sizes: [...formData.sizes, sizeValue.trim()] });
@@ -176,7 +218,6 @@ function AdminAddProduct() {
     setFormData({ ...formData, sizes: formData.sizes.filter(s => s !== size) });
   };
 
-  // Color management
   const addColor = () => {
     if (colorValue.trim() && !formData.colors.includes(colorValue.trim())) {
       setFormData({ ...formData, colors: [...formData.colors, colorValue.trim()] });
@@ -198,13 +239,41 @@ function AdminAddProduct() {
   };
 
   const submitProduct = async () => {
-    if (!formData.productName || !formData.brand || !formData.category || !formData.sellingPrice || !formData.quantity) {
-      alert('Please fill required fields: Product Name, Brand, Category, Selling Price, Quantity');
+    // User-friendly validation
+    if (!formData.productName) {
+      alert('⚠️ Please enter product name');
+      return;
+    }
+    if (!formData.brand) {
+      alert('⚠️ Please select or add a brand');
+      return;
+    }
+    if (!formData.category) {
+      alert('⚠️ Please select a category');
+      return;
+    }
+    if (!formData.subCategory) {
+      alert('⚠️ Please select a sub category');
+      return;
+    }
+    if (!formData.sellingPrice) {
+      alert('⚠️ Please enter selling price');
+      return;
+    }
+    if (!formData.quantity) {
+      alert('⚠️ Please enter stock quantity');
       return;
     }
 
     setLoading(true);
     const token = localStorage.getItem('adminToken');
+    
+    if (!token) {
+      alert('❌ Session expired. Please login again.');
+      setLoading(false);
+      return;
+    }
+    
     const productData = {
       name: formData.productName,
       brand: formData.brand,
@@ -219,25 +288,19 @@ function AdminAddProduct() {
       shortDescription: formData.shortDescription,
       description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
-      // Skincare
       skinType: formData.skinType,
       concerns: formData.concerns,
       ingredients: formData.ingredients,
-      // Makeup
       shade: formData.shade,
       finish: formData.finish,
       coverage: formData.coverage,
-      // Clothing
       sizes: formData.sizes,
       colors: formData.colors,
       fabric: formData.fabric,
-      // Hair
       hairType: formData.hairType,
       hairConcerns: formData.hairConcerns,
-      // Accessories
       material: formData.material,
       gender: formData.gender,
-      // SEO
       seoTitle: formData.seoTitle,
       seoDescription: formData.seoDescription,
       seoKeywords: formData.seoKeywords,
@@ -256,32 +319,58 @@ function AdminAddProduct() {
         },
         body: JSON.stringify(productData)
       });
-      if (!response.ok) throw new Error(await response.text());
-      alert('✓ Product listed successfully!');
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        const error = await response.text();
+        throw new Error(error || 'Failed to add product');
+      }
+      
+      alert('🎉 Product added successfully! Redirecting to inventory...');
       navigate('/admin/inventory');
     } catch (error) {
       console.error('Submit error:', error);
-      alert('Failed to add product: ' + error.message);
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        alert('🌐 Network error. Please check your internet connection and try again.');
+      } else {
+        alert(`❌ ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const goToNextStep = () => {
-    if (step === 1 && (!formData.productName || !formData.brand || !formData.category || !formData.subCategory)) {
-      alert('Please fill all vital information');
-      return;
+    if (step === 1) {
+      if (!formData.productName) {
+        alert('⚠️ Please enter product name');
+        return;
+      }
+      if (!formData.brand) {
+        alert('⚠️ Please select or add a brand');
+        return;
+      }
+      if (!formData.category) {
+        alert('⚠️ Please select a category');
+        return;
+      }
+      if (!formData.subCategory) {
+        alert('⚠️ Please select a sub category');
+        return;
+      }
     }
     if (step === 2 && formData.images.length === 0) {
-      alert('Please upload at least one image');
+      alert('📸 Please upload at least one product image');
       return;
     }
     if (step === 3 && !formData.sellingPrice) {
-      alert('Please enter selling price');
+      alert('💰 Please enter selling price');
       return;
     }
     if (step === 4 && !formData.quantity) {
-      alert('Please enter stock quantity');
+      alert('📦 Please enter stock quantity');
       return;
     }
     setStep(step + 1);
@@ -399,9 +488,9 @@ function AdminAddProduct() {
               </div>
               <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" />
               <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-5 py-2 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600">
-                <IconUpload /> {uploadingImages ? 'Uploading...' : 'Upload Images'}
+                <IconUpload /> {uploadingImages ? 'Uploading...' : 'Choose Images'}
               </label>
-              <p className="text-xs text-gray-400 mt-2">Up to 5 images, max 2MB each</p>
+              <p className="text-xs text-gray-400 mt-2">Upload up to 5 images (max 5MB each, automatically compressed)</p>
             </div>
             <div className="flex justify-between mt-6"><button onClick={() => setStep(1)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2 rounded-lg">Continue →</button></div>
           </div>
@@ -453,7 +542,6 @@ function AdminAddProduct() {
               <div className="flex gap-2"><input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., Dermatologically tested" className="flex-1 border rounded-lg px-4 py-2" /><button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div>
             </div>
 
-            {/* Category Specific Fields */}
             {formData.category === 'Skincare' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">🧴 Skincare Specific</h3>
