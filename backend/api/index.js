@@ -240,7 +240,7 @@ app.post('/api/auth/register', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
     
     res.status(201).json({
