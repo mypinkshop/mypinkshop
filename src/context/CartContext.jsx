@@ -11,21 +11,44 @@ export const CartProvider = ({ children }) => {
   useEffect(() => {
     const savedCart = localStorage.getItem('pinkCart');
     if (savedCart) {
-      const parsed = JSON.parse(savedCart);
-      setCart(parsed);
-      setCartCount(parsed.reduce((sum, i) => sum + i.quantity, 0));
+      try {
+        const parsed = JSON.parse(savedCart);
+        setCart(parsed);
+        setCartCount(parsed.reduce((sum, i) => sum + i.quantity, 0));
+      } catch (e) {
+        console.error('Error loading cart:', e);
+      }
     }
   }, []);
 
+  // ✅ FIXED: Add to cart with proper image storage
   const addToCart = (product) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === product.id);
       let newCart;
+      
+      // Ensure image is properly captured
+      const productToAdd = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity || 1,
+        image: product.image || product.images?.[0] || null,
+        category: product.category || '',
+        emoji: product.emoji || '✨',
+        stock: product.stock || 0
+      };
+      
       if (existing) {
-        newCart = prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+        newCart = prev.map(i => 
+          i.id === product.id 
+            ? { ...i, quantity: i.quantity + (product.quantity || 1) } 
+            : i
+        );
       } else {
-        newCart = [...prev, { ...product, quantity: 1 }];
+        newCart = [...prev, productToAdd];
       }
+      
       localStorage.setItem('pinkCart', JSON.stringify(newCart));
       setCartCount(newCart.reduce((sum, i) => sum + i.quantity, 0));
       return newCart;
@@ -49,7 +72,9 @@ export const CartProvider = ({ children }) => {
       return;
     }
     setCart(prev => {
-      const newCart = prev.map(i => i.id === id ? { ...i, quantity: newQuantity } : i);
+      const newCart = prev.map(i => 
+        i.id === id ? { ...i, quantity: newQuantity } : i
+      );
       localStorage.setItem('pinkCart', JSON.stringify(newCart));
       setCartCount(newCart.reduce((sum, i) => sum + i.quantity, 0));
       return newCart;
@@ -61,8 +86,23 @@ export const CartProvider = ({ children }) => {
     return cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
   };
 
+  // Clear cart (for after checkout)
+  const clearCart = () => {
+    setCart([]);
+    setCartCount(0);
+    localStorage.removeItem('pinkCart');
+  };
+
   return (
-    <CartContext.Provider value={{ cart, cartCount, addToCart, removeFromCart, updateQuantity, cartTotal }}>
+    <CartContext.Provider value={{ 
+      cart, 
+      cartCount, 
+      addToCart, 
+      removeFromCart, 
+      updateQuantity, 
+      cartTotal,
+      clearCart
+    }}>
       {children}
     </CartContext.Provider>
   );
