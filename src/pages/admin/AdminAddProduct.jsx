@@ -15,33 +15,26 @@ function AdminAddProduct() {
   ]);
   
   const [formData, setFormData] = useState({
-    // Basic Info
     productName: '',
     brand: '',
     category: '',
     subCategory: '',
     images: [],
-    // Pricing
     mrp: '',
     sellingPrice: '',
     tax: 5,
-    // Inventory
     sku: '',
     quantity: '',
     lowStockThreshold: 10,
-    // Description
     shortDescription: '',
     fullDescription: '',
     keyFeatures: [],
-    // Skincare specific
     skinType: 'all',
     concerns: [],
     ingredients: '',
-    // Makeup specific
     shade: '',
     finish: '',
     coverage: '',
-    // SEO
     seoTitle: '',
     seoDescription: '',
     seoKeywords: '',
@@ -53,7 +46,6 @@ function AdminAddProduct() {
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
-  // Load brands
   useEffect(() => {
     const savedBrands = localStorage.getItem('brandsList');
     if (savedBrands) setBrands(JSON.parse(savedBrands));
@@ -64,7 +56,6 @@ function AdminAddProduct() {
     localStorage.setItem('brandsList', JSON.stringify(updatedBrands));
   };
 
-  // Image upload
   const convertToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -74,11 +65,24 @@ function AdminAddProduct() {
     });
   };
 
+  // ✅ FIXED: Added Authorization token
   const uploadImageToBackend = async (file) => {
+    const token = localStorage.getItem('adminToken');
     const formDataImg = new FormData();
     formDataImg.append('images', file);
-    const response = await fetch(`${API_URL}/api/upload`, { method: 'POST', body: formDataImg });
-    if (!response.ok) throw new Error('Upload failed');
+    
+    const response = await fetch(`${API_URL}/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formDataImg
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Upload failed');
+    }
     const data = await response.json();
     return data.url;
   };
@@ -100,7 +104,8 @@ function AdminAddProduct() {
         const imageUrl = await uploadImageToBackend(file);
         uploadedUrls.push(imageUrl);
       } catch (error) {
-        alert(`Failed to upload ${file.name}`);
+        console.error('Upload error:', error);
+        alert(`Failed to upload ${file.name}: ${error.message}`);
       }
     }
     setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
@@ -111,7 +116,6 @@ function AdminAddProduct() {
     setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
   };
 
-  // Brand handlers
   const handleAddNewBrand = () => {
     if (newBrand.trim() && !brands.includes(newBrand.trim())) {
       const updatedBrands = [...brands, newBrand.trim()];
@@ -129,20 +133,15 @@ function AdminAddProduct() {
 
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
-  // Categories
   const categories = {
     'Skincare': ['Face Wash', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen', 'Masks', 'Eye Cream', 'Cleanser'],
     'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer']
   };
 
-  // Skin Concerns
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
-
-  // Makeup Finishes
   const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'];
   const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer'];
 
-  // Key Features
   const addKeyFeature = () => {
     if (keyFeature.trim()) {
       setFormData({ ...formData, keyFeatures: [...formData.keyFeatures, keyFeature.trim()] });
@@ -153,7 +152,6 @@ function AdminAddProduct() {
     setFormData({ ...formData, keyFeatures: formData.keyFeatures.filter((_, i) => i !== index) });
   };
 
-  // Submit
   const submitProduct = async () => {
     if (!formData.productName || !formData.brand || !formData.category || !formData.sellingPrice || !formData.quantity) {
       alert('Please fill required fields: Product Name, Brand, Category, Selling Price, Quantity');
@@ -161,6 +159,7 @@ function AdminAddProduct() {
     }
 
     setLoading(true);
+    const token = localStorage.getItem('adminToken');
     const productData = {
       name: formData.productName,
       brand: formData.brand,
@@ -175,15 +174,12 @@ function AdminAddProduct() {
       shortDescription: formData.shortDescription,
       description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
-      // Skincare specific
       skinType: formData.skinType,
       concerns: formData.concerns,
       ingredients: formData.ingredients,
-      // Makeup specific
       shade: formData.shade,
       finish: formData.finish,
       coverage: formData.coverage,
-      // SEO
       seoTitle: formData.seoTitle,
       seoDescription: formData.seoDescription,
       seoKeywords: formData.seoKeywords,
@@ -196,14 +192,18 @@ function AdminAddProduct() {
     try {
       const response = await fetch(`${API_URL}/api/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(productData)
       });
       if (!response.ok) throw new Error(await response.text());
       alert('✓ Product listed successfully!');
       navigate('/admin/inventory');
     } catch (error) {
-      alert('Failed to add product');
+      console.error('Submit error:', error);
+      alert('Failed to add product: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -237,7 +237,6 @@ function AdminAddProduct() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
       <div className="bg-white border-b sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -254,7 +253,6 @@ function AdminAddProduct() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Progress Steps */}
         <div className="bg-white rounded-lg shadow-sm border p-4 mb-8 overflow-x-auto">
           <div className="flex justify-between min-w-[500px]">
             {['Basic', 'Images', 'Pricing', 'Stock', 'Details', 'SEO'].map((label, idx) => (
@@ -269,7 +267,6 @@ function AdminAddProduct() {
           </div>
         </div>
 
-        {/* Step 1: Basic Info */}
         {step === 1 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">📋 Basic Information</h2>
@@ -278,7 +275,6 @@ function AdminAddProduct() {
                 <label className="block text-sm font-medium mb-1">Product Name <span className="text-red-500">*</span></label>
                 <input type="text" value={formData.productName} onChange={(e) => setFormData({...formData, productName: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C Serum" />
               </div>
-              
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-1">Brand <span className="text-red-500">*</span></label>
                 <input type="text" placeholder="Search brand..." value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} className="w-full border rounded-lg px-4 py-2.5" />
@@ -297,7 +293,6 @@ function AdminAddProduct() {
                   </div>
                 )}
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">Category <span className="text-red-500">*</span></label>
                 <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value, subCategory: ''})} className="w-full border rounded-lg px-4 py-2.5">
@@ -305,7 +300,6 @@ function AdminAddProduct() {
                   {Object.keys(categories).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">Sub Category <span className="text-red-500">*</span></label>
                 <select value={formData.subCategory} onChange={(e) => setFormData({...formData, subCategory: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" disabled={!formData.category}>
@@ -318,7 +312,6 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Add Brand Modal */}
         {showAddBrand && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddBrand(false)}>
             <div className="bg-white rounded-lg max-w-md w-full" onClick={(e) => e.stopPropagation()}>
@@ -334,7 +327,6 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 2: Images */}
         {step === 2 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">📸 Product Images</h2>
@@ -357,7 +349,6 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 3: Pricing */}
         {step === 3 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">💰 Pricing</h2>
@@ -370,7 +361,6 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 4: Inventory */}
         {step === 4 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">📦 Inventory</h2>
@@ -382,12 +372,9 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 5: Product Details (Skincare/Makeup specific) */}
         {step === 5 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">✨ Product Details</h2>
-            
-            {/* Common fields */}
             <div className="mb-5">
               <label className="block text-sm font-medium mb-1">Short Description</label>
               <textarea rows="2" value={formData.shortDescription} onChange={(e) => setFormData({...formData, shortDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Brief description" />
@@ -396,8 +383,6 @@ function AdminAddProduct() {
               <label className="block text-sm font-medium mb-1">Full Description</label>
               <textarea rows="4" value={formData.fullDescription} onChange={(e) => setFormData({...formData, fullDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Detailed description" />
             </div>
-            
-            {/* Key Features */}
             <div className="mb-5">
               <label className="block text-sm font-medium mb-1">Key Features</label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -408,62 +393,21 @@ function AdminAddProduct() {
               <div className="flex gap-2"><input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., Dermatologically tested" className="flex-1 border rounded-lg px-4 py-2" /><button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div>
             </div>
 
-            {/* Category specific fields */}
             {formData.category === 'Skincare' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">🧴 Skincare Specific</h3>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Skin Type</label>
-                  <select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">
-                    <option value="all">All Skin Types</option>
-                    <option value="oily">Oily</option>
-                    <option value="dry">Dry</option>
-                    <option value="combination">Combination</option>
-                    <option value="sensitive">Sensitive</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Skin Concerns</label>
-                  <div className="flex flex-wrap gap-2">
-                    {skinConcerns.map(concern => (
-                      <label key={concern} className="flex items-center gap-1">
-                        <input type="checkbox" value={concern} onChange={(e) => {
-                          const updated = e.target.checked ? [...formData.concerns, concern] : formData.concerns.filter(c => c !== concern);
-                          setFormData({...formData, concerns: updated});
-                        }} />
-                        <span className="text-sm">{concern}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Key Ingredients</label>
-                  <input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C, Hyaluronic Acid, Niacinamide" />
-                </div>
+                <div><label className="block text-sm font-medium mb-1">Skin Type</label><select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="all">All Skin Types</option><option value="oily">Oily</option><option value="dry">Dry</option><option value="combination">Combination</option><option value="sensitive">Sensitive</option></select></div>
+                <div><label className="block text-sm font-medium mb-1">Skin Concerns</label><div className="flex flex-wrap gap-2">{skinConcerns.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, concern] : formData.concerns.filter(c => c !== concern); setFormData({...formData, concerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
+                <div><label className="block text-sm font-medium mb-1">Key Ingredients</label><input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C, Hyaluronic Acid" /></div>
               </div>
             )}
 
             {formData.category === 'Makeup' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">💄 Makeup Specific</h3>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Shade / Color</label>
-                  <input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red, Nude Pink, Classic Beige" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Finish</label>
-                  <select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">
-                    <option value="">Select Finish</option>
-                    {makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Coverage</label>
-                  <select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">
-                    <option value="">Select Coverage</option>
-                    {makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+                <div><label className="block text-sm font-medium mb-1">Shade / Color</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red" /></div>
+                <div><label className="block text-sm font-medium mb-1">Finish</label><select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Finish</option>{makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
+                <div><label className="block text-sm font-medium mb-1">Coverage</label><select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Coverage</option>{makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
               </div>
             )}
 
@@ -471,7 +415,6 @@ function AdminAddProduct() {
           </div>
         )}
 
-        {/* Step 6: SEO */}
         {step === 6 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">🔍 SEO</h2>
