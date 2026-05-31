@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
+import { api } from '../utils/api';
 
 function AdminProducts() {
   const navigate = useNavigate();
@@ -30,11 +31,25 @@ function AdminProducts() {
     loadProducts();
   }, [navigate]);
 
-  // Load products from backend API
+  // ✅ Load products from backend API with token
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/products`);
+      const token = localStorage.getItem('adminToken');
+      
+      const response = await fetch(`${API_URL}/api/products`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminRole');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) {
         throw new Error('Failed to load products');
@@ -56,16 +71,27 @@ function AdminProducts() {
     }
   };
 
-  // Update stock in backend
+  // ✅ Update stock in backend
   const updateStock = async (productId, newStock) => {
     if (newStock < 0) return;
     
     try {
+      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ stock: newStock })
       });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) throw new Error('Update failed');
       
@@ -77,14 +103,25 @@ function AdminProducts() {
     }
   };
 
-  // Approve product
+  // ✅ Approve product
   const approveProduct = async (productId) => {
     try {
+      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ adminApproved: true, status: 'active' })
       });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) throw new Error('Approval failed');
       
@@ -96,14 +133,25 @@ function AdminProducts() {
     }
   };
 
-  // Reject product
+  // ✅ Reject product (delete)
   const rejectProduct = async (productId) => {
     if (!window.confirm('Reject and delete this product?')) return;
     
     try {
+      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) throw new Error('Rejection failed');
       
@@ -115,12 +163,23 @@ function AdminProducts() {
     }
   };
 
-  // Delete product
+  // ✅ Delete product
   const deleteProduct = async (productId) => {
     try {
+      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) throw new Error('Delete failed');
       
@@ -135,14 +194,19 @@ function AdminProducts() {
     }
   };
 
-  // Bulk delete
+  // ✅ Bulk delete
   const bulkDelete = async () => {
     if (selectedProducts.length === 0) return;
     if (!window.confirm(`Delete ${selectedProducts.length} products?`)) return;
     
     try {
+      const token = localStorage.getItem('adminToken');
+      
       for (const productId of selectedProducts) {
-        await fetch(`${API_URL}/api/products/${productId}`, { method: 'DELETE' });
+        await fetch(`${API_URL}/api/products/${productId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
       }
       await loadProducts();
       setSelectedProducts([]);
@@ -153,16 +217,27 @@ function AdminProducts() {
     }
   };
 
-  // Toggle product status
+  // ✅ Toggle product status
   const toggleProductStatus = async (productId, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     
     try {
+      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ status: newStatus })
       });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) throw new Error('Status update failed');
       
@@ -349,7 +424,7 @@ function AdminProducts() {
                     {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
                   
-                  {/* ✅ Brand Filter - Fixed Z-Index (No Overlap) */}
+                  {/* Brand Filter */}
                   <div className="relative" style={{ zIndex: 60 }}>
                     <div className="flex items-center border border-pink-200 rounded-xl bg-white overflow-hidden">
                       <input
@@ -442,7 +517,7 @@ function AdminProducts() {
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Stock</th>
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Status</th>
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
-                  </tr>
+                  </table>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
                   {currentProducts.length === 0 ? (
