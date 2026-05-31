@@ -29,7 +29,6 @@ function Login() {
     const email = isEmail ? identifier : `${identifier}@phone.com`;
 
     try {
-      // ✅ Call backend API directly
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,12 +44,9 @@ function Login() {
         localStorage.setItem('userEmail', data.email);
         localStorage.setItem('userName', data.name);
         localStorage.setItem('userId', data._id);
-        
-        // ✅ For admin panel compatibility
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminRole', data.role);
         
-        // ✅ Also update AuthContext if needed
         if (login) {
           await login(email, password);
         }
@@ -64,11 +60,24 @@ function Login() {
           navigate('/');
         }
       } else {
-        setError(data.message || 'Invalid email/mobile or password');
+        // ✅ USER-FRIENDLY ERROR MESSAGES
+        if (response.status === 401) {
+          if (data.message?.toLowerCase().includes('password') || data.message?.toLowerCase().includes('wrong')) {
+            setError('❌ Wrong password. Please try again or click "Forgot Password".');
+          } else if (data.message?.toLowerCase().includes('account') || data.message?.toLowerCase().includes('found')) {
+            setError('❌ No account found with this email. Please sign up first.');
+          } else {
+            setError(data.message || '❌ Invalid email or password. Please try again.');
+          }
+        } else if (response.status === 500) {
+          setError('❌ Something went wrong on our end. Please try again later.');
+        } else {
+          setError(data.message || '❌ Login failed. Please try again.');
+        }
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Network error. Please try again.');
+      setError('❌ Network issue. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -77,7 +86,7 @@ function Login() {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     if (!resetEmail) {
-      setError('Please enter your email address');
+      setError('❌ Please enter your email address to reset password.');
       return;
     }
     setLoading(true);
