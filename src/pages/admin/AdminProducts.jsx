@@ -56,7 +56,7 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Update stock in backend
+  // Update stock in backend
   const updateStock = async (productId, newStock) => {
     if (newStock < 0) return;
     
@@ -89,14 +89,14 @@ function AdminProducts() {
       if (!response.ok) throw new Error('Approval failed');
       
       await loadProducts();
-      alert('✓ Product approved and now visible on website');
+      alert('✓ Product approved');
     } catch (error) {
       console.error('Error approving product:', error);
       alert('Failed to approve product');
     }
   };
 
-  // Reject product (delete)
+  // Reject product
   const rejectProduct = async (productId) => {
     if (!window.confirm('Reject and delete this product?')) return;
     
@@ -128,7 +128,7 @@ function AdminProducts() {
       setShowDeleteModal(false);
       setProductToDelete(null);
       setSelectedProducts([]);
-      alert('🗑 Product deleted successfully');
+      alert('🗑 Product deleted');
     } catch (error) {
       console.error('Error deleting product:', error);
       alert('Failed to delete product');
@@ -146,7 +146,7 @@ function AdminProducts() {
       }
       await loadProducts();
       setSelectedProducts([]);
-      alert(`${selectedProducts.length} products deleted successfully`);
+      alert(`${selectedProducts.length} products deleted`);
     } catch (error) {
       console.error('Error bulk deleting:', error);
       alert('Failed to delete some products');
@@ -167,7 +167,7 @@ function AdminProducts() {
       if (!response.ok) throw new Error('Status update failed');
       
       await loadProducts();
-      alert(`Product status updated to ${newStatus}`);
+      alert(`Status updated to ${newStatus}`);
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Failed to update status');
@@ -196,11 +196,8 @@ function AdminProducts() {
     }
   };
 
-  // ✅ Get unique brands from products
+  // Get unique brands
   const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
-
-  // Filtered brands based on search
-  const filteredBrands = uniqueBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
   const getStatusBadge = (status) => {
     switch(status) {
@@ -245,7 +242,6 @@ function AdminProducts() {
   const lowStockCount = products.filter(p => p.stock < 10 && p.stock > 0).length;
   const outOfStockCount = products.filter(p => p.stock === 0).length;
 
-  // Stats card click handlers
   const handleStatsClick = (type) => {
     setActiveTab('approved');
     setSearchTerm('');
@@ -269,13 +265,6 @@ function AdminProducts() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Clear brand filter
-  const clearBrandFilter = () => {
-    setFilterBrand('all');
-    setBrandSearch('');
-    setShowBrandDropdown(false);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -293,7 +282,7 @@ function AdminProducts() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-pink-50/30">
       <AdminSidebar />
       
-      {/* Premium Header */}
+      {/* Header */}
       <div className="bg-white/95 backdrop-blur-md border-b border-pink-100 px-4 sm:px-6 py-3 sm:py-4 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-sm">
         <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
@@ -310,7 +299,7 @@ function AdminProducts() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Premium Stats Cards */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
             <div onClick={() => handleStatsClick('all')} className="bg-white rounded-2xl shadow-sm border border-pink-100 p-4 cursor-pointer hover:shadow-md hover:border-pink-300 transition group">
               <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Total Products</p><span className="text-xl text-gray-400 group-hover:scale-110 transition">📦</span></div>
@@ -321,7 +310,7 @@ function AdminProducts() {
               <p className="text-2xl font-bold text-green-600">{activeCount}</p>
             </div>
             <div onClick={() => handleStatsClick('pending')} className="bg-white rounded-2xl shadow-sm border border-amber-100 p-4 cursor-pointer hover:shadow-md hover:border-amber-300 transition group">
-              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Pending Approval</p><span className="text-xl text-amber-500 group-hover:scale-110 transition">⏳</span></div>
+              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Pending</p><span className="text-xl text-amber-500 group-hover:scale-110 transition">⏳</span></div>
               <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
             </div>
             <div onClick={() => handleStatsClick('lowstock')} className="bg-white rounded-2xl shadow-sm border border-orange-100 p-4 cursor-pointer hover:shadow-md hover:border-orange-300 transition group">
@@ -334,75 +323,87 @@ function AdminProducts() {
             </div>
           </div>
 
-          {/* Premium Tabs */}
+          {/* Tabs */}
           <div className="flex flex-wrap gap-6 border-b border-pink-100 mb-6">
-            <button onClick={() => { setActiveTab('approved'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              Approved Products ({products.length})
+            <button onClick={() => { setActiveTab('approved'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
+              Approved ({products.length})
             </button>
-            <button onClick={() => { setActiveTab('pending'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              Pending Approval ({pendingProducts.length})
+            <button onClick={() => { setActiveTab('pending'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
+              Pending ({pendingProducts.length})
             </button>
           </div>
 
-          {/* Filters - Added Brand Filter */}
+          {/* Filters */}
           {activeTab === 'approved' && (
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 mb-6 overflow-hidden">
               <div className="p-4 border-b border-pink-100 flex flex-wrap justify-between items-center gap-3">
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search by name */}
                   <div className="relative">
-                    <input type="text" placeholder="Search by name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-64 pl-9 pr-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white" />
+                    <input type="text" placeholder="Search by name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-56 pl-9 pr-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white" />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
                   </div>
+                  
+                  {/* Category filter */}
                   <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white">
                     {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
                   
-                  {/* ✅ Brand Filter with Search */}
+                  {/* ✅ Brand Filter - Search + Dropdown */}
                   <div className="relative">
-                    <button
-                      onClick={() => setShowBrandDropdown(!showBrandDropdown)}
-                      className="px-3 py-2 border border-pink-200 rounded-xl text-sm bg-white flex items-center gap-2 hover:border-pink-400 transition"
-                    >
-                      <span>{filterBrand === 'all' ? 'All Brands' : filterBrand}</span>
-                      <span className="text-pink-500">▼</span>
-                    </button>
+                    <div className="flex items-center border border-pink-200 rounded-xl bg-white overflow-hidden">
+                      <input
+                        type="text"
+                        placeholder="Search by brand..."
+                        value={brandSearch}
+                        onChange={(e) => {
+                          setBrandSearch(e.target.value);
+                          setShowBrandDropdown(true);
+                        }}
+                        onFocus={() => setShowBrandDropdown(true)}
+                        className="px-3 py-2 text-sm focus:outline-none flex-1 min-w-[140px]"
+                      />
+                      <button
+                        onClick={() => setShowBrandDropdown(!showBrandDropdown)}
+                        className="px-2 py-2 border-l border-pink-200 text-gray-400 hover:text-pink-500"
+                      >
+                        <span className="text-sm">▼</span>
+                      </button>
+                    </div>
                     
                     {showBrandDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-pink-200 rounded-xl shadow-lg z-50">
-                        <div className="p-2 border-b border-pink-100">
-                          <input
-                            type="text"
-                            placeholder="Search brand..."
-                            value={brandSearch}
-                            onChange={(e) => setBrandSearch(e.target.value)}
-                            className="w-full px-3 py-1.5 border border-pink-200 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-1 w-full bg-white border border-pink-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <button
+                          onClick={() => {
+                            setFilterBrand('all');
+                            setBrandSearch('');
+                            setShowBrandDropdown(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition ${filterBrand === 'all' ? 'bg-pink-100 text-pink-600 font-medium' : 'text-gray-700'}`}
+                        >
+                          All Brands
+                        </button>
+                        {uniqueBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).map(brand => (
                           <button
-                            onClick={() => { setFilterBrand('all'); setBrandSearch(''); setShowBrandDropdown(false); }}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition ${filterBrand === 'all' ? 'bg-pink-100 text-pink-600' : 'text-gray-700'}`}
+                            key={brand}
+                            onClick={() => {
+                              setFilterBrand(brand);
+                              setBrandSearch('');
+                              setShowBrandDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition ${filterBrand === brand ? 'bg-pink-100 text-pink-600 font-medium' : 'text-gray-700'}`}
                           >
-                            All Brands
+                            {brand}
                           </button>
-                          {filteredBrands.map(brand => (
-                            <button
-                              key={brand}
-                              onClick={() => { setFilterBrand(brand); setBrandSearch(''); setShowBrandDropdown(false); }}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition ${filterBrand === brand ? 'bg-pink-100 text-pink-600' : 'text-gray-700'}`}
-                            >
-                              {brand}
-                            </button>
-                          ))}
-                          {filteredBrands.length === 0 && brandSearch && (
-                            <div className="px-3 py-2 text-sm text-gray-400">No brands found</div>
-                          )}
-                        </div>
+                        ))}
+                        {uniqueBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).length === 0 && brandSearch && (
+                          <div className="px-3 py-2 text-sm text-gray-400">No brands found</div>
+                        )}
                       </div>
                     )}
                   </div>
                   
+                  {/* Stock status filter */}
                   <select value={filterStockStatus} onChange={(e) => setFilterStockStatus(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white">
                     <option value="all">All Stock</option>
                     <option value="instock">In Stock (&gt;10)</option>
@@ -410,12 +411,14 @@ function AdminProducts() {
                     <option value="outofstock">Out of Stock (0)</option>
                   </select>
                   
+                  {/* Clear all button */}
                   {(filterBrand !== 'all' || searchTerm || filterCategory !== 'all' || filterStockStatus !== 'all') && (
                     <button onClick={() => { setSearchTerm(''); setFilterCategory('all'); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className="px-3 py-2 text-sm text-pink-600 hover:bg-pink-50 rounded-xl transition">
                       Clear All ✕
                     </button>
                   )}
                 </div>
+                
                 {selectedProducts.length > 0 && (
                   <button onClick={bulkDelete} className="bg-gradient-to-r from-red-500 to-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition">
                     Delete Selected ({selectedProducts.length})
@@ -446,10 +449,8 @@ function AdminProducts() {
                     <tr className="hover:bg-pink-50/30">
                       <td colSpan={activeTab === 'approved' ? 8 : 7} className="px-4 py-16 text-center">
                         <div className="text-6xl mb-4">📦</div>
-                        <p className="text-gray-400">{activeTab === 'pending' ? 'No products pending approval' : 'No products found'}</p>
-                        {activeTab === 'approved' && (
-                          <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">Add your first product →</Link>
-                        )}
+                        <p className="text-gray-400">{activeTab === 'pending' ? 'No products pending' : 'No products found'}</p>
+                        {activeTab === 'approved' && <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">Add your first product →</Link>}
                        </td>
                     </tr>
                   ) : (
@@ -482,22 +483,12 @@ function AdminProducts() {
                         <td className="px-4 py-3 text-right font-bold text-pink-600">₹{product.price}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <button 
-                              onClick={() => updateStock(product._id, product.stock - 1)}
-                              className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600"
-                            >
-                              -
-                            </button>
+                            <button onClick={() => updateStock(product._id, product.stock - 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">-</button>
                             <div className="flex flex-col items-center">
                               {getStockBadge(product.stock)}
                               <span className="text-xs text-gray-500 mt-1">{product.stock} units</span>
                             </div>
-                            <button 
-                              onClick={() => updateStock(product._id, product.stock + 1)}
-                              className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600"
-                            >
-                              +
-                            </button>
+                            <button onClick={() => updateStock(product._id, product.stock + 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">+</button>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
@@ -510,7 +501,7 @@ function AdminProducts() {
                               </>
                             ) : (
                               <>
-                                <button onClick={() => editProduct(product._id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit Product">✏️</button>
+                                <button onClick={() => editProduct(product._id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">✏️</button>
                                 <button onClick={() => toggleProductStatus(product._id, product.status)} className={`p-1.5 rounded-lg transition ${product.status === 'active' ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`} title={product.status === 'active' ? 'Disable' : 'Enable'}>
                                   {product.status === 'active' ? '🔒' : '🔓'}
                                 </button>
@@ -533,7 +524,7 @@ function AdminProducts() {
         </div>
       </div>
 
-      {/* Premium Delete Modal */}
+      {/* Delete Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
