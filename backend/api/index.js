@@ -266,7 +266,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 // ========== PRODUCT ROUTES ==========
 
-app.get('/api/products', authMiddleware, async (req, res) => {
+// ✅ PUBLIC ROUTE - No authentication required (for homepage)
+app.get('/api/products', async (req, res) => {
   try {
     await connectDB();
     const products = await Product.find({ status: 'active', adminApproved: true }).sort({ createdAt: -1 });
@@ -276,7 +277,8 @@ app.get('/api/products', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/products/:id', authMiddleware, async (req, res) => {
+// Protected route for single product
+app.get('/api/products/:id', async (req, res) => {
   try {
     await connectDB();
     const product = await Product.findById(req.params.id);
@@ -289,6 +291,7 @@ app.get('/api/products/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Add product - requires authentication
 app.post('/api/products', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'vendor') {
     return res.status(403).json({ message: 'Only sellers can add products' });
