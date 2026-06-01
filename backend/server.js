@@ -15,10 +15,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 🔥 Bulk upload route (IMPORT)
+const bulkUploadRoutes = require('./routes/bulkUploadRoutes');
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
-app.use('/api/admin', require('./routes/admin'));  // 👈 Admin route added
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/bulk-upload', bulkUploadRoutes);  // 🔥 YEH LINE ADD KARI
 
 // Root route
 app.get('/', (req, res) => {
