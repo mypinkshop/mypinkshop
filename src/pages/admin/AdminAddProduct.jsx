@@ -26,8 +26,7 @@ function AdminAddProduct() {
     sku: '',
     quantity: '',
     lowStockThreshold: 10,
-    shortDescription: '',
-    fullDescription: '',
+    fullDescription: [], // 🔥 Array of bullet points
     keyFeatures: [],
     skinType: 'all',
     concerns: [],
@@ -47,6 +46,7 @@ function AdminAddProduct() {
     seoKeywords: '',
   });
   
+  const [currentBullet, setCurrentBullet] = useState(''); // 🔥 Current bullet point
   const [keyFeature, setKeyFeature] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -103,7 +103,7 @@ function AdminAddProduct() {
     });
   };
 
-  // ✅ Upload image to backend with compression and user-friendly errors
+  // ✅ Upload image to backend
   const uploadImageToBackend = async (file) => {
     const token = localStorage.getItem('adminToken');
     
@@ -173,6 +173,29 @@ function AdminAddProduct() {
 
   const removeImage = (index) => {
     setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
+  };
+
+  // 🔥 Add bullet point to description
+  const addBulletPoint = () => {
+    if (currentBullet.trim()) {
+      if (formData.fullDescription.length >= 8) {
+        alert('⚠️ Maximum 8 bullet points allowed!');
+        return;
+      }
+      setFormData({
+        ...formData,
+        fullDescription: [...formData.fullDescription, currentBullet.trim()]
+      });
+      setCurrentBullet(''); // Clear for next bullet
+    }
+  };
+
+  // 🔥 Remove bullet point
+  const removeBulletPoint = (index) => {
+    setFormData({
+      ...formData,
+      fullDescription: formData.fullDescription.filter((_, i) => i !== index)
+    });
   };
 
   const handleAddNewBrand = () => {
@@ -285,8 +308,7 @@ function AdminAddProduct() {
       stock: parseInt(formData.quantity),
       sku: formData.sku || `SKU-${Date.now()}`,
       images: formData.images,
-      shortDescription: formData.shortDescription,
-      description: formData.fullDescription,
+      description: formData.fullDescription, // 🔥 Array of bullet points
       keyFeatures: formData.keyFeatures,
       skinType: formData.skinType,
       concerns: formData.concerns,
@@ -380,7 +402,6 @@ function AdminAddProduct() {
   const IconBack = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
   const IconUpload = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
   const IconPlus = () => (<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
-  const IconX = () => (<svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -512,7 +533,11 @@ function AdminAddProduct() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">📦 Inventory</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div><label className="block text-sm font-medium mb-1">SKU</label><input type="text" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Auto" /></div>
+              <div>
+                <label className="block text-sm font-medium mb-1">SKU</label>
+                <input type="text" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Auto Generated" />
+                <p className="text-xs text-gray-400 mt-1">Leave empty for auto generation</p>
+              </div>
               <div><label className="block text-sm font-medium mb-1">Quantity/Stock <span className="text-red-500">*</span></label><input type="number" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" /></div>
             </div>
             <div className="flex justify-between mt-6"><button onClick={() => setStep(3)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2 rounded-lg">Continue →</button></div>
@@ -523,30 +548,79 @@ function AdminAddProduct() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold mb-4">✨ Product Details</h2>
             
-            <div className="mb-5">
-              <label className="block text-sm font-medium mb-1">Short Description</label>
-              <textarea rows="2" value={formData.shortDescription} onChange={(e) => setFormData({...formData, shortDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Brief description" />
-            </div>
-            <div className="mb-5">
-              <label className="block text-sm font-medium mb-1">Full Description</label>
-              <textarea rows="4" value={formData.fullDescription} onChange={(e) => setFormData({...formData, fullDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Detailed description" />
-            </div>
-            
-            <div className="mb-5">
-              <label className="block text-sm font-medium mb-1">Key Features</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {formData.keyFeatures.map((f, i) => (
-                  <span key={i} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">✓ {f}<button onClick={() => removeKeyFeature(i)} className="text-red-400">×</button></span>
+            {/* 🔥 BULLET POINTS SECTION - Amazon style */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
+                Product Description (Bullet Points) 
+                <span className="text-xs text-gray-400 ml-2">Max 8 points</span>
+              </label>
+              
+              {/* List of added bullet points */}
+              <div className="space-y-2 mb-3">
+                {formData.fullDescription.map((bullet, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
+                    <span className="text-pink-500 font-bold ml-2">•</span>
+                    <span className="flex-1 text-sm">{bullet}</span>
+                    <button 
+                      onClick={() => removeBulletPoint(idx)}
+                      className="text-red-400 hover:text-red-600 px-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ))}
               </div>
-              <div className="flex gap-2"><input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., Dermatologically tested" className="flex-1 border rounded-lg px-4 py-2" /><button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div>
+              
+              {/* Add new bullet point */}
+              {formData.fullDescription.length < 8 && (
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={currentBullet} 
+                    onChange={(e) => setCurrentBullet(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addBulletPoint()}
+                    placeholder="e.g., Dermatologically tested for sensitive skin"
+                    className="flex-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-500"
+                  />
+                  <button 
+                    onClick={addBulletPoint}
+                    className="px-5 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition flex items-center gap-1"
+                  >
+                    <IconPlus /> Add
+                  </button>
+                </div>
+              )}
+              
+              {formData.fullDescription.length === 8 && (
+                <p className="text-xs text-green-600 mt-2">✅ Maximum 8 bullet points added</p>
+              )}
+              {formData.fullDescription.length === 0 && (
+                <p className="text-xs text-gray-400 mt-2">Add key features as bullet points (like Amazon)</p>
+              )}
+            </div>
+
+            {/* Key Features */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium mb-1">Key Features (Highlights)</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.keyFeatures.map((f, i) => (
+                  <span key={i} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                    ⭐ {f}
+                    <button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., 100% Vegan" className="flex-1 border rounded-lg px-4 py-2" />
+                <button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button>
+              </div>
             </div>
 
             {formData.category === 'Skincare' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">🧴 Skincare Specific</h3>
                 <div><label className="block text-sm font-medium mb-1">Skin Type</label><select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="all">All Skin Types</option><option value="oily">Oily</option><option value="dry">Dry</option><option value="combination">Combination</option><option value="sensitive">Sensitive</option></select></div>
-                <div><label className="block text-sm font-medium mb-1">Skin Concerns</label><div className="flex flex-wrap gap-2">{skinConcerns.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, concern] : formData.concerns.filter(c => c !== concern); setFormData({...formData, concerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
+                <div><label className="block text-sm font-medium mb-1">Skin Concerns</label><div className="flex flex-wrap gap-3">{skinConcerns.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, concern] : formData.concerns.filter(c => c !== concern); setFormData({...formData, concerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
                 <div><label className="block text-sm font-medium mb-1">Key Ingredients</label><input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C, Hyaluronic Acid" /></div>
               </div>
             )}
@@ -554,7 +628,7 @@ function AdminAddProduct() {
             {formData.category === 'Makeup' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">💄 Makeup Specific</h3>
-                <div><label className="block text-sm font-medium mb-1">Shade / Color</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red" /></div>
+                <div><label className="block text-sm font-medium mb-1">Shade / Color</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red, Nude Pink, Coral" /></div>
                 <div><label className="block text-sm font-medium mb-1">Finish</label><select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Finish</option>{makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
                 <div><label className="block text-sm font-medium mb-1">Coverage</label><select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Coverage</option>{makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
               </div>
@@ -564,15 +638,15 @@ function AdminAddProduct() {
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">💇‍♀️ Hair Specific</h3>
                 <div><label className="block text-sm font-medium mb-1">Hair Type</label><select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">{hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}</select></div>
-                <div><label className="block text-sm font-medium mb-1">Hair Concerns</label><div className="flex flex-wrap gap-2">{hairConcernsList.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), concern] : (formData.hairConcerns || []).filter(c => c !== concern); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
+                <div><label className="block text-sm font-medium mb-1">Hair Concerns</label><div className="flex flex-wrap gap-3">{hairConcernsList.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), concern] : (formData.hairConcerns || []).filter(c => c !== concern); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
               </div>
             )}
 
             {formData.category === 'Clothing' && (
               <div className="space-y-4 border-t pt-4">
                 <h3 className="font-medium">👗 Clothing Specific</h3>
-                <div><label className="block text-sm font-medium mb-1">Sizes Available</label><div className="flex flex-wrap gap-2 mb-2">{formData.sizes.map(size => (<span key={size} className="bg-gray-100 px-2 py-1 rounded-full text-sm flex items-center gap-1">{size}<button onClick={() => removeSize(size)} className="text-red-400">×</button></span>))}</div><div className="flex gap-2"><select value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} className="border rounded-lg px-4 py-2"><option value="">Select Size</option>{sizes.map(s => <option key={s} value={s}>{s}</option>)}</select><button onClick={addSize} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
-                <div><label className="block text-sm font-medium mb-1">Colors Available</label><div className="flex flex-wrap gap-2 mb-2">{formData.colors.map(color => (<span key={color} className="bg-gray-100 px-2 py-1 rounded-full text-sm flex items-center gap-1">{color}<button onClick={() => removeColor(color)} className="text-red-400">×</button></span>))}</div><div className="flex gap-2"><select value={colorValue} onChange={(e) => setColorValue(e.target.value)} className="border rounded-lg px-4 py-2"><option value="">Select Color</option>{colors.map(c => <option key={c} value={c}>{c}</option>)}</select><button onClick={addColor} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
+                <div><label className="block text-sm font-medium mb-1">Sizes Available</label><div className="flex flex-wrap gap-2 mb-2">{formData.sizes.map(size => (<span key={size} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">{size}<button onClick={() => removeSize(size)} className="text-red-400">×</button></span>))}</div><div className="flex gap-2"><select value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} className="border rounded-lg px-4 py-2"><option value="">Select Size</option>{sizes.map(s => <option key={s} value={s}>{s}</option>)}</select><button onClick={addSize} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
+                <div><label className="block text-sm font-medium mb-1">Colors Available</label><div className="flex flex-wrap gap-2 mb-2">{formData.colors.map(color => (<span key={color} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">{color}<button onClick={() => removeColor(color)} className="text-red-400">×</button></span>))}</div><div className="flex gap-2"><select value={colorValue} onChange={(e) => setColorValue(e.target.value)} className="border rounded-lg px-4 py-2"><option value="">Select Color</option>{colors.map(c => <option key={c} value={c}>{c}</option>)}</select><button onClick={addColor} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button></div></div>
                 <div><label className="block text-sm font-medium mb-1">Fabric / Material</label><input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Cotton, Silk, Polyester" /></div>
               </div>
             )}
@@ -591,10 +665,10 @@ function AdminAddProduct() {
 
         {step === 6 && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">🔍 SEO</h2>
+            <h2 className="text-lg font-semibold mb-4">🔍 SEO (Optional)</h2>
             <div className="space-y-4">
-              <div><label className="block text-sm font-medium mb-1">SEO Title</label><input type="text" value={formData.seoTitle} onChange={(e) => setFormData({...formData, seoTitle: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" /></div>
-              <div><label className="block text-sm font-medium mb-1">SEO Description</label><textarea rows="2" value={formData.seoDescription} onChange={(e) => setFormData({...formData, seoDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" /></div>
+              <div><label className="block text-sm font-medium mb-1">SEO Title</label><input type="text" value={formData.seoTitle} onChange={(e) => setFormData({...formData, seoTitle: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Leave empty for auto" /></div>
+              <div><label className="block text-sm font-medium mb-1">SEO Description</label><textarea rows="2" value={formData.seoDescription} onChange={(e) => setFormData({...formData, seoDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Leave empty for auto" /></div>
               <div><label className="block text-sm font-medium mb-1">SEO Keywords</label><input type="text" value={formData.seoKeywords} onChange={(e) => setFormData({...formData, seoKeywords: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="comma, separated, keywords" /></div>
             </div>
             <div className="flex justify-between mt-6"><button onClick={() => setStep(5)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-6 py-2 rounded-lg">{loading ? 'Submitting...' : '✓ Submit Product'}</button></div>
