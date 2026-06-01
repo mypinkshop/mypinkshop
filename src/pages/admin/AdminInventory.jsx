@@ -24,7 +24,7 @@ function AdminInventory() {
     loadInventory();
   }, [navigate]);
 
-  // ✅ FIXED: Load products from BACKEND API (not localStorage)
+  // ✅ Load products from BACKEND API
   const loadInventory = async () => {
     try {
       setLoading(true);
@@ -71,7 +71,6 @@ function AdminInventory() {
       
       if (!response.ok) throw new Error('Update failed');
       
-      // Reload inventory
       await loadInventory();
       alert(`✓ Stock updated to ${newStock}`);
     } catch (error) {
@@ -159,17 +158,30 @@ function AdminInventory() {
             <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Inventory Management</h1>
             <p className="text-xs text-gray-400 mt-0.5">Track and manage your product stock levels</p>
           </div>
-          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg hover:scale-105 transition-all">
-            + Add Product
-          </Link>
+          
+          {/* 🔥 BUTTONS - ADDED BULK UPLOAD */}
+          <div className="flex gap-3">
+            <Link 
+              to="/admin/add-product" 
+              className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg hover:scale-105 transition-all"
+            >
+              + Add Product
+            </Link>
+            <Link 
+              to="/admin/bulk-upload" 
+              className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg hover:scale-105 transition-all flex items-center gap-2"
+            >
+              📊 Bulk Upload
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Baki ka code same hai */}
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Premium Stats Cards */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-4 hover:shadow-md transition group">
               <div className="flex items-center justify-between mb-2">
@@ -201,7 +213,7 @@ function AdminInventory() {
             </div>
           </div>
 
-          {/* Premium Filters Bar */}
+          {/* Filters Bar */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-pink-100 mb-6 overflow-hidden">
             <div className="p-4 border-b border-pink-100 flex flex-wrap justify-between items-center gap-3">
               <div className="flex flex-wrap gap-2">
@@ -240,7 +252,7 @@ function AdminInventory() {
               </div>
             </div>
 
-            {/* Premium Table - WITH IMAGES */}
+            {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gradient-to-r from-pink-50 to-rose-50 border-b border-pink-100">
@@ -252,7 +264,7 @@ function AdminInventory() {
                     <th className="px-4 py-3 text-right text-gray-700 font-semibold">Stock</th>
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Status</th>
                     <th className="px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
                   {filteredProducts.length === 0 ? (
@@ -263,8 +275,8 @@ function AdminInventory() {
                         <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">
                           Add your first product →
                         </Link>
-                       </td>
-                     </tr>
+                      </td>
+                    </tr>
                   ) : (
                     filteredProducts.map(product => (
                       <tr key={product.id} className="hover:bg-pink-50/30 transition">
@@ -286,13 +298,13 @@ function AdminInventory() {
                               <p className="text-xs text-gray-400 capitalize">{product.mainCategory || product.category}</p>
                             </div>
                           </div>
-                         </td>
-                        <td className="px-4 py-3 text-gray-500 text-xs font-mono">{product.sku?.slice(-8) || 'N/A'} </td>
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 text-xs font-mono">{product.sku?.slice(-8) || 'N/A'}</td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full capitalize">
                             {product.mainCategory || product.category || 'General'}
                           </span>
-                         </td>
+                        </td>
                         <td className="px-4 py-3 text-right font-bold text-pink-600">₹{product.price}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
@@ -312,10 +324,10 @@ function AdminInventory() {
                               +
                             </button>
                           </div>
-                         </td>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           {getStatusBadge(product.status, product.stock)}
-                         </td>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex justify-center gap-2">
                             <Link to={`/admin/edit-product/${product.id}`} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
@@ -329,12 +341,12 @@ function AdminInventory() {
                               🗑️
                             </button>
                           </div>
-                         </td>
-                       </tr>
+                        </td>
+                      </tr>
                     ))
                   )}
                 </tbody>
-               </table>
+              </table>
             </div>
           </div>
 
@@ -346,7 +358,7 @@ function AdminInventory() {
         </div>
       </div>
 
-      {/* Premium Delete Modal */}
+      {/* Delete Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
