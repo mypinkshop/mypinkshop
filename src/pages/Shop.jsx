@@ -1,24 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// ✅ Product Card Component
+// ✅ FIXED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
   const handleAddToCart = () => {
-    addToCart(product);
+    addToCart({
+      id: product._id || product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image: product.images?.[0],
+      stock: product.stock
+    });
     setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 1500);
+    // Reset after 2 seconds so button can be used again
+    setTimeout(() => setIsAdded(false), 2000);
+  };
+
+  const handleGoToCart = () => {
+    window.location.href = '/cart';
   };
 
   const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
+    const productId = product._id || product.id;
+    if (isInWishlist(productId)) {
+      removeFromWishlist(productId);
     } else {
       addToWishlist(product);
     }
@@ -26,13 +39,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+      <Link to={`/product/${product._id || product.id}`}>
+        <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
               onError={() => setImgError(true)}
               loading="lazy"
             />
@@ -42,17 +55,17 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
@@ -60,7 +73,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       </Link>
       
       <div className="p-4">
-        <Link to={`/product/${product.id}`}>
+        <Link to={`/product/${product._id || product.id}`}>
           <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
             {product.name}
           </h3>
@@ -87,23 +100,32 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         </div>
         
         <div className="flex gap-2">
-          <button 
-            onClick={handleAddToCart} 
-            disabled={product.stock === 0}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
-              product.stock > 0 
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5' 
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {isAdded ? 'Added! ✓' : 'Add to Cart'}
-          </button>
+          {isAdded ? (
+            <button 
+              onClick={handleGoToCart}
+              className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600 transform hover:-translate-y-0.5"
+            >
+              ✓ Go to Cart
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddToCart} 
+              disabled={product.stock === 0}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+                product.stock > 0 
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Add to Cart
+            </button>
+          )}
           
           <button 
             onClick={handleWishlistToggle}
-            className="w-10 py-2 border border-pink-200 rounded-xl text-center hover:bg-pink-50 transition transform hover:-translate-y-0.5"
+            className="w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 border border-pink-200 hover:bg-pink-50"
           >
-            {isInWishlist(product.id) ? '❤️' : '🤍'}
+            {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
         </div>
       </div>
@@ -131,7 +153,7 @@ function Shop() {
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
-  // Get category from URL
+  // Load products
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
@@ -147,7 +169,6 @@ function Shop() {
       setSortBy('rating');
     }
     
-    // ✅ Load products from backend API
     const loadProducts = async () => {
       try {
         setLoading(true);
@@ -159,13 +180,18 @@ function Shop() {
         
         let data = await response.json();
         
-        // Apply offer filter if needed
         if (offer === 'sale') {
           data = data.filter(p => p.badge === 'Sale');
         }
         
-        setProducts(data);
-        console.log("✅ Loaded products from API:", data.length);
+        // Transform products to have consistent id
+        const transformedData = data.map(p => ({
+          ...p,
+          id: p._id,
+          category: p.mainCategory || p.category
+        }));
+        
+        setProducts(transformedData);
       } catch (error) {
         console.error("Error loading products:", error);
         setProducts([]);
@@ -177,31 +203,51 @@ function Shop() {
     loadProducts();
   }, [location]);
 
-  // Apply filters and sorting
+  // 🔥 FIXED FILTERS - using useMemo for performance
   useEffect(() => {
     let filtered = [...products];
 
+    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()));
-    }
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => p.category === selectedCategory);
+      filtered = filtered.filter(p => 
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
     
-    const min = minPrice ? parseInt(minPrice) : 0;
-    const max = maxPrice ? parseInt(maxPrice) : Infinity;
+    // 🔥 FIXED Category filter - check both mainCategory and category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => {
+        const productCategory = (p.mainCategory || p.category || '').toLowerCase();
+        return productCategory === selectedCategory.toLowerCase();
+      });
+    }
+    
+    // Price filter
+    const min = minPrice ? parseFloat(minPrice) : 0;
+    const max = maxPrice ? parseFloat(maxPrice) : Infinity;
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
     
+    // Rating filter
     if (selectedRating > 0) {
       filtered = filtered.filter(p => (p.rating || 4) >= selectedRating);
     }
     
+    // Sorting
     switch(sortBy) {
-      case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
-      case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
-      case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
-      default: break;
+      case 'price_low': 
+        filtered.sort((a, b) => a.price - b.price); 
+        break;
+      case 'price_high': 
+        filtered.sort((a, b) => b.price - a.price); 
+        break;
+      case 'rating': 
+        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); 
+        break;
+      case 'newest': 
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); 
+        break;
+      default: 
+        break;
     }
     
     setFilteredProducts(filtered);
@@ -214,6 +260,7 @@ function Shop() {
     setMaxPrice('');
     setSelectedRating(0);
     setSortBy('default');
+    navigate('/shop');
   };
 
   // Category chips
@@ -226,14 +273,15 @@ function Shop() {
     { id: 'accessories', name: 'Accessories', icon: '👜' },
   ];
 
-  const categories = [
+  // 🔥 FIXED Categories count
+  const categories = useMemo(() => [
     { id: 'all', name: 'All Products', count: products.length },
-    { id: 'skincare', name: 'Skincare', count: products.filter(p => p.category === 'skincare').length },
-    { id: 'makeup', name: 'Makeup', count: products.filter(p => p.category === 'makeup').length },
-    { id: 'hair', name: 'Hair', count: products.filter(p => p.category === 'hair').length },
-    { id: 'clothing', name: 'Clothing', count: products.filter(p => p.category === 'clothing').length },
-    { id: 'accessories', name: 'Accessories', count: products.filter(p => p.category === 'accessories').length },
-  ];
+    { id: 'skincare', name: 'Skincare', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'skincare').length },
+    { id: 'makeup', name: 'Makeup', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'makeup').length },
+    { id: 'hair', name: 'Hair', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'hair').length },
+    { id: 'clothing', name: 'Clothing', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'clothing').length },
+    { id: 'accessories', name: 'Accessories', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'accessories').length },
+  ], [products]);
 
   if (loading) {
     return (
@@ -294,14 +342,14 @@ function Shop() {
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5">{wishlistCount}</span>}
+                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
               </button>
               
               <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5">{cartCount}</span>}
+                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
               </Link>
               
               {user ? <Avatar user={user} onLogout={logout} /> : 
@@ -389,7 +437,10 @@ function Shop() {
                         type="radio" 
                         name="category" 
                         checked={selectedCategory === cat.id} 
-                        onChange={() => setSelectedCategory(cat.id)} 
+                        onChange={() => {
+                          setSelectedCategory(cat.id);
+                          navigate(`/shop?category=${cat.id === 'all' ? '' : cat.id}`);
+                        }}
                         className="w-4 h-4 text-pink-500 focus:ring-pink-400"
                       />
                       <span className="text-sm text-gray-700">{cat.name}</span>
@@ -506,7 +557,7 @@ function Shop() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {filteredProducts.map(product => (
                   <ProductCard 
-                    key={product.id} 
+                    key={product._id || product.id} 
                     product={product} 
                     addToCart={addToCart}
                     isInWishlist={isInWishlist}
@@ -520,7 +571,7 @@ function Shop() {
         </div>
       </div>
 
-      {/* Premium Footer */}
+      {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -569,7 +620,7 @@ function Shop() {
         </div>
       </footer>
 
-      <style jsx>{`
+      <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
         }
