@@ -29,6 +29,12 @@ import AdminCoupons from './pages/admin/AdminCoupons';
 import AdminBrandApplications from './pages/admin/AdminBrandApplications';
 import AdminBanners from './pages/admin/AdminBanners';
 import AdminReviews from './pages/admin/AdminReviews';
+import AdminEditProduct from './pages/admin/AdminEditProduct';
+
+// 🔥 NEW IMPORTS - Bulk Upload Pages
+import AdminBulkUpload from './pages/admin/AdminBulkUpload';
+import VendorBulkUpload from './pages/vendor/VendorBulkUpload';
+
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -50,6 +56,7 @@ import VendorOrderReports from './pages/vendor/VendorOrderReports';
 import VendorUserPermissions from './pages/vendor/VendorUserPermissions';
 import VendorFBA from './pages/vendor/VendorFBA';
 import VendorStoreBuilder from './pages/vendor/VendorStoreBuilder';
+
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
@@ -60,9 +67,8 @@ import ContactUs from './pages/ContactUs';
 import ShippingInfo from './pages/ShippingInfo';
 import ReturnsPolicy from './pages/ReturnsPolicy';
 import FAQs from './pages/FAQs';
-import AdminEditProduct from './pages/admin/AdminEditProduct';
 
-// ✅ NEW IMPORTS - Category Pages
+// ✅ Category Pages
 import SkincarePage from './pages/SkincarePage';
 import MakeupPage from './pages/MakeupPage';
 import ClothingPage from './pages/ClothingPage';
@@ -95,16 +101,17 @@ function App() {
               <Route path="/returns" element={<ReturnsPolicy />} />
               <Route path="/faqs" element={<FAQs />} />
 
-              {/* ✅ NEW - Category Pages */}
+              {/* Category Pages */}
               <Route path="/skincare" element={<SkincarePage />} />
               <Route path="/makeup" element={<MakeupPage />} />
               <Route path="/clothing" element={<ClothingPage />} />
               <Route path="/accessories" element={<AccessoriesPage />} />
               <Route path="/hair" element={<HairPage />} />
 
-              {/* Admin Routes */}
+              {/* 🔥 ADMIN ROUTES - Bulk Upload added */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />  {/* 🔥 NEW */}
               <Route path="/admin/vendors" element={<AdminVendors />} />
               <Route path="/admin/brand-applications" element={<AdminBrandApplications />} />
               <Route path="/admin/products" element={<AdminProducts />} />
@@ -124,11 +131,12 @@ function App() {
               <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
               <Route path="/admin/reviews" element={<AdminReviews />} />
 
-              {/* Vendor Routes */}
+              {/* 🔥 VENDOR ROUTES - Bulk Upload added */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
               <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
               <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+              <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />  {/* 🔥 NEW */}
               <Route path="/vendor/business-details" element={<VendorBusinessDetails />} />
               <Route path="/vendor/products" element={<VendorProducts />} />
               <Route path="/vendor/add-product" element={<VendorAddProduct />} />
