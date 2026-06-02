@@ -4,8 +4,9 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
-// ✅ Product Card Component - FINAL FIXED (No Auto Reset)
+// Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist }) => {
   const [imgError, setImgError] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
@@ -13,10 +14,8 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
 
   const handleButtonClick = () => {
     if (addedToCart) {
-      // Already added → Go to Cart
       navigate('/cart');
     } else {
-      // Add to cart first
       addToCart(product);
       setAddedToCart(true);
     }
@@ -82,27 +81,63 @@ function Home() {
   const { wishlistCount, isInWishlist } = useWishlist();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 59, seconds: 59 });
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Countdown timer
+  // Fixed target end time - 11:59 PM today (won't reset on refresh)
+  const getTargetEndTime = () => {
+    const endTime = localStorage.getItem('dealEndTime');
+    const now = new Date();
+    
+    if (endTime) {
+      const parsedEndTime = new Date(parseInt(endTime));
+      if (parsedEndTime > now) {
+        return parsedEndTime;
+      }
+    }
+    
+    // Set to 11:59 PM today
+    const newEndTime = new Date();
+    newEndTime.setHours(23, 59, 59, 999);
+    localStorage.setItem('dealEndTime', newEndTime.getTime());
+    return newEndTime;
+  };
+
+  const [targetEndTime] = useState(getTargetEndTime());
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  // Countdown timer - REAL, doesn't reset on refresh
   useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const difference = targetEndTime - now;
+      
+      if (difference <= 0) {
+        // Deal expired, set new end time for tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(23, 59, 59, 999);
+        localStorage.setItem('dealEndTime', tomorrow.getTime());
+        window.location.reload();
+        return { hours: 0, minutes: 0, seconds: 0 };
+      }
+      
+      return {
+        hours: Math.floor(difference / (1000 * 60 * 60)),
+        minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((difference % (1000 * 60)) / 1000)
+      };
+    };
+    
+    setTimeLeft(calculateTimeLeft());
+    
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        }
-        clearInterval(timer);
-        return prev;
-      });
+      setTimeLeft(calculateTimeLeft());
     }, 1000);
+    
     return () => clearInterval(timer);
-  }, []);
+  }, [targetEndTime]);
 
   // Load products from backend API
   useEffect(() => {
@@ -117,7 +152,6 @@ function Home() {
         
         const data = await response.json();
         setProducts(data);
-        console.log("✅ Loaded products from API:", data.length);
       } catch (error) {
         console.error("Error loading products:", error);
         setProducts([]);
@@ -141,7 +175,6 @@ function Home() {
         
         const data = await response.json();
         setBanners(data);
-        console.log("✅ Loaded banners from API:", data.length);
       } catch (error) {
         console.error("Error loading banners:", error);
         setBanners([]);
@@ -159,11 +192,46 @@ function Home() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  const featuredProducts = products.slice(0, 4);
-  const bestsellerProducts = products.slice(4, 12);
-  const newArrivals = products.filter(p => p.isNew).slice(0, 4);
+  // Handle search
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
-  // Categories - links to separate pages
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  // REAL DATA - Deals of the Day (products with discount)
+  const dealsOfDay = products.filter(p => p.originalPrice && p.originalPrice > p.price).slice(0, 4);
+  
+  // REAL DATA - Bestsellers (products with highest rating)
+  const bestsellers = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4);
+  
+  // REAL DATA - New Arrivals (products with isNew flag or newest created)
+  const newArrivals = products.filter(p => p.isNew).length > 0 
+    ? products.filter(p => p.isNew).slice(0, 4)
+    : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4);
+  
+  // Category wise products
+  const skincareProducts = products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4);
+  const makeupProducts = products.filter(p => p.mainCategory === 'Makeup' || p.category === 'Makeup').slice(0, 4);
+  const hairProducts = products.filter(p => p.mainCategory === 'Hair' || p.category === 'Hair').slice(0, 4);
+  const clothingProducts = products.filter(p => p.mainCategory === 'Clothing' || p.category === 'Clothing').slice(0, 4);
+  const accessoriesProducts = products.filter(p => p.mainCategory === 'Accessories' || p.category === 'Accessories').slice(0, 4);
+
+  // Categories for display
+  const categorySections = [
+    { name: 'Skincare', products: skincareProducts, viewAllLink: '/skincare', icon: '🧴', color: 'from-pink-100 to-rose-100' },
+    { name: 'Makeup', products: makeupProducts, viewAllLink: '/makeup', icon: '💄', color: 'from-purple-100 to-pink-100' },
+    { name: 'Hair Care', products: hairProducts, viewAllLink: '/hair', icon: '💇‍♀️', color: 'from-blue-100 to-indigo-100' },
+    { name: 'Clothing', products: clothingProducts, viewAllLink: '/clothing', icon: '👗', color: 'from-emerald-100 to-teal-100' },
+    { name: 'Accessories', products: accessoriesProducts, viewAllLink: '/accessories', icon: '👜', color: 'from-amber-100 to-orange-100' },
+  ];
+
   const categories = [
     { name: 'Skincare', image: '🧴', link: '/skincare' },
     { name: 'Makeup', image: '💄', link: '/makeup' },
@@ -172,7 +240,6 @@ function Home() {
     { name: 'Accessories', image: '👜', link: '/accessories' },
   ];
 
-  // Navigation links
   const navLinks = [
     { name: 'All', link: '/shop' },
     { name: 'Skincare', link: '/skincare' },
@@ -199,18 +266,8 @@ function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Premium Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Extra 10% off on first order</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Cash on Delivery Available</span>
-          <span>✨</span>
-        </div>
-      </div>
+      {/* 🔥 DYNAMIC OFFER BANNER - FROM ADMIN PANEL */}
+      <OfferBanner />
 
       {/* Premium Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
@@ -227,15 +284,21 @@ function Home() {
               </div>
             </Link>
 
-            {/* Search Bar */}
+            {/* Search Bar - WORKING */}
             <div className="flex-1 max-w-md lg:max-w-2xl">
               <div className="relative">
                 <input 
                   type="text" 
                   placeholder="Search for products, brands and more..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                 />
-                <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all">
+                <button 
+                  onClick={handleSearch}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                >
                   <span className="hidden sm:inline">Search</span>
                   <span className="sm:hidden">🔍</span>
                 </button>
@@ -411,8 +474,8 @@ function Home() {
         </div>
       </section>
 
-      {/* Deals of the Day Section */}
-      {featuredProducts.length > 0 && (
+      {/* Deals of the Day Section - REAL DATA with persistent timer */}
+      {dealsOfDay.length > 0 && (
         <section className="py-12 sm:py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
@@ -438,7 +501,7 @@ function Home() {
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {featuredProducts.map(product => (
+              {dealsOfDay.map(product => (
                 <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
               ))}
             </div>
@@ -446,16 +509,16 @@ function Home() {
         </section>
       )}
 
-      {/* Bestsellers Section */}
-      {bestsellerProducts.length > 0 && (
+      {/* Bestsellers Section - REAL DATA */}
+      {bestsellers.length > 0 && (
         <section className="py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">⭐ Bestsellers</h2>
               <Link to="/shop?sort=bestseller" className="text-pink-500 text-sm hover:underline">View All →</Link>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {bestsellerProducts.slice(0, 4).map(product => (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {bestsellers.map(product => (
                 <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
               ))}
             </div>
@@ -463,7 +526,7 @@ function Home() {
         </section>
       )}
 
-      {/* New Arrivals */}
+      {/* New Arrivals - REAL DATA */}
       {newArrivals.length > 0 && (
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -471,7 +534,7 @@ function Home() {
               <h2 className="text-2xl font-bold text-gray-800">🆕 New Arrivals</h2>
               <Link to="/shop?sort=newest" className="text-pink-500 text-sm hover:underline">View All →</Link>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
               {newArrivals.map(product => (
                 <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
               ))}
@@ -479,6 +542,28 @@ function Home() {
           </div>
         </section>
       )}
+
+      {/* Category Wise Products Sections */}
+      {categorySections.map((section, idx) => (
+        section.products.length > 0 && (
+          <section key={idx} className={`py-12 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{section.icon}</span>
+                  <h2 className="text-2xl font-bold text-gray-800">{section.name}</h2>
+                </div>
+                <Link to={section.viewAllLink} className="text-pink-500 text-sm hover:underline">View All →</Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {section.products.map(product => (
+                  <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )
+      ))}
 
       {/* Newsletter */}
       <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
@@ -540,7 +625,7 @@ function Home() {
         </div>
       </footer>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fade-in-up {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
