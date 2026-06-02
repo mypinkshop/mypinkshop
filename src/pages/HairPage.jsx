@@ -1,170 +1,150 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// Product Card Component
+// Ultra Premium Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleAddToCart = () => {
-    addToCart(product);
+    addToCart({
+      id: product._id || product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image: product.images?.[0],
+      stock: product.stock
+    });
     setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 1500);
+    setTimeout(() => setIsAdded(false), 2000);
+  };
+
+  const handleGoToCart = () => {
+    window.location.href = '/cart';
   };
 
   const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
+    const productId = product._id || product.id;
+    if (isInWishlist(productId)) {
+      removeFromWishlist(productId);
     } else {
       addToWishlist(product);
     }
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+    <div 
+      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-700 hover:-translate-y-2 border border-gray-100"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Link to={`/product/${product._id || product.id}`}>
+        <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
               onError={() => setImgError(true)}
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl">
-              {product.emoji || '💇‍♀️'}
+            <div className="w-full h-full flex items-center justify-center text-4xl font-light text-gray-300">
+              {product.name?.charAt(0) || 'P'}
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 left-4 bg-black/80 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full font-light tracking-wide">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 right-4 bg-amber-600/90 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full font-light tracking-wide">
               NEW
             </span>
           )}
+          {product.stock === 0 && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+              <span className="text-white text-sm font-light px-4 py-2 bg-black/50 rounded-full tracking-wide">Out of Stock</span>
+            </div>
+          )}
         </div>
       </Link>
-      <div className="p-4">
-        <Link to={`/product/${product.id}`}>
-          <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">
+      
+      <div className="p-5">
+        <Link to={`/product/${product._id || product.id}`}>
+          <h3 className="font-medium text-gray-800 text-base mb-1 line-clamp-2 hover:text-gray-600 transition tracking-wide">
             {product.name}
           </h3>
         </Link>
-        <p className="text-xs text-gray-400 mb-2">{product.brand || 'MyPinkShop'}</p>
-        <div className="flex items-center gap-1 mb-2">
-          <div className="flex text-yellow-400 text-sm">
-            {'★'.repeat(Math.floor(product.rating || 4))}
-            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-          </div>
-          <span className="text-xs text-gray-400">({product.rating || 4})</span>
-        </div>
+        <p className="text-xs text-gray-400 mb-2 tracking-wide">{product.brand || 'MyPinkShop'}</p>
+        
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <>
-              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-              <span className="text-xs text-green-500">
-                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
-              </span>
-            </>
-          )}
+          <div className="flex items-center gap-1">
+            <div className="flex text-amber-400 text-xs">
+              {'★'.repeat(Math.floor(product.rating || 4))}
+              {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+            </div>
+            <span className="text-xs text-gray-400">({product.rating || 4})</span>
+          </div>
         </div>
-        <div className="flex gap-2">
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-semibold text-gray-800">₹{product.price}</span>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <>
+                <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+                <span className="text-xs text-emerald-600 font-medium">
+                  {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-3">
+          {isAdded ? (
+            <button 
+              onClick={handleGoToCart}
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Go to Cart
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddToCart} 
+              disabled={product.stock === 0}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                product.stock > 0 
+                  ? 'bg-black text-white hover:bg-gray-800 hover:shadow-lg' 
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Add to Cart
+            </button>
+          )}
+          
           <button 
-            onClick={handleAddToCart} 
-            className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+            onClick={handleWishlistToggle}
+            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${
+              isInWishlist(product._id || product.id) 
+                ? 'border-rose-200 bg-rose-50 text-rose-500' 
+                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+            }`}
           >
-            {isAdded ? 'Added! ✓' : 'Add to Cart'}
-          </button>
-          <button 
-            onClick={handleWishlistToggle} 
-            className="w-10 py-2 border border-pink-200 rounded-full text-center hover:bg-pink-50 transition"
-          >
-            {isInWishlist(product.id) ? '❤️' : '🤍'}
+            {isInWishlist(product._id || product.id) ? '❤︎' : '♡'}
           </button>
         </div>
       </div>
     </div>
   );
 };
-
-// ✅ HAIR SUBCATEGORIES - From screenshot
-const hairCategories = [
-  // Tools & Accessories
-  { id: 'hairStyling', name: 'Hair Styling', icon: '💇‍♀️', mainCat: 'Tools & Accessories' },
-  { id: 'hairColor', name: 'Hair Color', icon: '🎨', mainCat: 'Tools & Accessories' },
-  { id: 'hairSpray', name: 'Hair Spray', icon: '💨', mainCat: 'Tools & Accessories' },
-  { id: 'straighteners', name: 'Straighteners', icon: '🔌', mainCat: 'Tools & Accessories' },
-  { id: 'rollersCurlers', name: 'Rollers & Curlers', icon: '🌀', mainCat: 'Tools & Accessories' },
-  { id: 'hairExtensions', name: 'Hair Extensions', icon: '💇‍♀️', mainCat: 'Tools & Accessories' },
-  { id: 'hairAccessories', name: 'Hair Accessories', icon: '🎀', mainCat: 'Tools & Accessories' },
-  
-  // Hair Care
-  { id: 'dryShampoo', name: 'Dry Shampoo', icon: '🧴', mainCat: 'Hair Care' },
-  { id: 'conditioner', name: 'Conditioner', icon: '💧', mainCat: 'Hair Care' },
-  { id: 'hairOil', name: 'Hair Oil', icon: '🫒', mainCat: 'Hair Care' },
-  { id: 'hairSerum', name: 'Hair Serum', icon: '✨', mainCat: 'Hair Care' },
-  { id: 'hairCreamsMasks', name: 'Hair Creams & Masks', icon: '🎭', mainCat: 'Hair Care' },
-  { id: 'hairSupplements', name: 'Hair Supplements', icon: '💊', mainCat: 'Hair Care' },
-  { id: 'leaveInConditioner', name: 'Leave-In Conditioner', icon: '💧', mainCat: 'Hair Care' },
-  
-  // Hair Kits & Combos
-  { id: 'hairKits', name: 'Hair Kits', icon: '🎁', mainCat: 'Kits & Combos' },
-  { id: 'hairCombos', name: 'Hair Combos', icon: '📦', mainCat: 'Kits & Combos' },
-];
-
-// Shop by Concern
-const hairConcerns = [
-  { id: 'hairfall', name: 'Hairfall & Thinning', icon: '🍂' },
-  { id: 'dandruff', name: 'Dandruff', icon: '❄️' },
-  { id: 'dryFrizzy', name: 'Dry & Frizzy Hair', icon: '🌾' },
-  { id: 'splitEnds', name: 'Split Ends', icon: '✂️' },
-  { id: 'colorProtection', name: 'Color Protection', icon: '🎨' },
-  { id: 'damagedHair', name: 'Damaged Hair', icon: '⚠️' },
-  { id: 'hairGrowth', name: 'Hair Growth', icon: '🌱' },
-  { id: 'curlEnhancing', name: 'Curl Enhancing', icon: '🌀' },
-  { id: 'volume', name: 'Volume', icon: '📈' },
-  { id: 'lengthShine', name: 'Length & Shine', icon: '✨' },
-  { id: 'bondBuilding', name: 'Bond Building', icon: '🔗' },
-];
-
-// Top Brands
-const topBrands = [
-  { id: 'nykaaNaturals', name: 'Nykaa Naturals', icon: '🌿', color: 'from-green-400 to-emerald-500' },
-  { id: 'lorealParis', name: 'L\'Oreal Paris', icon: 'L', color: 'from-red-500 to-pink-500' },
-  { id: 'wella', name: 'Wella Professionals', icon: 'W', color: 'from-purple-500 to-indigo-500' },
-  { id: 'lorealPro', name: 'L\'Oreal Professionnel', icon: 'L', color: 'from-gray-700 to-black' },
-  { id: 'bblunt', name: 'BBlunt', icon: 'B', color: 'from-blue-400 to-cyan-500' },
-  { id: 'herbalEssences', name: 'Herbal Essences', icon: '🌺', color: 'from-pink-400 to-orange-400' },
-  { id: 'schwarzkopf', name: 'Schwarzkopf Professional', icon: 'S', color: 'from-yellow-500 to-amber-600' },
-];
-
-// Hair Types (Scalp Types)
-const hairTypes = [
-  { id: 'dry', name: 'Dry', icon: '🏜️' },
-  { id: 'acneProne', name: 'Acne Prone', icon: '🔴' },
-  { id: 'sensitive', name: 'Sensitive', icon: '😌' },
-  { id: 'balanced', name: 'Balanced', icon: '⚖️' },
-  { id: 'oily', name: 'Oily', icon: '💧' },
-];
-
-// Trending Searches
-const trendingSearches = [
-  'Hair Growth Oil',
-  'Dandruff Shampoo',
-  'Castor Oil For Hair',
-  'Sulphate Free Shampoo',
-  'Hair Straightener Brush',
-];
 
 function HairPage() {
   const navigate = useNavigate();
@@ -175,534 +155,564 @@ function HairPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSubcat, setSelectedSubcat] = useState('all');
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedConcern, setSelectedConcern] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedHairType, setSelectedHairType] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
-  const [activeMainCat, setActiveMainCat] = useState('all');
-  const [activeTab, setActiveTab] = useState('categories'); // 'categories', 'concerns', 'brands'
+  const [priceRange, setPriceRange] = useState('all');
 
-  // Get unique main categories
-  const mainCategories = ['all', ...new Set(hairCategories.map(c => c.mainCat))];
+  const API_URL = 'https://mypinkshop-dr93.vercel.app';
 
+  // Load products from API
   useEffect(() => {
-    const storedProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    const hairProducts = storedProducts.filter(p => 
-      p.adminApproved === true && 
-      p.status === 'active' && 
-      p.category === 'hair'
-    );
-    setProducts(hairProducts);
-    setLoading(false);
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/api/products`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to load products');
+        }
+        
+        let data = await response.json();
+        
+        // Filter hair products
+        const hairProducts = data.filter(p => 
+          (p.mainCategory === 'Hair' || p.category === 'Hair' || p.category === 'hair') &&
+          p.status === 'active'
+        ).map(p => ({
+          ...p,
+          id: p._id,
+          subcategory: p.subCategory || p.subcategory,
+          hairConcerns: p.hairConcerns || [],
+          hairType: p.hairType
+        }));
+        
+        setProducts(hairProducts);
+      } catch (error) {
+        console.error('Error loading products:', error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadProducts();
   }, []);
 
+  // Filter and sort products
   useEffect(() => {
     let filtered = [...products];
 
+    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    if (selectedSubcat !== 'all') {
-      filtered = filtered.filter(p => p.subcategory === selectedSubcat);
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.mainCategory === selectedCategory || p.category === selectedCategory);
     }
 
+    // Subcategory filter
+    if (selectedSubcategory !== 'all') {
+      filtered = filtered.filter(p => p.subcategory === selectedSubcategory);
+    }
+
+    // Concern filter
     if (selectedConcern !== 'all') {
       filtered = filtered.filter(p => p.hairConcerns?.includes(selectedConcern));
     }
 
+    // Brand filter
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
 
+    // Hair type filter
     if (selectedHairType !== 'all') {
       filtered = filtered.filter(p => p.hairType === selectedHairType);
     }
 
-    const min = minPrice ? parseInt(minPrice) : 0;
-    const max = maxPrice ? parseInt(maxPrice) : Infinity;
+    // Price filter
+    let min = 0, max = Infinity;
+    if (priceRange !== 'all') {
+      switch(priceRange) {
+        case 'under500': max = 500; break;
+        case '500-1000': min = 500; max = 1000; break;
+        case '1000-2000': min = 1000; max = 2000; break;
+        case '2000-5000': min = 2000; max = 5000; break;
+        case 'above5000': min = 5000; break;
+        default: break;
+      }
+    }
+    if (minPrice) min = parseFloat(minPrice);
+    if (maxPrice) max = parseFloat(maxPrice);
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
 
+    // Sorting
     switch(sortBy) {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => (b.id || 0) - (a.id || 0)); break;
+      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
       default: break;
     }
     
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedSubcat, selectedConcern, selectedBrand, selectedHairType, minPrice, maxPrice, sortBy, products]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedConcern, selectedBrand, selectedHairType, minPrice, maxPrice, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedSubcat('all');
+    setSelectedCategory('all');
+    setSelectedSubcategory('all');
     setSelectedConcern('all');
     setSelectedBrand('all');
     setSelectedHairType('all');
     setMinPrice('');
     setMaxPrice('');
     setSortBy('default');
-    setActiveMainCat('all');
+    setPriceRange('all');
   };
 
-  const getFilteredSubcategories = () => {
-    if (activeMainCat === 'all') return hairCategories;
-    return hairCategories.filter(c => c.mainCat === activeMainCat);
-  };
+  // Get unique values for dropdowns
+  const categories = useMemo(() => {
+    const cats = [...new Set(products.map(p => p.mainCategory || p.category).filter(Boolean))];
+    return [{ id: 'all', name: 'All Categories' }, ...cats.map(c => ({ id: c, name: c }))];
+  }, [products]);
 
-  const getCategoryDisplayName = (catId) => {
-    const cat = hairCategories.find(c => c.id === catId);
-    return cat ? cat.name : catId;
-  };
+  const subcategories = useMemo(() => {
+    const subs = [...new Set(products.map(p => p.subcategory).filter(Boolean))];
+    return [{ id: 'all', name: 'All Subcategories' }, ...subs.map(s => ({ id: s, name: s }))];
+  }, [products]);
+
+  const concerns = useMemo(() => {
+    const allConcerns = products.flatMap(p => p.hairConcerns || []).filter(Boolean);
+    const uniqueConcerns = [...new Set(allConcerns)];
+    return [{ id: 'all', name: 'All Concerns' }, ...uniqueConcerns.map(c => ({ id: c, name: c }))];
+  }, [products]);
+
+  const brands = useMemo(() => {
+    const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+    return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
+  }, [products]);
+
+  const hairTypes = [
+    { id: 'all', name: 'All Hair Types' },
+    { id: 'dry', name: 'Dry Hair' },
+    { id: 'oily', name: 'Oily Hair' },
+    { id: 'normal', name: 'Normal Hair' },
+    { id: 'curly', name: 'Curly Hair' },
+    { id: 'wavy', name: 'Wavy Hair' },
+    { id: 'straight', name: 'Straight Hair' },
+    { id: 'damaged', name: 'Damaged Hair' },
+    { id: 'colored', name: 'Color Treated' },
+  ];
+
+  const priceRanges = [
+    { id: 'all', name: 'All Prices' },
+    { id: 'under500', name: 'Under ₹500' },
+    { id: '500-1000', name: '₹500 - ₹1000' },
+    { id: '1000-2000', name: '₹1000 - ₹2000' },
+    { id: '2000-5000', name: '₹2000 - ₹5000' },
+    { id: 'above5000', name: 'Above ₹5000' },
+  ];
+
+  const sortOptions = [
+    { id: 'default', name: 'Default Sorting' },
+    { id: 'price_low', name: 'Price: Low to High' },
+    { id: 'price_high', name: 'Price: High to Low' },
+    { id: 'rating', name: 'Highest Rated' },
+    { id: 'newest', name: 'Newest First' },
+  ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-2 border-gray-200 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400 text-sm tracking-wide">Loading collection...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+    <div className="min-h-screen bg-white">
       
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Extra 10% off on first order</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Cash on Delivery Available</span>
-          <span>✨</span>
+      {/* Top Bar - Minimal Luxury */}
+      <div className="bg-black text-white py-2.5 text-center text-xs tracking-wider">
+        <div className="max-w-7xl mx-auto px-4">
+          <span>FREE SHIPPING ON ORDERS ABOVE ₹999 • EXTRA 10% OFF ON FIRST ORDER</span>
         </div>
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
-            <Link to="/" className="flex items-center gap-2 shrink-0 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg sm:text-xl">M</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                <p className="text-[10px] text-gray-400">FOR THE GIRLIES ✨</p>
-              </div>
+      <header className="sticky top-0 z-50 bg-white/98 backdrop-blur-md border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <Link to="/" className="shrink-0">
+              <h1 className="text-2xl font-light tracking-[0.3em] text-black">MY PINK SHOP</h1>
             </Link>
 
-            <div className="flex-1 max-w-md lg:max-w-2xl">
+            <div className="flex-1 max-w-xl">
               <div className="relative">
                 <input 
                   type="text" 
-                  placeholder="Search hair care products, brands, or concerns..."
+                  placeholder="Search hair care..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-5 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
+                  className="w-full px-5 py-3 border border-gray-200 rounded-full focus:outline-none focus:border-black transition-all bg-white text-sm tracking-wide"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                <button 
+                  onClick={() => setSearchTerm(searchTerm)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button onClick={() => navigate('/wishlist')} className="relative p-2 text-gray-700 hover:text-pink-500">
+            <div className="flex items-center gap-6">
+              <button onClick={() => navigate('/wishlist')} className="relative text-gray-600 hover:text-black transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{wishlistCount}</span>}
+                {wishlistCount > 0 && <span className="absolute -top-2 -right-2 bg-black text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{wishlistCount}</span>}
               </button>
-              <Link to="/cart" className="relative p-2 text-gray-700 hover:text-pink-500">
+              
+              <Link to="/cart" className="relative text-gray-600 hover:text-black transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{cartCount}</span>}
+                {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-black text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
               </Link>
-              {user ? <Avatar user={user} onLogout={logout} /> : <Link to="/login" className="p-2 text-gray-700">👤</Link>}
+              
+              {user ? <Avatar user={user} onLogout={logout} /> : 
+                <Link to="/login" className="text-gray-600 hover:text-black transition">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </Link>
+              }
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero Banner */}
-      <div className="relative bg-gradient-to-r from-blue-100 via-indigo-100 to-purple-100 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-700 to-purple-700 bg-clip-text text-transparent mb-3">
-            Hair Care 💇‍♀️
+      {/* Hero Section */}
+      <div className="relative bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-black mb-4">
+            Hair Care
           </h1>
-          <p className="text-blue-600 text-base sm:text-lg max-w-2xl mx-auto">
-            Healthy, beautiful hair starts here. Explore our premium hair care collection.
+          <p className="text-gray-500 text-base max-w-2xl mx-auto font-light tracking-wide">
+            Discover our curated collection of premium hair care products for healthy, beautiful hair.
           </p>
         </div>
       </div>
 
-      {/* Trending Searches Bar */}
-      <div className="bg-white border-b border-pink-100 py-3">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">🔥 Trending:</span>
-            {trendingSearches.map((trend, idx) => (
-              <button
-                key={idx}
-                onClick={() => setSearchTerm(trend)}
-                className="text-sm text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors"
-              >
-                {trend}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Hair Types (Scalp Types) */}
-      <div className="bg-white border-b border-pink-100 py-3">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide">
-            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">💆‍♀️ Scalp Type:</span>
-            {hairTypes.map(type => (
-              <button
-                key={type.id}
-                onClick={() => setSelectedHairType(selectedHairType === type.name ? 'all' : type.name)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-all ${
-                  selectedHairType === type.name 
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-pink-100'
-                }`}
-              >
-                <span>{type.icon}</span> {type.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs: Categories vs Concerns vs Brands */}
-      <div className="border-b border-pink-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-6">
-            <button 
-              onClick={() => setActiveTab('categories')} 
-              className={`py-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'categories' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-500'}`}
-            >
-              Categories ✨
-            </button>
-            <button 
-              onClick={() => setActiveTab('concerns')} 
-              className={`py-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'concerns' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-500'}`}
-            >
-              Shop by Concern 🎯
-            </button>
-            <button 
-              onClick={() => setActiveTab('brands')} 
-              className={`py-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'brands' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-500'}`}
-            >
-              Top Brands 👑
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Categories View */}
-      {activeTab === 'categories' && (
-        <>
-          {/* Main Category Tabs */}
-          <div className="bg-white border-b border-pink-100">
-            <div className="max-w-7xl mx-auto px-4">
-              <div className="flex gap-4 overflow-x-auto py-2 scrollbar-hide">
-                {mainCategories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveMainCat(cat)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                      activeMainCat === cat 
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                        : 'text-gray-600 hover:text-pink-500'
-                    }`}
-                  >
-                    {cat === 'all' ? 'All Categories' : cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Subcategories Grid */}
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <button
-                onClick={() => setSelectedSubcat('all')}
-                className={`border rounded-xl p-3 text-center transition-all ${selectedSubcat === 'all' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-              >
-                <div className="text-2xl mb-1">📦</div>
-                <div className="font-semibold text-sm">All Products</div>
-                <div className="text-xs opacity-75">{products.length}</div>
-              </button>
-              {getFilteredSubcategories().map(cat => {
-                const productCount = products.filter(p => p.subcategory === cat.id).length;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedSubcat(cat.id)}
-                    className={`border rounded-xl p-3 text-center transition-all ${selectedSubcat === cat.id ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-                  >
-                    <div className="text-2xl mb-1">{cat.icon}</div>
-                    <div className="font-semibold text-sm">{cat.name}</div>
-                    <div className="text-xs opacity-75">{productCount} items</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Concerns View */}
-      {activeTab === 'concerns' && (
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {hairConcerns.map(concern => {
-              const productCount = products.filter(p => p.hairConcerns?.includes(concern.name)).length;
-              return (
-                <button
-                  key={concern.id}
-                  onClick={() => setSelectedConcern(selectedConcern === concern.name ? 'all' : concern.name)}
-                  className={`border rounded-xl p-3 text-center transition-all ${selectedConcern === concern.name ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-                >
-                  <div className="text-2xl mb-1">{concern.icon}</div>
-                  <div className="font-semibold text-sm">{concern.name}</div>
-                  <div className="text-xs opacity-75">{productCount} solutions</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Brands View */}
-      {activeTab === 'brands' && (
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {topBrands.map(brand => {
-              const productCount = products.filter(p => p.brand === brand.name).length;
-              return (
-                <button
-                  key={brand.id}
-                  onClick={() => setSelectedBrand(selectedBrand === brand.name ? 'all' : brand.name)}
-                  className={`border rounded-2xl p-4 text-center transition-all ${selectedBrand === brand.name ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-                >
-                  <div className={`w-12 h-12 mx-auto rounded-full bg-gradient-to-r ${brand.color} flex items-center justify-center text-white font-bold text-lg mb-2 shadow-md`}>
-                    {brand.icon}
-                  </div>
-                  <div className="font-semibold text-sm">{brand.name}</div>
-                  <div className="text-xs opacity-75">{productCount} products</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Breadcrumb */}
-      <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500">Home</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium">Hair Care</span>
-          {selectedSubcat !== 'all' && (
-            <>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600">{getCategoryDisplayName(selectedSubcat)}</span>
-            </>
-          )}
-          {selectedConcern !== 'all' && (
-            <>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600">{selectedConcern}</span>
-            </>
-          )}
-          {selectedBrand !== 'all' && (
-            <>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600">{selectedBrand}</span>
-            </>
-          )}
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center gap-2 text-xs">
+          <Link to="/" className="text-gray-400 hover:text-black transition">Home</Link>
+          <span className="text-gray-300">/</span>
+          <span className="text-black font-medium">Hair Care</span>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 pb-12">
+      <div className="max-w-7xl mx-auto px-4 pb-16">
         
-        {/* Mobile Filter Button */}
-        <button 
-          onClick={() => setShowFilters(!showFilters)} 
-          className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
-        >
-          <span>🔽</span> Filters & Sorting
-        </button>
-
-        <div className="flex flex-col md:flex-row gap-6">
-          
-          {/* Left Sidebar - Filters */}
-          <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 space-y-5`}>
+        {/* Filter Bar */}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             
-            {/* Price Range */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">💰</span> Price Range
-              </h3>
-              <div className="flex gap-3">
-                <input 
-                  type="number" 
-                  placeholder="Min ₹" 
-                  value={minPrice} 
-                  onChange={(e) => setMinPrice(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                />
-                <input 
-                  type="number" 
-                  placeholder="Max ₹" 
-                  value={maxPrice} 
-                  onChange={(e) => setMaxPrice(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                />
-              </div>
-              <div className="flex gap-2 mt-3">
-                {['500', '1000', '2000'].map(price => (
-                  <button 
-                    key={price}
-                    onClick={() => { setMinPrice('0'); setMaxPrice(price); }}
-                    className="text-xs px-3 py-1 bg-gray-100 rounded-full hover:bg-pink-100 transition"
-                  >
-                    Under ₹{price}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Clear Filters Button */}
-            <button 
-              onClick={clearFilters} 
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-            >
-              Clear All Filters ✨
-            </button>
-          </div>
-
-          {/* Right Section - Products */}
-          <div className="flex-1">
-            
-            {/* Sort and Count Bar */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Showing</span>
-                <span className="font-semibold text-pink-600">{filteredProducts.length}</span>
-                <span className="text-sm text-gray-500">of {products.length} products</span>
-              </div>
-              
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)} 
-                className="px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
+            {/* Desktop Filters */}
+            <div className="hidden md:flex flex-wrap gap-3">
+              {/* Category Dropdown */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
               >
-                <option value="default">Sort by: Default</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="rating">Rating: High to Low</option>
-                <option value="newest">Newest First</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+
+              {/* Subcategory Dropdown */}
+              <select
+                value={selectedSubcategory}
+                onChange={(e) => setSelectedSubcategory(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
+              >
+                {subcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+
+              {/* Concern Dropdown */}
+              <select
+                value={selectedConcern}
+                onChange={(e) => setSelectedConcern(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
+              >
+                {concerns.map(concern => (
+                  <option key={concern.id} value={concern.id}>{concern.name}</option>
+                ))}
+              </select>
+
+              {/* Brand Dropdown */}
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
+              >
+                {brands.map(brand => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+
+              {/* Hair Type Dropdown */}
+              <select
+                value={selectedHairType}
+                onChange={(e) => setSelectedHairType(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
+              >
+                {hairTypes.map(type => (
+                  <option key={type.id} value={type.id}>{type.name}</option>
+                ))}
+              </select>
+
+              {/* Price Range Dropdown */}
+              <select
+                value={priceRange}
+                onChange={(e) => setPriceRange(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
+              >
+                {priceRanges.map(range => (
+                  <option key={range.id} value={range.id}>{range.name}</option>
+                ))}
               </select>
             </div>
-            
-            {/* Products Grid */}
-            {filteredProducts.length === 0 ? (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
-                <div className="text-7xl mb-4">💇‍♀️</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No hair care products found</h3>
-                <p className="text-gray-500 mb-4">Try adjusting your filters or search term</p>
-                <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">
-                  Clear Filters
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {filteredProducts.map(product => (
-                  <ProductCard 
-                    key={product.id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                  />
-                ))}
-              </div>
-            )}
+
+            {/* Mobile Filter Button */}
+            <button 
+              onClick={() => setShowFilters(!showFilters)} 
+              className="md:hidden px-5 py-2 border border-gray-200 rounded-full text-sm flex items-center gap-2"
+            >
+              <span>Filters</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-5 py-2 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:border-black cursor-pointer"
+            >
+              {sortOptions.map(option => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+              ))}
+            </select>
           </div>
+
+          {/* Active Filters Display */}
+          {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedConcern !== 'all' || selectedBrand !== 'all' || selectedHairType !== 'all' || priceRange !== 'all' || searchTerm) && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {selectedCategory !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  {selectedCategory}
+                  <button onClick={() => setSelectedCategory('all')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              {selectedSubcategory !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  {selectedSubcategory}
+                  <button onClick={() => setSelectedSubcategory('all')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              {selectedConcern !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  {selectedConcern}
+                  <button onClick={() => setSelectedConcern('all')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              {selectedBrand !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  {selectedBrand}
+                  <button onClick={() => setSelectedBrand('all')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              {selectedHairType !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  {hairTypes.find(t => t.id === selectedHairType)?.name}
+                  <button onClick={() => setSelectedHairType('all')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              {priceRange !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  {priceRanges.find(r => r.id === priceRange)?.name}
+                  <button onClick={() => setPriceRange('all')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="text-xs px-3 py-1 bg-gray-100 rounded-full flex items-center gap-2">
+                  Search: {searchTerm}
+                  <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-black">×</button>
+                </span>
+              )}
+              <button onClick={clearFilters} className="text-xs px-3 py-1 text-black underline hover:no-underline">
+                Clear All
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Mobile Filters Modal */}
+        {showFilters && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+            <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-medium text-lg">Filters</h3>
+                <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">×</button>
+              </div>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Category</label>
+                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl text-sm">
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Subcategory</label>
+                  <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl text-sm">
+                    {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Concern</label>
+                  <select value={selectedConcern} onChange={(e) => setSelectedConcern(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl text-sm">
+                    {concerns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Brand</label>
+                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl text-sm">
+                    {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Hair Type</label>
+                  <select value={selectedHairType} onChange={(e) => setSelectedHairType(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl text-sm">
+                    {hairTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Price Range</label>
+                  <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl text-sm">
+                    {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <button onClick={clearFilters} className="w-full py-3 bg-black text-white rounded-xl text-sm">Clear All Filters</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results Count */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-400 tracking-wide">
+            Showing <span className="text-black font-medium">{filteredProducts.length}</span> of{' '}
+            <span className="text-black font-medium">{products.length}</span> products
+          </p>
+        </div>
+        
+        {/* Products Grid */}
+        {filteredProducts.length === 0 ? (
+          <div className="bg-gray-50 rounded-2xl p-16 text-center">
+            <div className="text-5xl mb-4 text-gray-300">∅</div>
+            <h3 className="text-xl font-light text-gray-800 mb-2">No products found</h3>
+            <p className="text-gray-400 text-sm mb-6">Try adjusting your filters</p>
+            <button onClick={clearFilters} className="px-6 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition">
+              Clear All Filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {filteredProducts.map(product => (
+              <ProductCard 
+                key={product._id || product.id} 
+                product={product} 
+                addToCart={addToCart}
+                isInWishlist={isInWishlist}
+                addToWishlist={addToWishlist}
+                removeFromWishlist={removeFromWishlist}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+      <footer className="bg-black text-gray-400 py-16">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">M</span>
-                </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-              </div>
-              <p className="text-sm">Luxury beauty and hair care for the modern woman.</p>
+              <h3 className="text-white text-lg font-light tracking-wide mb-4">MY PINK SHOP</h3>
+              <p className="text-sm font-light">Luxury beauty and hair care for the modern woman.</p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/hair" className="hover:text-pink-500 transition">Hair Care</Link></li>
-                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+              <h4 className="text-white text-sm font-medium mb-4">SHOP</h4>
+              <ul className="space-y-2 text-sm font-light">
+                <li><Link to="/skincare" className="hover:text-white transition">Skincare</Link></li>
+                <li><Link to="/makeup" className="hover:text-white transition">Makeup</Link></li>
+                <li><Link to="/hair" className="hover:text-white transition">Hair Care</Link></li>
+                <li><Link to="/clothing" className="hover:text-white transition">Clothing</Link></li>
+                <li><Link to="/accessories" className="hover:text-white transition">Accessories</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+              <h4 className="text-white text-sm font-medium mb-4">SUPPORT</h4>
+              <ul className="space-y-2 text-sm font-light">
+                <li><Link to="/contact" className="hover:text-white transition">Contact</Link></li>
+                <li><Link to="/faqs" className="hover:text-white transition">FAQs</Link></li>
+                <li><Link to="/shipping" className="hover:text-white transition">Shipping</Link></li>
+                <li><Link to="/returns" className="hover:text-white transition">Returns</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+              <h4 className="text-white text-sm font-medium mb-4">FOLLOW</h4>
+              <ul className="space-y-2 text-sm font-light">
+                <li><a href="#" className="hover:text-white transition">Instagram</a></li>
+                <li><a href="#" className="hover:text-white transition">TikTok</a></li>
+                <li><a href="#" className="hover:text-white transition">Pinterest</a></li>
+                <li><a href="#" className="hover:text-white transition">YouTube</a></li>
               </ul>
             </div>
           </div>
           <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            <p className="text-xs font-light">© 2026 MyPinkShop. All rights reserved.</p>
           </div>
         </div>
       </footer>
-
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 }
