@@ -18,7 +18,7 @@ function Login() {
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
 
   const handleSubmit = async (e) => {
     e.preventDefault();

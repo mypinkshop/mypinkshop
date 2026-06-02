@@ -41,7 +41,7 @@ function VendorAddProduct() {
   const [variationType, setVariationType] = useState('size');
   const [variationValue, setVariationValue] = useState('');
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
 
   const categories = {
     'Skincare': ['Face Wash', 'Serums', 'Moisturizers', 'Toners', 'Sunscreen'],

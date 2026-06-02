@@ -19,7 +19,7 @@ function ProductDetail() {
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const loadProduct = async () => {

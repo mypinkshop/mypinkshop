@@ -1,4 +1,4 @@
-const API_URL = 'https://mypinkshop-dr93.vercel.app';
+const API_URL = 'https://api.mypinkshop.com';
 
 const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
 

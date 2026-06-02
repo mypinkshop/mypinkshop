@@ -4,7 +4,7 @@ function OfferBanner() {
   const [offer, setOffer] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const fetchOffer = async () => {

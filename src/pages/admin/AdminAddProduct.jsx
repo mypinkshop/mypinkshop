@@ -53,7 +53,7 @@ function AdminAddProduct() {
   const [sizeValue, setSizeValue] = useState('');
   const [colorValue, setColorValue] = useState('');
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const savedBrands = localStorage.getItem('brandsList');

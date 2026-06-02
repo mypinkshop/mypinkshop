@@ -143,7 +143,7 @@ function Home() {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const API_URL = 'https://mypinkshop-dr93.vercel.app';
+        const API_URL = 'https://api.mypinkshop.com';
         const response = await fetch(`${API_URL}/api/products`);
         
         if (!response.ok) {
@@ -166,7 +166,7 @@ function Home() {
   useEffect(() => {
     const loadBanners = async () => {
       try {
-        const API_URL = 'https://mypinkshop-dr93.vercel.app';
+        const API_URL = 'https://api.mypinkshop.com';
         const response = await fetch(`${API_URL}/api/banners/active`);
         
         if (!response.ok) {

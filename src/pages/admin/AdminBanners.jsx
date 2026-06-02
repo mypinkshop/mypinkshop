@@ -22,7 +22,7 @@ function AdminBanners() {
   });
   const [imagePreviews, setImagePreviews] = useState([]);
 
-  const API_BASE = 'https://mypinkshop-dr93.vercel.app/api';
+  const API_BASE = 'https://api.mypinkshop.com/api';
 
   // Auth check
   useEffect(() => {

@@ -7,7 +7,7 @@ function BulkUpload({ userRole, onSuccess }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
   const token = localStorage.getItem('token');
 
   // Download CSV template

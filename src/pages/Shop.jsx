@@ -151,7 +151,7 @@ function Shop() {
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
 
-  const API_URL = 'https://mypinkshop-dr93.vercel.app';
+  const API_URL = 'https://api.mypinkshop.com';
 
   // Load products
   useEffect(() => {
