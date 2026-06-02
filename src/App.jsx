@@ -30,6 +30,8 @@ import AdminBrandApplications from './pages/admin/AdminBrandApplications';
 import AdminBanners from './pages/admin/AdminBanners';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminEditProduct from './pages/admin/AdminEditProduct';
+import AdminOffers from './pages/admin/AdminOffers';
+
 
 // 🔥 NEW IMPORTS - Bulk Upload Pages
 import AdminBulkUpload from './pages/admin/AdminBulkUpload';
@@ -130,6 +132,7 @@ function App() {
               <Route path="/admin/banners" element={<AdminBanners />} />
               <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
               <Route path="/admin/reviews" element={<AdminReviews />} />
+              <Route path="/admin/offers" element={<AdminOffers />} />
 
               {/* 🔥 VENDOR ROUTES - Bulk Upload added */}
               <Route path="/vendor/login" element={<VendorLogin />} />
