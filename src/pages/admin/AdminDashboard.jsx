@@ -24,6 +24,7 @@ function AdminDashboard() {
   const [topProducts, setTopProducts] = useState([]);
   const [salesData, setSalesData] = useState([]);
   const [categorySales, setCategorySales] = useState([]);
+  const [activeOffer, setActiveOffer] = useState(null);
   const navigate = useNavigate();
 
   const API_URL = 'https://mypinkshop-dr93.vercel.app';
@@ -35,39 +36,40 @@ function AdminDashboard() {
       return;
     }
     loadDashboardData();
+    loadActiveOffer();
   }, [navigate, selectedPeriod]);
 
-  // ✅ Load REAL data from backend API
+  // Load active offer
+  const loadActiveOffer = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/offers/active-offer`);
+      const data = await response.json();
+      setActiveOffer(data);
+    } catch (error) {
+      console.error('Error loading offer:', error);
+    }
+  };
+
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
       
-      // 1. Fetch REAL products from backend
       const productsRes = await fetch(`${API_URL}/api/products`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const allProducts = await productsRes.json();
       
-      // 2. Fetch REAL banners
-      const bannersRes = await fetch(`${API_URL}/api/banners/active`);
-      const allBanners = await bannersRes.json();
-      
-      // 3. Calculate REAL stats from products
       const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
       const pendingProducts = allProducts.filter(p => p.adminApproved !== true);
       const lowStockProducts = approvedProducts.filter(p => (p.stock || 0) < 10 && (p.stock || 0) > 0);
-      const outOfStockProducts = approvedProducts.filter(p => (p.stock || 0) === 0);
       
-      // Total revenue from products
       const totalRevenue = approvedProducts.reduce((sum, p) => sum + (p.price || 0), 0);
       
-      // Today's sales (products added today)
       const today = new Date().toISOString().split('T')[0];
       const todayProducts = approvedProducts.filter(p => p.createdAt?.split('T')[0] === today);
       const todaySales = todayProducts.reduce((sum, p) => sum + (p.price || 0), 0);
       
-      // Monthly growth calculation based on product addition
       const now = new Date();
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -79,7 +81,6 @@ function AdminDashboard() {
       const thisMonthRevenue = thisMonthProducts.reduce((sum, p) => sum + (p.price || 0), 0);
       const monthlyGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1) : 0;
       
-      // Category sales from REAL products
       const categoryMap = {};
       approvedProducts.forEach(p => {
         const cat = p.mainCategory || p.category || 'Other';
@@ -91,14 +92,12 @@ function AdminDashboard() {
         .slice(0, 5);
       setCategorySales(categorySalesList);
       
-      // Top products from REAL data
       const topProductsList = [...approvedProducts]
         .sort((a, b) => (b.stock || 0) - (a.stock || 0))
         .slice(0, 5)
         .map(p => ({ ...p, totalSold: (p.stock || 0) }));
       setTopProducts(topProductsList);
       
-      // Sales chart data based on REAL products
       let salesChartData = [];
       if (selectedPeriod === 'weekly') {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -124,7 +123,6 @@ function AdminDashboard() {
       }
       setSalesData(salesChartData);
       
-      // Recent orders (from localStorage for now, will be from API later)
       const storedOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
       const recentOrdersList = storedOrders.slice(-5).reverse().map(order => ({
         id: order.id,
@@ -135,13 +133,12 @@ function AdminDashboard() {
       }));
       setRecentOrders(recentOrdersList);
       
-      // Update stats
       setStats({
         totalRevenue,
         totalOrders: approvedProducts.length,
         totalProducts: approvedProducts.length,
-        totalVendors: 8, // Will be from API later
-        totalCustomers: 245, // Will be from API later
+        totalVendors: 8,
+        totalCustomers: 245,
         pendingVendors: 2,
         pendingProducts: pendingProducts.length,
         lowStockProducts: lowStockProducts.length,
@@ -170,7 +167,6 @@ function AdminDashboard() {
     }
   };
 
-  // ✅ Click handlers for stats cards (properly working)
   const handleCardClick = (type) => {
     switch(type) {
       case 'products':
@@ -213,9 +209,7 @@ function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-pink-50/20">
       <AdminSidebar />
       
-      {/* Main Content */}
       <div className="lg:ml-64">
-        {/* Premium Header */}
         <div className="bg-white/80 backdrop-blur-md border-b border-pink-100 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 sticky top-0 z-40 shadow-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
             <div>
@@ -245,7 +239,27 @@ function AdminDashboard() {
 
         <div className="p-3 sm:p-4 lg:p-6 xl:p-8">
           
-          {/* Stats Cards Row 1 - Clickable */}
+          {/* Active Offer Banner */}
+          {activeOffer && (
+            <div className="mb-6 bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 rounded-2xl p-4 text-white shadow-lg">
+              <div className="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <p className="text-sm opacity-90">🔥 Current Live Offer</p>
+                  <p className="font-medium">{activeOffer.description}</p>
+                  <p className="text-xs opacity-80 mt-1">
+                    Min Order: ₹{activeOffer.minOrderValue} | {activeOffer.discountType === 'percentage' ? `${activeOffer.discountValue}% OFF` : `₹${activeOffer.discountValue} OFF`}
+                  </p>
+                </div>
+                <Link 
+                  to="/admin/offers" 
+                  className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-sm font-medium hover:bg-white/30 transition"
+                >
+                  Edit Offer →
+                </Link>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
             <div onClick={() => handleCardClick('revenue')} className="cursor-pointer group bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -287,7 +301,6 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Stats Cards Row 2 - Clickable */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
             <div onClick={() => handleCardClick('products')} className="cursor-pointer bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-md transition">
               <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -341,9 +354,7 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-            {/* Sales Chart */}
             <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-4 sm:p-5 lg:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
                 <div>
@@ -370,7 +381,6 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* Category Sales - REAL DATA */}
             <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-4 sm:p-5 lg:p-6 shadow-sm">
               <h3 className="font-semibold text-gray-800 text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
                 <span className="text-lg sm:text-xl">📊</span> Sales by Category
@@ -395,7 +405,6 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Top Products - REAL DATA */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-4 sm:p-5 lg:p-6 shadow-sm">
               <h3 className="font-semibold text-gray-800 text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
@@ -419,7 +428,6 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* Recent Orders */}
             <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-4 sm:p-5 lg:p-6 shadow-sm">
               <h3 className="font-semibold text-gray-800 text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
                 <span className="text-lg sm:text-xl">📋</span> Recent Orders
@@ -432,8 +440,8 @@ function AdminDashboard() {
                     <div key={order.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-pink-50 rounded-xl transition">
                       <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-xs sm:text-sm font-bold text-white shadow-md">{idx + 1}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-gray-800">{order.id}</p>
-                        <p className="text-[10px] sm:text-xs text-gray-400">{order.customer}</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-800 truncate">{order.id}</p>
+                        <p className="text-[10px] sm:text-xs text-gray-400 truncate">{order.customer}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs sm:text-sm font-semibold text-pink-600">₹{order.amount.toLocaleString()}</p>
@@ -491,7 +499,7 @@ function AdminDashboard() {
           )}
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-4">
             <Link to="/admin/add-product" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-4 text-center border border-pink-100 hover:shadow-lg hover:-translate-y-1 transition-all group">
               <div className="text-xl sm:text-2xl lg:text-3xl mb-1 sm:mb-2 group-hover:scale-110 transition">➕</div>
               <p className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-700">Add Product</p>
@@ -503,6 +511,10 @@ function AdminDashboard() {
             <Link to="/admin/vendors" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-4 text-center border border-pink-100 hover:shadow-lg hover:-translate-y-1 transition-all group">
               <div className="text-xl sm:text-2xl lg:text-3xl mb-1 sm:mb-2 group-hover:scale-110 transition">🏪</div>
               <p className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-700">Vendors</p>
+            </Link>
+            <Link to="/admin/offers" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-4 text-center border border-pink-100 hover:shadow-lg hover:-translate-y-1 transition-all group">
+              <div className="text-xl sm:text-2xl lg:text-3xl mb-1 sm:mb-2 group-hover:scale-110 transition">🏷️</div>
+              <p className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-700">Offers</p>
             </Link>
             <Link to="/admin/banners" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-4 text-center border border-pink-100 hover:shadow-lg hover:-translate-y-1 transition-all group">
               <div className="text-xl sm:text-2xl lg:text-3xl mb-1 sm:mb-2 group-hover:scale-110 transition">🎨</div>
