@@ -24,11 +24,12 @@ function AdminSidebar() {
   const menuItems = [
     { name: 'Dashboard', icon: '📊', path: '/admin/dashboard', badge: null },
     { name: 'Vendors', icon: '🏪', path: '/admin/vendors', badge: null },
-    { name: 'Inventory', icon: '📦', path: '/admin/products', badge: null },  // ✅ Products → Inventory
+    { name: 'Inventory', icon: '📦', path: '/admin/products', badge: null },
     { name: 'Add Product', icon: '➕', path: '/admin/add-product', badge: null },
     { name: 'Categories', icon: '📁', path: '/admin/categories', badge: null },
     { name: 'Orders', icon: '🛒', path: '/admin/orders', badge: null },
     { name: 'Customers', icon: '👥', path: '/admin/customers', badge: null },
+    { name: 'Offers & Promotions', icon: '🏷️', path: '/admin/offers', badge: null },  // 🔥 YEH LINE ADD KARI
     { name: 'Banners', icon: '🎨', path: '/admin/banners', badge: null },
     { name: 'Coupons', icon: '🎫', path: '/admin/coupons', badge: null },
     { name: 'Advertising', icon: '📢', path: '/admin/advertising', badge: null },
