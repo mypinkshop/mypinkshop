@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 
-// ✅ CORS - Updated with www.mypinkshop.com
+// ✅ CORS - Updated with all domains
 app.use(cors({
   origin: ['https://mypinkshop.vercel.app', 'https://mypinkshop.com', 'https://www.mypinkshop.com', 'http://localhost:3000'],
   credentials: true,
@@ -389,6 +389,32 @@ app.post('/api/offers/create', authMiddleware, adminMiddleware, async (req, res)
     await offer.save();
     res.status(201).json({ success: true, offer });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ UPDATE OFFER ROUTE - FIXED (ADDED)
+app.put('/api/offers/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { title, description, discountValue, minOrderValue, isActive } = req.body;
+    
+    const offer = await Offer.findById(req.params.id);
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+    
+    if (title !== undefined) offer.title = title;
+    if (description !== undefined) offer.description = description;
+    if (discountValue !== undefined) offer.discountValue = discountValue;
+    if (minOrderValue !== undefined) offer.minOrderValue = minOrderValue;
+    if (isActive !== undefined) offer.isActive = isActive;
+    offer.updatedAt = new Date();
+    
+    await offer.save();
+    res.json({ success: true, offer });
+  } catch (error) {
+    console.error('Error in update offer:', error);
     res.status(500).json({ error: error.message });
   }
 });
