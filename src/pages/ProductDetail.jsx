@@ -21,13 +21,13 @@ function ProductDetail() {
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
   
-  // 🔥 Variant selection
+  // Variant selection
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedDesign, setSelectedDesign] = useState('');
   const [selectedVariant, setSelectedVariant] = useState(null);
   
-  // 🔥 Pincode checker
+  // Pincode checker - Using Backend API
   const [pincode, setPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
@@ -57,7 +57,6 @@ function ProductDetail() {
           setProduct(data);
           setSelectedImage(0);
           
-          // Set default selections
           if (data.sizes && data.sizes.length > 0) {
             setSelectedSize(data.sizes[0]);
           }
@@ -94,7 +93,7 @@ function ProductDetail() {
     }
   }, [selectedSize, selectedColor, product]);
 
-  // Pincode delivery check
+  // 🔥 FIXED: Pincode delivery check using Backend API
   const checkDelivery = async () => {
     if (!pincode || pincode.length !== 6) {
       alert('Please enter a valid 6-digit pincode');
@@ -105,21 +104,46 @@ function ProductDetail() {
     setDeliveryStatus(null);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock response - Replace with Shiprocket API
-      const deliverablePincodes = ['110001', '110002', '110003', '400001', '400002', '560001', '560002', '700001', '600001'];
-      const isDeliverable = deliverablePincodes.includes(pincode);
-      
-      setDeliveryStatus({
-        isDeliverable,
-        message: isDeliverable 
-          ? `✅ Delivery available to PIN ${pincode}. Expected delivery in 3-5 business days.`
-          : `❌ Sorry, delivery is not available to PIN ${pincode} yet.`,
-        estimatedDays: isDeliverable ? '3-5 business days' : null
+      const response = await fetch(`${API_URL}/api/shipping/check-delivery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          pincode: pincode, 
+          cartTotal: product?.price || 0,
+          weight: product?.weight || 0.5
+        })
       });
       
+      const data = await response.json();
+      
+      if (data.success && data.deliverable) {
+        let deliveryText = '';
+        if (data.estimatedDelivery?.minDate && data.estimatedDelivery?.maxDate) {
+          if (data.estimatedDelivery.minDate === data.estimatedDelivery.maxDate) {
+            deliveryText = `Expected delivery on ${data.estimatedDelivery.maxDate}`;
+          } else {
+            deliveryText = `Expected delivery between ${data.estimatedDelivery.minDate} - ${data.estimatedDelivery.maxDate}`;
+          }
+        } else if (data.estimatedDelivery?.maxDays) {
+          deliveryText = `Expected delivery in ${data.estimatedDelivery.maxDays} business days`;
+        } else {
+          deliveryText = `Delivery available to PIN ${pincode}`;
+        }
+        
+        setDeliveryStatus({
+          isDeliverable: true,
+          message: `✅ ${deliveryText}`,
+          estimatedDays: data.estimatedDelivery?.maxDays ? `${data.estimatedDelivery.maxDays} days` : null
+        });
+      } else {
+        setDeliveryStatus({
+          isDeliverable: false,
+          message: data.message || '❌ Sorry, delivery is not available to this pincode yet.'
+        });
+      }
+      
     } catch (error) {
+      console.error('Delivery check error:', error);
       setDeliveryStatus({
         isDeliverable: false,
         message: 'Unable to check delivery. Please try again later.'
@@ -160,7 +184,6 @@ function ProductDetail() {
       return;
     }
     
-    // Validate selections
     if (product.sizes?.length > 0 && !selectedSize) {
       alert('Please select a size');
       return;
@@ -428,7 +451,7 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* 🔥 SIZE SELECTOR */}
+            {/* SIZE SELECTOR */}
             {showSizeSelector && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
@@ -452,7 +475,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 COLOR SELECTOR */}
+            {/* COLOR SELECTOR */}
             {showColorSelector && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">Select Color</h3>
@@ -474,7 +497,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 PINCODE DELIVERY CHECKER */}
+            {/* 🔥 PINCODE DELIVERY CHECKER - WORKING WITH BACKEND */}
             <div className="border-t border-gray-200 pt-4">
               <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
               <div className="flex flex-col sm:flex-row gap-3">
