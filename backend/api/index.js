@@ -579,15 +579,66 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
 app.post('/api/shipping/check-delivery', async (req, res) => {
   try {
     const { pincode, cartTotal, weight = 0.5 } = req.body;
-    const pickupPincode = '110001'; // Tumhara warehouse pincode
+    const pickupPincode = '110001';
     
-    const delivery = await shiprocket.getEstimatedDelivery(pickupPincode, pincode, weight);
+    console.log('📦 Checking delivery for pincode:', pincode);
+    console.log('🔑 SHIPROCKET_EMAIL:', process.env.SHIPROCKET_EMAIL ? 'Set' : 'NOT SET');
+    console.log('🔑 SHIPROCKET_PASSWORD:', process.env.SHIPROCKET_PASSWORD ? 'Set' : 'NOT SET');
     
-    if (!delivery.deliverable) {
+    let delivery;
+    let useMock = false;
+    
+    try {
+      delivery = await shiprocket.getEstimatedDelivery(pickupPincode, pincode, weight);
+      console.log('✅ Shiprocket response:', delivery);
+      
+      if (!delivery.deliverable) {
+        console.log('⚠️ No courier available, using mock data');
+        useMock = true;
+      }
+    } catch (shiprocketError) {
+      console.error('❌ Shiprocket API error:', shiprocketError.message);
+      useMock = true;
+    }
+    
+    // 🔥 FALLBACK - Mock data if Shiprocket fails
+    if (useMock || !delivery || !delivery.deliverable) {
+      const mockDeliverablePincodes = ['110001', '110002', '110003', '400001', '400002', '400072', '560001', '560002', '700001', '600001', '800001', '500001'];
+      const isDeliverable = mockDeliverablePincodes.includes(pincode);
+      
+      if (!isDeliverable) {
+        return res.json({
+          success: false,
+          deliverable: false,
+          message: 'Sorry, delivery is not available at this pincode.'
+        });
+      }
+      
+      const estimatedDate = new Date();
+      estimatedDate.setDate(estimatedDate.getDate() + 5);
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() + 3);
+      
+      const freeShippingThreshold = 999;
+      let shippingCharge = 50;
+      if (cartTotal >= freeShippingThreshold) {
+        shippingCharge = 0;
+      }
+      
       return res.json({
-        success: false,
-        deliverable: false,
-        message: 'Sorry, delivery is not available at this pincode.'
+        success: true,
+        deliverable: true,
+        shippingCharge: shippingCharge,
+        estimatedDelivery: {
+          minDate: minDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          maxDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          minDays: 3,
+          maxDays: 5
+        },
+        courierName: 'Standard Delivery',
+        freeShippingThreshold: freeShippingThreshold,
+        cutOffTime: '16:00',
+        note: 'Using fallback (Shiprocket API not available)'
       });
     }
     
@@ -612,7 +663,7 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Delivery check error:', error);
+    console.error('❌ Delivery check error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
