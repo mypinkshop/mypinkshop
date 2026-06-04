@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -135,21 +135,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
-const clothingCategories = [
-  { id: 'womenWestern', name: "Women's Western", icon: '👗' },
-  { id: 'womenEthnic', name: "Women's Ethnic", icon: '🥻' },
-  { id: 'menWestern', name: "Men's Western", icon: '👔' },
-  { id: 'menEthnic', name: "Men's Ethnic", icon: '🤵' },
-  { id: 'kids', name: "Kids Wear", icon: '🧸' },
-  { id: 'activewear', name: "Activewear", icon: '🏃‍♀️' },
-  { id: 'innerwear', name: "Innerwear", icon: '👙' },
-  { id: 'sleepwear', name: "Sleepwear", icon: '😴' },
-  { id: 'footwear', name: "Footwear", icon: '👠' },
-  { id: 'jewelry', name: "Jewelry", icon: '💍' },
-];
-
-const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
-
 function ClothingPage() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
@@ -159,24 +144,33 @@ function ClothingPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSubcat, setSelectedSubcat] = useState('all');
+  
+  // Filter states - HairPage jaisa
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
+  const [selectedBrand, setSelectedBrand] = useState('all');
+  const [selectedSize, setSelectedSize] = useState('all');
+  const [selectedGender, setSelectedGender] = useState('all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [selectedSize, setSelectedSize] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
+  const [priceRange, setPriceRange] = useState('all');
 
   const API_URL = 'https://api.mypinkshop.com';
 
+  // Load products from API
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
         const response = await fetch(`${API_URL}/api/products`);
-        if (!response.ok) throw new Error('Failed to load products');
+        
+        if (!response.ok) {
+          throw new Error('Failed to load products');
+        }
+        
         let data = await response.json();
         
         const clothingProducts = data.filter(p => 
@@ -185,7 +179,9 @@ function ClothingPage() {
         ).map(p => ({
           ...p,
           id: p._id,
-          category: p.mainCategory || p.category
+          subcategory: p.subCategory || p.subcategory || p.category,
+          sizes: p.sizes || [],
+          gender: p.gender || 'unisex'
         }));
         
         setProducts(clothingProducts);
@@ -196,55 +192,133 @@ function ClothingPage() {
         setLoading(false);
       }
     };
+    
     loadProducts();
   }, []);
 
-  // Search autocomplete
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    if (value.length > 1) {
-      const suggestions = products
-        .filter(p => p.name?.toLowerCase().includes(value.toLowerCase()))
-        .slice(0, 5)
-        .map(p => p.name);
-      setSearchSuggestions(suggestions);
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
+  // Filter and sort products
   useEffect(() => {
     let filtered = [...products];
+
+    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(p => p.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+      filtered = filtered.filter(p => 
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-    if (selectedSubcat !== 'all') {
-      filtered = filtered.filter(p => p.subcategory === selectedSubcat || p.category === selectedSubcat);
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.mainCategory === selectedCategory || p.category === selectedCategory);
     }
-    const min = minPrice ? parseFloat(minPrice) : 0;
-    const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-    filtered = filtered.filter(p => p.price >= min && p.price <= max);
+
+    // Subcategory filter
+    if (selectedSubcategory !== 'all') {
+      filtered = filtered.filter(p => {
+        const productSub = (p.subCategory || p.subcategory || p.category || '').toLowerCase();
+        const selected = selectedSubcategory.toLowerCase();
+        return productSub === selected;
+      });
+    }
+
+    // Brand filter
+    if (selectedBrand !== 'all') {
+      filtered = filtered.filter(p => p.brand === selectedBrand);
+    }
+
+    // Size filter
     if (selectedSize !== 'all') {
       filtered = filtered.filter(p => p.sizes?.includes(selectedSize));
     }
-    if (sortBy === 'price_low') filtered.sort((a, b) => a.price - b.price);
-    if (sortBy === 'price_high') filtered.sort((a, b) => b.price - a.price);
-    if (sortBy === 'rating') filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    if (sortBy === 'newest') filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Gender filter
+    if (selectedGender !== 'all') {
+      filtered = filtered.filter(p => p.gender?.toLowerCase() === selectedGender.toLowerCase());
+    }
+
+    // Price filter
+    let min = 0, max = Infinity;
+    if (priceRange !== 'all') {
+      switch(priceRange) {
+        case 'under500': max = 500; break;
+        case '500-1000': min = 500; max = 1000; break;
+        case '1000-2000': min = 1000; max = 2000; break;
+        case '2000-5000': min = 2000; max = 5000; break;
+        case 'above5000': min = 5000; break;
+        default: break;
+      }
+    }
+    if (minPrice) min = parseFloat(minPrice);
+    if (maxPrice) max = parseFloat(maxPrice);
+    filtered = filtered.filter(p => p.price >= min && p.price <= max);
+
+    // Sorting
+    switch(sortBy) {
+      case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
+      case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
+      case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
+      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
+      default: break;
+    }
+    
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedSubcat, minPrice, maxPrice, selectedSize, sortBy, products]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, selectedSize, selectedGender, minPrice, maxPrice, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedSubcat('all');
+    setSelectedCategory('all');
+    setSelectedSubcategory('all');
+    setSelectedBrand('all');
+    setSelectedSize('all');
+    setSelectedGender('all');
     setMinPrice('');
     setMaxPrice('');
-    setSelectedSize('all');
     setSortBy('default');
-    setShowSuggestions(false);
+    setPriceRange('all');
   };
+
+  // Get unique values for dropdowns
+  const categories = useMemo(() => {
+    const cats = [...new Set(products.map(p => p.mainCategory || p.category).filter(Boolean))];
+    return [{ id: 'all', name: 'All Categories' }, ...cats.map(c => ({ id: c, name: c }))];
+  }, [products]);
+
+  const subcategories = useMemo(() => {
+    const subs = [...new Set(products.map(p => p.subCategory || p.subcategory || p.category).filter(Boolean))];
+    return [{ id: 'all', name: 'All Subcategories' }, ...subs.map(s => ({ id: s, name: s }))];
+  }, [products]);
+
+  const brands = useMemo(() => {
+    const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+    return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
+  }, [products]);
+
+  const sizesList = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+  const genderOptions = [
+    { id: 'all', name: 'All Genders' },
+    { id: 'women', name: "Women's" },
+    { id: 'men', name: "Men's" },
+    { id: 'kids', name: "Kids" },
+    { id: 'unisex', name: "Unisex" }
+  ];
+
+  const priceRanges = [
+    { id: 'all', name: 'All Prices' },
+    { id: 'under500', name: 'Under ₹500' },
+    { id: '500-1000', name: '₹500 - ₹1000' },
+    { id: '1000-2000', name: '₹1000 - ₹2000' },
+    { id: '2000-5000', name: '₹2000 - ₹5000' },
+    { id: 'above5000', name: 'Above ₹5000' },
+  ];
+
+  const sortOptions = [
+    { id: 'default', name: 'Default Sorting' },
+    { id: 'price_low', name: 'Price: Low to High' },
+    { id: 'price_high', name: 'Price: High to Low' },
+    { id: 'rating', name: 'Highest Rated' },
+    { id: 'newest', name: 'Newest First' },
+  ];
 
   if (loading) {
     return (
@@ -283,30 +357,11 @@ function ClothingPage() {
                   type="text" 
                   placeholder="Search clothing..."
                   value={searchTerm}
-                  onChange={handleSearchChange}
-                  onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                 />
-                {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                    {searchSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSearchTerm(suggestion);
-                          setShowSuggestions(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
-                      >
-                        🔍 {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all">
-                  <span className="hidden sm:inline">Search</span>
-                  <span className="sm:hidden">🔍</span>
+                <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition">
+                  🔍
                 </button>
               </div>
             </div>
@@ -350,37 +405,6 @@ function ClothingPage() {
         </div>
       </div>
 
-      {/* Categories Scroll */}
-      <div className="border-b border-pink-100 bg-white overflow-x-auto">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
-            <button 
-              onClick={() => setSelectedSubcat('all')} 
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-all ${
-                selectedSubcat === 'all' 
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              📦 All ({products.length})
-            </button>
-            {clothingCategories.map(cat => (
-              <button 
-                key={cat.id} 
-                onClick={() => setSelectedSubcat(cat.id)} 
-                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap flex items-center gap-1 transition-all ${
-                  selectedSubcat === cat.id 
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span>{cat.icon}</span> {cat.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center gap-2 text-sm">
@@ -390,120 +414,236 @@ function ClothingPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 pb-16">
         
-        <button 
-          onClick={() => setShowFilters(!showFilters)} 
-          className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
-        >
-          <span>🔽</span> Filters & Sorting
-        </button>
-
-        <div className="flex flex-col md:flex-row gap-6">
-          
-          {/* Sidebar Filters */}
-          <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 space-y-5`}>
+        {/* Filter Bar - HairPage Style */}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">💰</span> Price Range
-              </h3>
-              <div className="flex gap-3">
-                <input 
-                  type="number" 
-                  placeholder="Min ₹" 
-                  value={minPrice} 
-                  onChange={(e) => setMinPrice(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                />
-                <input 
-                  type="number" 
-                  placeholder="Max ₹" 
-                  value={maxPrice} 
-                  onChange={(e) => setMaxPrice(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                />
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">📏</span> Size
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {sizes.map(size => (
-                  <button 
-                    key={size} 
-                    onClick={() => setSelectedSize(selectedSize === size ? 'all' : size)} 
-                    className={`px-3 py-1 rounded-full text-sm transition-all ${
-                      selectedSize === size 
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button 
-              onClick={clearFilters} 
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-            >
-              Clear All Filters ✨
-            </button>
-          </div>
-
-          {/* Products Section */}
-          <div className="flex-1">
-            
-            {/* Sort and Count Bar */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Showing</span>
-                <span className="font-semibold text-pink-600">{filteredProducts.length}</span>
-                <span className="text-sm text-gray-500">of {products.length} products</span>
-              </div>
-              
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)} 
-                className="px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
+            {/* Desktop Filters */}
+            <div className="hidden md:flex flex-wrap gap-3">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
               >
-                <option value="default">Sort by: Default</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="rating">Rating: High to Low</option>
-                <option value="newest">Newest First</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedSubcategory}
+                onChange={(e) => setSelectedSubcategory(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {subcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {brands.map(brand => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedSize}
+                onChange={(e) => setSelectedSize(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                <option value="all">All Sizes</option>
+                {sizesList.map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedGender}
+                onChange={(e) => setSelectedGender(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {genderOptions.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={priceRange}
+                onChange={(e) => setPriceRange(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {priceRanges.map(range => (
+                  <option key={range.id} value={range.id}>{range.name}</option>
+                ))}
               </select>
             </div>
-            
-            {/* Products Grid */}
-            {filteredProducts.length === 0 ? (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
-                <div className="text-7xl mb-4">👗</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No clothing products found</h3>
-                <p className="text-gray-500 mb-4">Try adjusting your filters or search term</p>
-                <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">Clear Filters</button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {filteredProducts.map(product => (
-                  <ProductCard 
-                    key={product._id || product.id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                  />
-                ))}
-              </div>
-            )}
+
+            {/* Mobile Filter Button */}
+            <button 
+              onClick={() => setShowFilters(!showFilters)} 
+              className="md:hidden px-5 py-2 border border-pink-200 rounded-full text-sm flex items-center gap-2 bg-white"
+            >
+              <span>Filters</span>
+              <span>🔽</span>
+            </button>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-5 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+            >
+              {sortOptions.map(option => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+              ))}
+            </select>
           </div>
+
+          {/* Active Filters Display */}
+          {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedSize !== 'all' || selectedGender !== 'all' || priceRange !== 'all' || searchTerm) && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {selectedCategory !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {selectedCategory}
+                  <button onClick={() => setSelectedCategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedSubcategory !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {selectedSubcategory}
+                  <button onClick={() => setSelectedSubcategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedBrand !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {selectedBrand}
+                  <button onClick={() => setSelectedBrand('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedSize !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  Size: {selectedSize}
+                  <button onClick={() => setSelectedSize('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedGender !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {genderOptions.find(g => g.id === selectedGender)?.name}
+                  <button onClick={() => setSelectedGender('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {priceRange !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {priceRanges.find(r => r.id === priceRange)?.name}
+                  <button onClick={() => setPriceRange('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  Search: {searchTerm}
+                  <button onClick={() => setSearchTerm('')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline hover:no-underline">
+                Clear All
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Mobile Filters Modal */}
+        {showFilters && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+            <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
+                <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
+              </div>
+              
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
+                  <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Size</label>
+                  <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    <option value="all">All Sizes</option>
+                    {sizesList.map(size => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                  <select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {genderOptions.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                  <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition">
+                  Clear All Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results Count */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-500">
+            Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of{' '}
+            <span className="font-semibold text-pink-600">{products.length}</span> products
+          </p>
+        </div>
+        
+        {/* Products Grid */}
+        {filteredProducts.length === 0 ? (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-16 text-center border border-pink-100">
+            <div className="text-6xl mb-4">👗</div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No clothing products found</h3>
+            <p className="text-gray-500 mb-6">Try adjusting your filters or search term</p>
+            <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:shadow-lg transition">
+              Clear All Filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {filteredProducts.map(product => (
+              <ProductCard 
+                key={product._id || product.id} 
+                product={product} 
+                addToCart={addToCart}
+                isInWishlist={isInWishlist}
+                addToWishlist={addToWishlist}
+                removeFromWishlist={removeFromWishlist}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
