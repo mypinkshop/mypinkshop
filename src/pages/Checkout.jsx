@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
+import OfferBanner from '../components/OfferBanner';
 
 function Checkout() {
   const { cart, cartTotal, clearCart } = useCart();
@@ -26,13 +27,14 @@ function Checkout() {
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [couponMessage, setCouponMessage] = useState(null);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   
-  // 🔥 Shipping/Delivery States
   const [shippingInfo, setShippingInfo] = useState({
     deliverable: true,
     estimatedDelivery: null,
@@ -47,12 +49,10 @@ function Checkout() {
   const subtotal = cartTotal();
   const discount = couponDiscount;
   const tax = Math.round((subtotal - discount) * 0.05);
-  
-  // Use shipping charge from backend settings
   const deliveryCharges = shippingInfo.shippingCharge;
   const total = subtotal - discount + tax + deliveryCharges;
 
-  // Load shipping settings from backend
+  // Load shipping settings
   useEffect(() => {
     const loadShippingSettings = async () => {
       try {
@@ -72,7 +72,7 @@ function Checkout() {
     loadShippingSettings();
   }, []);
 
-  // 🔥 FIXED: Check delivery when pincode changes using backend API
+  // Check delivery when pincode changes
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -160,19 +160,55 @@ function Checkout() {
     localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
   };
 
-  const applyCoupon = () => {
-    if (couponCode === 'WELCOME10') {
-      setCouponDiscount(Math.round(subtotal * 0.1));
-      setCouponApplied(true);
-    } else if (couponCode === 'FLAT200') {
-      setCouponDiscount(200);
-      setCouponApplied(true);
-    } else if (couponCode === 'PINK15') {
-      setCouponDiscount(Math.round(subtotal * 0.15));
-      setCouponApplied(true);
-    } else {
-      alert('Invalid coupon code');
+  // 🔥 REAL COUPON API - Admin panel se create kiya hua coupon validate karega
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) {
+      alert('Please enter a coupon code');
+      return;
     }
+    
+    setApplyingCoupon(true);
+    setCouponMessage(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/api/coupons/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: couponCode,
+          cartTotal: subtotal,
+          userId: user?._id || null
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.valid) {
+        setCouponDiscount(data.coupon.discountAmount);
+        setCouponApplied(true);
+        setCouponMessage({ type: 'success', text: `✓ Coupon applied! You saved ₹${data.coupon.discountAmount}` });
+        // Clear any previous message after 3 seconds
+        setTimeout(() => setCouponMessage(null), 3000);
+      } else {
+        setCouponDiscount(0);
+        setCouponApplied(false);
+        setCouponMessage({ type: 'error', text: data.message || 'Invalid coupon code' });
+      }
+    } catch (error) {
+      console.error('Coupon error:', error);
+      setCouponMessage({ type: 'error', text: 'Failed to apply coupon. Please try again.' });
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
+  // Remove coupon
+  const removeCoupon = () => {
+    setCouponCode('');
+    setCouponDiscount(0);
+    setCouponApplied(false);
+    setCouponMessage({ type: 'info', text: 'Coupon removed' });
+    setTimeout(() => setCouponMessage(null), 2000);
   };
 
   const placeOrder = async () => {
@@ -199,11 +235,17 @@ function Checkout() {
       id: newOrderId,
       date: new Date().toISOString(),
       items: cart.map(item => ({
-        ...item,
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        size: item.size || null,
+        color: item.color || null,
         image: item.image || null
       })),
       subtotal: subtotal,
       discount: discount,
+      couponCode: couponApplied ? couponCode : null,
       deliveryCharges: deliveryCharges,
       tax: tax,
       total: total,
@@ -224,7 +266,6 @@ function Checkout() {
     window.scrollTo(0, 0);
   };
 
-  // Delivery options
   const deliveryOptions = [
     { id: 'standard', name: 'Standard Delivery', price: 0 },
     { id: 'express', name: 'Express Delivery', price: 99 },
@@ -237,7 +278,6 @@ function Checkout() {
     { id: 'netbanking', name: 'Net Banking', description: 'All major banks' },
   ];
 
-  // Get delivery date display
   const getDeliveryDateDisplay = () => {
     if (!shippingInfo.estimatedDelivery) return 'Check pincode for delivery estimate';
     if (shippingInfo.estimatedDelivery.minDate && shippingInfo.estimatedDelivery.maxDate) {
@@ -292,6 +332,9 @@ function Checkout() {
   return (
     <div className="min-h-screen bg-gray-50">
       
+      {/* 🔥 OFFER BANNER */}
+      <OfferBanner />
+
       {/* Top Bar */}
       <div className="bg-gray-900 text-white py-2 text-center text-sm">
         Free Shipping on ₹{shippingInfo.freeShippingThreshold}+ | Secure Checkout | 100% Safe Shopping
@@ -387,6 +430,7 @@ function Checkout() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Form fields same as before */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                     <input
@@ -510,15 +554,10 @@ function Checkout() {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Delivery Options</h2>
                 
-                {/* Delivery Estimate Banner */}
                 {shippingInfo.estimatedDelivery && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                    <p className="text-sm text-blue-800">
-                      📦 Estimated Delivery: {getDeliveryDateDisplay()}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Orders placed before {shippingInfo.cutOffTime} will be processed today
-                    </p>
+                    <p className="text-sm text-blue-800">📦 Estimated Delivery: {getDeliveryDateDisplay()}</p>
+                    <p className="text-xs text-blue-600 mt-1">Orders placed before {shippingInfo.cutOffTime} will be processed today</p>
                   </div>
                 )}
                 
@@ -566,16 +605,10 @@ function Checkout() {
                 )}
                 
                 <div className="flex gap-4 mt-6">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg font-medium hover:bg-gray-50 transition"
-                  >
+                  <button onClick={() => setStep(1)} className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg font-medium hover:bg-gray-50 transition">
                     ← Back
                   </button>
-                  <button
-                    onClick={() => setStep(3)}
-                    className="flex-1 bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition"
-                  >
+                  <button onClick={() => setStep(3)} className="flex-1 bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition">
                     Continue to Payment →
                   </button>
                 </div>
@@ -610,10 +643,7 @@ function Checkout() {
                   ))}
                 </div>
                 <div className="flex gap-4 mt-6">
-                  <button
-                    onClick={() => setStep(2)}
-                    className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg font-medium hover:bg-gray-50 transition"
-                  >
+                  <button onClick={() => setStep(2)} className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg font-medium hover:bg-gray-50 transition">
                     ← Back
                   </button>
                   <button
@@ -657,6 +687,7 @@ function Checkout() {
                     <div className="flex-1">
                       <p className="font-medium text-sm text-gray-800 line-clamp-1">{item.name}</p>
                       {item.size && <p className="text-xs text-gray-500">Size: {item.size}</p>}
+                      {item.color && <p className="text-xs text-gray-500">Color: {item.color}</p>}
                       <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       <p className="text-sm font-semibold text-pink-600">₹{item.price * item.quantity}</p>
                     </div>
@@ -664,28 +695,42 @@ function Checkout() {
                 ))}
               </div>
 
-              {/* Coupon */}
+              {/* 🔥 REAL COUPON SECTION */}
               <div className="mb-4">
                 <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="Coupon code"
                     value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                  />
-                  <button
-                    onClick={applyCoupon}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 uppercase"
                     disabled={couponApplied}
-                    className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
-                  >
-                    Apply
-                  </button>
+                  />
+                  {couponApplied ? (
+                    <button
+                      onClick={removeCoupon}
+                      className="px-4 py-2 bg-red-100 text-red-600 rounded-lg text-sm font-medium hover:bg-red-200 transition"
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      onClick={applyCoupon}
+                      disabled={applyingCoupon || !couponCode.trim()}
+                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                    >
+                      {applyingCoupon ? 'Applying...' : 'Apply'}
+                    </button>
+                  )}
                 </div>
-                {couponApplied && (
-                  <p className="text-xs text-green-600 mt-1">✓ Coupon applied! Saved ₹{couponDiscount}</p>
+                {couponMessage && (
+                  <p className={`text-xs mt-1 ${couponMessage.type === 'success' ? 'text-green-600' : couponMessage.type === 'error' ? 'text-red-600' : 'text-blue-600'}`}>
+                    {couponMessage.text}
+                  </p>
                 )}
-                <p className="text-xs text-gray-400 mt-2">Try: WELCOME10, FLAT200, PINK15</p>
+                {!couponApplied && (
+                  <p className="text-xs text-gray-400 mt-2">✨ Enter coupon code to get discount</p>
+                )}
               </div>
 
               {/* Price Details */}
@@ -696,7 +741,7 @@ function Checkout() {
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
+                    <span>Coupon Discount</span>
                     <span>-₹{discount}</span>
                   </div>
                 )}
@@ -707,7 +752,7 @@ function Checkout() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Tax (5% GST)</span>
+                  <span className="text-gray-500">Tax (18% GST)</span>
                   <span className="text-gray-800">₹{tax}</span>
                 </div>
                 <div className="flex justify-between pt-3 border-t border-gray-200">
@@ -722,17 +767,13 @@ function Checkout() {
                   <p className="text-xs font-semibold text-gray-600 mb-1">Delivery Address</p>
                   <p className="text-xs text-gray-600">{formData.fullName}, {formData.phone}</p>
                   <p className="text-xs text-gray-500">{formData.address}, {formData.city} - {formData.pincode}</p>
-                  {shippingInfo.estimatedDelivery && (
-                    <p className="text-xs text-green-600 mt-1">📦 {getDeliveryDateDisplay()}</p>
-                  )}
+                  {shippingInfo.estimatedDelivery && <p className="text-xs text-green-600 mt-1">📦 {getDeliveryDateDisplay()}</p>}
                 </div>
               )}
 
               {/* Secure Badge */}
               <div className="mt-4 text-center">
-                <p className="text-xs text-gray-400 flex items-center justify-center gap-1">
-                  <span>🔒</span> 100% Secure Checkout
-                </p>
+                <p className="text-xs text-gray-400 flex items-center justify-center gap-1">🔒 100% Secure Checkout</p>
               </div>
             </div>
           </div>
