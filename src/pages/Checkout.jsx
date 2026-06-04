@@ -31,11 +31,90 @@ function Checkout() {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  
+  // 🔥 Shipping/Delivery States
+  const [shippingInfo, setShippingInfo] = useState({
+    deliverable: true,
+    estimatedDelivery: null,
+    shippingCharge: 0,
+    freeShippingThreshold: 999,
+    cutOffTime: '16:00',
+    checking: false
+  });
 
-  const deliveryCharges = deliveryMethod === 'express' ? 99 : 0;
+  const API_URL = 'https://api.mypinkshop.com';
+
+  // Load shipping settings from backend
+  useEffect(() => {
+    const loadShippingSettings = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/shipping/settings`);
+        const data = await response.json();
+        if (data.success) {
+          setShippingInfo(prev => ({
+            ...prev,
+            freeShippingThreshold: data.settings.freeShippingThreshold,
+            cutOffTime: data.settings.cutOffTime
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading shipping settings:', error);
+      }
+    };
+    loadShippingSettings();
+  }, []);
+
+  // Check delivery when pincode changes
+  useEffect(() => {
+    const checkDelivery = async () => {
+      if (formData.pincode && formData.pincode.length === 6) {
+        setShippingInfo(prev => ({ ...prev, checking: true }));
+        try {
+          const response = await fetch(`${API_URL}/api/shipping/check-delivery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pincode: formData.pincode,
+              cartTotal: subtotal,
+              isExpress: deliveryMethod === 'express'
+            })
+          });
+          const data = await response.json();
+          
+          if (data.success && data.deliverable) {
+            setShippingInfo({
+              deliverable: true,
+              estimatedDelivery: data.estimatedDelivery,
+              shippingCharge: data.shippingCharge,
+              freeShippingThreshold: data.freeShippingThreshold,
+              cutOffTime: data.cutOffTime,
+              checking: false
+            });
+          } else {
+            setShippingInfo(prev => ({
+              ...prev,
+              deliverable: false,
+              checking: false,
+              estimatedDelivery: null
+            }));
+          }
+        } catch (error) {
+          console.error('Delivery check error:', error);
+          setShippingInfo(prev => ({ ...prev, checking: false }));
+        }
+      }
+    };
+    
+    const timeoutId = setTimeout(checkDelivery, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.pincode, subtotal, deliveryMethod]);
+
   const subtotal = cartTotal();
   const discount = couponDiscount;
   const tax = Math.round((subtotal - discount) * 0.05);
+  
+  // 🔥 Use shipping charge from backend settings
+  const deliveryCharges = shippingInfo.shippingCharge;
   const total = subtotal - discount + tax + deliveryCharges;
 
   useEffect(() => {
@@ -101,6 +180,11 @@ function Checkout() {
       alert('Please fill all address fields');
       return;
     }
+    
+    if (!shippingInfo.deliverable) {
+      alert('Sorry, delivery is not available at this pincode');
+      return;
+    }
 
     setIsPlacingOrder(true);
 
@@ -126,6 +210,7 @@ function Checkout() {
       deliveryMethod: deliveryMethod,
       paymentMethod: paymentMethod,
       shippingAddress: formData,
+      estimatedDelivery: shippingInfo.estimatedDelivery,
       status: 'pending',
     };
 
@@ -139,9 +224,10 @@ function Checkout() {
     window.scrollTo(0, 0);
   };
 
+  // 🔥 Delivery options - User sirf standard vs express choose karega
   const deliveryOptions = [
-    { id: 'standard', name: 'Standard Delivery', days: '3-5 business days', price: 0 },
-    { id: 'express', name: 'Express Delivery', days: '1-2 business days', price: 99 },
+    { id: 'standard', name: 'Standard Delivery', price: 0 },
+    { id: 'express', name: 'Express Delivery', price: 99 },
   ];
 
   const paymentOptions = [
@@ -150,6 +236,18 @@ function Checkout() {
     { id: 'upi', name: 'UPI', description: 'Google Pay, PhonePe, Paytm' },
     { id: 'netbanking', name: 'Net Banking', description: 'All major banks' },
   ];
+
+  // Get delivery date display
+  const getDeliveryDateDisplay = () => {
+    if (!shippingInfo.estimatedDelivery) return 'Check pincode for delivery estimate';
+    if (shippingInfo.estimatedDelivery.minDate && shippingInfo.estimatedDelivery.maxDate) {
+      if (shippingInfo.estimatedDelivery.minDate === shippingInfo.estimatedDelivery.maxDate) {
+        return `Expected delivery on ${shippingInfo.estimatedDelivery.minDate}`;
+      }
+      return `Expected delivery between ${shippingInfo.estimatedDelivery.minDate} - ${shippingInfo.estimatedDelivery.maxDate}`;
+    }
+    return `${shippingInfo.estimatedDelivery.minDays}-${shippingInfo.estimatedDelivery.maxDays} business days`;
+  };
 
   if (orderPlaced) {
     return (
@@ -162,6 +260,12 @@ function Checkout() {
             <h1 className="text-2xl font-bold text-gray-800 mb-2">Order Placed Successfully!</h1>
             <p className="text-gray-500 mb-4">Order ID: <span className="font-semibold text-pink-600">{orderId}</span></p>
             <p className="text-gray-600 mb-6">Your order has been confirmed. You will receive a confirmation email shortly.</p>
+            {shippingInfo.estimatedDelivery && (
+              <div className="bg-green-50 rounded-lg p-4 mb-6 text-left">
+                <p className="font-semibold text-green-800 mb-1">📦 Delivery Estimate</p>
+                <p className="text-green-700 text-sm">{getDeliveryDateDisplay()}</p>
+              </div>
+            )}
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
               <p className="font-semibold mb-2 text-gray-800">Order Summary</p>
               <p className="text-sm text-gray-600">Total Amount: <span className="font-bold">₹{total}</span></p>
@@ -187,7 +291,7 @@ function Checkout() {
       
       {/* Top Bar */}
       <div className="bg-gray-900 text-white py-2 text-center text-sm">
-        Free Shipping on ₹999+ | Secure Checkout | 100% Safe Shopping
+        Free Shipping on ₹{shippingInfo.freeShippingThreshold}+ | Secure Checkout | 100% Safe Shopping
       </div>
 
       {/* Header */}
@@ -353,9 +457,19 @@ function Checkout() {
                       name="pincode"
                       value={formData.pincode}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      maxLength="6"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500"
                       required
                     />
+                    {shippingInfo.checking && (
+                      <p className="text-xs text-gray-400 mt-1">Checking delivery availability...</p>
+                    )}
+                    {!shippingInfo.checking && formData.pincode.length === 6 && !shippingInfo.deliverable && (
+                      <p className="text-xs text-red-500 mt-1">❌ Delivery not available at this pincode</p>
+                    )}
+                    {!shippingInfo.checking && formData.pincode.length === 6 && shippingInfo.deliverable && shippingInfo.estimatedDelivery && (
+                      <p className="text-xs text-green-600 mt-1">✅ {getDeliveryDateDisplay()}</p>
+                    )}
                   </div>
                   <div className="flex items-center mt-2">
                     <input
@@ -371,6 +485,10 @@ function Checkout() {
                 <button
                   onClick={() => {
                     if (formData.fullName && formData.phone && formData.address && formData.city && formData.pincode) {
+                      if (!shippingInfo.deliverable) {
+                        alert('Sorry, delivery is not available at this pincode');
+                        return;
+                      }
                       setStep(2);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     } else {
@@ -388,34 +506,62 @@ function Checkout() {
             {step === 2 && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Delivery Options</h2>
+                
+                {/* Delivery Estimate Banner */}
+                {shippingInfo.estimatedDelivery && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <p className="text-sm text-blue-800">
+                      📦 Estimated Delivery: {getDeliveryDateDisplay()}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Orders placed before {shippingInfo.cutOffTime} will be processed today
+                    </p>
+                  </div>
+                )}
+                
                 <div className="space-y-3">
-                  {deliveryOptions.map(option => (
-                    <label
-                      key={option.id}
-                      className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition ${
-                        deliveryMethod === option.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="radio"
-                          name="delivery"
-                          value={option.id}
-                          checked={deliveryMethod === option.id}
-                          onChange={() => setDeliveryMethod(option.id)}
-                          className="w-4 h-4 text-pink-600"
-                        />
-                        <div>
-                          <p className="font-medium text-gray-800">{option.name}</p>
-                          <p className="text-sm text-gray-500">Delivery in {option.days}</p>
+                  {deliveryOptions.map(option => {
+                    const optionShippingCharge = option.id === 'express' ? 99 : shippingInfo.shippingCharge;
+                    const isFree = subtotal >= shippingInfo.freeShippingThreshold;
+                    const displayPrice = isFree ? 0 : optionShippingCharge;
+                    
+                    return (
+                      <label
+                        key={option.id}
+                        className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition ${
+                          deliveryMethod === option.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="radio"
+                            name="delivery"
+                            value={option.id}
+                            checked={deliveryMethod === option.id}
+                            onChange={() => setDeliveryMethod(option.id)}
+                            className="w-4 h-4 text-pink-600"
+                          />
+                          <div>
+                            <p className="font-medium text-gray-800">{option.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {option.id === 'express' ? 'Faster delivery' : 'Standard delivery time'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <p className={`font-semibold ${option.price === 0 ? 'text-green-600' : 'text-gray-800'}`}>
-                        {option.price === 0 ? 'FREE' : `₹${option.price}`}
-                      </p>
-                    </label>
-                  ))}
+                        <p className={`font-semibold ${displayPrice === 0 ? 'text-green-600' : 'text-gray-800'}`}>
+                          {displayPrice === 0 ? 'FREE' : `₹${displayPrice}`}
+                        </p>
+                      </label>
+                    );
+                  })}
                 </div>
+                
+                {subtotal < shippingInfo.freeShippingThreshold && (
+                  <p className="text-xs text-gray-500 mt-3">
+                    🚚 Add ₹{shippingInfo.freeShippingThreshold - subtotal} more for FREE delivery
+                  </p>
+                )}
+                
                 <div className="flex gap-4 mt-6">
                   <button
                     onClick={() => setStep(1)}
@@ -469,7 +615,7 @@ function Checkout() {
                   </button>
                   <button
                     onClick={placeOrder}
-                    disabled={isPlacingOrder}
+                    disabled={isPlacingOrder || !shippingInfo.deliverable}
                     className="flex-1 bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 transition disabled:opacity-50"
                   >
                     {isPlacingOrder ? (
@@ -494,7 +640,6 @@ function Checkout() {
               <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
                 {cart.map(item => (
                   <div key={item.id} className="flex gap-3 pb-3 border-b border-gray-100">
-                    {/* ✅ PRODUCT IMAGE */}
                     {item.image ? (
                       <img 
                         src={item.image} 
@@ -508,6 +653,7 @@ function Checkout() {
                     )}
                     <div className="flex-1">
                       <p className="font-medium text-sm text-gray-800 line-clamp-1">{item.name}</p>
+                      {item.size && <p className="text-xs text-gray-500">Size: {item.size}</p>}
                       <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                       <p className="text-sm font-semibold text-pink-600">₹{item.price * item.quantity}</p>
                     </div>
@@ -573,6 +719,9 @@ function Checkout() {
                   <p className="text-xs font-semibold text-gray-600 mb-1">Delivery Address</p>
                   <p className="text-xs text-gray-600">{formData.fullName}, {formData.phone}</p>
                   <p className="text-xs text-gray-500">{formData.address}, {formData.city} - {formData.pincode}</p>
+                  {shippingInfo.estimatedDelivery && (
+                    <p className="text-xs text-green-600 mt-1">📦 {getDeliveryDateDisplay()}</p>
+                  )}
                 </div>
               )}
 
