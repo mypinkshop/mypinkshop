@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
 
 const app = express();
 
@@ -15,7 +16,6 @@ app.use(cors({
       'https://www.mypinkshop.com',
       'http://localhost:3000'
     ];
-    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -28,7 +28,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// ✅ Explicit OPTIONS handler for preflight requests (Chrome CORS Fix)
+// ✅ Explicit OPTIONS handler for preflight requests
 app.options('*', (req, res) => {
   const allowedOrigins = [
     'https://mypinkshop.vercel.app',
@@ -64,6 +64,82 @@ const connectDB = async () => {
     console.error('❌ MongoDB Error:', error.message);
   }
 };
+
+// ========== Shiprocket Service (Real API) ==========
+class ShiprocketService {
+  constructor() {
+    this.baseURL = 'https://apiv2.shiprocket.in/v1/external';
+    this.token = null;
+    this.tokenExpiry = null;
+  }
+
+  async getAuthToken() {
+    try {
+      const response = await axios.post(`${this.baseURL}/auth/login`, {
+        email: process.env.SHIPROCKET_EMAIL,
+        password: process.env.SHIPROCKET_PASSWORD
+      });
+      this.token = response.data.token;
+      this.tokenExpiry = Date.now() + 3600000;
+      console.log('✅ Shiprocket Auth Token Obtained');
+      return this.token;
+    } catch (error) {
+      console.error('❌ Shiprocket Auth Error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async checkServiceability(pickupPincode, deliveryPincode, weight = 0.5) {
+    try {
+      if (!this.token || Date.now() > this.tokenExpiry) {
+        await this.getAuthToken();
+      }
+      
+      const response = await axios.get(`${this.baseURL}/courier/serviceability`, {
+        params: {
+          pickup_postcode: pickupPincode,
+          delivery_postcode: deliveryPincode,
+          weight: weight
+        },
+        headers: { 'Authorization': `Bearer ${this.token}` }
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Serviceability Error:', error.response?.data || error.message);
+      return { success: false, data: [] };
+    }
+  }
+
+  async getEstimatedDelivery(pickupPincode, deliveryPincode, weight = 0.5) {
+    try {
+      const serviceability = await this.checkServiceability(pickupPincode, deliveryPincode, weight);
+      
+      if (serviceability && serviceability.data && serviceability.data.length > 0) {
+        const sorted = serviceability.data.sort((a, b) => a.estimated_days - b.estimated_days);
+        const best = sorted[0];
+        
+        const estimatedDate = new Date();
+        estimatedDate.setDate(estimatedDate.getDate() + best.estimated_days);
+        
+        return {
+          success: true,
+          deliverable: true,
+          shippingCharge: best.rate,
+          estimatedDays: best.estimated_days,
+          estimatedDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          courierName: best.courier_name
+        };
+      }
+      
+      return { success: false, deliverable: false, message: 'No courier available' };
+    } catch (error) {
+      return { success: false, deliverable: false, error: error.message };
+    }
+  }
+}
+
+const shiprocket = new ShiprocketService();
 
 // ========== User Schema ==========
 const userSchema = new mongoose.Schema({
@@ -497,95 +573,42 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// ========== SHIPPING ROUTES ==========
+// ========== SHIPPING ROUTES (REAL SHIPROCKET API) ==========
 
-// Shipping settings (in-memory - can be moved to DB later)
-let shippingSettings = {
-  defaultDays: [3, 7],
-  expressDays: [1, 3],
-  freeShippingThreshold: 999,
-  shippingCharges: 50,
-  expressCharges: 99,
-  codCharges: 30,
-  deliverablePincodes: ['110001', '110002', '110003', '400001', '400002', '560001', '560002', '700001', '600001'],
-  cutOffTime: '16:00',
-  sundayDelivery: false,
-  warehouseAddress: {
-    pincode: '110001',
-    city: 'New Delhi',
-    state: 'Delhi'
-  }
-};
-
-// 📍 Check delivery availability and get estimated date (Public)
+// 📍 Check delivery availability with REAL Shiprocket API
 app.post('/api/shipping/check-delivery', async (req, res) => {
   try {
-    const { pincode, cartTotal, isExpress } = req.body;
+    const { pincode, cartTotal, weight = 0.5 } = req.body;
+    const pickupPincode = '110001'; // Tumhara warehouse pincode
     
-    // Check if pincode is serviceable
-    const isServiceable = shippingSettings.deliverablePincodes.length === 0 || 
-                          shippingSettings.deliverablePincodes.includes(pincode);
+    const delivery = await shiprocket.getEstimatedDelivery(pickupPincode, pincode, weight);
     
-    if (!isServiceable) {
+    if (!delivery.deliverable) {
       return res.json({
         success: false,
         deliverable: false,
-        message: 'Sorry, delivery is not available at this pincode yet.'
+        message: 'Sorry, delivery is not available at this pincode.'
       });
     }
     
-    // Calculate shipping charges
-    let shippingCharge = 0;
-    let shippingType = 'standard';
-    
-    if (cartTotal >= shippingSettings.freeShippingThreshold) {
+    // Free shipping threshold
+    const freeShippingThreshold = 999;
+    let shippingCharge = delivery.shippingCharge;
+    if (cartTotal >= freeShippingThreshold) {
       shippingCharge = 0;
-    } else if (isExpress) {
-      shippingCharge = shippingSettings.expressCharges;
-      shippingType = 'express';
-    } else {
-      shippingCharge = shippingSettings.shippingCharges;
-    }
-    
-    // Calculate estimated delivery date
-    const daysToAdd = isExpress ? shippingSettings.expressDays[1] : shippingSettings.defaultDays[1];
-    const minDays = isExpress ? shippingSettings.expressDays[0] : shippingSettings.defaultDays[0];
-    
-    let estimatedDate = new Date();
-    let daysAdded = 0;
-    let actualDays = 0;
-    
-    // Skip Sundays if not available
-    while (daysAdded < daysToAdd) {
-      estimatedDate.setDate(estimatedDate.getDate() + 1);
-      if (estimatedDate.getDay() !== 0 || shippingSettings.sundayDelivery) {
-        daysAdded++;
-        actualDays++;
-      }
-    }
-    
-    const minEstimatedDate = new Date();
-    let minDaysAdded = 0;
-    while (minDaysAdded < minDays) {
-      minEstimatedDate.setDate(minEstimatedDate.getDate() + 1);
-      if (minEstimatedDate.getDay() !== 0 || shippingSettings.sundayDelivery) {
-        minDaysAdded++;
-      }
     }
     
     res.json({
       success: true,
       deliverable: true,
-      shippingCharge,
-      shippingType,
+      shippingCharge: shippingCharge,
       estimatedDelivery: {
-        minDate: minEstimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-        maxDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-        minDays: minDays,
-        maxDays: actualDays
+        maxDate: delivery.estimatedDate,
+        maxDays: delivery.estimatedDays
       },
-      freeShippingThreshold: shippingSettings.freeShippingThreshold,
-      cutOffTime: shippingSettings.cutOffTime
+      courierName: delivery.courierName,
+      freeShippingThreshold: freeShippingThreshold,
+      cutOffTime: '16:00'
     });
     
   } catch (error) {
@@ -594,44 +617,15 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
   }
 });
 
-// 📦 Get shipping settings (Public - limited info, Admin - full info)
+// 📦 Get shipping settings (Public)
 app.get('/api/shipping/settings', async (req, res) => {
-  try {
-    // Check if user is admin
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded.role === 'admin') {
-          return res.json({ success: true, settings: shippingSettings });
-        }
-      } catch (e) {
-        // Token invalid, return public info
-      }
+  res.json({
+    success: true,
+    settings: {
+      freeShippingThreshold: 999,
+      cutOffTime: '16:00'
     }
-    
-    // Public info (limited)
-    res.json({ 
-      success: true, 
-      settings: {
-        freeShippingThreshold: shippingSettings.freeShippingThreshold,
-        cutOffTime: shippingSettings.cutOffTime
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// 📦 Update shipping settings (Admin only)
-app.post('/api/shipping/settings', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    shippingSettings = { ...shippingSettings, ...req.body };
-    res.json({ success: true, settings: shippingSettings });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+  });
 });
 
 module.exports = app;
