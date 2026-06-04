@@ -4,21 +4,16 @@ const cors = require('cors');
 const app = express();
 
 // Simple CORS
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(cors());
 app.use(express.json());
 
-// ========== SIMPLE TEST ROUTES ==========
+// ========== SIMPLE ROUTES ==========
 
 app.get('/', (req, res) => {
   res.json({ 
-    message: '🎀 MyPinkShop API is running!',
+    message: 'API is running!',
     status: 'alive',
-    timestamp: new Date().toISOString()
+    time: new Date().toISOString()
   });
 });
 
@@ -26,7 +21,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok',
     message: 'Server is healthy',
-    timestamp: new Date().toISOString()
+    time: new Date().toISOString()
   });
 });
 
@@ -39,12 +34,15 @@ app.get('/api/offers/active-offer', (req, res) => {
   });
 });
 
-app.get('/api/ping', (req, res) => {
+app.get('/api/test', (req, res) => {
   res.json({ 
-    message: 'pong',
-    timestamp: new Date().toISOString()
+    success: true, 
+    message: 'Test route working!',
+    env_check: {
+      mongo_uri: !!process.env.MONGO_URI,
+      jwt: !!process.env.JWT_SECRET
+    }
   });
 });
 
-// Export for Vercel
 module.exports = app;
