@@ -45,7 +45,7 @@ const offerSchema = new mongoose.Schema({
 
 const Offer = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
 
-// ========== Simple Auth Middleware ==========
+// ========== Auth Middleware ==========
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
