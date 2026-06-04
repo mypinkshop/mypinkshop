@@ -4,21 +4,35 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
 // Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const navigate = useNavigate();
 
   const handleAddToCart = () => {
-    addToCart(product);
+    addToCart({
+      id: product._id || product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image: product.images?.[0],
+      stock: product.stock
+    });
     setIsAdded(true);
-    setTimeout(() => setIsAdded(false), 1500);
+    setTimeout(() => setIsAdded(false), 2000);
+  };
+
+  const handleGoToCart = () => {
+    navigate('/cart');
   };
 
   const handleWishlistToggle = () => {
-    if (isInWishlist(product.id)) {
-      removeFromWishlist(product.id);
+    const productId = product._id || product.id;
+    if (isInWishlist(productId)) {
+      removeFromWishlist(productId);
     } else {
       addToWishlist(product);
     }
@@ -26,40 +40,47 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+      <Link to={`/product/${product._id || product.id}`}>
+        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
               onError={() => setImgError(true)}
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl">
+            <div className="w-full h-full flex items-center justify-center text-5xl">
               {product.emoji || '💄'}
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
+          {product.stock === 0 && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
+              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
+            </div>
+          )}
         </div>
       </Link>
+      
       <div className="p-4">
-        <Link to={`/product/${product.id}`}>
-          <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">
+        <Link to={`/product/${product._id || product.id}`}>
+          <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
             {product.name}
           </h3>
         </Link>
         <p className="text-xs text-gray-400 mb-2">{product.brand || 'MyPinkShop'}</p>
+        
         <div className="flex items-center gap-1 mb-2">
           <div className="flex text-yellow-400 text-sm">
             {'★'.repeat(Math.floor(product.rating || 4))}
@@ -67,6 +88,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           </div>
           <span className="text-xs text-gray-400">({product.rating || 4})</span>
         </div>
+        
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
           {product.originalPrice && product.originalPrice > product.price && (
@@ -78,18 +100,34 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             </>
           )}
         </div>
+        
         <div className="flex gap-2">
+          {isAdded ? (
+            <button 
+              onClick={handleGoToCart}
+              className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600 transform hover:-translate-y-0.5"
+            >
+              ✓ Go to Cart
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddToCart} 
+              disabled={product.stock === 0}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+                product.stock > 0 
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Add to Cart
+            </button>
+          )}
+          
           <button 
-            onClick={handleAddToCart} 
-            className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+            onClick={handleWishlistToggle}
+            className="w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 border border-pink-200 hover:bg-pink-50"
           >
-            {isAdded ? 'Added! ✓' : 'Add to Cart'}
-          </button>
-          <button 
-            onClick={handleWishlistToggle} 
-            className="w-10 py-2 border border-pink-200 rounded-full text-center hover:bg-pink-50 transition"
-          >
-            {isInWishlist(product.id) ? '❤️' : '🤍'}
+            {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
         </div>
       </div>
@@ -97,87 +135,42 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
-// ✅ MAKEUP SUBCATEGORIES - As requested
+// ✅ MAKEUP SUBCATEGORIES
 const makeupCategories = [
-  // Face
   { id: 'facePrimer', name: 'Face Primer', icon: '🧴', mainCat: 'Face' },
   { id: 'concealer', name: 'Concealer', icon: '🎨', mainCat: 'Face' },
   { id: 'foundation', name: 'Foundation', icon: '🧴', mainCat: 'Face' },
   { id: 'compact', name: 'Compact', icon: '🔘', mainCat: 'Face' },
   { id: 'contour', name: 'Contour', icon: '📐', mainCat: 'Face' },
   { id: 'loosePowder', name: 'Loose Powder', icon: '⚪', mainCat: 'Face' },
-  { id: 'tintedMoisturizer', name: 'Tinted Moisturizer', icon: '💧', mainCat: 'Face' },
   { id: 'blush', name: 'Blush', icon: '🌸', mainCat: 'Face' },
   { id: 'bronzer', name: 'Bronzer', icon: '☀️', mainCat: 'Face' },
-  { id: 'bbCcCream', name: 'BB & CC Cream', icon: '🧴', mainCat: 'Face' },
   { id: 'highlighter', name: 'Highlighter', icon: '✨', mainCat: 'Face' },
   { id: 'settingSpray', name: 'Setting Spray', icon: '💨', mainCat: 'Face' },
-  { id: 'makeupRemover', name: 'Makeup Remover', icon: '🧼', mainCat: 'Face' },
-  { id: 'sindoor', name: 'Sindoor', icon: '🔴', mainCat: 'Face' },
-  
-  // Eyes
   { id: 'kajal', name: 'Kajal', icon: '✏️', mainCat: 'Eyes' },
   { id: 'eyeliner', name: 'Eyeliner', icon: '📏', mainCat: 'Eyes' },
   { id: 'mascara', name: 'Mascara', icon: '👁️‍🗨️', mainCat: 'Eyes' },
   { id: 'eyeshadow', name: 'Eye Shadow', icon: '🎨', mainCat: 'Eyes' },
-  { id: 'eyebrowEnhancer', name: 'Eye Brow Enhancers', icon: '✏️', mainCat: 'Eyes' },
-  { id: 'eyePrimer', name: 'Eye Primer', icon: '🧴', mainCat: 'Eyes' },
-  { id: 'falseLashes', name: 'False Eyelashes', icon: '👁️', mainCat: 'Eyes' },
-  { id: 'eyeMakeupRemover', name: 'Eye Makeup Remover', icon: '💧', mainCat: 'Eyes' },
-  { id: 'underEyeConcealer', name: 'Under Eye Concealer', icon: '👁️', mainCat: 'Eyes' },
-  { id: 'contactLenses', name: 'Contact Lenses', icon: '👀', mainCat: 'Eyes' },
-  
-  // Lips
   { id: 'lipstick', name: 'Lipstick', icon: '💄', mainCat: 'Lips' },
   { id: 'liquidLipstick', name: 'Liquid Lipstick', icon: '💧', mainCat: 'Lips' },
-  { id: 'lipCrayon', name: 'Lip Crayon', icon: '🖍️', mainCat: 'Lips' },
   { id: 'lipGloss', name: 'Lip Gloss', icon: '✨', mainCat: 'Lips' },
   { id: 'lipLiner', name: 'Lip Liner', icon: '📏', mainCat: 'Lips' },
-  { id: 'lipPlumper', name: 'Lip Plumper', icon: '👄', mainCat: 'Lips' },
-  { id: 'lipTint', name: 'Lip Tint', icon: '🎨', mainCat: 'Lips' },
-  
-  // Nails
   { id: 'nailPolish', name: 'Nail Polish', icon: '💅', mainCat: 'Nails' },
-  { id: 'nailArtKits', name: 'Nail Art Kits', icon: '🎨', mainCat: 'Nails' },
-  { id: 'nailCare', name: 'Nail Care', icon: '💅', mainCat: 'Nails' },
-  { id: 'nailPolishRemover', name: 'Nail Polish Remover', icon: '💧', mainCat: 'Nails' },
-  
-  // Makeup Kits & Combos
-  { id: 'makeupKits', name: 'Makeup Kits', icon: '🎁', mainCat: 'Kits & Combos' },
-  { id: 'makeupCombos', name: 'Makeup Combos', icon: '📦', mainCat: 'Kits & Combos' },
-  
-  // Tools & Brushes
-  { id: 'faceBrush', name: 'Face Brush', icon: '🖌️', mainCat: 'Tools & Brushes' },
-  { id: 'eyeBrush', name: 'Eye Brush', icon: '🖌️', mainCat: 'Tools & Brushes' },
-  { id: 'lipBrush', name: 'Lip Brush', icon: '🖌️', mainCat: 'Tools & Brushes' },
-  { id: 'brushSets', name: 'Brush Sets', icon: '🎨', mainCat: 'Tools & Brushes' },
-  { id: 'brushCleaners', name: 'Brush Cleaners', icon: '🧼', mainCat: 'Tools & Brushes' },
-  { id: 'sponges', name: 'Sponges & Applicators', icon: '🧽', mainCat: 'Tools & Brushes' },
-  { id: 'eyelashCurlers', name: 'Eyelash Curlers', icon: '🔧', mainCat: 'Tools & Brushes' },
-  { id: 'tweezers', name: 'Tweezers', icon: '🔧', mainCat: 'Tools & Brushes' },
-  { id: 'sharpeners', name: 'Sharpeners', icon: '✏️', mainCat: 'Tools & Brushes' },
-  { id: 'mirrors', name: 'Mirrors', icon: '🪞', mainCat: 'Tools & Brushes' },
-  { id: 'makeupPouches', name: 'Makeup Pouches', icon: '👜', mainCat: 'Tools & Brushes' },
-  { id: 'multiPalettes', name: 'Multi-Functional Palettes', icon: '🎨', mainCat: 'Tools & Brushes' },
+  { id: 'makeupKits', name: 'Makeup Kits', icon: '🎁', mainCat: 'Kits' },
+  { id: 'makeupBrushes', name: 'Makeup Brushes', icon: '🖌️', mainCat: 'Tools' },
 ];
 
 // Top Brands
 const topBrands = [
-  { id: 'kayBeauty', name: 'Kay Beauty', icon: 'K', color: 'from-pink-400 to-rose-400' },
   { id: 'hudaBeauty', name: 'Huda Beauty', icon: 'H', color: 'from-purple-400 to-pink-400' },
-  { id: 'charlotteTilbury', name: 'Charlotte Tilbury', icon: 'C', color: 'from-gold-400 to-amber-400' },
   { id: 'mac', name: 'M.A.C', icon: 'M', color: 'from-gray-700 to-gray-900' },
-  { id: 'maybelline', name: 'Maybelline New York', icon: 'M', color: 'from-yellow-400 to-orange-400' },
+  { id: 'maybelline', name: 'Maybelline', icon: 'M', color: 'from-yellow-400 to-orange-400' },
   { id: 'loreal', name: 'L\'Oreal Paris', icon: 'L', color: 'from-red-500 to-pink-500' },
   { id: 'lakme', name: 'Lakme', icon: 'L', color: 'from-blue-400 to-purple-400' },
   { id: 'nykaa', name: 'Nykaa Cosmetics', icon: 'N', color: 'from-pink-500 to-rose-500' },
-  { id: 'nyx', name: 'Nyx Pro.Makeup', icon: 'N', color: 'from-black to-gray-700' },
 ];
 
-// Finish Types
-const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy', 'Metallic'];
-
-// Coverage Types
+const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy'];
 const coverageTypes = ['Light', 'Medium', 'Full', 'Sheer'];
 
 function MakeupPage() {
@@ -192,6 +185,8 @@ function MakeupPage() {
   const [selectedSubcat, setSelectedSubcat] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [selectedFinish, setSelectedFinish] = useState('all');
@@ -199,28 +194,62 @@ function MakeupPage() {
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
   const [activeMainCat, setActiveMainCat] = useState('all');
-  const [activeTab, setActiveTab] = useState('categories'); // 'categories' or 'brands'
+  const [activeTab, setActiveTab] = useState('categories');
 
-  // Get unique main categories for grouping
   const mainCategories = ['all', ...new Set(makeupCategories.map(c => c.mainCat))];
+  const API_URL = 'https://api.mypinkshop.com';
 
+  // Load products from API
   useEffect(() => {
-    const storedProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    const makeupProducts = storedProducts.filter(p => 
-      p.adminApproved === true && 
-      p.status === 'active' && 
-      p.category === 'makeup'
-    );
-    setProducts(makeupProducts);
-    setLoading(false);
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/api/products`);
+        if (!response.ok) throw new Error('Failed to load products');
+        let data = await response.json();
+        
+        const makeupProducts = data.filter(p => 
+          (p.mainCategory === 'Makeup' || p.category === 'Makeup' || p.category === 'makeup') &&
+          p.status === 'active'
+        ).map(p => ({
+          ...p,
+          id: p._id,
+          category: p.mainCategory || p.category
+        }));
+        
+        setProducts(makeupProducts);
+      } catch (error) {
+        console.error('Error loading products:', error);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProducts();
   }, []);
+
+  // Search autocomplete
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    if (value.length > 1) {
+      const suggestions = products
+        .filter(p => p.name?.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 5)
+        .map(p => p.name);
+      setSearchSuggestions(suggestions);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = [...products];
 
     if (searchTerm) {
       filtered = filtered.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -233,8 +262,8 @@ function MakeupPage() {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
 
-    const min = minPrice ? parseInt(minPrice) : 0;
-    const max = maxPrice ? parseInt(maxPrice) : Infinity;
+    const min = minPrice ? parseFloat(minPrice) : 0;
+    const max = maxPrice ? parseFloat(maxPrice) : Infinity;
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
 
     if (selectedFinish !== 'all') {
@@ -249,7 +278,7 @@ function MakeupPage() {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => (b.id || 0) - (a.id || 0)); break;
+      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
       default: break;
     }
     
@@ -266,9 +295,9 @@ function MakeupPage() {
     setSelectedCoverage('all');
     setSortBy('default');
     setActiveMainCat('all');
+    setShowSuggestions(false);
   };
 
-  // Get filtered subcategories by main category
   const getFilteredSubcategories = () => {
     if (activeMainCat === 'all') return makeupCategories;
     return makeupCategories.filter(c => c.mainCat === activeMainCat);
@@ -282,7 +311,10 @@ function MakeupPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading collection...</p>
+        </div>
       </div>
     );
   }
@@ -290,18 +322,8 @@ function MakeupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Extra 10% off on first order</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Cash on Delivery Available</span>
-          <span>✨</span>
-        </div>
-      </div>
+      {/* 🔥 OFFER BANNER */}
+      <OfferBanner />
 
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
@@ -323,9 +345,27 @@ function MakeupPage() {
                   type="text" 
                   placeholder="Search makeup products, brands, or shades..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
+                  onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   className="w-full px-5 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
                 />
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                    {searchSuggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSearchTerm(suggestion);
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
+                      >
+                        🔍 {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
               </div>
             </div>
@@ -361,7 +401,7 @@ function MakeupPage() {
         </div>
       </div>
 
-      {/* Tabs: Categories vs Brands */}
+      {/* Tabs */}
       <div className="border-b border-pink-100 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6">
@@ -384,7 +424,6 @@ function MakeupPage() {
       {/* Categories View */}
       {activeTab === 'categories' && (
         <>
-          {/* Main Category Tabs (Face, Eyes, Lips, Nails, etc.) */}
           <div className="bg-white border-b border-pink-100">
             <div className="max-w-7xl mx-auto px-4">
               <div className="flex gap-4 overflow-x-auto py-2 scrollbar-hide">
@@ -405,7 +444,6 @@ function MakeupPage() {
             </div>
           </div>
 
-          {/* Subcategories Grid */}
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               <button
@@ -438,7 +476,7 @@ function MakeupPage() {
       {/* Brands View */}
       {activeTab === 'brands' && (
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {topBrands.map(brand => {
               const productCount = products.filter(p => p.brand === brand.name).length;
               return (
@@ -483,7 +521,6 @@ function MakeupPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 pb-12">
         
-        {/* Mobile Filter Button */}
         <button 
           onClick={() => setShowFilters(!showFilters)} 
           className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
@@ -493,10 +530,9 @@ function MakeupPage() {
 
         <div className="flex flex-col md:flex-row gap-6">
           
-          {/* Left Sidebar - Filters */}
+          {/* Sidebar Filters */}
           <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 space-y-5`}>
             
-            {/* Price Range */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <span className="text-pink-500">💰</span> Price Range
@@ -519,7 +555,6 @@ function MakeupPage() {
               </div>
             </div>
 
-            {/* Finish Type */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <span className="text-pink-500">✨</span> Finish
@@ -541,7 +576,6 @@ function MakeupPage() {
               </div>
             </div>
 
-            {/* Coverage */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <span className="text-pink-500">🎨</span> Coverage
@@ -563,7 +597,6 @@ function MakeupPage() {
               </div>
             </div>
 
-            {/* Clear Filters Button */}
             <button 
               onClick={clearFilters} 
               className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
@@ -572,10 +605,9 @@ function MakeupPage() {
             </button>
           </div>
 
-          {/* Right Section - Products */}
+          {/* Products Section */}
           <div className="flex-1">
             
-            {/* Sort and Count Bar */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Showing</span>
@@ -596,7 +628,6 @@ function MakeupPage() {
               </select>
             </div>
             
-            {/* Products Grid */}
             {filteredProducts.length === 0 ? (
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
                 <div className="text-7xl mb-4">💄</div>
@@ -610,7 +641,7 @@ function MakeupPage() {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {filteredProducts.map(product => (
                   <ProductCard 
-                    key={product.id} 
+                    key={product._id || product.id} 
                     product={product} 
                     addToCart={addToCart}
                     isInWishlist={isInWishlist}
@@ -626,49 +657,9 @@ function MakeupPage() {
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">M</span>
-                </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-              </div>
-              <p className="text-sm">Luxury beauty and makeup for the modern woman.</p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+          <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
         </div>
       </footer>
 
