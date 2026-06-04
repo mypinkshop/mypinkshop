@@ -44,6 +44,14 @@ function Checkout() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
+  const subtotal = cartTotal();
+  const discount = couponDiscount;
+  const tax = Math.round((subtotal - discount) * 0.05);
+  
+  // Use shipping charge from backend settings
+  const deliveryCharges = shippingInfo.shippingCharge;
+  const total = subtotal - discount + tax + deliveryCharges;
+
   // Load shipping settings from backend
   useEffect(() => {
     const loadShippingSettings = async () => {
@@ -64,7 +72,7 @@ function Checkout() {
     loadShippingSettings();
   }, []);
 
-  // Check delivery when pincode changes
+  // 🔥 FIXED: Check delivery when pincode changes using backend API
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -76,7 +84,7 @@ function Checkout() {
             body: JSON.stringify({
               pincode: formData.pincode,
               cartTotal: subtotal,
-              isExpress: deliveryMethod === 'express'
+              weight: 0.5
             })
           });
           const data = await response.json();
@@ -107,15 +115,7 @@ function Checkout() {
     
     const timeoutId = setTimeout(checkDelivery, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.pincode, subtotal, deliveryMethod]);
-
-  const subtotal = cartTotal();
-  const discount = couponDiscount;
-  const tax = Math.round((subtotal - discount) * 0.05);
-  
-  // 🔥 Use shipping charge from backend settings
-  const deliveryCharges = shippingInfo.shippingCharge;
-  const total = subtotal - discount + tax + deliveryCharges;
+  }, [formData.pincode, subtotal]);
 
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) {
@@ -224,7 +224,7 @@ function Checkout() {
     window.scrollTo(0, 0);
   };
 
-  // 🔥 Delivery options - User sirf standard vs express choose karega
+  // Delivery options
   const deliveryOptions = [
     { id: 'standard', name: 'Standard Delivery', price: 0 },
     { id: 'express', name: 'Express Delivery', price: 99 },
@@ -246,7 +246,10 @@ function Checkout() {
       }
       return `Expected delivery between ${shippingInfo.estimatedDelivery.minDate} - ${shippingInfo.estimatedDelivery.maxDate}`;
     }
-    return `${shippingInfo.estimatedDelivery.minDays}-${shippingInfo.estimatedDelivery.maxDays} business days`;
+    if (shippingInfo.estimatedDelivery.maxDays) {
+      return `Expected delivery in ${shippingInfo.estimatedDelivery.maxDays} business days`;
+    }
+    return 'Delivery available';
   };
 
   if (orderPlaced) {
