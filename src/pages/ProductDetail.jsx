@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import ReviewSection from '../components/ReviewSection';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -12,15 +13,28 @@ function ProductDetail() {
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
   const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
+  
+  // 🔥 Variant selection
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedDesign, setSelectedDesign] = useState('');
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  
+  // 🔥 Pincode checker
+  const [pincode, setPincode] = useState('');
+  const [deliveryStatus, setDeliveryStatus] = useState(null);
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
 
+  // Load product
   useEffect(() => {
     const loadProduct = async () => {
       if (!id || id === 'undefined') {
@@ -42,6 +56,17 @@ function ProductDetail() {
         if (data && data._id) {
           setProduct(data);
           setSelectedImage(0);
+          
+          // Set default selections
+          if (data.sizes && data.sizes.length > 0) {
+            setSelectedSize(data.sizes[0]);
+          }
+          if (data.colors && data.colors.length > 0) {
+            setSelectedColor(data.colors[0]);
+          }
+          if (data.variants && data.variants.length > 0) {
+            setSelectedVariant(data.variants[0]);
+          }
         } else {
           setProduct(null);
         }
@@ -56,26 +81,92 @@ function ProductDetail() {
     loadProduct();
   }, [id]);
 
-  const decreaseQuantity = () => {
-    if (quantity > 0) {
-      setQuantity(quantity - 1);
-      if (quantity - 1 === 0) {
-        setAddedToCart(false);
+  // Update price when variant changes
+  useEffect(() => {
+    if (product?.variants && product.variants.length > 0) {
+      const matchingVariant = product.variants.find(v => 
+        (!selectedSize || v.size === selectedSize) &&
+        (!selectedColor || v.color === selectedColor)
+      );
+      if (matchingVariant) {
+        setSelectedVariant(matchingVariant);
       }
+    }
+  }, [selectedSize, selectedColor, product]);
+
+  // Pincode delivery check
+  const checkDelivery = async () => {
+    if (!pincode || pincode.length !== 6) {
+      alert('Please enter a valid 6-digit pincode');
+      return;
+    }
+
+    setCheckingDelivery(true);
+    setDeliveryStatus(null);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock response - Replace with Shiprocket API
+      const deliverablePincodes = ['110001', '110002', '110003', '400001', '400002', '560001', '560002', '700001', '600001'];
+      const isDeliverable = deliverablePincodes.includes(pincode);
+      
+      setDeliveryStatus({
+        isDeliverable,
+        message: isDeliverable 
+          ? `✅ Delivery available to PIN ${pincode}. Expected delivery in 3-5 business days.`
+          : `❌ Sorry, delivery is not available to PIN ${pincode} yet.`,
+        estimatedDays: isDeliverable ? '3-5 business days' : null
+      });
+      
+    } catch (error) {
+      setDeliveryStatus({
+        isDeliverable: false,
+        message: 'Unable to check delivery. Please try again later.'
+      });
+    } finally {
+      setCheckingDelivery(false);
+    }
+  };
+
+  const decreaseQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
     }
   };
 
   const increaseQuantity = () => {
-    if (product && quantity < product.stock) {
+    const maxStock = selectedVariant?.stock || product?.stock || 0;
+    if (quantity < maxStock) {
       setQuantity(quantity + 1);
     }
+  };
+
+  const getCurrentPrice = () => {
+    if (selectedVariant?.price) return selectedVariant.price;
+    return product?.price || 0;
+  };
+
+  const getCurrentStock = () => {
+    if (selectedVariant?.stock !== undefined) return selectedVariant.stock;
+    return product?.stock || 0;
   };
 
   const handleCartButtonClick = () => {
     if (!product) return;
     
-    if (quantity === 0) {
+    if (quantity < 1) {
       alert('Please select at least 1 quantity');
+      return;
+    }
+    
+    // Validate selections
+    if (product.sizes?.length > 0 && !selectedSize) {
+      alert('Please select a size');
+      return;
+    }
+    if (product.colors?.length > 0 && !selectedColor) {
+      alert('Please select a color');
       return;
     }
     
@@ -85,11 +176,13 @@ function ProductDetail() {
       addToCart({ 
         id: product._id,
         name: product.name, 
-        price: product.price,
+        price: getCurrentPrice(),
         quantity: quantity,
+        size: selectedSize,
+        color: selectedColor,
         image: product.images && product.images[0] ? product.images[0] : null,
         category: product.category,
-        stock: product.stock
+        stock: getCurrentStock()
       });
       setAddedToCart(true);
     }
@@ -98,19 +191,30 @@ function ProductDetail() {
   const handleBuyNow = () => {
     if (!product) return;
     
-    if (quantity === 0) {
+    if (quantity < 1) {
       alert('Please select at least 1 quantity');
+      return;
+    }
+    
+    if (product.sizes?.length > 0 && !selectedSize) {
+      alert('Please select a size');
+      return;
+    }
+    if (product.colors?.length > 0 && !selectedColor) {
+      alert('Please select a color');
       return;
     }
     
     addToCart({ 
       id: product._id,
       name: product.name, 
-      price: product.price,
+      price: getCurrentPrice(),
       quantity: quantity,
+      size: selectedSize,
+      color: selectedColor,
       image: product.images && product.images[0] ? product.images[0] : null,
       category: product.category,
-      stock: product.stock
+      stock: getCurrentStock()
     });
     navigate('/cart');
   };
@@ -129,13 +233,8 @@ function ProductDetail() {
     ? product.images 
     : ['https://via.placeholder.com/800x800?text=Product+Image'];
 
-  // 🔥 Get description as array (bullet points)
   const getDescriptionBullets = () => {
-    if (product?.description && Array.isArray(product.description)) {
-      return product.description;
-    }
     if (product?.description && typeof product.description === 'string') {
-      // Check if it has bullet points separated by | or new line
       if (product.description.includes('|')) {
         return product.description.split('|').map(b => b.trim());
       }
@@ -145,34 +244,6 @@ function ProductDetail() {
       return [product.description];
     }
     return ['Premium quality product crafted with care.'];
-  };
-
-  // 🔥 Get key features
-  const getKeyFeatures = () => {
-    if (product?.keyFeatures && product.keyFeatures.length > 0) {
-      return product.keyFeatures;
-    }
-    return [
-      'Premium quality',
-      'Suitable for all skin types',
-      'Dermatologically tested',
-      'Cruelty-free',
-      'Paraben free'
-    ];
-  };
-
-  // 🔥 Get specifications
-  const getSpecifications = () => {
-    if (product?.specifications && Object.keys(product.specifications).length > 0) {
-      return product.specifications;
-    }
-    return {
-      'Brand': product?.brand || 'MyPinkShop',
-      'Category': product?.mainCategory || product?.category || 'General',
-      'SKU': product?.sku || product?._id?.slice(-8) || 'N/A',
-      'Return Policy': '7 days return',
-      'Warranty': '1 year manufacturer warranty'
-    };
   };
 
   if (loading) {
@@ -204,27 +275,17 @@ function ProductDetail() {
   }
 
   const descriptionBullets = getDescriptionBullets();
-  const keyFeatures = getKeyFeatures();
-  const specifications = getSpecifications();
-  const isButtonDisabled = product.stock === 0 || quantity === 0;
+  const currentPrice = getCurrentPrice();
+  const currentStock = getCurrentStock();
+  const isButtonDisabled = currentStock === 0 || quantity < 1;
+  const showSizeSelector = product.sizes && product.sizes.length > 0;
+  const showColorSelector = product.colors && product.colors.length > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Premium Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Extra 10% off on first order</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Cash on Delivery Available</span>
-          <span>✨</span>
-        </div>
-      </div>
+      <OfferBanner />
 
-      {/* Premium Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -251,12 +312,12 @@ function ProductDetail() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-              <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
                 {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
-              </Link>
+              </button>
               
               <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,11 +340,11 @@ function ProductDetail() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Home</Link>
-          <span className="text-gray-400 whitespace-nowrap">/</span>
-          <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Shop</Link>
-          <span className="text-gray-400 whitespace-nowrap">/</span>
+        <div className="flex items-center gap-2 text-sm">
+          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+          <span className="text-gray-400">/</span>
+          <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition">Shop</Link>
+          <span className="text-gray-400">/</span>
           <span className="text-pink-600 font-medium truncate">{product.name}</span>
         </div>
       </div>
@@ -353,35 +414,96 @@ function ProductDetail() {
               </div>
               <span className="text-gray-300">|</span>
               <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
-              <span className="text-gray-300">|</span>
-              <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {product.stock > 0 ? `${product.stock} items available` : 'Out of Stock'}
-              </span>
             </div>
 
             <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-2xl sm:text-3xl font-bold text-pink-600">₹{product.price}</span>
-              {product.originalPrice && product.originalPrice > product.price && (
+              <span className="text-2xl sm:text-3xl font-bold text-pink-600">₹{currentPrice}</span>
+              {product.originalPrice && product.originalPrice > currentPrice && (
                 <>
                   <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
                   <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
-                    {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                    {Math.round(((product.originalPrice - currentPrice) / product.originalPrice) * 100)}% OFF
                   </span>
                 </>
               )}
             </div>
 
-            {/* 🔥 REAL DESCRIPTION - Bullet Points */}
+            {/* 🔥 SIZE SELECTOR */}
+            {showSizeSelector && (
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-800 mb-3">
+                  Select Size <span className="text-red-500">*</span>
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {product.sizes.map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => setSelectedSize(size)}
+                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                        selectedSize === size
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
+                          : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 🔥 COLOR SELECTOR */}
+            {showColorSelector && (
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-800 mb-3">Select Color</h3>
+                <div className="flex flex-wrap gap-3">
+                  {product.colors.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setSelectedColor(color)}
+                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                        selectedColor === color
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
+                          : 'border-gray-300 text-gray-700 hover:border-pink-400'
+                      }`}
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 🔥 PINCODE DELIVERY CHECKER */}
             <div className="border-t border-gray-200 pt-4">
-              <h3 className="font-medium text-gray-800 mb-2">Description:</h3>
-              <ul className="space-y-2">
-                {descriptionBullets.map((bullet, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-gray-600 text-sm sm:text-base">
-                    <span className="text-pink-500 mt-0.5">•</span>
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
+              <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <input 
+                    type="text" 
+                    placeholder="Enter Pincode" 
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength="6"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 text-sm"
+                  />
+                </div>
+                <button 
+                  onClick={checkDelivery}
+                  disabled={checkingDelivery || pincode.length !== 6}
+                  className="px-5 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg text-sm font-medium hover:shadow-lg transition disabled:opacity-50"
+                >
+                  {checkingDelivery ? 'Checking...' : 'Check'}
+                </button>
+              </div>
+              {deliveryStatus && (
+                <div className={`mt-3 p-3 rounded-lg text-sm ${deliveryStatus.isDeliverable ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                  {deliveryStatus.message}
+                  {deliveryStatus.estimatedDays && (
+                    <p className="text-xs mt-1 opacity-75">⏱️ Estimated: {deliveryStatus.estimatedDays}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Quantity Selector */}
@@ -391,12 +513,9 @@ function ProductDetail() {
                 <div className="flex items-center border border-gray-300 rounded-full">
                   <button onClick={decreaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium">-</button>
                   <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
-                  <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= product.stock}>+</button>
+                  <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= currentStock}>+</button>
                 </div>
-                <span className="text-xs sm:text-sm text-gray-500">
-                  {product.stock > 0 ? `${product.stock} items available` : 'Out of stock'}
-                  {quantity === 0 && <span className="text-amber-500 ml-2">⚠ Select quantity</span>}
-                </span>
+                {quantity === 0 && <span className="text-amber-500 text-sm">⚠ Select quantity</span>}
               </div>
             </div>
 
@@ -428,14 +547,48 @@ function ProductDetail() {
               </button>
             </div>
 
-            {/* 🔥 REAL Product Details Box */}
+            {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
-              {Object.entries(specifications).map(([key, value], idx) => (
-                <div key={idx} className="flex flex-wrap justify-between py-1 gap-2">
-                  <span className="text-gray-500">{key}:</span>
-                  <span className="text-gray-800 font-medium text-right">{String(value)}</span>
+              <div className="flex flex-wrap justify-between py-1 gap-2">
+                <span className="text-gray-500">Brand:</span>
+                <span className="text-gray-800 font-medium text-right">{product.brand || 'MyPinkShop'}</span>
+              </div>
+              <div className="flex flex-wrap justify-between py-1 gap-2">
+                <span className="text-gray-500">Category:</span>
+                <span className="text-gray-800 capitalize text-right">{product.mainCategory || product.category || 'General'}</span>
+              </div>
+              {product.fabric && (
+                <div className="flex flex-wrap justify-between py-1 gap-2">
+                  <span className="text-gray-500">Fabric:</span>
+                  <span className="text-gray-800 text-right">{product.fabric}</span>
                 </div>
-              ))}
+              )}
+              {product.material && (
+                <div className="flex flex-wrap justify-between py-1 gap-2">
+                  <span className="text-gray-500">Material:</span>
+                  <span className="text-gray-800 text-right">{product.material}</span>
+                </div>
+              )}
+              {selectedSize && (
+                <div className="flex flex-wrap justify-between py-1 gap-2 border-t border-gray-200 pt-2 mt-1">
+                  <span className="text-gray-500">Selected Size:</span>
+                  <span className="text-gray-800 font-medium text-right">{selectedSize}</span>
+                </div>
+              )}
+              {selectedColor && (
+                <div className="flex flex-wrap justify-between py-1 gap-2">
+                  <span className="text-gray-500">Selected Color:</span>
+                  <span className="text-gray-800 font-medium text-right">{selectedColor}</span>
+                </div>
+              )}
+              <div className="flex flex-wrap justify-between py-1 gap-2">
+                <span className="text-gray-500">SKU:</span>
+                <span className="text-gray-800 text-right">{selectedVariant?.sku || product.sku || product._id?.slice(-8) || 'N/A'}</span>
+              </div>
+              <div className="flex flex-wrap justify-between py-1 gap-2">
+                <span className="text-gray-500">Return Policy:</span>
+                <span className="text-gray-800 text-right">7 days return</span>
+              </div>
             </div>
           </div>
         </div>
@@ -457,7 +610,6 @@ function ProductDetail() {
           </div>
 
           <div className="py-6">
-            {/* 🔥 DESCRIPTION TAB - Bullet Points */}
             {activeTab === 'description' && (
               <div className="space-y-4">
                 <ul className="space-y-3">
@@ -475,10 +627,9 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 KEY FEATURES TAB */}
             {activeTab === 'features' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {keyFeatures.map((feature, idx) => (
+                {(product.keyFeatures || ['Premium quality', 'Suitable for all', 'Dermatologically tested', 'Cruelty-free']).map((feature, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-3 sm:p-4 bg-pink-50 rounded-xl">
                     <span className="text-pink-500 text-lg sm:text-xl">✓</span>
                     <span className="text-gray-700 text-sm sm:text-base">{feature}</span>
@@ -487,12 +638,11 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 SPECIFICATIONS TAB */}
             {activeTab === 'specifications' && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm min-w-[300px]">
                   <tbody className="divide-y divide-gray-200">
-                    {Object.entries(specifications).map(([key, value], idx) => (
+                    {Object.entries(product.specifications || {}).map(([key, value], idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                         <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
                         <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600 text-sm">{String(value)}</td>
@@ -526,10 +676,10 @@ function ProductDetail() {
             <div>
               <h4 className="font-semibold text-white mb-4">Shop</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link to="/shop?category=skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/shop?category=makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/shop?category=clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/shop?category=accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
               </ul>
             </div>
             <div>
