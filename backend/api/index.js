@@ -44,7 +44,7 @@ app.options('*', (req, res) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+  res.header('Access-Control-Max-Age', '86400');
   res.sendStatus(200);
 });
 
@@ -108,7 +108,6 @@ const productSchema = new mongoose.Schema({
   status: { type: String, default: 'active' },
   adminApproved: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
-  // 🔥 New fields for variants
   sizes: { type: [String], default: [] },
   colors: { type: [String], default: [] },
   variants: { type: Array, default: [] },
@@ -449,7 +448,6 @@ app.post('/api/offers/create', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
-// ✅ UPDATE OFFER ROUTE
 app.put('/api/offers/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -496,6 +494,143 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== SHIPPING ROUTES ==========
+
+// Shipping settings (in-memory - can be moved to DB later)
+let shippingSettings = {
+  defaultDays: [3, 7],
+  expressDays: [1, 3],
+  freeShippingThreshold: 999,
+  shippingCharges: 50,
+  expressCharges: 99,
+  codCharges: 30,
+  deliverablePincodes: ['110001', '110002', '110003', '400001', '400002', '560001', '560002', '700001', '600001'],
+  cutOffTime: '16:00',
+  sundayDelivery: false,
+  warehouseAddress: {
+    pincode: '110001',
+    city: 'New Delhi',
+    state: 'Delhi'
+  }
+};
+
+// 📍 Check delivery availability and get estimated date (Public)
+app.post('/api/shipping/check-delivery', async (req, res) => {
+  try {
+    const { pincode, cartTotal, isExpress } = req.body;
+    
+    // Check if pincode is serviceable
+    const isServiceable = shippingSettings.deliverablePincodes.length === 0 || 
+                          shippingSettings.deliverablePincodes.includes(pincode);
+    
+    if (!isServiceable) {
+      return res.json({
+        success: false,
+        deliverable: false,
+        message: 'Sorry, delivery is not available at this pincode yet.'
+      });
+    }
+    
+    // Calculate shipping charges
+    let shippingCharge = 0;
+    let shippingType = 'standard';
+    
+    if (cartTotal >= shippingSettings.freeShippingThreshold) {
+      shippingCharge = 0;
+    } else if (isExpress) {
+      shippingCharge = shippingSettings.expressCharges;
+      shippingType = 'express';
+    } else {
+      shippingCharge = shippingSettings.shippingCharges;
+    }
+    
+    // Calculate estimated delivery date
+    const daysToAdd = isExpress ? shippingSettings.expressDays[1] : shippingSettings.defaultDays[1];
+    const minDays = isExpress ? shippingSettings.expressDays[0] : shippingSettings.defaultDays[0];
+    
+    let estimatedDate = new Date();
+    let daysAdded = 0;
+    let actualDays = 0;
+    
+    // Skip Sundays if not available
+    while (daysAdded < daysToAdd) {
+      estimatedDate.setDate(estimatedDate.getDate() + 1);
+      if (estimatedDate.getDay() !== 0 || shippingSettings.sundayDelivery) {
+        daysAdded++;
+        actualDays++;
+      }
+    }
+    
+    const minEstimatedDate = new Date();
+    let minDaysAdded = 0;
+    while (minDaysAdded < minDays) {
+      minEstimatedDate.setDate(minEstimatedDate.getDate() + 1);
+      if (minEstimatedDate.getDay() !== 0 || shippingSettings.sundayDelivery) {
+        minDaysAdded++;
+      }
+    }
+    
+    res.json({
+      success: true,
+      deliverable: true,
+      shippingCharge,
+      shippingType,
+      estimatedDelivery: {
+        minDate: minEstimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        maxDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        minDays: minDays,
+        maxDays: actualDays
+      },
+      freeShippingThreshold: shippingSettings.freeShippingThreshold,
+      cutOffTime: shippingSettings.cutOffTime
+    });
+    
+  } catch (error) {
+    console.error('Delivery check error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 📦 Get shipping settings (Public - limited info, Admin - full info)
+app.get('/api/shipping/settings', async (req, res) => {
+  try {
+    // Check if user is admin
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.role === 'admin') {
+          return res.json({ success: true, settings: shippingSettings });
+        }
+      } catch (e) {
+        // Token invalid, return public info
+      }
+    }
+    
+    // Public info (limited)
+    res.json({ 
+      success: true, 
+      settings: {
+        freeShippingThreshold: shippingSettings.freeShippingThreshold,
+        cutOffTime: shippingSettings.cutOffTime
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 📦 Update shipping settings (Admin only)
+app.post('/api/shipping/settings', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    shippingSettings = { ...shippingSettings, ...req.body };
+    res.json({ success: true, settings: shippingSettings });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
