@@ -6,14 +6,50 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 
-// ✅ CORS - Updated with all domains
+// ✅ CORS - Chrome compatible with function-based origin
 app.use(cors({
-  origin: ['https://mypinkshop.vercel.app', 'https://mypinkshop.com', 'https://www.mypinkshop.com', 'http://localhost:3000'],
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'https://mypinkshop.vercel.app',
+      'https://mypinkshop.com',
+      'https://www.mypinkshop.com',
+      'http://localhost:3000'
+    ];
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
-app.use(express.json());
+
+// ✅ Explicit OPTIONS handler for preflight requests (Chrome CORS Fix)
+app.options('*', (req, res) => {
+  const allowedOrigins = [
+    'https://mypinkshop.vercel.app',
+    'https://mypinkshop.com',
+    'https://www.mypinkshop.com',
+    'http://localhost:3000'
+  ];
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+  res.sendStatus(200);
+});
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // ========== MongoDB Connection ==========
 let isConnected = false;
@@ -71,7 +107,16 @@ const productSchema = new mongoose.Schema({
   isNew: { type: Boolean, default: false },
   status: { type: String, default: 'active' },
   adminApproved: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  // 🔥 New fields for variants
+  sizes: { type: [String], default: [] },
+  colors: { type: [String], default: [] },
+  variants: { type: Array, default: [] },
+  fabric: { type: String, default: '' },
+  material: { type: String, default: '' },
+  gender: { type: String, default: 'unisex' },
+  weight: { type: String, default: '' },
+  dimensions: { type: String, default: '' }
 });
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
@@ -220,6 +265,14 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       description: req.body.description || '',
       shortDescription: req.body.shortDescription || '',
       keyFeatures: req.body.keyFeatures || [],
+      sizes: req.body.sizes || [],
+      colors: req.body.colors || [],
+      variants: req.body.variants || [],
+      fabric: req.body.fabric || '',
+      material: req.body.material || '',
+      gender: req.body.gender || 'unisex',
+      weight: req.body.weight || '',
+      dimensions: req.body.dimensions || '',
       isNew: true,
       status: 'active',
       adminApproved: req.user?.role === 'admin'
@@ -244,6 +297,9 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
     if (req.body.status !== undefined) product.status = req.body.status;
     if (req.body.price !== undefined) product.price = req.body.price;
     if (req.body.name !== undefined) product.name = req.body.name;
+    if (req.body.sizes !== undefined) product.sizes = req.body.sizes;
+    if (req.body.colors !== undefined) product.colors = req.body.colors;
+    if (req.body.variants !== undefined) product.variants = req.body.variants;
     
     await product.save();
     res.json({ success: true, product });
@@ -393,7 +449,7 @@ app.post('/api/offers/create', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
-// ✅ UPDATE OFFER ROUTE - FIXED (ADDED)
+// ✅ UPDATE OFFER ROUTE
 app.put('/api/offers/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
