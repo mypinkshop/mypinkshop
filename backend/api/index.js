@@ -9,7 +9,12 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['https://mypinkshop.vercel.app', 'https://mypinkshop.com', 'http://localhost:3000', 'http://localhost:5000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -79,9 +84,25 @@ const bannerSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// 🔥 OFFER SCHEMA
+const offerSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  isActive: { type: Boolean, default: true },
+  type: { type: String, enum: ['top_banner', 'popup', 'coupon'], default: 'top_banner' },
+  discountType: { type: String, enum: ['percentage', 'fixed'], default: 'percentage' },
+  discountValue: { type: Number, default: 10 },
+  minOrderValue: { type: Number, default: 999 },
+  startDate: { type: Date, default: Date.now },
+  endDate: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.model('User', userSchema);
 const Product = mongoose.model('Product', productSchema);
 const Banner = mongoose.model('Banner', bannerSchema);
+const Offer = mongoose.model('Offer', offerSchema);
 
 // ========== R2 Upload Service ==========
 const AWS = require('aws-sdk');
@@ -217,18 +238,157 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// ========== OFFER ROUTES ==========
+
+// ✅ Get active offer for top banner (Public)
+app.get('/api/offers/active-offer', async (req, res) => {
+  try {
+    await connectDB();
+    const currentDate = new Date();
+    const offer = await Offer.findOne({
+      isActive: true,
+      type: 'top_banner',
+      startDate: { $lte: currentDate },
+      $or: [
+        { endDate: { $gte: currentDate } },
+        { endDate: null }
+      ]
+    }).sort({ createdAt: -1 });
+    
+    res.json(offer || {
+      title: 'Free Shipping',
+      description: 'FREE SHIPPING ON ORDERS ABOVE ₹999 • EXTRA 10% OFF ON FIRST ORDER',
+      discountValue: 10,
+      minOrderValue: 999
+    });
+  } catch (error) {
+    console.error('Error in /active-offer:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Get all offers (Admin only)
+app.get('/api/offers/all', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const offers = await Offer.find().sort({ createdAt: -1 });
+    res.json(offers);
+  } catch (error) {
+    console.error('Error in /all:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Create new offer (Admin only)
+app.post('/api/offers/create', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { title, description, discountType, discountValue, minOrderValue, startDate, endDate, type } = req.body;
+    
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
+    
+    const offer = new Offer({
+      title,
+      description,
+      type: type || 'top_banner',
+      discountType: discountType || 'percentage',
+      discountValue: discountValue || 10,
+      minOrderValue: minOrderValue || 999,
+      startDate: startDate || new Date(),
+      endDate: endDate || null,
+      isActive: true
+    });
+    
+    await offer.save();
+    res.status(201).json({ success: true, offer });
+  } catch (error) {
+    console.error('Error in /create:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Update offer (Admin only)
+app.put('/api/offers/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { title, description, discountType, discountValue, minOrderValue, startDate, endDate, isActive } = req.body;
+    
+    const offer = await Offer.findByIdAndUpdate(
+      req.params.id,
+      {
+        title,
+        description,
+        discountType,
+        discountValue,
+        minOrderValue,
+        startDate,
+        endDate,
+        isActive,
+        updatedAt: new Date()
+      },
+      { new: true, runValidators: true }
+    );
+    
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+    
+    res.json({ success: true, offer });
+  } catch (error) {
+    console.error('Error in /update:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Toggle offer status (Admin only)
+app.patch('/api/offers/toggle/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const offer = await Offer.findById(req.params.id);
+    
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+    
+    offer.isActive = !offer.isActive;
+    offer.updatedAt = new Date();
+    await offer.save();
+    
+    res.json({ success: true, isActive: offer.isActive });
+  } catch (error) {
+    console.error('Error in /toggle:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Delete offer (Admin only)
+app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const offer = await Offer.findByIdAndDelete(req.params.id);
+    
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in /delete:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== AUTH ROUTES ==========
 
-// ✅ REGISTER ROUTE - PERMANENTLY DISABLED FOR SECURITY
 app.post('/api/auth/register', async (req, res) => {
   return res.status(403).json({ 
     success: false,
-    message: 'Public registration is disabled. Please contact admin to create an account.',
-    note: 'Admin can create users via MongoDB Atlas only'
+    message: 'Public registration is disabled. Please contact admin to create an account.'
   });
 });
 
-// ✅ LOGIN ROUTE - Active
 app.post('/api/auth/login', async (req, res) => {
   try {
     await connectDB();
@@ -236,7 +396,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'No account found with this email. Please contact admin.' });
+      return res.status(401).json({ message: 'No account found with this email.' });
     }
     
     const isMatch = await user.matchPassword(password);
@@ -256,17 +416,15 @@ app.post('/api/auth/login', async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      token,
-      message: 'Login successful! Welcome back.'
+      token
     });
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong. Please try again later.' });
+    res.status(500).json({ message: 'Something went wrong.' });
   }
 });
 
 // ========== PRODUCT ROUTES ==========
 
-// ✅ PUBLIC ROUTE - No authentication required (for homepage)
 app.get('/api/products', async (req, res) => {
   try {
     await connectDB();
@@ -277,7 +435,6 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Protected route for single product
 app.get('/api/products/:id', async (req, res) => {
   try {
     await connectDB();
@@ -291,7 +448,6 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// Add product - requires authentication
 app.post('/api/products', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'vendor') {
     return res.status(403).json({ message: 'Only sellers can add products' });
@@ -302,24 +458,15 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     
     const product = new Product({
       name: req.body.name,
-      brand: req.body.brand || req.body.vendorName || '',
-      vendorName: req.body.vendorName || req.body.brand || '',
+      brand: req.body.brand || '',
       category: req.body.category,
       mainCategory: req.body.mainCategory || '',
       price: req.body.price,
       originalPrice: req.body.originalPrice || req.body.price * 1.2,
       stock: req.body.stock || 0,
       images: req.body.images || [],
-      shortDescription: req.body.shortDescription || '',
       description: req.body.description || '',
       keyFeatures: req.body.keyFeatures || [],
-      specifications: req.body.specifications || {},
-      weight: req.body.weight || '',
-      dimensions: req.body.dimensions || '',
-      shippingCharges: req.body.shippingCharges || 0,
-      seoTitle: req.body.seoTitle || '',
-      seoDescription: req.body.seoDescription || '',
-      seoKeywords: req.body.seoKeywords || '',
       badge: req.body.badge || '',
       rating: req.body.rating || 4.0,
       status: 'active',
@@ -328,10 +475,10 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     });
     
     await product.save();
-    res.json({ success: true, product, message: 'Product added successfully!' });
+    res.json({ success: true, product });
   } catch (error) {
     console.error('Add product error:', error);
-    res.status(500).json({ success: false, message: 'Failed to add product. Please try again.' });
+    res.status(500).json({ success: false, message: 'Failed to add product' });
   }
 });
 
@@ -346,13 +493,11 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
     
     if (req.body.stock !== undefined) product.stock = req.body.stock;
     if (req.body.status !== undefined) product.status = req.body.status;
-    if (req.body.adminApproved !== undefined) product.adminApproved = req.body.adminApproved;
     if (req.body.price !== undefined) product.price = req.body.price;
     if (req.body.name !== undefined) product.name = req.body.name;
-    if (req.body.brand !== undefined) product.brand = req.body.brand;
     
     await product.save();
-    res.json({ success: true, product, message: 'Product updated successfully!' });
+    res.json({ success: true, product });
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ success: false, message: 'Failed to update product' });
@@ -408,7 +553,7 @@ app.post('/api/banners', authMiddleware, adminMiddleware, upload.array('images',
     });
     
     await banner.save();
-    res.json({ success: true, banner, message: 'Banner added successfully!' });
+    res.json({ success: true, banner });
   } catch (error) {
     console.error('Add banner error:', error);
     res.status(500).json({ success: false, message: 'Failed to add banner' });
@@ -444,7 +589,7 @@ app.put('/api/banners/:id', authMiddleware, adminMiddleware, upload.array('image
     }
     
     await banner.save();
-    res.json({ success: true, banner, message: 'Banner updated successfully!' });
+    res.json({ success: true, banner });
   } catch (error) {
     console.error('Update banner error:', error);
     res.status(500).json({ success: false, message: 'Failed to update banner' });
@@ -481,21 +626,18 @@ app.post('/api/upload', authMiddleware, upload.array('images', 5), async (req, r
         const result = await uploadToR2(file, 'products');
         if (result.success) {
           imageUrls.push(result.url);
-        } else {
-          console.error('Upload failed:', result.error);
         }
       }
     }
     
     if (imageUrls.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images uploaded. Please select images.' });
+      return res.status(400).json({ success: false, message: 'No images uploaded.' });
     }
     
     res.json({ 
       success: true, 
       url: imageUrls[0],
-      urls: imageUrls,
-      message: 'Images uploaded successfully!'
+      urls: imageUrls
     });
   } catch (error) {
     console.error('Upload error:', error);
