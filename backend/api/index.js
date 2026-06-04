@@ -65,7 +65,7 @@ const connectDB = async () => {
   }
 };
 
-// ========== Shiprocket Service (Real API) ==========
+// ========== Shiprocket Service ==========
 class ShiprocketService {
   constructor() {
     this.baseURL = 'https://apiv2.shiprocket.in/v1/external';
@@ -573,55 +573,28 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// ========== SHIPPING ROUTES (REAL SHIPROCKET API) ==========
-
-// 📍 Check delivery availability with REAL Shiprocket API
+// ========== SHIPPING ROUTES ==========
 app.post('/api/shipping/check-delivery', async (req, res) => {
   try {
     const { pincode, cartTotal, weight = 0.5 } = req.body;
     const pickupPincode = '208021';
     
-    console.log('📦 Checking delivery for pincode:', pincode);
-    console.log('🔑 SHIPROCKET_EMAIL:', process.env.SHIPROCKET_EMAIL ? 'Set' : 'NOT SET');
-    console.log('🔑 SHIPROCKET_PASSWORD:', process.env.SHIPROCKET_PASSWORD ? 'Set' : 'NOT SET');
-    
     let delivery;
     let useMock = false;
     
     try {
-      // First, ensure we have a valid token
       await shiprocket.getAuthToken();
-      
-      // Then check serviceability
       delivery = await shiprocket.getEstimatedDelivery(pickupPincode, pincode, weight);
-      console.log('✅ Shiprocket response:', JSON.stringify(delivery, null, 2));
       
       if (!delivery.deliverable) {
-        console.log('⚠️ No courier available, using mock data');
         useMock = true;
       }
     } catch (shiprocketError) {
-      console.error('❌ Shiprocket API error:', shiprocketError.message);
-      if (shiprocketError.response) {
-        console.error('Response data:', shiprocketError.response.data);
-      }
+      console.error('Shiprocket API error:', shiprocketError.message);
       useMock = true;
     }
     
-    // 🔥 FALLBACK - Mock data if Shiprocket fails
     if (useMock || !delivery || !delivery.deliverable) {
-      // Allow ALL pincodes for now (empty array = all pincodes allowed)
-      const mockDeliverablePincodes = []; // Empty means all pincodes allowed
-      const isDeliverable = mockDeliverablePincodes.length === 0 || mockDeliverablePincodes.includes(pincode);
-      
-      if (!isDeliverable) {
-        return res.json({
-          success: false,
-          deliverable: false,
-          message: 'Sorry, delivery is not available at this pincode.'
-        });
-      }
-      
       const estimatedDate = new Date();
       estimatedDate.setDate(estimatedDate.getDate() + 5);
       const minDate = new Date();
@@ -645,12 +618,10 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
         },
         courierName: 'Standard Delivery',
         freeShippingThreshold: freeShippingThreshold,
-        cutOffTime: '16:00',
-        note: 'Using fallback (Shiprocket API not available)'
+        cutOffTime: '16:00'
       });
     }
     
-    // Free shipping threshold
     const freeShippingThreshold = 999;
     let shippingCharge = delivery.shippingCharge;
     if (cartTotal >= freeShippingThreshold) {
@@ -673,12 +644,11 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Delivery check error:', error);
+    console.error('Delivery check error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 📦 Get shipping settings (Public)
 app.get('/api/shipping/settings', async (req, res) => {
   res.json({
     success: true,
@@ -687,6 +657,142 @@ app.get('/api/shipping/settings', async (req, res) => {
       cutOffTime: '16:00'
     }
   });
+});
+
+// ========== COUPON ROUTES ==========
+const Coupon = require('../models/Coupon');
+
+// Validate coupon (Public)
+app.post('/api/coupons/validate', async (req, res) => {
+  try {
+    const { code, cartTotal } = req.body;
+    const couponCode = code.toUpperCase();
+    
+    const coupon = await Coupon.findOne({ 
+      code: couponCode, 
+      isActive: true,
+      startDate: { $lte: new Date() },
+      $or: [
+        { endDate: { $gte: new Date() } },
+        { endDate: null }
+      ]
+    });
+    
+    if (!coupon) {
+      return res.json({ valid: false, message: 'Invalid coupon code' });
+    }
+    
+    if (coupon.usedCount >= coupon.usageLimit) {
+      return res.json({ valid: false, message: 'Coupon usage limit exceeded' });
+    }
+    
+    if (cartTotal < coupon.minOrderValue) {
+      return res.json({ valid: false, message: `Minimum order of ₹${coupon.minOrderValue} required` });
+    }
+    
+    let discountAmount = 0;
+    if (coupon.discountType === 'percentage') {
+      discountAmount = (cartTotal * coupon.discountValue) / 100;
+      if (coupon.maxDiscount > 0 && discountAmount > coupon.maxDiscount) {
+        discountAmount = coupon.maxDiscount;
+      }
+    } else {
+      discountAmount = coupon.discountValue;
+      if (discountAmount > cartTotal) discountAmount = cartTotal;
+    }
+    
+    res.json({
+      valid: true,
+      coupon: {
+        id: coupon._id,
+        code: coupon.code,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        discountAmount: Math.round(discountAmount),
+        minOrderValue: coupon.minOrderValue
+      }
+    });
+    
+  } catch (error) {
+    console.error('Coupon validation error:', error);
+    res.status(500).json({ valid: false, message: 'Server error' });
+  }
+});
+
+// Get all coupons (Admin only)
+app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    res.json(coupons);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create coupon (Admin only)
+app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { code, description, discountType, discountValue, minOrderValue, maxDiscount, usageLimit, startDate, endDate } = req.body;
+    
+    const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
+    if (existingCoupon) {
+      return res.status(400).json({ error: 'Coupon code already exists' });
+    }
+    
+    const coupon = new Coupon({
+      code: code.toUpperCase(),
+      description,
+      discountType,
+      discountValue,
+      minOrderValue: minOrderValue || 0,
+      maxDiscount: maxDiscount || 0,
+      usageLimit: usageLimit || 1,
+      startDate: startDate || new Date(),
+      endDate: endDate || null,
+      isActive: true
+    });
+    
+    await coupon.save();
+    res.status(201).json({ success: true, coupon });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update coupon (Admin only)
+app.put('/api/coupons/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const coupon = await Coupon.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedAt: new Date() },
+      { new: true }
+    );
+    res.json({ success: true, coupon });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle coupon status (Admin only)
+app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const coupon = await Coupon.findById(req.params.id);
+    coupon.isActive = !coupon.isActive;
+    await coupon.save();
+    res.json({ success: true, isActive: coupon.isActive });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete coupon (Admin only)
+app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await Coupon.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = app;
