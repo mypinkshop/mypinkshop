@@ -31,11 +31,7 @@ import AdminBanners from './pages/admin/AdminBanners';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminEditProduct from './pages/admin/AdminEditProduct';
 import AdminOffers from './pages/admin/AdminOffers';
-
-
-// 🔥 NEW IMPORTS - Bulk Upload Pages
 import AdminBulkUpload from './pages/admin/AdminBulkUpload';
-import VendorBulkUpload from './pages/vendor/VendorBulkUpload';
 
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
@@ -58,6 +54,7 @@ import VendorOrderReports from './pages/vendor/VendorOrderReports';
 import VendorUserPermissions from './pages/vendor/VendorUserPermissions';
 import VendorFBA from './pages/vendor/VendorFBA';
 import VendorStoreBuilder from './pages/vendor/VendorStoreBuilder';
+import VendorBulkUpload from './pages/vendor/VendorBulkUpload';
 
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -110,10 +107,9 @@ function App() {
               <Route path="/accessories" element={<AccessoriesPage />} />
               <Route path="/hair" element={<HairPage />} />
 
-              {/* 🔥 ADMIN ROUTES - Bulk Upload added */}
+              {/* 🔥 ADMIN ROUTES */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />  {/* 🔥 NEW */}
               <Route path="/admin/vendors" element={<AdminVendors />} />
               <Route path="/admin/brand-applications" element={<AdminBrandApplications />} />
               <Route path="/admin/products" element={<AdminProducts />} />
@@ -133,13 +129,13 @@ function App() {
               <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
               <Route path="/admin/reviews" element={<AdminReviews />} />
               <Route path="/admin/offers" element={<AdminOffers />} />
+              <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
 
-              {/* 🔥 VENDOR ROUTES - Bulk Upload added */}
+              {/* 🔥 VENDOR ROUTES */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
               <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
               <Route path="/vendor/dashboard" element={<VendorDashboard />} />
-              <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />  {/* 🔥 NEW */}
               <Route path="/vendor/business-details" element={<VendorBusinessDetails />} />
               <Route path="/vendor/products" element={<VendorProducts />} />
               <Route path="/vendor/add-product" element={<VendorAddProduct />} />
@@ -157,6 +153,7 @@ function App() {
               <Route path="/vendor/permissions" element={<VendorUserPermissions />} />
               <Route path="/vendor/fba" element={<VendorFBA />} />
               <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
+              <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />
             </Routes>
           </ReviewProvider>
         </CartProvider>
