@@ -579,7 +579,7 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
 app.post('/api/shipping/check-delivery', async (req, res) => {
   try {
     const { pincode, cartTotal, weight = 0.5 } = req.body;
-    const pickupPincode = '110001';
+    const pickupPincode = '208021';
     
     console.log('📦 Checking delivery for pincode:', pincode);
     console.log('🔑 SHIPROCKET_EMAIL:', process.env.SHIPROCKET_EMAIL ? 'Set' : 'NOT SET');
@@ -589,8 +589,12 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
     let useMock = false;
     
     try {
+      // First, ensure we have a valid token
+      await shiprocket.getAuthToken();
+      
+      // Then check serviceability
       delivery = await shiprocket.getEstimatedDelivery(pickupPincode, pincode, weight);
-      console.log('✅ Shiprocket response:', delivery);
+      console.log('✅ Shiprocket response:', JSON.stringify(delivery, null, 2));
       
       if (!delivery.deliverable) {
         console.log('⚠️ No courier available, using mock data');
@@ -598,13 +602,17 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
       }
     } catch (shiprocketError) {
       console.error('❌ Shiprocket API error:', shiprocketError.message);
+      if (shiprocketError.response) {
+        console.error('Response data:', shiprocketError.response.data);
+      }
       useMock = true;
     }
     
     // 🔥 FALLBACK - Mock data if Shiprocket fails
     if (useMock || !delivery || !delivery.deliverable) {
-      const mockDeliverablePincodes = ['110001', '110002', '110003', '400001', '400002', '400072', '560001', '560002', '700001', '600001', '800001', '500001'];
-      const isDeliverable = mockDeliverablePincodes.includes(pincode);
+      // Allow ALL pincodes for now (empty array = all pincodes allowed)
+      const mockDeliverablePincodes = []; // Empty means all pincodes allowed
+      const isDeliverable = mockDeliverablePincodes.length === 0 || mockDeliverablePincodes.includes(pincode);
       
       if (!isDeliverable) {
         return res.json({
@@ -654,7 +662,9 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
       deliverable: true,
       shippingCharge: shippingCharge,
       estimatedDelivery: {
+        minDate: delivery.estimatedDate,
         maxDate: delivery.estimatedDate,
+        minDays: delivery.estimatedDays,
         maxDays: delivery.estimatedDays
       },
       courierName: delivery.courierName,
