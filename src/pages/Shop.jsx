@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
 // ✅ FIXED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
@@ -20,7 +21,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       stock: product.stock
     });
     setIsAdded(true);
-    // Reset after 2 seconds so button can be used again
     setTimeout(() => setIsAdded(false), 2000);
   };
 
@@ -144,6 +144,8 @@ function Shop() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -157,9 +159,13 @@ function Shop() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
+    const search = params.get('search');
     const offer = params.get('offer');
     const sort = params.get('sort');
     
+    if (search) {
+      setSearchTerm(search);
+    }
     if (category && category !== 'all') {
       setSelectedCategory(category);
     }
@@ -184,7 +190,6 @@ function Shop() {
           data = data.filter(p => p.badge === 'Sale');
         }
         
-        // Transform products to have consistent id
         const transformedData = data.map(p => ({
           ...p,
           id: p._id,
@@ -203,7 +208,32 @@ function Shop() {
     loadProducts();
   }, [location]);
 
-  // 🔥 FIXED FILTERS - using useMemo for performance
+  // Handle search with autocomplete
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    if (value.length > 1) {
+      const suggestions = products
+        .filter(p => p.name?.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 5)
+        .map(p => p.name);
+      setSearchSuggestions(suggestions);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSearch = () => {
+    if (searchTerm) {
+      navigate(`/shop?search=${encodeURIComponent(searchTerm)}`);
+    } else {
+      navigate('/shop');
+    }
+  };
+
+  // 🔥 FIXED FILTERS
   useEffect(() => {
     let filtered = [...products];
 
@@ -214,7 +244,7 @@ function Shop() {
       );
     }
     
-    // 🔥 FIXED Category filter - check both mainCategory and category
+    // Category filter
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => {
         const productCategory = (p.mainCategory || p.category || '').toLowerCase();
@@ -227,9 +257,9 @@ function Shop() {
     const max = maxPrice ? parseFloat(maxPrice) : Infinity;
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
     
-    // Rating filter
+    // Rating filter - All stars working
     if (selectedRating > 0) {
-      filtered = filtered.filter(p => (p.rating || 4) >= selectedRating);
+      filtered = filtered.filter(p => Math.floor(p.rating || 4) >= selectedRating);
     }
     
     // Sorting
@@ -263,7 +293,6 @@ function Shop() {
     navigate('/shop');
   };
 
-  // Category chips
   const categoryChips = [
     { id: 'all', name: 'All', icon: '✨' },
     { id: 'skincare', name: 'Skincare', icon: '🧴' },
@@ -273,7 +302,6 @@ function Shop() {
     { id: 'accessories', name: 'Accessories', icon: '👜' },
   ];
 
-  // 🔥 FIXED Categories count
   const categories = useMemo(() => [
     { id: 'all', name: 'All Products', count: products.length },
     { id: 'skincare', name: 'Skincare', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'skincare').length },
@@ -297,18 +325,8 @@ function Shop() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Premium Top Bar */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-          <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Extra 10% off on first order</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Cash on Delivery Available</span>
-          <span>✨</span>
-        </div>
-      </div>
+      {/* 🔥 OFFER BANNER ADDED */}
+      <OfferBanner />
 
       {/* Premium Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
@@ -324,16 +342,45 @@ function Shop() {
               </div>
             </Link>
 
+            {/* 🔥 SEARCH BAR WITH AUTOCOMPLETE */}
             <div className="flex-1 max-w-md lg:max-w-2xl">
               <div className="relative">
                 <input 
                   type="text" 
                   placeholder="Search for products..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
+                  onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+                
+                {/* Autocomplete Suggestions */}
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                    {searchSuggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSearchTerm(suggestion);
+                          setShowSuggestions(false);
+                          handleSearch();
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
+                      >
+                        🔍 {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                <button 
+                  onClick={handleSearch}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                >
+                  <span className="hidden sm:inline">Search</span>
+                  <span className="sm:hidden">🔍</span>
+                </button>
               </div>
             </div>
 
@@ -411,7 +458,6 @@ function Shop() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         
-        {/* Mobile Filter Button */}
         <button 
           onClick={() => setShowFilters(!showFilters)} 
           className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
@@ -424,7 +470,6 @@ function Shop() {
           {/* Left Sidebar - Filters */}
           <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 lg:w-96 space-y-5`}>
             
-            {/* Categories */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <span className="text-pink-500">✨</span> Categories
@@ -451,7 +496,6 @@ function Shop() {
               </div>
             </div>
 
-            {/* Price Range */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <span className="text-pink-500">💰</span> Price Range
@@ -478,13 +522,13 @@ function Shop() {
               </div>
             </div>
 
-            {/* Rating Filter */}
+            {/* 🔥 FIXED RATING FILTER - All Stars */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <span className="text-pink-500">⭐</span> Rating
               </h3>
               <div className="space-y-2">
-                {[4, 3].map(r => (
+                {[5, 4, 3, 2, 1].map(r => (
                   <label key={r} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
                     <input 
                       type="radio" 
@@ -512,7 +556,6 @@ function Shop() {
               </div>
             </div>
 
-            {/* Clear Filters Button */}
             <button 
               onClick={clearFilters} 
               className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
@@ -524,7 +567,6 @@ function Shop() {
           {/* Right Section - Products */}
           <div className="flex-1">
             
-            {/* Sort and Count Bar */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Showing</span>
@@ -545,7 +587,6 @@ function Shop() {
               </select>
             </div>
             
-            {/* Products Grid */}
             {filteredProducts.length === 0 ? (
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
                 <div className="text-7xl mb-4">🔍</div>
