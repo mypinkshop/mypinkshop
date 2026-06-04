@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -135,44 +135,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
-// ✅ MAKEUP SUBCATEGORIES
-const makeupCategories = [
-  { id: 'facePrimer', name: 'Face Primer', icon: '🧴', mainCat: 'Face' },
-  { id: 'concealer', name: 'Concealer', icon: '🎨', mainCat: 'Face' },
-  { id: 'foundation', name: 'Foundation', icon: '🧴', mainCat: 'Face' },
-  { id: 'compact', name: 'Compact', icon: '🔘', mainCat: 'Face' },
-  { id: 'contour', name: 'Contour', icon: '📐', mainCat: 'Face' },
-  { id: 'loosePowder', name: 'Loose Powder', icon: '⚪', mainCat: 'Face' },
-  { id: 'blush', name: 'Blush', icon: '🌸', mainCat: 'Face' },
-  { id: 'bronzer', name: 'Bronzer', icon: '☀️', mainCat: 'Face' },
-  { id: 'highlighter', name: 'Highlighter', icon: '✨', mainCat: 'Face' },
-  { id: 'settingSpray', name: 'Setting Spray', icon: '💨', mainCat: 'Face' },
-  { id: 'kajal', name: 'Kajal', icon: '✏️', mainCat: 'Eyes' },
-  { id: 'eyeliner', name: 'Eyeliner', icon: '📏', mainCat: 'Eyes' },
-  { id: 'mascara', name: 'Mascara', icon: '👁️‍🗨️', mainCat: 'Eyes' },
-  { id: 'eyeshadow', name: 'Eye Shadow', icon: '🎨', mainCat: 'Eyes' },
-  { id: 'lipstick', name: 'Lipstick', icon: '💄', mainCat: 'Lips' },
-  { id: 'liquidLipstick', name: 'Liquid Lipstick', icon: '💧', mainCat: 'Lips' },
-  { id: 'lipGloss', name: 'Lip Gloss', icon: '✨', mainCat: 'Lips' },
-  { id: 'lipLiner', name: 'Lip Liner', icon: '📏', mainCat: 'Lips' },
-  { id: 'nailPolish', name: 'Nail Polish', icon: '💅', mainCat: 'Nails' },
-  { id: 'makeupKits', name: 'Makeup Kits', icon: '🎁', mainCat: 'Kits' },
-  { id: 'makeupBrushes', name: 'Makeup Brushes', icon: '🖌️', mainCat: 'Tools' },
-];
-
-// Top Brands
-const topBrands = [
-  { id: 'hudaBeauty', name: 'Huda Beauty', icon: 'H', color: 'from-purple-400 to-pink-400' },
-  { id: 'mac', name: 'M.A.C', icon: 'M', color: 'from-gray-700 to-gray-900' },
-  { id: 'maybelline', name: 'Maybelline', icon: 'M', color: 'from-yellow-400 to-orange-400' },
-  { id: 'loreal', name: 'L\'Oreal Paris', icon: 'L', color: 'from-red-500 to-pink-500' },
-  { id: 'lakme', name: 'Lakme', icon: 'L', color: 'from-blue-400 to-purple-400' },
-  { id: 'nykaa', name: 'Nykaa Cosmetics', icon: 'N', color: 'from-pink-500 to-rose-500' },
-];
-
-const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy'];
-const coverageTypes = ['Light', 'Medium', 'Full', 'Sheer'];
-
 function MakeupPage() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
@@ -182,21 +144,20 @@ function MakeupPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSubcat, setSelectedSubcat] = useState('all');
-  const [selectedBrand, setSelectedBrand] = useState('all');
+  
+  // Filter states - HairPage style
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
+  const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedFinish, setSelectedFinish] = useState('all');
   const [selectedCoverage, setSelectedCoverage] = useState('all');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
-  const [activeMainCat, setActiveMainCat] = useState('all');
-  const [activeTab, setActiveTab] = useState('categories');
+  const [priceRange, setPriceRange] = useState('all');
 
-  const mainCategories = ['all', ...new Set(makeupCategories.map(c => c.mainCat))];
   const API_URL = 'https://api.mypinkshop.com';
 
   // Load products from API
@@ -205,7 +166,11 @@ function MakeupPage() {
       try {
         setLoading(true);
         const response = await fetch(`${API_URL}/api/products`);
-        if (!response.ok) throw new Error('Failed to load products');
+        
+        if (!response.ok) {
+          throw new Error('Failed to load products');
+        }
+        
         let data = await response.json();
         
         const makeupProducts = data.filter(p => 
@@ -214,7 +179,9 @@ function MakeupPage() {
         ).map(p => ({
           ...p,
           id: p._id,
-          category: p.mainCategory || p.category
+          subcategory: p.subCategory || p.subcategory || p.category,
+          finish: p.finish || '',
+          coverage: p.coverage || ''
         }));
         
         setProducts(makeupProducts);
@@ -225,28 +192,15 @@ function MakeupPage() {
         setLoading(false);
       }
     };
+    
     loadProducts();
   }, []);
 
-  // Search autocomplete
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    if (value.length > 1) {
-      const suggestions = products
-        .filter(p => p.name?.toLowerCase().includes(value.toLowerCase()))
-        .slice(0, 5)
-        .map(p => p.name);
-      setSearchSuggestions(suggestions);
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
+  // Filter and sort products
   useEffect(() => {
     let filtered = [...products];
 
+    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(p => 
         p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -254,26 +208,52 @@ function MakeupPage() {
       );
     }
 
-    if (selectedSubcat !== 'all') {
-      filtered = filtered.filter(p => p.subcategory === selectedSubcat);
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.mainCategory === selectedCategory || p.category === selectedCategory);
     }
 
+    // Subcategory filter
+    if (selectedSubcategory !== 'all') {
+      filtered = filtered.filter(p => {
+        const productSub = (p.subCategory || p.subcategory || p.category || '').toLowerCase();
+        const selected = selectedSubcategory.toLowerCase();
+        return productSub === selected;
+      });
+    }
+
+    // Brand filter
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
 
-    const min = minPrice ? parseFloat(minPrice) : 0;
-    const max = maxPrice ? parseFloat(maxPrice) : Infinity;
+    // Finish filter
+    if (selectedFinish !== 'all') {
+      filtered = filtered.filter(p => p.finish?.toLowerCase() === selectedFinish.toLowerCase());
+    }
+
+    // Coverage filter
+    if (selectedCoverage !== 'all') {
+      filtered = filtered.filter(p => p.coverage?.toLowerCase() === selectedCoverage.toLowerCase());
+    }
+
+    // Price filter
+    let min = 0, max = Infinity;
+    if (priceRange !== 'all') {
+      switch(priceRange) {
+        case 'under500': max = 500; break;
+        case '500-1000': min = 500; max = 1000; break;
+        case '1000-2000': min = 1000; max = 2000; break;
+        case '2000-5000': min = 2000; max = 5000; break;
+        case 'above5000': min = 5000; break;
+        default: break;
+      }
+    }
+    if (minPrice) min = parseFloat(minPrice);
+    if (maxPrice) max = parseFloat(maxPrice);
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
 
-    if (selectedFinish !== 'all') {
-      filtered = filtered.filter(p => p.finish === selectedFinish);
-    }
-
-    if (selectedCoverage !== 'all') {
-      filtered = filtered.filter(p => p.coverage === selectedCoverage);
-    }
-
+    // Sorting
     switch(sortBy) {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
@@ -283,30 +263,56 @@ function MakeupPage() {
     }
     
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedSubcat, selectedBrand, minPrice, maxPrice, selectedFinish, selectedCoverage, sortBy, products]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, selectedFinish, selectedCoverage, minPrice, maxPrice, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedSubcat('all');
+    setSelectedCategory('all');
+    setSelectedSubcategory('all');
     setSelectedBrand('all');
-    setMinPrice('');
-    setMaxPrice('');
     setSelectedFinish('all');
     setSelectedCoverage('all');
+    setMinPrice('');
+    setMaxPrice('');
     setSortBy('default');
-    setActiveMainCat('all');
-    setShowSuggestions(false);
+    setPriceRange('all');
   };
 
-  const getFilteredSubcategories = () => {
-    if (activeMainCat === 'all') return makeupCategories;
-    return makeupCategories.filter(c => c.mainCat === activeMainCat);
-  };
+  // Get unique values for dropdowns
+  const categories = useMemo(() => {
+    const cats = [...new Set(products.map(p => p.mainCategory || p.category).filter(Boolean))];
+    return [{ id: 'all', name: 'All Categories' }, ...cats.map(c => ({ id: c, name: c }))];
+  }, [products]);
 
-  const getCategoryDisplayName = (catId) => {
-    const cat = makeupCategories.find(c => c.id === catId);
-    return cat ? cat.name : catId;
-  };
+  const subcategories = useMemo(() => {
+    const subs = [...new Set(products.map(p => p.subCategory || p.subcategory || p.category).filter(Boolean))];
+    return [{ id: 'all', name: 'All Subcategories' }, ...subs.map(s => ({ id: s, name: s }))];
+  }, [products]);
+
+  const brands = useMemo(() => {
+    const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+    return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
+  }, [products]);
+
+  const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy', 'Metallic'];
+  const coverageTypes = ['Light', 'Medium', 'Full', 'Sheer'];
+
+  const priceRanges = [
+    { id: 'all', name: 'All Prices' },
+    { id: 'under500', name: 'Under ₹500' },
+    { id: '500-1000', name: '₹500 - ₹1000' },
+    { id: '1000-2000', name: '₹1000 - ₹2000' },
+    { id: '2000-5000', name: '₹2000 - ₹5000' },
+    { id: 'above5000', name: 'Above ₹5000' },
+  ];
+
+  const sortOptions = [
+    { id: 'default', name: 'Default Sorting' },
+    { id: 'price_low', name: 'Price: Low to High' },
+    { id: 'price_high', name: 'Price: High to Low' },
+    { id: 'rating', name: 'Highest Rated' },
+    { id: 'newest', name: 'Newest First' },
+  ];
 
   if (loading) {
     return (
@@ -343,29 +349,11 @@ function MakeupPage() {
               <div className="relative">
                 <input 
                   type="text" 
-                  placeholder="Search makeup products, brands, or shades..."
+                  placeholder="Search makeup products..."
                   value={searchTerm}
-                  onChange={handleSearchChange}
-                  onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-5 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
                 />
-                {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                    {searchSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSearchTerm(suggestion);
-                          setShowSuggestions(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
-                      >
-                        🔍 {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
               </div>
             </div>
@@ -401,258 +389,247 @@ function MakeupPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-pink-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-6">
-            <button 
-              onClick={() => setActiveTab('categories')} 
-              className={`py-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'categories' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-500'}`}
-            >
-              Categories ✨
-            </button>
-            <button 
-              onClick={() => setActiveTab('brands')} 
-              className={`py-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'brands' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-500'}`}
-            >
-              Top Brands 👑
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Categories View */}
-      {activeTab === 'categories' && (
-        <>
-          <div className="bg-white border-b border-pink-100">
-            <div className="max-w-7xl mx-auto px-4">
-              <div className="flex gap-4 overflow-x-auto py-2 scrollbar-hide">
-                {mainCategories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveMainCat(cat)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                      activeMainCat === cat 
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                        : 'text-gray-600 hover:text-pink-500'
-                    }`}
-                  >
-                    {cat === 'all' ? 'All Categories' : cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <button
-                onClick={() => setSelectedSubcat('all')}
-                className={`border rounded-xl p-3 text-center transition-all ${selectedSubcat === 'all' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-              >
-                <div className="text-2xl mb-1">📦</div>
-                <div className="font-semibold text-sm">All Products</div>
-                <div className="text-xs opacity-75">{products.length}</div>
-              </button>
-              {getFilteredSubcategories().map(cat => {
-                const productCount = products.filter(p => p.subcategory === cat.id).length;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedSubcat(cat.id)}
-                    className={`border rounded-xl p-3 text-center transition-all ${selectedSubcat === cat.id ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-                  >
-                    <div className="text-2xl mb-1">{cat.icon}</div>
-                    <div className="font-semibold text-sm">{cat.name}</div>
-                    <div className="text-xs opacity-75">{productCount} items</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Brands View */}
-      {activeTab === 'brands' && (
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {topBrands.map(brand => {
-              const productCount = products.filter(p => p.brand === brand.name).length;
-              return (
-                <button
-                  key={brand.id}
-                  onClick={() => setSelectedBrand(selectedBrand === brand.name ? 'all' : brand.name)}
-                  className={`border rounded-2xl p-4 text-center transition-all ${selectedBrand === brand.name ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'bg-white hover:shadow-md border-pink-100'}`}
-                >
-                  <div className={`w-12 h-12 mx-auto rounded-full bg-gradient-to-r ${brand.color} flex items-center justify-center text-white font-bold text-lg mb-2 shadow-md`}>
-                    {brand.icon}
-                  </div>
-                  <div className="font-semibold text-sm">{brand.name}</div>
-                  <div className="text-xs opacity-75">{productCount} products</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Breadcrumb */}
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500">Home</Link>
+          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
           <span className="text-gray-400">/</span>
           <span className="text-pink-600 font-medium">Makeup</span>
-          {selectedSubcat !== 'all' && (
-            <>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600">{getCategoryDisplayName(selectedSubcat)}</span>
-            </>
-          )}
-          {selectedBrand !== 'all' && (
-            <>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600">{selectedBrand}</span>
-            </>
-          )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 pb-12">
+      <div className="max-w-7xl mx-auto px-4 pb-16">
         
-        <button 
-          onClick={() => setShowFilters(!showFilters)} 
-          className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
-        >
-          <span>🔽</span> Filters & Sorting
-        </button>
-
-        <div className="flex flex-col md:flex-row gap-6">
-          
-          {/* Sidebar Filters */}
-          <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 space-y-5`}>
+        {/* Filter Bar - HairPage Style */}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">💰</span> Price Range
-              </h3>
-              <div className="flex gap-3">
-                <input 
-                  type="number" 
-                  placeholder="Min ₹" 
-                  value={minPrice} 
-                  onChange={(e) => setMinPrice(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                />
-                <input 
-                  type="number" 
-                  placeholder="Max ₹" 
-                  value={maxPrice} 
-                  onChange={(e) => setMaxPrice(e.target.value)} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                />
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">✨</span> Finish
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {finishTypes.map(finish => (
-                  <button
-                    key={finish}
-                    onClick={() => setSelectedFinish(selectedFinish === finish ? 'all' : finish)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      selectedFinish === finish 
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-pink-100'
-                    }`}
-                  >
-                    {finish}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">🎨</span> Coverage
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {coverageTypes.map(coverage => (
-                  <button
-                    key={coverage}
-                    onClick={() => setSelectedCoverage(selectedCoverage === coverage ? 'all' : coverage)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      selectedCoverage === coverage 
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-pink-100'
-                    }`}
-                  >
-                    {coverage}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button 
-              onClick={clearFilters} 
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-            >
-              Clear All Filters ✨
-            </button>
-          </div>
-
-          {/* Products Section */}
-          <div className="flex-1">
-            
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Showing</span>
-                <span className="font-semibold text-pink-600">{filteredProducts.length}</span>
-                <span className="text-sm text-gray-500">of {products.length} products</span>
-              </div>
-              
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)} 
-                className="px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
+            {/* Desktop Filters */}
+            <div className="hidden md:flex flex-wrap gap-3">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
               >
-                <option value="default">Sort by: Default</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="rating">Rating: High to Low</option>
-                <option value="newest">Newest First</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedSubcategory}
+                onChange={(e) => setSelectedSubcategory(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {subcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {brands.map(brand => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedFinish}
+                onChange={(e) => setSelectedFinish(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                <option value="all">All Finishes</option>
+                {finishTypes.map(finish => (
+                  <option key={finish} value={finish}>{finish}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedCoverage}
+                onChange={(e) => setSelectedCoverage(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                <option value="all">All Coverage</option>
+                {coverageTypes.map(coverage => (
+                  <option key={coverage} value={coverage}>{coverage}</option>
+                ))}
+              </select>
+
+              <select
+                value={priceRange}
+                onChange={(e) => setPriceRange(e.target.value)}
+                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+              >
+                {priceRanges.map(range => (
+                  <option key={range.id} value={range.id}>{range.name}</option>
+                ))}
               </select>
             </div>
-            
-            {filteredProducts.length === 0 ? (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
-                <div className="text-7xl mb-4">💄</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No makeup products found</h3>
-                <p className="text-gray-500 mb-4">Try adjusting your filters or search term</p>
-                <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">
-                  Clear Filters
+
+            {/* Mobile Filter Button */}
+            <button 
+              onClick={() => setShowFilters(!showFilters)} 
+              className="md:hidden px-5 py-2 border border-pink-200 rounded-full text-sm flex items-center gap-2 bg-white"
+            >
+              <span>Filters</span>
+              <span>🔽</span>
+            </button>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-5 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
+            >
+              {sortOptions.map(option => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Active Filters Display */}
+          {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedFinish !== 'all' || selectedCoverage !== 'all' || priceRange !== 'all' || searchTerm) && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {selectedCategory !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {selectedCategory}
+                  <button onClick={() => setSelectedCategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedSubcategory !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {selectedSubcategory}
+                  <button onClick={() => setSelectedSubcategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedBrand !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {selectedBrand}
+                  <button onClick={() => setSelectedBrand('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedFinish !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  Finish: {selectedFinish}
+                  <button onClick={() => setSelectedFinish('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {selectedCoverage !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  Coverage: {selectedCoverage}
+                  <button onClick={() => setSelectedCoverage('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {priceRange !== 'all' && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  {priceRanges.find(r => r.id === priceRange)?.name}
+                  <button onClick={() => setPriceRange('all')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
+                  Search: {searchTerm}
+                  <button onClick={() => setSearchTerm('')} className="text-pink-400 hover:text-pink-600">×</button>
+                </span>
+              )}
+              <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline hover:no-underline">
+                Clear All
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Filters Modal */}
+        {showFilters && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+            <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
+                <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
+              </div>
+              
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
+                  <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
+                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Finish</label>
+                  <select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    <option value="all">All Finishes</option>
+                    {finishTypes.map(finish => <option key={finish} value={finish}>{finish}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Coverage</label>
+                  <select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    <option value="all">All Coverage</option>
+                    {coverageTypes.map(coverage => <option key={coverage} value={coverage}>{coverage}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                  <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
+                    {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition">
+                  Clear All Filters
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {filteredProducts.map(product => (
-                  <ProductCard 
-                    key={product._id || product.id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                  />
-                ))}
-              </div>
-            )}
+            </div>
           </div>
+        )}
+
+        {/* Results Count */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-500">
+            Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of{' '}
+            <span className="font-semibold text-pink-600">{products.length}</span> products
+          </p>
         </div>
+        
+        {/* Products Grid */}
+        {filteredProducts.length === 0 ? (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-16 text-center border border-pink-100">
+            <div className="text-6xl mb-4">💄</div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">No makeup products found</h3>
+            <p className="text-gray-500 mb-6">Try adjusting your filters or search term</p>
+            <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:shadow-lg transition">
+              Clear All Filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {filteredProducts.map(product => (
+              <ProductCard 
+                key={product._id || product.id} 
+                product={product} 
+                addToCart={addToCart}
+                isInWishlist={isInWishlist}
+                addToWishlist={addToWishlist}
+                removeFromWishlist={removeFromWishlist}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
