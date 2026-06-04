@@ -6,9 +6,9 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 
-// Middleware
+// ✅ CORS - Updated with www.mypinkshop.com
 app.use(cors({
-  origin: ['https://mypinkshop.vercel.app', 'https://mypinkshop.com', 'http://localhost:3000'],
+  origin: ['https://mypinkshop.vercel.app', 'https://mypinkshop.com', 'https://www.mypinkshop.com', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
