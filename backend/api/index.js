@@ -672,7 +672,6 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
       const minDate = new Date();
       minDate.setDate(minDate.getDate() + 3);
       
-      // 🔥 FIXED: Free shipping threshold changed from 999 to 499
       const freeShippingThreshold = 499;
       let shippingCharge = 50;
       if (cartTotal >= freeShippingThreshold) {
@@ -695,7 +694,6 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
       });
     }
     
-    // 🔥 FIXED: Free shipping threshold changed from 999 to 499
     const freeShippingThreshold = 499;
     let shippingCharge = delivery.shippingCharge;
     if (cartTotal >= freeShippingThreshold) {
@@ -727,7 +725,6 @@ app.get('/api/shipping/settings', async (req, res) => {
   res.json({
     success: true,
     settings: {
-      // 🔥 FIXED: Free shipping threshold changed from 999 to 499
       freeShippingThreshold: 499,
       cutOffTime: '16:00'
     }
@@ -863,14 +860,12 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
 
 // ========== 🔥 FULLY UPGRADED AMAZON IMPORT ROUTES ==========
 // 🔥 FIX 1: Full bullet points fetch (no limit)
-// 🔥 FIX 2: Variations auto-detect from Amazon
-// 🔥 FIX 3: Custom variations fallback if not found
-// 🔥 FIX 4: Key ingredients extraction
-// 🔥 FIX 5: Skin type detection
-// 🔥 FIX 6: Concerns detection
-// 🔥 FIX 7: Category auto-detect
-// 🔥 FIX 8: SubCategory auto-detect
-// 🔥 FIX 9: Brand clean (remove "Visit the store")
+// 🔥 FIX 2: Variations auto-detect with garbage filtering (Buy Now, Subscribe removed)
+// 🔥 FIX 3: Key ingredients extraction
+// 🔥 FIX 4: Skin type detection
+// 🔥 FIX 5: Concerns detection
+// 🔥 FIX 6: Category & SubCategory auto-detect
+// 🔥 FIX 7: Brand clean
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -912,7 +907,6 @@ const scrapeAmazonProduct = async (url) => {
     // ========== 4. 🔥 FULL DESCRIPTION - ALL BULLET POINTS ==========
     let descriptionArray = [];
     
-    // Method 1: Amazon feature bullets
     $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small, .a-unordered-list .a-list-item').each((i, el) => {
       let text = $(el).text().trim();
       if (text && text.length > 10 && text.length < 500) {
@@ -931,18 +925,6 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Method 2: Product description paragraphs
-    if (descriptionArray.length < 3) {
-      $('#productDescription p, #productDescription span, .a-plus .a-row').each((i, el) => {
-        let text = $(el).text().trim();
-        if (text && text.length > 20 && text.length < 400) {
-          text = text.replace(/\s+/g, ' ').trim();
-          descriptionArray.push(text);
-        }
-      });
-    }
-    
-    // Method 3: Split by periods as last resort
     if (descriptionArray.length === 0) {
       const productDesc = $('#productDescription').text().trim();
       if (productDesc) {
@@ -958,7 +940,7 @@ const scrapeAmazonProduct = async (url) => {
     
     descriptionArray = [...new Set(descriptionArray)];
     
-    // ========== 5. KEY FEATURES / HIGHLIGHTS ==========
+    // ========== 5. KEY FEATURES ==========
     let keyFeaturesArray = [];
     $('#feature-bullets .a-list-item').each((i, el) => {
       let text = $(el).text().trim();
@@ -981,13 +963,6 @@ const scrapeAmazonProduct = async (url) => {
       if (match && match[1] && match[1].length > 10) {
         ingredients = match[1].trim();
         if (ingredients.length > 10 && ingredients.length < 300) break;
-      }
-    }
-    
-    if (!ingredients && fullText.length > 0) {
-      const possibleIngredients = fullText.match(/(?:Vitamin|Hyaluronic|Retinol|Niacinamide|Salicylic|Glycolic|Lactic|Ceramide|Peptide|Antioxidant|Alpha Arbutin|Kojic|Ferulic)[^.]*\./gi);
-      if (possibleIngredients) {
-        ingredients = possibleIngredients.slice(0, 3).join(', ');
       }
     }
     
@@ -1049,137 +1024,100 @@ const scrapeAmazonProduct = async (url) => {
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
     if (brand && (brand.toLowerCase().includes('visit') || brand.toLowerCase().includes('store'))) brand = '';
     
-    // ========== 10. 🔥 VARIATIONS EXTRACTION (WITH CUSTOM FALLBACK) ==========
+    // ========== 10. 🔥 VARIATIONS EXTRACTION WITH GARBAGE FILTER ==========
     let variations = [];
     
-    // Method 1: Get from size dropdown
+    // Words to filter out (buttons, actions, etc.)
+    const variationFilterWords = [
+      'buy now', 'add to cart', 'subscribe', 'save', 'buy', 'cart',
+      'checkout', 'payment', 'delivery', 'shipping', 'offer', 'deal',
+      'coupon', 'promo', 'discount', 'see all', 'view more', 'shop now',
+      'order now', 'get it', 'fast delivery', 'free shipping', 'subscribe now',
+      'subscribe & save', 'auto delivery', 'one time purchase', 'secure transaction',
+      'cash on delivery', 'cod', 'emi', 'warranty', 'return policy', 'exchange'
+    ];
+    
+    const isValidVariation = (text) => {
+      const lowerText = text.toLowerCase();
+      for (const word of variationFilterWords) {
+        if (lowerText.includes(word)) return false;
+      }
+      if (/[₹$£€]/.test(text)) return false;
+      if (/^\d+$/.test(text)) return false;
+      if (text.length < 2 || text.length > 30) return false;
+      return true;
+    };
+    
+    // Method 1: Size dropdown
     $('#variation_size_name li, .a-dropdown-size select option, select[name="dropdown_selected_size_name"] option').each((i, el) => {
       let varText = $(el).text().trim();
-      if (varText && varText !== 'Select' && varText !== 'Choose' && varText !== '--' && varText.length < 30) {
-        if (!variations.find(v => v.name === varText)) {
-          variations.push({ 
-            name: varText, 
-            price: finalPrice, 
-            mrp: finalOriginalPrice || Math.round(finalPrice * 1.2),
-            stock: 10 
-          });
+      if (varText && varText !== 'Select' && varText !== 'Choose' && varText !== '--') {
+        if (isValidVariation(varText) && !variations.find(v => v.name === varText)) {
+          variations.push({ name: varText, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
         }
       }
     });
     
-    // Method 2: Get from color/shade dropdown
+    // Method 2: Color/Shade dropdown
     $('#variation_color_name li, .a-dropdown-color select option, #variation_color select option').each((i, el) => {
       let varText = $(el).text().trim();
-      if (varText && varText !== 'Select' && varText !== 'Choose' && varText.length < 30) {
-        if (!variations.find(v => v.name === varText)) {
-          variations.push({ 
-            name: varText, 
-            price: finalPrice, 
-            mrp: finalOriginalPrice || Math.round(finalPrice * 1.2),
-            stock: 10 
-          });
+      if (varText && varText !== 'Select' && varText !== 'Choose') {
+        if (isValidVariation(varText) && !variations.find(v => v.name === varText)) {
+          variations.push({ name: varText, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
         }
       }
     });
     
-    // Method 3: Get from twister swatches (size/color buttons)
+    // Method 3: Twister swatches - SKIP BUTTONS
     $('.twisterSwatchWrapper .swatchElement, .a-button-stack .a-button').each((i, el) => {
-      let varText = $(el).find('.a-button-text, .swatchTitle').text().trim();
-      if (varText && varText.length < 30 && varText.length > 0) {
-        if (!variations.find(v => v.name === varText)) {
-          variations.push({ 
-            name: varText, 
-            price: finalPrice, 
-            mrp: finalOriginalPrice || Math.round(finalPrice * 1.2),
-            stock: 10 
-          });
-        }
+      let varText = $(el).find('.a-button-text, .swatchTitle').last().text().trim();
+      if (!varText) varText = $(el).text().trim();
+      if (isValidVariation(varText) && varText.length > 0 && !variations.find(v => v.name === varText)) {
+        variations.push({ name: varText, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
       }
     });
     
-    // Method 4: Extract sizes from description (ml, g, kg, L)
+    // Method 4: Extract sizes from description
     if (variations.length === 0) {
       const sizePattern = /(\d+(?:\.\d+)?)\s*(ml|g|kg|L|mg|gm)/gi;
       const foundSizes = [];
       let match;
       while ((match = sizePattern.exec(fullText)) !== null) {
         const size = match[1] + match[2];
-        if (!foundSizes.includes(size)) {
+        if (!foundSizes.includes(size) && isValidVariation(size)) {
           foundSizes.push(size);
         }
       }
       foundSizes.slice(0, 8).forEach(size => {
-        variations.push({ 
-          name: size, 
-          price: finalPrice, 
-          mrp: finalOriginalPrice || Math.round(finalPrice * 1.2),
-          stock: 10 
-        });
+        variations.push({ name: size, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
       });
     }
     
     // Method 5: Extract shades/colors from description
     if (variations.length === 0) {
-      const shadePattern = /(Fair|Light|Medium|Tan|Deep|Red|Pink|Nude|Coral|Berry|Mauve|Brown|Black|Purple|Blue|Green|Yellow|Orange|Rose|Maroon|Teal|Beige|Ivory|Warm|Cool|Neutral)/gi;
+      const shadePattern = /(Fair|Light|Medium|Tan|Deep|Red|Pink|Nude|Coral|Berry|Mauve|Brown|Black|Purple|Blue|Green|Yellow|Orange|Rose|Maroon|Teal|Beige|Ivory)/gi;
       const foundShades = [];
       let shadeMatch;
       while ((shadeMatch = shadePattern.exec(fullText)) !== null) {
         const shade = shadeMatch[1];
-        if (!foundShades.includes(shade)) {
+        if (!foundShades.includes(shade) && isValidVariation(shade)) {
           foundShades.push(shade);
         }
       }
       foundShades.slice(0, 8).forEach(shade => {
-        variations.push({ 
-          name: shade, 
-          price: finalPrice, 
-          mrp: finalOriginalPrice || Math.round(finalPrice * 1.2),
-          stock: 10 
-        });
+        variations.push({ name: shade, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
       });
     }
     
-    // ========== 11. 🔥 CUSTOM VARIATIONS GENERATION (FALLBACK) ==========
-    if (variations.length === 0) {
-      const text = name.toLowerCase();
-      if (text.includes('serum') || text.includes('cream') || text.includes('lotion') || text.includes('moisturizer')) {
-        variations = [
-          { name: '30ml', price: finalPrice, mrp: Math.round(finalPrice * 1.2), stock: 10 },
-          { name: '50ml', price: Math.round(finalPrice * 1.4), mrp: Math.round(finalPrice * 1.68), stock: 10 },
-          { name: '100ml', price: Math.round(finalPrice * 2.2), mrp: Math.round(finalPrice * 2.64), stock: 10 }
-        ];
-      } else if (text.includes('shampoo') || text.includes('conditioner') || text.includes('oil')) {
-        variations = [
-          { name: '200ml', price: finalPrice, mrp: Math.round(finalPrice * 1.2), stock: 10 },
-          { name: '400ml', price: Math.round(finalPrice * 1.6), mrp: Math.round(finalPrice * 1.92), stock: 10 },
-          { name: '1L', price: Math.round(finalPrice * 2.5), mrp: Math.round(finalPrice * 3), stock: 10 }
-        ];
-      } else if (text.includes('lipstick') || text.includes('foundation')) {
-        variations = [
-          { name: 'Standard', price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 }
-        ];
-      } else if (text.includes('face wash') || text.includes('cleanser')) {
-        variations = [
-          { name: '100ml', price: finalPrice, mrp: Math.round(finalPrice * 1.2), stock: 10 },
-          { name: '200ml', price: Math.round(finalPrice * 1.5), mrp: Math.round(finalPrice * 1.8), stock: 10 }
-        ];
-      } else {
-        variations = [
-          { name: 'Standard', price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 },
-          { name: 'Premium', price: Math.round(finalPrice * 1.3), mrp: Math.round(finalPrice * 1.56), stock: 10 }
-        ];
-      }
-    }
-    
-    // ========== 12. CATEGORY DETECTION ==========
+    // ========== 11. CATEGORY & SUBCATEGORY DETECTION ==========
     const detectCategory = (productName, productDesc) => {
       const text = (productName + ' ' + productDesc).toLowerCase();
       const categoryKeywords = {
-        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'face mask', 'eye cream', 'scrub', 'exfoliator'],
-        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
+        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'face mask', 'eye cream', 'scrub'],
+        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact'],
         'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga', 'salwar'],
-        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings', 'necklace']
+        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
       };
       
       for (const [cat, keywords] of Object.entries(categoryKeywords)) {
@@ -1190,15 +1128,14 @@ const scrapeAmazonProduct = async (url) => {
       return 'Skincare';
     };
     
-    // ========== 13. SUBCATEGORY DETECTION ==========
     const detectSubCategory = (productName, productDesc, category) => {
       const text = (productName + ' ' + productDesc).toLowerCase();
       const subCatMap = {
-        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm', 'Body Lotion'],
-        'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
-        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff', 'Hair Fall Control'],
+        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+        'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact'],
+        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff'],
         'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Shorts', 'Skirt'],
-        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace']
+        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings']
       };
       
       const subCats = subCatMap[category] || [];
@@ -1208,71 +1145,8 @@ const scrapeAmazonProduct = async (url) => {
       return '';
     };
     
-    // ========== 14. FINISH / COVERAGE DETECTION (for Makeup) ==========
-    let finish = '';
-    let coverage = '';
     const descriptionText = descriptionArray.join(' ');
     const detectedCategory = detectCategory(name, descriptionText);
-    
-    if (detectedCategory === 'Makeup') {
-      const finishKeywords = ['matte', 'glossy', 'satin', 'shimmer', 'dewy', 'metallic', 'creamy', 'velvet', 'liquid', 'powder'];
-      for (const f of finishKeywords) {
-        if (fullText.toLowerCase().includes(f)) {
-          finish = f.charAt(0).toUpperCase() + f.slice(1);
-          break;
-        }
-      }
-      
-      const coverageKeywords = ['light', 'medium', 'full', 'sheer', 'buildable'];
-      for (const c of coverageKeywords) {
-        if (fullText.toLowerCase().includes(c)) {
-          coverage = c.charAt(0).toUpperCase() + c.slice(1);
-          break;
-        }
-      }
-    }
-    
-    // ========== 15. HAIR TYPE DETECTION (for Hair) ==========
-    let hairType = 'all';
-    if (detectedCategory === 'Hair') {
-      const hairTypeKeywords = {
-        'oily': ['oily hair', 'oil control', 'clarifying', 'greasy'],
-        'dry': ['dry hair', 'hydrating', 'nourishing', 'damaged', 'brittle'],
-        'curly': ['curly hair', 'waves', 'curls', 'coils', 'wavy'],
-        'straight': ['straight hair', 'sleek', 'smoothing', 'frizz control'],
-        'normal': ['normal hair', 'daily use', 'everyday']
-      };
-      for (const [type, keywords] of Object.entries(hairTypeKeywords)) {
-        for (const keyword of keywords) {
-          if (fullText.toLowerCase().includes(keyword)) {
-            hairType = type;
-            break;
-          }
-        }
-      }
-    }
-    
-    // ========== 16. HAIR CONCERNS DETECTION ==========
-    const hairConcernsMap = {
-      'Hairfall': ['hair fall', 'hair loss', 'falling hair', 'thinning', 'shedding'],
-      'Dandruff': ['dandruff', 'flaky scalp', 'dry scalp', 'itching', 'scalp buildup'],
-      'Dry Hair': ['dry hair', 'brittle hair', 'rough hair', 'unmanageable'],
-      'Frizzy Hair': ['frizzy', 'unruly', 'flyaway', 'frizz control'],
-      'Split Ends': ['split ends', 'damaged ends', 'breakage'],
-      'Hair Growth': ['hair growth', 'grow hair', 'longer hair', 'density', 'volume'],
-      'Volume': ['volume', 'volumizing', 'thin hair', 'fullness', 'body']
-    };
-    
-    const detectedHairConcerns = [];
-    for (const [concern, keywords] of Object.entries(hairConcernsMap)) {
-      for (const keyword of keywords) {
-        if (fullText.toLowerCase().includes(keyword)) {
-          detectedHairConcerns.push(concern);
-          break;
-        }
-      }
-    }
-    
     const detectedSubCategory = detectSubCategory(name, descriptionText, detectedCategory);
     
     return {
@@ -1286,14 +1160,9 @@ const scrapeAmazonProduct = async (url) => {
       detectedCategory: detectedCategory,
       detectedSubCategory: detectedSubCategory,
       variations: variations.slice(0, 15),
-      // 🔥 New fields
       ingredients: ingredients,
       skinType: skinType,
-      concerns: detectedConcerns.slice(0, 5),
-      finish: finish,
-      coverage: coverage,
-      hairType: hairType,
-      hairConcerns: detectedHairConcerns.slice(0, 5)
+      concerns: detectedConcerns.slice(0, 5)
     };
     
   } catch (error) {
