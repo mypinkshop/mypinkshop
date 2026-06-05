@@ -6,12 +6,11 @@ const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const AWS = require('aws-sdk');
 
 const app = express();
 
-// ========== ✅ FIXED CORS ==========
+// ========== CORS - MOST PERMISSIVE ==========
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
@@ -25,19 +24,38 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({
-  origin: '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-}));
-
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// ========== Cloudflare R2 Configuration ==========
+const s3 = new AWS.S3({
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  accessKeyId: process.env.R2_ACCESS_KEY_ID,
+  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  signatureVersion: 'v4',
+  region: 'auto',
+});
+
+const BUCKET_NAME = process.env.R2_BUCKET_NAME;
+const PUBLIC_URL = process.env.R2_PUBLIC_URL;
+
+// ========== Multer (Memory Storage for Vercel) ==========
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images are allowed'));
+    }
+  }
+});
+
 // ========== MongoDB Connection ==========
 let isConnected = false;
-
 const connectDB = async () => {
   if (isConnected) return;
   try {
@@ -78,16 +96,10 @@ class ShiprocketService {
       if (!this.token || Date.now() > this.tokenExpiry) {
         await this.getAuthToken();
       }
-      
       const response = await axios.get(`${this.baseURL}/courier/serviceability`, {
-        params: {
-          pickup_postcode: pickupPincode,
-          delivery_postcode: deliveryPincode,
-          weight: weight
-        },
+        params: { pickup_postcode: pickupPincode, delivery_postcode: deliveryPincode, weight: weight },
         headers: { 'Authorization': `Bearer ${this.token}` }
       });
-      
       return response.data;
     } catch (error) {
       console.error('Serviceability Error:', error.response?.data || error.message);
@@ -98,24 +110,18 @@ class ShiprocketService {
   async getEstimatedDelivery(pickupPincode, deliveryPincode, weight = 0.5) {
     try {
       const serviceability = await this.checkServiceability(pickupPincode, deliveryPincode, weight);
-      
       if (serviceability && serviceability.data && serviceability.data.length > 0) {
         const sorted = serviceability.data.sort((a, b) => a.estimated_days - b.estimated_days);
         const best = sorted[0];
-        
         const estimatedDate = new Date();
         estimatedDate.setDate(estimatedDate.getDate() + best.estimated_days);
-        
         return {
-          success: true,
-          deliverable: true,
-          shippingCharge: best.rate,
+          success: true, deliverable: true, shippingCharge: best.rate,
           estimatedDays: best.estimated_days,
           estimatedDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
           courierName: best.courier_name
         };
       }
-      
       return { success: false, deliverable: false, message: 'No courier available' };
     } catch (error) {
       return { success: false, deliverable: false, error: error.message };
@@ -124,36 +130,6 @@ class ShiprocketService {
 }
 
 const shiprocket = new ShiprocketService();
-
-// ========== Multer Configuration ==========
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const timestamp = Date.now();
-    const randomString = Math.random().toString(36).substring(2, 10);
-    const ext = path.extname(file.originalname);
-    cb(null, `product-${timestamp}-${randomString}${ext}`);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only images are allowed'));
-    }
-  }
-});
 
 // ========== Schemas ==========
 const userSchema = new mongoose.Schema({
@@ -291,28 +267,46 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-  await connectDB();
-  res.json({ 
-    status: 'ok', 
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  });
+  try {
+    await connectDB();
+    res.json({ 
+      status: 'ok', 
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.json({ status: 'ok', database: 'connecting...', timestamp: new Date().toISOString() });
+  }
 });
 
-// ========== UPLOAD ROUTES ==========
-app.post('/api/upload', authMiddleware, upload.single('images'), (req, res) => {
+// ========== UPLOAD ROUTES (R2 - VERCEL COMPATIBLE) ==========
+// Single image upload
+app.post('/api/upload', authMiddleware, upload.single('images'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    
-    const baseUrl = process.env.BASE_URL || 'https://api.mypinkshop.com';
-    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
-    
+
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const fileExtension = req.file.originalname.split('.').pop();
+    const filename = `products/${timestamp}-${randomString}.${fileExtension}`;
+
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: filename,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+      ACL: 'public-read',
+    };
+
+    await s3.upload(params).promise();
+    const imageUrl = `${PUBLIC_URL}/${filename}`;
+
     res.json({
       success: true,
       url: imageUrl,
-      message: 'Image uploaded successfully'
+      message: 'Image uploaded successfully to R2'
     });
   } catch (error) {
     console.error('Upload error:', error);
@@ -320,19 +314,36 @@ app.post('/api/upload', authMiddleware, upload.single('images'), (req, res) => {
   }
 });
 
-app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), (req, res) => {
+// Multiple images upload
+app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
-    
-    const baseUrl = process.env.BASE_URL || 'https://api.mypinkshop.com';
-    const urls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
-    
+
+    const uploadedUrls = [];
+    for (const file of req.files) {
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileExtension = file.originalname.split('.').pop();
+      const filename = `products/${timestamp}-${randomString}.${fileExtension}`;
+
+      const params = {
+        Bucket: BUCKET_NAME,
+        Key: filename,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+        ACL: 'public-read',
+      };
+
+      await s3.upload(params).promise();
+      uploadedUrls.push(`${PUBLIC_URL}/${filename}`);
+    }
+
     res.json({
       success: true,
-      urls: urls,
-      message: `${urls.length} images uploaded successfully`
+      urls: uploadedUrls,
+      message: `${uploadedUrls.length} images uploaded successfully to R2`
     });
   } catch (error) {
     console.error('Upload error:', error);
@@ -340,27 +351,27 @@ app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), (req
   }
 });
 
-app.delete('/api/upload', authMiddleware, adminMiddleware, (req, res) => {
+// Delete image
+app.delete('/api/upload', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { imageUrl } = req.body;
     if (!imageUrl) {
       return res.status(400).json({ error: 'Image URL required' });
     }
-    
+
     const filename = imageUrl.split('/').pop();
-    const filepath = path.join(uploadDir, filename);
-    
-    if (fs.existsSync(filepath)) {
-      fs.unlinkSync(filepath);
-    }
-    
-    res.json({ success: true, message: 'Image deleted successfully' });
+    const params = {
+      Bucket: BUCKET_NAME,
+      Key: `products/${filename}`,
+    };
+
+    await s3.deleteObject(params).promise();
+    res.json({ success: true, message: 'Image deleted successfully from R2' });
   } catch (error) {
+    console.error('Delete error:', error);
     res.status(500).json({ error: error.message });
   }
 });
-
-app.use('/uploads', express.static(uploadDir));
 
 // ========== AUTH ROUTES ==========
 app.post('/api/auth/login', async (req, res) => {
@@ -964,4 +975,4 @@ app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.url} not found` });
 });
 
-module.exports = app;
+module.exports = app; ye check kr sahi hai ya changes chahiye
