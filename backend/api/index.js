@@ -4,6 +4,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
+const cheerio = require('cheerio');
 
 const app = express();
 
@@ -791,6 +792,107 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
     await Coupon.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== AMAZON IMPORT ROUTES ==========
+
+// Amazon Scraper Function
+const scrapeAmazonProduct = async (url) => {
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    
+    // Extract product name
+    const name = $('#productTitle').text().trim() || 'Unknown Product';
+    
+    // Extract price
+    let price = $('#priceblock_ourprice').text();
+    if (!price) price = $('#priceblock_dealprice').text();
+    if (!price) price = $('.a-price-whole').first().text();
+    const priceMatch = price.match(/[\d,]+/);
+    const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
+    
+    // Extract original price
+    let originalPrice = $('#priceblock_wasprice').text();
+    if (!originalPrice) originalPrice = $('.a-text-strike').first().text();
+    const originalMatch = originalPrice.match(/[\d,]+/);
+    const finalOriginalPrice = originalMatch ? parseInt(originalMatch[0].replace(/,/g, '')) : 0;
+    
+    // Extract images
+    const images = [];
+    $('#imgTagWrapperId img, .a-dynamic-image, #landingImage').each((i, el) => {
+      let src = $(el).attr('src') || $(el).attr('data-old-hires');
+      if (src && src.includes('.jpg') && !images.includes(src)) {
+        src = src.split('._')[0] + '._SL1500_.jpg';
+        images.push(src);
+      }
+    });
+    
+    // Extract description
+    let description = $('#productDescription').text().trim();
+    if (!description) description = $('#feature-bullets').text().trim();
+    
+    // Extract features
+    const features = [];
+    $('#feature-bullets .a-list-item').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text) features.push(text);
+    });
+    
+    // Extract brand
+    let brand = $('#bylineInfo').text().trim();
+    if (!brand) brand = $('#brand').text().trim();
+    
+    return {
+      name,
+      brand: brand || '',
+      price: finalPrice,
+      originalPrice: finalOriginalPrice,
+      images: [...new Set(images)].slice(0, 5),
+      description: description.substring(0, 2000),
+      keyFeatures: features.slice(0, 10)
+    };
+    
+  } catch (error) {
+    console.error('Scraping error:', error.message);
+    throw new Error('Failed to fetch product details. Please check the URL.');
+  }
+};
+
+// 🔥 IMPORT FROM AMAZON - Admin AND Vendor both can use (adminMiddleware removed)
+app.post('/api/import/amazon', authMiddleware, async (req, res) => {
+  try {
+    const { url } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ error: 'Amazon URL is required' });
+    }
+    
+    if (!url.includes('amazon.in') && !url.includes('amazon.com')) {
+      return res.status(400).json({ error: 'Please enter a valid Amazon URL' });
+    }
+    
+    const scrapedData = await scrapeAmazonProduct(url);
+    
+    res.json({
+      success: true,
+      scraped: scrapedData,
+      message: 'Product details fetched successfully!'
+    });
+    
+  } catch (error) {
+    console.error('Import error:', error);
     res.status(500).json({ error: error.message });
   }
 });
