@@ -859,13 +859,6 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
 });
 
 // ========== 🔥 FULLY UPGRADED AMAZON IMPORT ROUTES ==========
-// 🔥 FIX 1: Full bullet points fetch (no limit)
-// 🔥 FIX 2: Variations auto-detect with garbage filtering (Buy Now, Subscribe removed)
-// 🔥 FIX 3: Key ingredients extraction
-// 🔥 FIX 4: Skin type detection
-// 🔥 FIX 5: Concerns detection
-// 🔥 FIX 6: Category & SubCategory auto-detect
-// 🔥 FIX 7: Brand clean
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -904,7 +897,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== 4. 🔥 FULL DESCRIPTION - ALL BULLET POINTS ==========
+    // ========== 4. FULL DESCRIPTION ==========
     let descriptionArray = [];
     
     $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small, .a-unordered-list .a-list-item').each((i, el) => {
@@ -952,7 +945,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== 6. 🔥 KEY INGREDIENTS EXTRACTION ==========
+    // ========== 6. KEY INGREDIENTS ==========
     let ingredients = '';
     const fullText = descriptionArray.join(' ') + ' ' + $('#productDescription').text();
     const ingredientsKeywords = ['ingredients', 'key ingredients', 'what\'s inside', 'formulated with', 'contains', 'active ingredients'];
@@ -966,7 +959,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    // ========== 7. 🔥 SKIN TYPE DETECTION ==========
+    // ========== 7. SKIN TYPE ==========
     let skinType = 'all';
     const skinTypeKeywords = {
       'oily': ['oily skin', 'excess oil', 'oil control', 'mattifying', 'sebum', 'pore', 'shine'],
@@ -986,7 +979,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    // ========== 8. 🔥 CONCERNS DETECTION ==========
+    // ========== 8. CONCERNS ==========
     const concernsMap = {
       'Acne': ['acne', 'pimple', 'breakout', 'blemish', 'spot', 'zits', 'clogged pores'],
       'Aging': ['aging', 'wrinkle', 'fine line', 'anti-aging', 'firming', 'collagen', 'elasticity'],
@@ -1008,7 +1001,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    // ========== 9. 🔥 BRAND EXTRACTION (CLEAN) ==========
+    // ========== 9. BRAND EXTRACTION ==========
     let brand = '';
     const bylineText = $('#bylineInfo').text().trim();
     if (bylineText) {
@@ -1024,7 +1017,7 @@ const scrapeAmazonProduct = async (url) => {
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
     if (brand && (brand.toLowerCase().includes('visit') || brand.toLowerCase().includes('store'))) brand = '';
     
-    // ========== 10. 🔥 VARIATIONS EXTRACTION WITH GARBAGE FILTER ==========
+    // ========== 10. 🔥 VARIATIONS EXTRACTION (UPDATED - Handles Table Variations) ==========
     let variations = [];
     
     // Words to filter out (buttons, actions, etc.)
@@ -1034,21 +1027,25 @@ const scrapeAmazonProduct = async (url) => {
       'coupon', 'promo', 'discount', 'see all', 'view more', 'shop now',
       'order now', 'get it', 'fast delivery', 'free shipping', 'subscribe now',
       'subscribe & save', 'auto delivery', 'one time purchase', 'secure transaction',
-      'cash on delivery', 'cod', 'emi', 'warranty', 'return policy', 'exchange'
+      'cash on delivery', 'cod', 'emi', 'warranty', 'return policy', 'exchange',
+      'click to see', 'full view', 'fulfilled', 'non-returnable', 'pay on delivery',
+      'amazon delivered', 'top brand', 'free delivery', 'secure transaction',
+      'pack of', 'bundle', 'set', 'combo', 'deal of the day'
     ];
     
     const isValidVariation = (text) => {
+      if (!text) return false;
       const lowerText = text.toLowerCase();
       for (const word of variationFilterWords) {
         if (lowerText.includes(word)) return false;
       }
       if (/[₹$£€]/.test(text)) return false;
       if (/^\d+$/.test(text)) return false;
-      if (text.length < 2 || text.length > 30) return false;
+      if (text.length < 2 || text.length > 40) return false;
       return true;
     };
     
-    // Method 1: Size dropdown
+    // 🔥 METHOD 1: Size dropdown
     $('#variation_size_name li, .a-dropdown-size select option, select[name="dropdown_selected_size_name"] option').each((i, el) => {
       let varText = $(el).text().trim();
       if (varText && varText !== 'Select' && varText !== 'Choose' && varText !== '--') {
@@ -1058,7 +1055,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Method 2: Color/Shade dropdown
+    // 🔥 METHOD 2: Color/Shade dropdown
     $('#variation_color_name li, .a-dropdown-color select option, #variation_color select option').each((i, el) => {
       let varText = $(el).text().trim();
       if (varText && varText !== 'Select' && varText !== 'Choose') {
@@ -1068,7 +1065,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Method 3: Twister swatches - SKIP BUTTONS
+    // 🔥 METHOD 3: Twister swatches
     $('.twisterSwatchWrapper .swatchElement, .a-button-stack .a-button').each((i, el) => {
       let varText = $(el).find('.a-button-text, .swatchTitle').last().text().trim();
       if (!varText) varText = $(el).text().trim();
@@ -1077,39 +1074,100 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Method 4: Extract sizes from description
-    if (variations.length === 0) {
-      const sizePattern = /(\d+(?:\.\d+)?)\s*(ml|g|kg|L|mg|gm)/gi;
-      const foundSizes = [];
-      let match;
-      while ((match = sizePattern.exec(fullText)) !== null) {
-        const size = match[1] + match[2];
-        if (!foundSizes.includes(size) && isValidVariation(size)) {
-          foundSizes.push(size);
-        }
+    // 🔥 METHOD 4: Extract sizes from description
+    const sizePattern = /(\d+(?:\.\d+)?)\s*(ml|g|kg|L|mg|gm)/gi;
+    const foundSizes = [];
+    let match;
+    while ((match = sizePattern.exec(fullText)) !== null) {
+      const size = match[1] + match[2];
+      if (!foundSizes.includes(size) && isValidVariation(size)) {
+        foundSizes.push(size);
       }
-      foundSizes.slice(0, 8).forEach(size => {
+    }
+    foundSizes.slice(0, 10).forEach(size => {
+      if (!variations.find(v => v.name === size)) {
         variations.push({ name: size, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-      });
-    }
+      }
+    });
     
-    // Method 5: Extract shades/colors from description
-    if (variations.length === 0) {
-      const shadePattern = /(Fair|Light|Medium|Tan|Deep|Red|Pink|Nude|Coral|Berry|Mauve|Brown|Black|Purple|Blue|Green|Yellow|Orange|Rose|Maroon|Teal|Beige|Ivory)/gi;
-      const foundShades = [];
-      let shadeMatch;
-      while ((shadeMatch = shadePattern.exec(fullText)) !== null) {
-        const shade = shadeMatch[1];
-        if (!foundShades.includes(shade) && isValidVariation(shade)) {
-          foundShades.push(shade);
+    // 🔥 METHOD 5: Extract shades/colors from description
+    const shadePattern = /(Fair|Light|Medium|Tan|Deep|Red|Pink|Nude|Coral|Berry|Mauve|Brown|Black|Purple|Blue|Green|Yellow|Orange|Rose|Maroon|Teal|Beige|Ivory)/gi;
+    const foundShades = [];
+    let shadeMatch;
+    while ((shadeMatch = shadePattern.exec(fullText)) !== null) {
+      const shade = shadeMatch[1];
+      if (!foundShades.includes(shade) && isValidVariation(shade)) {
+        foundShades.push(shade);
+      }
+    }
+    foundShades.slice(0, 10).forEach(shade => {
+      if (!variations.find(v => v.name === shade)) {
+        variations.push({ name: shade, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
+      }
+    });
+    
+    // 🔥🔥 METHOD 6: NEW - Extract from TABLE variations (like in your screenshot) 🔥🔥
+    $('table, .a-dynamic-list, .a-lineitem, [role="table"]').each((i, table) => {
+      $(table).find('tr, .a-row, .a-spacing-small').each((j, row) => {
+        const rowHtml = $(row).html();
+        const rowText = $(row).text().trim();
+        
+        // Look for size pattern in row
+        const sizeMatch = rowText.match(/(\d+)\s*(g|ml|kg|gm)(?:\s*\([^)]*\))?/i);
+        if (sizeMatch) {
+          const size = sizeMatch[0];
+          // Look for price in same row
+          const priceMatch = rowText.match(/₹(\d+(?:,\d+)?)/);
+          const variationPrice = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : finalPrice;
+          
+          if (isValidVariation(size) && !variations.find(v => v.name === size)) {
+            variations.push({ 
+              name: size, 
+              price: variationPrice, 
+              mrp: Math.round(variationPrice * 1.2),
+              stock: 10 
+            });
+          }
+        }
+      });
+    });
+    
+    // 🔥 METHOD 7: Extract from span with size and price together
+    $('span, .a-size-base, .a-size-small').each((i, el) => {
+      const text = $(el).text().trim();
+      const sizeMatch = text.match(/(\d+\s*(?:g|ml|gm|kg))\s*[–-]\s*₹(\d+)/i);
+      if (sizeMatch) {
+        const size = sizeMatch[1];
+        const price = parseInt(sizeMatch[2]);
+        if (isValidVariation(size) && !variations.find(v => v.name === size)) {
+          variations.push({ name: size, price: price, mrp: Math.round(price * 1.2), stock: 10 });
         }
       }
-      foundShades.slice(0, 8).forEach(shade => {
-        variations.push({ name: shade, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-      });
-    }
+    });
     
-    // ========== 11. CATEGORY & SUBCATEGORY DETECTION ==========
+    // 🔥 METHOD 8: Look for "Size:" or "Quantity:" labels
+    $('th, td, .a-text-bold, .a-spacing-base').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text.match(/size|quantity|pack/i) && !text.match(/click|view|see/i)) {
+        const parent = $(el).parent();
+        const parentText = parent.text();
+        const sizeMatch = parentText.match(/(\d+\s*(?:g|ml|gm|kg))/i);
+        if (sizeMatch && !variations.find(v => v.name === sizeMatch[0])) {
+          const priceMatch = parentText.match(/₹(\d+)/);
+          const price = priceMatch ? parseInt(priceMatch[1]) : finalPrice;
+          if (isValidVariation(sizeMatch[0])) {
+            variations.push({ name: sizeMatch[0], price: price, mrp: Math.round(price * 1.2), stock: 10 });
+          }
+        }
+      }
+    });
+    
+    // Remove duplicates based on name
+    variations = variations.filter((v, i, self) => 
+      i === self.findIndex((t) => t.name === v.name)
+    );
+    
+    // ========== 11. CATEGORY & SUBCATEGORY ==========
     const detectCategory = (productName, productDesc) => {
       const text = (productName + ' ' + productDesc).toLowerCase();
       const categoryKeywords = {
