@@ -24,10 +24,9 @@ function ProductDetail() {
   // Variant selection
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
-  const [selectedDesign, setSelectedDesign] = useState('');
   const [selectedVariant, setSelectedVariant] = useState(null);
   
-  // Pincode checker - Using Backend API
+  // Pincode checker
   const [pincode, setPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
@@ -256,13 +255,11 @@ function ProductDetail() {
     ? product.images 
     : ['https://via.placeholder.com/800x800?text=Product+Image'];
 
-  // 🔥 FIXED: Get description as array (Amazon style)
+  // 🔥 Amazon Style - Get description as array of bullet points
   const getDescriptionBullets = () => {
-    // If description is already an array
     if (product?.description && Array.isArray(product.description)) {
       return product.description;
     }
-    // If description is a string, try to split
     if (product?.description && typeof product.description === 'string') {
       if (product.description.includes('|')) {
         return product.description.split('|').map(b => b.trim());
@@ -272,10 +269,10 @@ function ProductDetail() {
       }
       return [product.description];
     }
-    return ['Premium quality product crafted with care.'];
+    return [];
   };
 
-  // Get key features
+  // 🔥 Get key features as array
   const getKeyFeatures = () => {
     if (product?.keyFeatures && product.keyFeatures.length > 0) {
       return product.keyFeatures;
@@ -283,17 +280,28 @@ function ProductDetail() {
     return [];
   };
 
-  // Get specifications
+  // 🔥 Get specifications as key-value pairs (Product Details)
   const getSpecifications = () => {
-    if (product?.specifications && Object.keys(product.specifications).length > 0) {
-      return product.specifications;
-    }
-    return {
-      'Brand': product?.brand || 'MyPinkShop',
-      'Category': product?.mainCategory || product?.category || 'General',
-      'SKU': product?.sku || product?._id?.slice(-8) || 'N/A',
-      'Return Policy': '7 days return'
-    };
+    const specs = {};
+    
+    if (product?.brand) specs['Brand'] = product.brand;
+    if (product?.mainCategory || product?.category) specs['Category'] = product.mainCategory || product.category;
+    if (product?.weight) specs['Weight'] = product.weight;
+    if (product?.dimensions) specs['Dimensions'] = product.dimensions;
+    if (product?.fabric) specs['Fabric'] = product.fabric;
+    if (product?.material) specs['Material'] = product.material;
+    if (product?.gender) specs['Gender'] = product.gender;
+    if (product?.skinType && product.skinType !== 'all') specs['Skin Type'] = product.skinType;
+    if (product?.hairType && product.hairType !== 'all') specs['Hair Type'] = product.hairType;
+    if (product?.finish) specs['Finish'] = product.finish;
+    if (product?.coverage) specs['Coverage'] = product.coverage;
+    if (product?.shade) specs['Shade'] = product.shade;
+    if (product?.ingredients) specs['Key Ingredients'] = product.ingredients;
+    if (product?.sku) specs['SKU'] = product.sku;
+    
+    specs['Return Policy'] = '7 days return';
+    
+    return specs;
   };
 
   if (loading) {
@@ -643,7 +651,7 @@ function ProductDetail() {
             {/* 🔥 AMAZON STYLE DESCRIPTION - Bullet Points */}
             {activeTab === 'description' && (
               <div className="space-y-4">
-                {descriptionBullets.length > 0 && (
+                {descriptionBullets.length > 0 ? (
                   <ul className="space-y-3">
                     {descriptionBullets.map((bullet, idx) => (
                       <li key={idx} className="flex items-start gap-3 text-gray-600">
@@ -652,6 +660,8 @@ function ProductDetail() {
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p className="text-gray-500 text-center py-4">No description available</p>
                 )}
                 
                 {/* Shipping Info */}
@@ -676,7 +686,7 @@ function ProductDetail() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">No key features listed</p>
+                  <p className="text-gray-500 text-center py-8">No product highlights listed</p>
                 )}
               </div>
             )}
