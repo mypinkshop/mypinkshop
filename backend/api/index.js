@@ -28,13 +28,14 @@ app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ========== Cloudflare R2 Configuration ==========
+// ========== Cloudflare R2 Configuration (FIXED) ==========
 const s3 = new AWS.S3({
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `http://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   accessKeyId: process.env.R2_ACCESS_KEY_ID,
   secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   signatureVersion: 'v4',
   region: 'auto',
+  s3ForcePathStyle: true,
 });
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
@@ -279,7 +280,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ========== UPLOAD ROUTES (R2 - VERCEL COMPATIBLE) ==========
+// ========== UPLOAD ROUTES (R2 - FIXED) ==========
 // Single image upload
 app.post('/api/upload', authMiddleware, upload.single('images'), async (req, res) => {
   try {
@@ -297,7 +298,6 @@ app.post('/api/upload', authMiddleware, upload.single('images'), async (req, res
       Key: filename,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
-      ACL: 'public-read',
     };
 
     await s3.upload(params).promise();
@@ -333,7 +333,6 @@ app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), asyn
         Key: filename,
         Body: file.buffer,
         ContentType: file.mimetype,
-        ACL: 'public-read',
       };
 
       await s3.upload(params).promise();
