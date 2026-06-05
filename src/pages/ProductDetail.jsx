@@ -21,6 +21,8 @@ function ProductDetail() {
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
   const [activeOffer, setActiveOffer] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
   
   const [selectedVariation, setSelectedVariation] = useState(null);
   const [selectedVariationId, setSelectedVariationId] = useState('');
@@ -44,6 +46,26 @@ function ProductDetail() {
     loadActiveOffer();
   }, []);
 
+  // Fetch related products
+  const fetchRelatedProducts = async (category) => {
+    if (!category) return;
+    
+    setLoadingRelated(true);
+    try {
+      const response = await fetch(`${API_URL}/api/products?category=${category}&limit=10`);
+      const data = await response.json();
+      
+      let related = Array.isArray(data) ? data : data.products || [];
+      related = related.filter(p => p._id !== id).slice(0, 6);
+      
+      setRelatedProducts(related);
+    } catch (error) {
+      console.error('Error fetching related products:', error);
+    } finally {
+      setLoadingRelated(false);
+    }
+  };
+
   useEffect(() => {
     const loadProduct = async () => {
       if (!id || id === 'undefined') {
@@ -65,6 +87,9 @@ function ProductDetail() {
         if (data && data._id) {
           setProduct(data);
           setSelectedImage(0);
+          
+          // Fetch related products based on category
+          fetchRelatedProducts(data.mainCategory || data.category);
           
           if (data.variations && data.variations.length > 0) {
             const defaultVariation = data.variations[0];
@@ -511,7 +536,7 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Variations - Horizontal Buttons (Original Style) */}
+            {/* Variations - Horizontal Buttons */}
             {hasVariations && product.variations && product.variations.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
@@ -652,7 +677,7 @@ function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs Section - Website Style (Not Amazon) */}
+        {/* Tabs Section */}
         <div className="mt-12">
           <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'features', 'specifications', 'reviews'].map(tab => (
@@ -669,6 +694,7 @@ function ProductDetail() {
           </div>
 
           <div className="py-6">
+            {/* Description */}
             {activeTab === 'description' && (
               <div className="space-y-4">
                 {descriptionBullets.length > 0 ? (
@@ -686,6 +712,7 @@ function ProductDetail() {
               </div>
             )}
 
+            {/* Features */}
             {activeTab === 'features' && (
               <div className="space-y-4">
                 {keyFeatures.length > 0 ? (
@@ -703,15 +730,20 @@ function ProductDetail() {
               </div>
             )}
 
+            {/* Specifications - Pink Gradient Style */}
             {activeTab === 'specifications' && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+              <div className="bg-gradient-to-r from-pink-50 to-white rounded-xl overflow-hidden border border-pink-100 shadow-sm">
                 <table className="w-full text-sm">
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-pink-100">
                     {Object.entries(specifications).length > 0 ? (
                       Object.entries(specifications).map(([key, value], idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                          <td className="px-4 py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
-                          <td className="px-4 py-3 text-gray-600 text-sm">{String(value)}</td>
+                        <tr key={idx} className="hover:bg-pink-100/30 transition duration-150">
+                          <td className="px-4 py-3 font-medium text-pink-700 w-1/3 text-sm bg-pink-50/50">
+                            {key}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 text-sm">
+                            {String(value)}
+                          </td>
                         </tr>
                       ))
                     ) : (
@@ -726,13 +758,101 @@ function ProductDetail() {
               </div>
             )}
 
+            {/* Reviews */}
             {activeTab === 'reviews' && (
               <ReviewSection productId={id} />
             )}
           </div>
         </div>
+
+        {/* 🔥 Related Products - You May Also Like */}
+        {relatedProducts.length > 0 && (
+          <div className="mt-16">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                You May Also Like
+              </h2>
+              <Link 
+                to={`/shop?category=${product.mainCategory || product.category}`} 
+                className="text-pink-500 text-sm hover:underline flex items-center gap-1"
+              >
+                View All <span className="text-base">→</span>
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+              {relatedProducts.map((relatedProduct) => (
+                <Link 
+                  key={relatedProduct._id} 
+                  to={`/product/${relatedProduct._id}`}
+                  className="group bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg hover:border-pink-200 transition-all duration-300"
+                >
+                  <div className="relative aspect-square overflow-hidden bg-gray-50">
+                    <img 
+                      src={relatedProduct.images?.[0] || 'https://via.placeholder.com/200'} 
+                      alt={relatedProduct.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                    {relatedProduct.badge && (
+                      <span className="absolute top-2 left-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                        {relatedProduct.badge}
+                      </span>
+                    )}
+                    {(relatedProduct.discountPercent > 0 || (relatedProduct.originalPrice > relatedProduct.price)) && (
+                      <span className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                        {relatedProduct.discountPercent || Math.round(((relatedProduct.originalPrice - relatedProduct.price) / relatedProduct.originalPrice) * 100)}% OFF
+                      </span>
+                    )}
+                    {relatedProduct.isNew && !relatedProduct.badge && (
+                      <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="p-3">
+                    <h3 className="text-xs sm:text-sm font-medium text-gray-800 line-clamp-2 min-h-[2.5rem]">
+                      {relatedProduct.name}
+                    </h3>
+                    <p className="text-[10px] text-gray-500 mt-1 truncate">
+                      {relatedProduct.brand || 'MyPinkShop'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-sm sm:text-base font-bold text-pink-600">
+                        ₹{relatedProduct.price}
+                      </span>
+                      {relatedProduct.originalPrice > relatedProduct.price && (
+                        <span className="text-[10px] text-gray-400 line-through">
+                          ₹{relatedProduct.originalPrice}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <div className="flex text-yellow-400 text-[10px]">
+                        {'★'.repeat(Math.floor(relatedProduct.rating || 4))}
+                        {'☆'.repeat(5 - Math.floor(relatedProduct.rating || 4))}
+                      </div>
+                      <span className="text-[10px] text-gray-400">
+                        ({relatedProduct.reviewCount || 0})
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {loadingRelated && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin w-8 h-8 border-3 border-pink-500 border-t-transparent rounded-full"></div>
+          </div>
+        )}
+
       </div>
 
+      {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -787,6 +907,12 @@ function ProductDetail() {
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>
