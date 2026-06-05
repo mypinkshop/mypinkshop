@@ -242,6 +242,13 @@ function AdminAddProduct() {
     attributes: {}
   });
 
+  // ============ DEFINE ALL ARRAYS HERE ============
+  const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
+  const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Creamy', 'Powder', 'Liquid', 'Velvet'];
+  const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer', 'Buildable'];
+  const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying', 'Thinning Hair'];
+  const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
+
   // Complete SubCategories with all options
   const subCategoriesOptions = {
     Skincare: [
@@ -1218,7 +1225,7 @@ function AdminAddProduct() {
                             <td colSpan="2"></td>
                           </tr>
                         </tfoot>
-                      </table>
+                       </table>
                     </div>
                   )}
                 </div>
