@@ -1,139 +1,168 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-// 🔥 Amazon Importer Component
+// 🔥 AMAZON IMPORTER - Multi-URL Support
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
-  const [url, setUrl] = useState('');
+  const [urls, setUrls] = useState(['']);
   const [loading, setLoading] = useState(false);
-  const [fetchedData, setFetchedData] = useState(null);
-  const [step, setStep] = useState(1);
+  const [importedProducts, setImportedProducts] = useState([]);
 
   const API_URL = 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
 
-  const fetchProduct = async () => {
-    if (!url.trim()) {
-      alert('Please enter Amazon product URL');
+  const addUrlField = () => {
+    if (urls.length < 20) {
+      setUrls([...urls, '']);
+    } else {
+      alert('Maximum 20 URLs allowed');
+    }
+  };
+
+  const removeUrlField = (index) => {
+    const newUrls = urls.filter((_, i) => i !== index);
+    setUrls(newUrls);
+  };
+
+  const updateUrl = (index, value) => {
+    const newUrls = [...urls];
+    newUrls[index] = value;
+    setUrls(newUrls);
+  };
+
+  const fetchAllProducts = async () => {
+    const validUrls = urls.filter(url => url.trim());
+    if (validUrls.length === 0) {
+      alert('Please enter at least one Amazon URL');
       return;
     }
 
     setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/import/amazon`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ url })
-      });
+    const results = [];
 
-      const data = await response.json();
+    for (let i = 0; i < validUrls.length; i++) {
+      const url = validUrls[i];
+      try {
+        const response = await fetch(`${API_URL}/api/import/amazon`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ url })
+        });
 
-      if (data.success) {
-        setFetchedData(data);
-        setStep(2);
-      } else {
-        alert(data.error || 'Failed to fetch product');
+        const data = await response.json();
+        if (data.success) {
+          results.push({ ...data.scraped, originalUrl: url });
+        } else {
+          results.push({ error: data.error, originalUrl: url });
+        }
+      } catch (error) {
+        results.push({ error: error.message, originalUrl: url });
       }
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('Failed to import product. Please check the URL.');
-    } finally {
-      setLoading(false);
     }
+
+    setImportedProducts(results);
+    setLoading(false);
   };
 
-  const importProduct = () => {
-    if (fetchedData) {
-      // Auto-fill form data
-      setFormData(prev => ({
-        ...prev,
-        productName: fetchedData.scraped.name,
-        brand: fetchedData.scraped.brand || prev.brand,
-        sellingPrice: fetchedData.scraped.price,
-        mrp: fetchedData.scraped.originalPrice || fetchedData.scraped.price * 1.2,
-        fullDescription: fetchedData.scraped.description ? [fetchedData.scraped.description] : [],
-        keyFeatures: fetchedData.scraped.keyFeatures || []
-      }));
-      
-      // Auto-fill images
-      if (fetchedData.scraped.images && fetchedData.scraped.images.length > 0) {
-        setImages(fetchedData.scraped.images);
-      }
-      
-      alert('✅ Product details imported! Please review and continue.');
-      onProductImported();
+  const importToForm = (product) => {
+    let descriptionArray = [];
+    if (typeof product.description === 'string') {
+      descriptionArray = [product.description];
+    } else if (Array.isArray(product.description)) {
+      descriptionArray = product.description;
+    } else if (product.description) {
+      descriptionArray = [product.description];
     }
+    
+    setFormData(prev => ({
+      ...prev,
+      productName: product.name,
+      brand: product.brand || prev.brand,
+      sellingPrice: product.price,
+      mrp: product.originalPrice || product.price * 1.2,
+      fullDescription: descriptionArray,
+      keyFeatures: product.keyFeatures || []
+    }));
+    
+    if (product.images && product.images.length > 0) {
+      setImages(product.images);
+    }
+    
+    alert(`✅ "${product.name.substring(0, 50)}..." imported to form!`);
+    if (onProductImported) onProductImported();
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6 mb-6">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-        📦 Import from Amazon
+    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200 p-6 mb-6 shadow-lg">
+      <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+        <span className="text-3xl">📦</span> Import from Amazon
+        <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded-full ml-2">Multi-URL Support</span>
       </h3>
+      <p className="text-sm text-gray-600 mb-4">Paste Amazon product URLs to automatically fetch product details (Up to 20 URLs)</p>
       
-      {step === 1 && (
-        <>
-          <p className="text-sm text-gray-500 mb-4">
-            Paste Amazon product URL to automatically fetch product details
-          </p>
-          <div className="flex gap-3">
+      <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+        {urls.map((url, idx) => (
+          <div key={idx} className="flex gap-2">
             <input
               type="text"
               placeholder="https://www.amazon.in/dp/XXXXXXXXXX"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="flex-1 border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:border-pink-500"
+              onChange={(e) => updateUrl(idx, e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 bg-white"
             />
-            <button
-              onClick={fetchProduct}
-              disabled={loading}
-              className="px-6 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg font-medium hover:shadow-lg transition disabled:opacity-50"
-            >
-              {loading ? 'Fetching...' : '🔍 Fetch Product'}
-            </button>
-          </div>
-          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-600">
-              💡 Tip: Paste Amazon.in product URL. Product name, price, images, and description will be auto-filled.
-            </p>
-          </div>
-        </>
-      )}
-
-      {step === 2 && fetchedData && (
-        <div className="border-t pt-4">
-          <div className="flex gap-4 mb-4">
-            {fetchedData.scraped.images?.[0] && (
-              <img 
-                src={fetchedData.scraped.images[0]} 
-                alt={fetchedData.scraped.name}
-                className="w-20 h-20 object-cover rounded-lg border"
-              />
+            {urls.length > 1 && (
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition">
+                ✕
+              </button>
             )}
-            <div className="flex-1">
-              <h4 className="font-semibold text-gray-800">{fetchedData.scraped.name}</h4>
-              <p className="text-sm text-gray-500">Brand: {fetchedData.scraped.brand || 'N/A'}</p>
-              <p className="text-lg font-bold text-pink-600">₹{fetchedData.scraped.price}</p>
-            </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep(1)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={importProduct}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-medium hover:shadow-lg transition"
-            >
-              📥 Import to Form
-            </button>
+        ))}
+      </div>
+      
+      <div className="flex gap-3 mb-4">
+        <button onClick={addUrlField} className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium flex items-center gap-1">
+          ➕ Add Another URL ({urls.length}/20)
+        </button>
+        <button onClick={fetchAllProducts} disabled={loading} className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:shadow-lg transition disabled:opacity-50 flex items-center gap-2">
+          {loading ? '⏳ Fetching...' : '🔍 Fetch All Products'}
+        </button>
+      </div>
+      
+      {importedProducts.length > 0 && (
+        <div className="mt-4 border-t pt-4">
+          <h4 className="font-semibold text-gray-700 mb-3">📋 Fetched Products ({importedProducts.length})</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {importedProducts.map((product, idx) => (
+              <div key={idx} className={`p-3 rounded-lg flex justify-between items-center ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-md transition'}`}>
+                <div className="flex-1">
+                  {product.error ? (
+                    <>
+                      <p className="text-sm text-red-600 font-medium">❌ Failed: {product.originalUrl}</p>
+                      <p className="text-xs text-red-400">{product.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-gray-800 text-sm">{product.name.substring(0, 60)}...</p>
+                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'}</p>
+                    </>
+                  )}
+                </div>
+                {!product.error && (
+                  <button onClick={() => importToForm(product)} className="ml-3 px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition whitespace-nowrap">
+                    📥 Import
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
+      
+      <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+        <p className="text-xs text-blue-600">💡 Tip: You can paste up to 20 Amazon URLs at once. Products will be fetched and you can import them one by one.</p>
+      </div>
     </div>
   );
 };
@@ -177,9 +206,6 @@ function AdminAddProduct() {
     gender: 'unisex',
     weight: '',
     dimensions: '',
-    seoTitle: '',
-    seoDescription: '',
-    seoKeywords: '',
   });
   
   // Variations System
@@ -532,9 +558,6 @@ function AdminAddProduct() {
       dimensions: formData.dimensions,
       variations: variations,
       hasVariations: variations.length > 0,
-      seoTitle: formData.seoTitle,
-      seoDescription: formData.seoDescription,
-      seoKeywords: formData.seoKeywords,
       status: 'active',
       adminApproved: true,
       isNew: true,
@@ -610,7 +633,7 @@ function AdminAddProduct() {
             <Link to="/admin/inventory" className="text-gray-500 hover:text-gray-700"><IconBack /></Link>
             <div>
               <h1 className="text-xl font-semibold">Add Product</h1>
-              <p className="text-xs text-gray-500">Professional Product Management</p>
+              <p className="text-xs text-gray-500">Amazon Style Product Listing</p>
             </div>
           </div>
           <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-2 rounded-lg text-sm font-medium">
@@ -620,39 +643,48 @@ function AdminAddProduct() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Progress Steps */}
+        {/* Progress Steps - Only 4 Steps (No SEO) */}
         <div className="bg-white rounded-lg shadow-sm border p-4 mb-8 overflow-x-auto">
-          <div className="flex justify-between min-w-[500px]">
-            {['Basic', 'Images', 'Pricing', 'Details', 'SEO'].map((label, idx) => (
+          <div className="flex justify-between min-w-[400px]">
+            {['Basic', 'Images', 'Pricing', 'Details'].map((label, idx) => (
               <div key={idx} className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= idx + 1 ? 'bg-pink-600 text-white' : 'bg-gray-200 text-gray-400'}`}>
                   {step > idx + 1 ? '✓' : idx + 1}
                 </div>
                 <span className={`text-xs ml-2 ${step >= idx + 1 ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
-                {idx < 4 && <div className="w-8 h-px bg-gray-200 mx-2"></div>}
+                {idx < 3 && <div className="w-8 h-px bg-gray-200 mx-2"></div>}
               </div>
             ))}
           </div>
         </div>
 
-        {/* 🔥 Amazon Import Tab - Added */}
+        {/* TABS - Manual vs Import */}
         <div className="mb-6">
-          <div className="flex gap-2 border-b border-gray-200">
+          <div className="flex gap-3 border-b border-gray-200">
             <button
               onClick={() => setActiveTab('manual')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'manual' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'}`}
+              className={`px-6 py-3 text-base font-medium rounded-t-lg transition-all ${
+                activeTab === 'manual' 
+                  ? 'bg-pink-600 text-white shadow-lg' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
               ✏️ Manual Entry
             </button>
             <button
               onClick={() => setActiveTab('import')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'import' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'}`}
+              className={`px-6 py-3 text-base font-medium rounded-t-lg transition-all ${
+                activeTab === 'import' 
+                  ? 'bg-purple-600 text-white shadow-lg' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
               📦 Import from Amazon
             </button>
           </div>
         </div>
 
+        {/* AMAZON IMPORTER */}
         {activeTab === 'import' && (
           <AmazonImporter 
             onProductImported={() => setActiveTab('manual')} 
@@ -662,6 +694,7 @@ function AdminAddProduct() {
           />
         )}
 
+        {/* MANUAL ENTRY FORM */}
         {activeTab === 'manual' && (
           <>
             {/* Step 1 - Basic Information */}
@@ -770,14 +803,16 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* Step 4 - Product Details with Variations */}
+            {/* Step 4 - Product Details (Amazon Style) */}
             {step === 4 && (
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <h2 className="text-lg font-semibold mb-4">✨ Product Details</h2>
                 
-                {/* Bullet Points Description */}
+                {/* About this item - Bullet Points (Amazon Style) */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-2">Product Description (Bullet Points) <span className="text-xs text-gray-400 ml-2">Max 8 points</span></label>
+                  <label className="block text-sm font-medium mb-2">
+                    About this item <span className="text-xs text-gray-400 ml-2">(Bullet points - Max 8)</span>
+                  </label>
                   <div className="space-y-2 mb-3">
                     {formData.fullDescription.map((bullet, idx) => (
                       <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
@@ -789,18 +824,30 @@ function AdminAddProduct() {
                   </div>
                   {formData.fullDescription.length < 8 && (
                     <div className="flex gap-2">
-                      <input type="text" value={currentBullet} onChange={(e) => setCurrentBullet(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addBulletPoint()} placeholder="e.g., Dermatologically tested" className="flex-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-500" />
-                      <button onClick={addBulletPoint} className="px-5 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition flex items-center gap-1"><IconPlus /> Add</button>
+                      <input 
+                        type="text" 
+                        value={currentBullet} 
+                        onChange={(e) => setCurrentBullet(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addBulletPoint()}
+                        placeholder="e.g., Dermatologically tested for sensitive skin"
+                        className="flex-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-500"
+                      />
+                      <button onClick={addBulletPoint} className="px-5 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition flex items-center gap-1">
+                        <IconPlus /> Add
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Key Features */}
+                {/* Product Highlights - Key Features */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-1">Key Features (Highlights)</label>
+                  <label className="block text-sm font-medium mb-1">Product Highlights</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {formData.keyFeatures.map((f, i) => (
-                      <span key={i} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">⭐ {f}<button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button></span>
+                      <span key={i} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                        ✓ {f}
+                        <button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button>
+                      </span>
                     ))}
                   </div>
                   <div className="flex gap-2">
@@ -813,7 +860,7 @@ function AdminAddProduct() {
                 <div className="border-t pt-4 mb-6">
                   <div className="flex justify-between items-center mb-4">
                     <div>
-                      <h3 className="font-medium text-gray-800 text-lg">🎨 Product Variations</h3>
+                      <h3 className="font-medium text-gray-800 text-lg">Product Variations</h3>
                       <p className="text-xs text-gray-500">
                         {formData.category === 'Skincare' && 'Add different sizes (ml/gm) and fragrances'}
                         {formData.category === 'Makeup' && 'Add different shades and finishes'}
@@ -946,7 +993,7 @@ function AdminAddProduct() {
                 {/* Category Specific Fields */}
                 {formData.category === 'Skincare' && (
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">🧴 Skincare Specific</h3>
+                    <h3 className="font-medium">Skincare Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-sm font-medium mb-1">Skin Type</label><select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="all">All Skin Types</option><option value="oily">Oily</option><option value="dry">Dry</option><option value="combination">Combination</option><option value="sensitive">Sensitive</option></select></div>
                       <div><label className="block text-sm font-medium mb-1">Key Ingredients</label><input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C, Hyaluronic Acid" /></div>
@@ -957,7 +1004,7 @@ function AdminAddProduct() {
 
                 {formData.category === 'Makeup' && (
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">💄 Makeup Specific</h3>
+                    <h3 className="font-medium">Makeup Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-sm font-medium mb-1">Shade / Color</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red" /></div>
                       <div><label className="block text-sm font-medium mb-1">Finish</label><select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Finish</option>{makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
@@ -968,7 +1015,7 @@ function AdminAddProduct() {
 
                 {formData.category === 'Hair' && (
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">💇‍♀️ Hair Specific</h3>
+                    <h3 className="font-medium">Hair Care Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-sm font-medium mb-1">Hair Type</label><select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">{hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}</select></div>
                       <div><label className="block text-sm font-medium mb-1">Hair Concerns</label><div className="flex flex-wrap gap-3">{hairConcernsList.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), concern] : (formData.hairConcerns || []).filter(c => c !== concern); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
@@ -978,7 +1025,7 @@ function AdminAddProduct() {
 
                 {formData.category === 'Clothing' && (
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">👗 Clothing Specific</h3>
+                    <h3 className="font-medium">Clothing Details</h3>
                     <div><label className="block text-sm font-medium mb-1">Fabric / Material</label><input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Cotton, Silk, Polyester" /></div>
                     <div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div>
                   </div>
@@ -986,26 +1033,18 @@ function AdminAddProduct() {
 
                 {formData.category === 'Accessories' && (
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">💍 Accessories Specific</h3>
+                    <h3 className="font-medium">Accessories Details</h3>
                     <div><label className="block text-sm font-medium mb-1">Material</label><input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Silver, Gold, Leather" /></div>
                     <div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div>
                   </div>
                 )}
 
-                <div className="flex justify-between mt-6"><button onClick={() => setStep(3)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={() => setStep(5)} className="bg-pink-600 text-white px-6 py-2 rounded-lg">Continue →</button></div>
-              </div>
-            )}
-
-            {/* Step 5 - SEO */}
-            {step === 5 && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold mb-4">🔍 SEO (Optional)</h2>
-                <div className="space-y-4">
-                  <div><label className="block text-sm font-medium mb-1">SEO Title</label><input type="text" value={formData.seoTitle} onChange={(e) => setFormData({...formData, seoTitle: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Leave empty for auto" /></div>
-                  <div><label className="block text-sm font-medium mb-1">SEO Description</label><textarea rows="2" value={formData.seoDescription} onChange={(e) => setFormData({...formData, seoDescription: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Leave empty for auto" /></div>
-                  <div><label className="block text-sm font-medium mb-1">SEO Keywords</label><input type="text" value={formData.seoKeywords} onChange={(e) => setFormData({...formData, seoKeywords: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="comma, separated, keywords" /></div>
+                <div className="flex justify-between mt-6">
+                  <button onClick={() => setStep(3)} className="px-6 py-2 border rounded-lg hover:bg-gray-50 transition">← Back</button>
+                  <button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50">
+                    {loading ? 'Saving...' : '✓ Submit Product'}
+                  </button>
                 </div>
-                <div className="flex justify-between mt-6"><button onClick={() => setStep(4)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-6 py-2 rounded-lg">{loading ? 'Submitting...' : '✓ Submit Product'}</button></div>
               </div>
             )}
           </>
