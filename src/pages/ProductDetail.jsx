@@ -21,10 +21,9 @@ function ProductDetail() {
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
   
-  // Variant selection
-  const [selectedSize, setSelectedSize] = useState('');
-  const [selectedColor, setSelectedColor] = useState('');
-  const [selectedVariant, setSelectedVariant] = useState(null);
+  // Variant selection (for products with variations)
+  const [selectedVariation, setSelectedVariation] = useState(null);
+  const [selectedVariationId, setSelectedVariationId] = useState('');
   
   // Pincode checker
   const [pincode, setPincode] = useState('');
@@ -56,14 +55,11 @@ function ProductDetail() {
           setProduct(data);
           setSelectedImage(0);
           
-          if (data.sizes && data.sizes.length > 0) {
-            setSelectedSize(data.sizes[0]);
-          }
-          if (data.colors && data.colors.length > 0) {
-            setSelectedColor(data.colors[0]);
-          }
-          if (data.variants && data.variants.length > 0) {
-            setSelectedVariant(data.variants[0]);
+          // Set default selected variation if variations exist
+          if (data.variations && data.variations.length > 0) {
+            const defaultVariation = data.variations[0];
+            setSelectedVariation(defaultVariation);
+            setSelectedVariationId(defaultVariation.id || defaultVariation._id);
           }
         } else {
           setProduct(null);
@@ -79,20 +75,7 @@ function ProductDetail() {
     loadProduct();
   }, [id]);
 
-  // Update price when variant changes
-  useEffect(() => {
-    if (product?.variants && product.variants.length > 0) {
-      const matchingVariant = product.variants.find(v => 
-        (!selectedSize || v.size === selectedSize) &&
-        (!selectedColor || v.color === selectedColor)
-      );
-      if (matchingVariant) {
-        setSelectedVariant(matchingVariant);
-      }
-    }
-  }, [selectedSize, selectedColor, product]);
-
-  // Pincode delivery check using Backend API
+  // Pincode delivery check
   const checkDelivery = async () => {
     if (!pincode || pincode.length !== 6) {
       alert('Please enter a valid 6-digit pincode');
@@ -105,10 +88,10 @@ function ProductDetail() {
     try {
       const response = await fetch(`${API_URL}/api/shipping/check-delivery`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': application/json' },
         body: JSON.stringify({ 
           pincode: pincode, 
-          cartTotal: product?.price || 0,
+          cartTotal: getCurrentPrice(),
           weight: product?.weight || 0.5
         })
       });
@@ -159,20 +142,70 @@ function ProductDetail() {
   };
 
   const increaseQuantity = () => {
-    const maxStock = selectedVariant?.stock || product?.stock || 0;
+    const maxStock = getCurrentStock();
     if (quantity < maxStock) {
       setQuantity(quantity + 1);
     }
   };
 
   const getCurrentPrice = () => {
-    if (selectedVariant?.price) return selectedVariant.price;
-    return product?.price || 0;
+    if (selectedVariation?.price) return selectedVariation.price;
+    return product?.price || product?.sellingPrice || 0;
   };
 
   const getCurrentStock = () => {
-    if (selectedVariant?.stock !== undefined) return selectedVariant.stock;
+    if (selectedVariation?.stock !== undefined) return selectedVariation.stock;
     return product?.stock || 0;
+  };
+
+  const getCurrentMrp = () => {
+    if (selectedVariation?.mrp) return selectedVariation.mrp;
+    return product?.originalPrice || product?.mrp || getCurrentPrice() * 1.2;
+  };
+
+  const getDiscountPercent = () => {
+    const mrp = getCurrentMrp();
+    const price = getCurrentPrice();
+    if (mrp > price) {
+      return Math.round(((mrp - price) / mrp) * 100);
+    }
+    return 0;
+  };
+
+  const getVariationType = () => {
+    if (!product?.variations || product.variations.length === 0) return null;
+    
+    // Detect variation type from first variation
+    const firstVar = product.variations[0];
+    if (firstVar.name && firstVar.secondaryName) {
+      // This could be size+color, size+fragrance, etc.
+      return { primary: 'option', secondary: 'variant' };
+    }
+    if (firstVar.name) {
+      return { primary: 'option', secondary: null };
+    }
+    return null;
+  };
+
+  const getPrimaryOptions = () => {
+    if (!product?.variations) return [];
+    return [...new Set(product.variations.map(v => v.name).filter(Boolean))];
+  };
+
+  const getSecondaryOptions = (primaryName) => {
+    if (!product?.variations) return [];
+    return product.variations
+      .filter(v => v.name === primaryName)
+      .map(v => v.secondaryName)
+      .filter(Boolean);
+  };
+
+  const handleVariationChange = (variationId) => {
+    const variation = product.variations.find(v => (v.id || v._id) === variationId);
+    if (variation) {
+      setSelectedVariation(variation);
+      setSelectedVariationId(variationId);
+    }
   };
 
   const handleCartButtonClick = () => {
@@ -183,29 +216,27 @@ function ProductDetail() {
       return;
     }
     
-    if (product.sizes?.length > 0 && !selectedSize) {
-      alert('Please select a size');
-      return;
-    }
-    if (product.colors?.length > 0 && !selectedColor) {
-      alert('Please select a color');
-      return;
-    }
-    
     if (addedToCart) {
       navigate('/cart');
     } else {
-      addToCart({ 
+      const cartItem = { 
         id: product._id,
         name: product.name, 
         price: getCurrentPrice(),
         quantity: quantity,
-        size: selectedSize,
-        color: selectedColor,
         image: product.images && product.images[0] ? product.images[0] : null,
         category: product.category,
         stock: getCurrentStock()
-      });
+      };
+      
+      // Add variation details if selected
+      if (selectedVariation) {
+        cartItem.variationName = selectedVariation.name;
+        cartItem.variationSecondary = selectedVariation.secondaryName;
+        cartItem.variationId = selectedVariation.id || selectedVariation._id;
+      }
+      
+      addToCart(cartItem);
       setAddedToCart(true);
     }
   };
@@ -218,26 +249,23 @@ function ProductDetail() {
       return;
     }
     
-    if (product.sizes?.length > 0 && !selectedSize) {
-      alert('Please select a size');
-      return;
-    }
-    if (product.colors?.length > 0 && !selectedColor) {
-      alert('Please select a color');
-      return;
-    }
-    
-    addToCart({ 
+    const cartItem = { 
       id: product._id,
       name: product.name, 
       price: getCurrentPrice(),
       quantity: quantity,
-      size: selectedSize,
-      color: selectedColor,
       image: product.images && product.images[0] ? product.images[0] : null,
       category: product.category,
       stock: getCurrentStock()
-    });
+    };
+    
+    if (selectedVariation) {
+      cartItem.variationName = selectedVariation.name;
+      cartItem.variationSecondary = selectedVariation.secondaryName;
+      cartItem.variationId = selectedVariation.id || selectedVariation._id;
+    }
+    
+    addToCart(cartItem);
     navigate('/cart');
   };
 
@@ -255,24 +283,27 @@ function ProductDetail() {
     ? product.images 
     : ['https://via.placeholder.com/800x800?text=Product+Image'];
 
-  // 🔥 Amazon Style - Get description as array of bullet points
+  // Get description as array of bullet points
   const getDescriptionBullets = () => {
     if (product?.description && Array.isArray(product.description)) {
-      return product.description;
+      return product.description.filter(b => b && b.trim());
     }
     if (product?.description && typeof product.description === 'string') {
       if (product.description.includes('|')) {
-        return product.description.split('|').map(b => b.trim());
+        return product.description.split('|').map(b => b.trim()).filter(b => b);
       }
       if (product.description.includes('\n')) {
-        return product.description.split('\n').filter(b => b.trim() && b.length > 10);
+        return product.description.split('\n').filter(b => b.trim() && b.length > 5);
       }
       return [product.description];
+    }
+    if (product?.fullDescription && Array.isArray(product.fullDescription)) {
+      return product.fullDescription.filter(b => b && b.trim());
     }
     return [];
   };
 
-  // 🔥 Get key features as array
+  // Get key features as array
   const getKeyFeatures = () => {
     if (product?.keyFeatures && product.keyFeatures.length > 0) {
       return product.keyFeatures;
@@ -280,7 +311,7 @@ function ProductDetail() {
     return [];
   };
 
-  // 🔥 Get specifications as key-value pairs (Product Details)
+  // Get specifications as key-value pairs
   const getSpecifications = () => {
     const specs = {};
     
@@ -290,14 +321,15 @@ function ProductDetail() {
     if (product?.dimensions) specs['Dimensions'] = product.dimensions;
     if (product?.fabric) specs['Fabric'] = product.fabric;
     if (product?.material) specs['Material'] = product.material;
-    if (product?.gender) specs['Gender'] = product.gender;
-    if (product?.skinType && product.skinType !== 'all') specs['Skin Type'] = product.skinType;
-    if (product?.hairType && product.hairType !== 'all') specs['Hair Type'] = product.hairType;
+    if (product?.gender && product.gender !== 'unisex') specs['Gender'] = product.gender === 'men' ? 'Men' : product.gender === 'women' ? 'Women' : 'Kids';
+    if (product?.skinType && product.skinType !== 'all') specs['Skin Type'] = product.skinType.charAt(0).toUpperCase() + product.skinType.slice(1);
+    if (product?.hairType && product.hairType !== 'all') specs['Hair Type'] = product.hairType.charAt(0).toUpperCase() + product.hairType.slice(1);
     if (product?.finish) specs['Finish'] = product.finish;
     if (product?.coverage) specs['Coverage'] = product.coverage;
     if (product?.shade) specs['Shade'] = product.shade;
     if (product?.ingredients) specs['Key Ingredients'] = product.ingredients;
     if (product?.sku) specs['SKU'] = product.sku;
+    if (product?.tax) specs['GST'] = `${product.tax}%`;
     
     specs['Return Policy'] = '7 days return';
     
@@ -337,9 +369,12 @@ function ProductDetail() {
   const specifications = getSpecifications();
   const currentPrice = getCurrentPrice();
   const currentStock = getCurrentStock();
+  const currentMrp = getCurrentMrp();
+  const discountPercent = getDiscountPercent();
   const isButtonDisabled = currentStock === 0 || quantity < 1;
-  const showSizeSelector = product.sizes && product.sizes.length > 0;
-  const showColorSelector = product.colors && product.colors.length > 0;
+  const hasVariations = product.variations && product.variations.length > 0;
+  const primaryOptions = getPrimaryOptions();
+  const variationType = getVariationType();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -400,12 +435,12 @@ function ProductDetail() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm flex-wrap">
           <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
           <span className="text-gray-400">/</span>
           <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition">Shop</Link>
           <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium truncate">{product.name}</span>
+          <span className="text-pink-600 font-medium truncate max-w-[200px] sm:max-w-md">{product.name}</span>
         </div>
       </div>
 
@@ -478,59 +513,66 @@ function ProductDetail() {
 
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-2xl sm:text-3xl font-bold text-pink-600">₹{currentPrice}</span>
-              {product.originalPrice && product.originalPrice > currentPrice && (
+              {currentMrp > currentPrice && (
                 <>
-                  <span className="text-sm text-gray-400 line-through">₹{product.originalPrice}</span>
+                  <span className="text-sm text-gray-400 line-through">₹{currentMrp}</span>
                   <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
-                    {Math.round(((product.originalPrice - currentPrice) / product.originalPrice) * 100)}% OFF
+                    {discountPercent}% OFF
                   </span>
                 </>
               )}
             </div>
 
-            {/* SIZE SELECTOR */}
-            {showSizeSelector && (
+            {/* Variations Selector - For products with variations */}
+            {hasVariations && primaryOptions.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
-                  Select Size <span className="text-red-500">*</span>
+                  Select {variationType?.primary === 'option' ? 'Option' : 'Variation'}
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((size) => (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                        selectedSize === size
-                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
-                          : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
+                  {product.variations.map((variation) => {
+                    const variationId = variation.id || variation._id;
+                    const displayName = variation.secondaryName 
+                      ? `${variation.name} - ${variation.secondaryName}`
+                      : variation.name;
+                    const isSelected = selectedVariationId === variationId;
+                    
+                    return (
+                      <button
+                        key={variationId}
+                        onClick={() => handleVariationChange(variationId)}
+                        className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
+                            : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
+                        }`}
+                      >
+                        {displayName}
+                        {variation.price !== product.price && (
+                          <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* COLOR SELECTOR */}
-            {showColorSelector && (
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-sm font-medium text-gray-800 mb-3">Select Color</h3>
-                <div className="flex flex-wrap gap-3">
-                  {product.colors.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setSelectedColor(color)}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                        selectedColor === color
-                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
-                          : 'border-gray-300 text-gray-700 hover:border-pink-400'
-                      }`}
-                    >
-                      {color}
-                    </button>
-                  ))}
-                </div>
+            {/* Selected Variation Details */}
+            {selectedVariation && selectedVariation.sku && (
+              <div className="text-xs text-gray-400">
+                SKU: {selectedVariation.sku}
+              </div>
+            )}
+
+            {/* Stock Status */}
+            {currentStock > 0 ? (
+              <div className="text-sm text-green-600">
+                ✅ In Stock ({currentStock} available)
+              </div>
+            ) : (
+              <div className="text-sm text-red-600">
+                ❌ Out of Stock
               </div>
             )}
 
@@ -567,17 +609,19 @@ function ProductDetail() {
             </div>
 
             {/* Quantity Selector */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center border border-gray-300 rounded-full">
-                  <button onClick={decreaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium">-</button>
-                  <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
-                  <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= currentStock}>+</button>
+            {currentStock > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center border border-gray-300 rounded-full">
+                    <button onClick={decreaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium">-</button>
+                    <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
+                    <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= currentStock}>+</button>
+                  </div>
+                  {quantity === 0 && <span className="text-amber-500 text-sm">⚠ Select quantity</span>}
                 </div>
-                {quantity === 0 && <span className="text-amber-500 text-sm">⚠ Select quantity</span>}
               </div>
-            </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -609,22 +653,20 @@ function ProductDetail() {
 
             {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
-              {Object.entries(specifications).map(([key, value], idx) => (
+              {Object.entries(specifications).slice(0, 5).map(([key, value], idx) => (
                 <div key={idx} className="flex flex-wrap justify-between py-1 gap-2">
                   <span className="text-gray-500">{key}:</span>
                   <span className="text-gray-800 font-medium text-right">{String(value)}</span>
                 </div>
               ))}
-              {selectedSize && showSizeSelector && (
+              {selectedVariation && (
                 <div className="flex flex-wrap justify-between py-1 gap-2 border-t border-gray-200 pt-2 mt-1">
-                  <span className="text-gray-500">Selected Size:</span>
-                  <span className="text-gray-800 font-medium text-right">{selectedSize}</span>
-                </div>
-              )}
-              {selectedColor && showColorSelector && (
-                <div className="flex flex-wrap justify-between py-1 gap-2">
-                  <span className="text-gray-500">Selected Color:</span>
-                  <span className="text-gray-800 font-medium text-right">{selectedColor}</span>
+                  <span className="text-gray-500">Selected:</span>
+                  <span className="text-gray-800 font-medium text-right">
+                    {selectedVariation.secondaryName 
+                      ? `${selectedVariation.name} - ${selectedVariation.secondaryName}`
+                      : selectedVariation.name}
+                  </span>
                 </div>
               )}
             </div>
@@ -648,7 +690,7 @@ function ProductDetail() {
           </div>
 
           <div className="py-6">
-            {/* 🔥 AMAZON STYLE DESCRIPTION - Bullet Points */}
+            {/* Amazon Style Description - Bullet Points */}
             {activeTab === 'description' && (
               <div className="space-y-4">
                 {descriptionBullets.length > 0 ? (
@@ -661,7 +703,7 @@ function ProductDetail() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-gray-500 text-center py-4">No description available</p>
+                  <p className="text-gray-500 text-center py-8">No description available</p>
                 )}
                 
                 {/* Shipping Info */}
@@ -673,7 +715,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 KEY FEATURES - Amazon Style Highlights */}
+            {/* Key Features - Amazon Style Highlights */}
             {activeTab === 'features' && (
               <div className="space-y-4">
                 {keyFeatures.length > 0 ? (
@@ -691,7 +733,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 SPECIFICATIONS - Amazon Style Product Details */}
+            {/* Specifications - Amazon Style Product Details Table */}
             {activeTab === 'specifications' && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
