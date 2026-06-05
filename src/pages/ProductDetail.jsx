@@ -93,7 +93,7 @@ function ProductDetail() {
     }
   }, [selectedSize, selectedColor, product]);
 
-  // 🔥 FIXED: Pincode delivery check using Backend API
+  // Pincode delivery check using Backend API
   const checkDelivery = async () => {
     if (!pincode || pincode.length !== 6) {
       alert('Please enter a valid 6-digit pincode');
@@ -256,17 +256,44 @@ function ProductDetail() {
     ? product.images 
     : ['https://via.placeholder.com/800x800?text=Product+Image'];
 
+  // 🔥 FIXED: Get description as array (Amazon style)
   const getDescriptionBullets = () => {
+    // If description is already an array
+    if (product?.description && Array.isArray(product.description)) {
+      return product.description;
+    }
+    // If description is a string, try to split
     if (product?.description && typeof product.description === 'string') {
       if (product.description.includes('|')) {
         return product.description.split('|').map(b => b.trim());
       }
       if (product.description.includes('\n')) {
-        return product.description.split('\n').filter(b => b.trim());
+        return product.description.split('\n').filter(b => b.trim() && b.length > 10);
       }
       return [product.description];
     }
     return ['Premium quality product crafted with care.'];
+  };
+
+  // Get key features
+  const getKeyFeatures = () => {
+    if (product?.keyFeatures && product.keyFeatures.length > 0) {
+      return product.keyFeatures;
+    }
+    return [];
+  };
+
+  // Get specifications
+  const getSpecifications = () => {
+    if (product?.specifications && Object.keys(product.specifications).length > 0) {
+      return product.specifications;
+    }
+    return {
+      'Brand': product?.brand || 'MyPinkShop',
+      'Category': product?.mainCategory || product?.category || 'General',
+      'SKU': product?.sku || product?._id?.slice(-8) || 'N/A',
+      'Return Policy': '7 days return'
+    };
   };
 
   if (loading) {
@@ -298,6 +325,8 @@ function ProductDetail() {
   }
 
   const descriptionBullets = getDescriptionBullets();
+  const keyFeatures = getKeyFeatures();
+  const specifications = getSpecifications();
   const currentPrice = getCurrentPrice();
   const currentStock = getCurrentStock();
   const isButtonDisabled = currentStock === 0 || quantity < 1;
@@ -497,7 +526,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 PINCODE DELIVERY CHECKER - WORKING WITH BACKEND */}
+            {/* PINCODE DELIVERY CHECKER */}
             <div className="border-t border-gray-200 pt-4">
               <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -572,51 +601,29 @@ function ProductDetail() {
 
             {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
-              <div className="flex flex-wrap justify-between py-1 gap-2">
-                <span className="text-gray-500">Brand:</span>
-                <span className="text-gray-800 font-medium text-right">{product.brand || 'MyPinkShop'}</span>
-              </div>
-              <div className="flex flex-wrap justify-between py-1 gap-2">
-                <span className="text-gray-500">Category:</span>
-                <span className="text-gray-800 capitalize text-right">{product.mainCategory || product.category || 'General'}</span>
-              </div>
-              {product.fabric && (
-                <div className="flex flex-wrap justify-between py-1 gap-2">
-                  <span className="text-gray-500">Fabric:</span>
-                  <span className="text-gray-800 text-right">{product.fabric}</span>
+              {Object.entries(specifications).map(([key, value], idx) => (
+                <div key={idx} className="flex flex-wrap justify-between py-1 gap-2">
+                  <span className="text-gray-500">{key}:</span>
+                  <span className="text-gray-800 font-medium text-right">{String(value)}</span>
                 </div>
-              )}
-              {product.material && (
-                <div className="flex flex-wrap justify-between py-1 gap-2">
-                  <span className="text-gray-500">Material:</span>
-                  <span className="text-gray-800 text-right">{product.material}</span>
-                </div>
-              )}
-              {selectedSize && (
+              ))}
+              {selectedSize && showSizeSelector && (
                 <div className="flex flex-wrap justify-between py-1 gap-2 border-t border-gray-200 pt-2 mt-1">
                   <span className="text-gray-500">Selected Size:</span>
                   <span className="text-gray-800 font-medium text-right">{selectedSize}</span>
                 </div>
               )}
-              {selectedColor && (
+              {selectedColor && showColorSelector && (
                 <div className="flex flex-wrap justify-between py-1 gap-2">
                   <span className="text-gray-500">Selected Color:</span>
                   <span className="text-gray-800 font-medium text-right">{selectedColor}</span>
                 </div>
               )}
-              <div className="flex flex-wrap justify-between py-1 gap-2">
-                <span className="text-gray-500">SKU:</span>
-                <span className="text-gray-800 text-right">{selectedVariant?.sku || product.sku || product._id?.slice(-8) || 'N/A'}</span>
-              </div>
-              <div className="flex flex-wrap justify-between py-1 gap-2">
-                <span className="text-gray-500">Return Policy:</span>
-                <span className="text-gray-800 text-right">7 days return</span>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs Section */}
+        {/* Tabs Section - Amazon Style */}
         <div className="mt-12">
           <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'features', 'specifications', 'reviews'].map(tab => (
@@ -627,50 +634,72 @@ function ProductDetail() {
                   activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'
                 }`}
               >
-                {tab === 'description' ? 'Description' : tab === 'features' ? 'Key Features' : tab === 'specifications' ? 'Specifications' : 'Reviews'}
+                {tab === 'description' ? 'About this item' : tab === 'features' ? 'Product Highlights' : tab === 'specifications' ? 'Product Details' : 'Customer Reviews'}
               </button>
             ))}
           </div>
 
           <div className="py-6">
+            {/* 🔥 AMAZON STYLE DESCRIPTION - Bullet Points */}
             {activeTab === 'description' && (
               <div className="space-y-4">
-                <ul className="space-y-3">
-                  {descriptionBullets.map((bullet, idx) => (
-                    <li key={idx} className="flex items-start gap-3 text-gray-600">
-                      <span className="text-pink-500 text-lg">✨</span>
-                      <span>{bullet}</span>
-                    </li>
-                  ))}
-                </ul>
+                {descriptionBullets.length > 0 && (
+                  <ul className="space-y-3">
+                    {descriptionBullets.map((bullet, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-gray-600">
+                        <span className="text-pink-500 text-lg mt-0.5">•</span>
+                        <span className="text-sm sm:text-base">{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                
+                {/* Shipping Info */}
                 <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mt-4">
-                  <h4 className="font-medium text-gray-800 mb-2">Shipping Info</h4>
+                  <h4 className="font-medium text-gray-800 mb-2">Shipping Information</h4>
                   <p className="text-gray-600 text-sm">Free shipping on orders above ₹999. Usually delivered in 3-5 business days.</p>
+                  <p className="text-xs text-gray-400 mt-2">Returns accepted within 7 days of delivery.</p>
                 </div>
               </div>
             )}
 
+            {/* 🔥 KEY FEATURES - Amazon Style Highlights */}
             {activeTab === 'features' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {(product.keyFeatures || ['Premium quality', 'Suitable for all', 'Dermatologically tested', 'Cruelty-free']).map((feature, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 sm:p-4 bg-pink-50 rounded-xl">
-                    <span className="text-pink-500 text-lg sm:text-xl">✓</span>
-                    <span className="text-gray-700 text-sm sm:text-base">{feature}</span>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {keyFeatures.length > 0 ? (
+                  <ul className="space-y-3">
+                    {keyFeatures.map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-gray-600">
+                        <span className="text-green-500 text-lg">✓</span>
+                        <span className="text-sm sm:text-base">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No key features listed</p>
+                )}
               </div>
             )}
 
+            {/* 🔥 SPECIFICATIONS - Amazon Style Product Details */}
             {activeTab === 'specifications' && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-                <table className="w-full text-sm min-w-[300px]">
+                <table className="w-full text-sm">
                   <tbody className="divide-y divide-gray-200">
-                    {Object.entries(product.specifications || {}).map(([key, value], idx) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                        <td className="px-3 sm:px-4 py-2 sm:py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
-                        <td className="px-3 sm:px-4 py-2 sm:py-3 text-gray-600 text-sm">{String(value)}</td>
+                    {Object.entries(specifications).length > 0 ? (
+                      Object.entries(specifications).map(([key, value], idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <td className="px-4 py-3 font-medium text-gray-700 w-1/3 text-sm">{key}</td>
+                          <td className="px-4 py-3 text-gray-600 text-sm">{String(value)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="2" className="px-4 py-8 text-center text-gray-400">
+                          No specifications available
+                        </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
