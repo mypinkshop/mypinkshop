@@ -12,6 +12,42 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
 
   const categories = ['Skincare', 'Makeup', 'Hair', 'Clothing', 'Accessories'];
 
+  // Helper function to generate SEO fields
+  const generateSeoFields = (productName, brand, keyFeatures = []) => {
+    // Generate slug
+    const slug = productName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    
+    // Generate meta title (50-60 chars)
+    let metaTitle = `${productName}`;
+    if (brand) metaTitle = `${productName} - ${brand}`;
+    metaTitle = `${metaTitle} | MyPinkShop`;
+    if (metaTitle.length > 60) {
+      metaTitle = metaTitle.substring(0, 57) + '...';
+    }
+    
+    // Generate meta description (150-160 chars)
+    let metaDescription = `Buy ${productName}`;
+    if (brand) metaDescription += ` by ${brand}`;
+    metaDescription += ` online at best price. Shop now at MyPinkShop with free shipping and easy returns.`;
+    if (metaDescription.length > 160) {
+      metaDescription = metaDescription.substring(0, 157) + '...';
+    }
+    
+    // Generate meta keywords
+    const keywords = [brand, selectedCategory, ...(keyFeatures || [])].filter(Boolean);
+    const metaKeywords = keywords.join(', ');
+    
+    return {
+      slug,
+      metaTitle,
+      metaDescription,
+      metaKeywords
+    };
+  };
+
   const fetchProduct = async () => {
     if (!url.trim()) {
       alert('Please enter Amazon product URL');
@@ -45,7 +81,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     }
   };
 
-  // ✅ Import to form (for AdminAddProduct)
+  // ✅ Import to form with SEO fields
   const importToForm = () => {
     if (!fetchedProduct?.scraped) return;
 
@@ -65,7 +101,10 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       descriptionArray = scraped.description;
     }
 
-    // Set form data
+    // 🔥 Generate SEO fields from scraped data
+    const seoFields = generateSeoFields(scraped.name, scraped.brand, scraped.keyFeatures);
+
+    // Set form data with SEO fields
     setFormData(prev => ({
       ...prev,
       productName: scraped.name || '',
@@ -79,6 +118,11 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       aboutThisItem: descriptionArray,
       productHighlights: scraped.keyFeatures || [],
       images: scraped.images || [],
+      // 🔥 SEO FIELDS - ADDED
+      metaTitle: seoFields.metaTitle,
+      metaDescription: seoFields.metaDescription,
+      metaKeywords: seoFields.metaKeywords,
+      slug: seoFields.slug
     }));
 
     // Set images
@@ -91,7 +135,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       setVariations(scraped.variations);
     }
 
-    alert(`✅ "${scraped.name.substring(0, 50)}..." imported to form!`);
+    alert(`✅ "${scraped.name.substring(0, 50)}..." imported to form with SEO fields!`);
     
     // Close importer and go to manual form
     if (onProductImported) {
@@ -107,23 +151,42 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
   const saveProduct = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/import/save`, {
+      const scraped = fetchedProduct.scraped;
+      const seoFields = generateSeoFields(scraped.name, scraped.brand, scraped.keyFeatures);
+      
+      const productData = {
+        name: scraped.name,
+        brand: scraped.brand || '',
+        mainCategory: selectedCategory,
+        category: selectedCategory,
+        price: scraped.price,
+        originalPrice: scraped.originalPrice || scraped.price * 1.2,
+        stock: 10,
+        images: scraped.images || [],
+        description: scraped.description,
+        keyFeatures: scraped.keyFeatures || [],
+        // 🔥 SEO FIELDS - ADDED
+        metaTitle: seoFields.metaTitle,
+        metaDescription: seoFields.metaDescription,
+        metaKeywords: seoFields.metaKeywords,
+        slug: seoFields.slug,
+        status: 'active',
+        adminApproved: true
+      };
+
+      const response = await fetch(`${API_URL}/api/products`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          ...fetchedProduct.productData,
-          mainCategory: selectedCategory,
-          category: selectedCategory
-        })
+        body: JSON.stringify(productData)
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert('✅ Product imported successfully!');
+        alert('✅ Product imported successfully with SEO!');
         if (onProductImported) onProductImported();
         setStep(1);
         setUrl('');
@@ -151,7 +214,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
           <span className="text-2xl">📦</span> Import from Amazon
-          <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded-full">Multi-URL Support Coming Soon</span>
+          <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded-full">SEO Auto-Generated</span>
         </h2>
         {step === 2 && (
           <button onClick={resetImporter} className="text-gray-400 hover:text-gray-600">
@@ -163,7 +226,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       {step === 1 && (
         <>
           <p className="text-sm text-gray-500 mb-4">
-            Paste Amazon product URL to automatically fetch product details
+            Paste Amazon product URL to automatically fetch product details and SEO fields
           </p>
           
           <div className="mb-4">
@@ -199,7 +262,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
           
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-xs text-blue-600">
-              💡 Tip: Paste Amazon.in product URL. Product name, price, images, and description will be auto-filled.
+              💡 Tip: Paste Amazon.in product URL. Product name, price, images, description, and <strong className="font-bold">SEO fields (meta title, description, keywords, slug)</strong> will be auto-generated!
             </p>
           </div>
         </>
@@ -243,6 +306,39 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
             </select>
           </div>
 
+          {/* 🔥 SEO Preview Section - NEW */}
+          <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <p className="font-medium text-gray-700 mb-2 flex items-center gap-2">
+              <span>🔍</span> SEO Preview (Auto-generated)
+            </p>
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="text-gray-500">Slug:</span>
+                <code className="ml-2 text-blue-600 text-xs">
+                  {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).slug}
+                </code>
+              </div>
+              <div>
+                <span className="text-gray-500">Meta Title:</span>
+                <p className="text-blue-600 text-xs mt-0.5">
+                  {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).metaTitle}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-500">Meta Description:</span>
+                <p className="text-gray-600 text-xs mt-0.5">
+                  {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).metaDescription}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-500">Meta Keywords:</span>
+                <p className="text-gray-600 text-xs mt-0.5">
+                  {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).metaKeywords}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Preview fetched data */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
             <p className="font-medium text-gray-700 mb-2">📋 Fetched Data:</p>
@@ -251,6 +347,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
               <li>✅ Price: ₹{fetchedProduct.scraped.price}</li>
               <li>✅ Images: {fetchedProduct.scraped.images?.length || 0} images</li>
               <li>✅ Description: {fetchedProduct.scraped.description?.length || 0} characters</li>
+              <li>✅ SEO Fields: Auto-generated ✨</li>
             </ul>
           </div>
 
@@ -265,7 +362,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
               onClick={importToForm}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg transition"
             >
-              📥 Import to Form
+              📥 Import to Form (with SEO)
             </button>
             <button
               onClick={saveProduct}
