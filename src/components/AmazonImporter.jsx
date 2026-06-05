@@ -12,15 +12,44 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
 
   const categories = ['Skincare', 'Makeup', 'Hair', 'Clothing', 'Accessories'];
 
+  // Garbage words to filter out
+  const garbageWords = [
+    'See more product details', 'Report an issue', 'Product Description',
+    'To see our price', 'See more', 'Product details', 'Would you like to',
+    'Tell us about', 'Brief content visible', 'double tap to read full content',
+    'full content visible', 'double tap to read', 'Read more', 'Read less',
+    'Loading...', 'Sorry, we couldn\'t load the review', 'Customer Reviews',
+    'Top reviews', 'There was a problem', 'Filtered by', 'Sort by'
+  ];
+
+  // Helper function to clean text
+  const cleanText = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/【.*?】/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
+      .trim();
+  };
+
+  // Helper function to check if text is garbage
+  const isGarbage = (text) => {
+    if (!text || text.length < 15) return true;
+    for (const word of garbageWords) {
+      if (text.includes(word)) return true;
+    }
+    return false;
+  };
+
   // Helper function to generate SEO fields
   const generateSeoFields = (productName, brand, keyFeatures = []) => {
-    // Generate slug
     const slug = productName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     
-    // Generate meta title (50-60 chars)
     let metaTitle = `${productName}`;
     if (brand) metaTitle = `${productName} - ${brand}`;
     metaTitle = `${metaTitle} | MyPinkShop`;
@@ -28,7 +57,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       metaTitle = metaTitle.substring(0, 57) + '...';
     }
     
-    // Generate meta description (150-160 chars)
     let metaDescription = `Buy ${productName}`;
     if (brand) metaDescription += ` by ${brand}`;
     metaDescription += ` online at best price. Shop now at MyPinkShop with free shipping and easy returns.`;
@@ -36,16 +64,10 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       metaDescription = metaDescription.substring(0, 157) + '...';
     }
     
-    // Generate meta keywords
     const keywords = [brand, selectedCategory, ...(keyFeatures || [])].filter(Boolean);
     const metaKeywords = keywords.join(', ');
     
-    return {
-      slug,
-      metaTitle,
-      metaDescription,
-      metaKeywords
-    };
+    return { slug, metaTitle, metaDescription, metaKeywords };
   };
 
   const fetchProduct = async () => {
@@ -81,28 +103,77 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     }
   };
 
-  // ✅ Import to form with SEO fields
+  // Clean description array
+  const cleanDescriptionArray = (description) => {
+    let items = [];
+    
+    if (Array.isArray(description)) {
+      items = [...description];
+    } else if (typeof description === 'string') {
+      // Split by common delimiters
+      items = description.split(/\n|•|\*|\d+\.|●|○|▪|►|➤/);
+    }
+    
+    const cleaned = items
+      .map(item => cleanText(item))
+      .filter(item => !isGarbage(item))
+      .filter(item => item.length > 15 && item.length < 300);
+    
+    // Remove duplicates
+    return [...new Set(cleaned)];
+  };
+
+  // Clean key features array
+  const cleanFeaturesArray = (features) => {
+    let items = [];
+    
+    if (Array.isArray(features)) {
+      items = [...features];
+    } else if (typeof features === 'string') {
+      items = features.split(/\n|•|\*|●|○/);
+    }
+    
+    const cleaned = items
+      .map(item => cleanText(item))
+      .filter(item => !isGarbage(item))
+      .filter(item => item.length > 5 && item.length < 150);
+    
+    return [...new Set(cleaned)];
+  };
+
+  // ✅ Import to form with SEO fields and garbage filtering
   const importToForm = () => {
     if (!fetchedProduct?.scraped) return;
 
     const scraped = fetchedProduct.scraped;
     
-    // Convert description to array of bullet points
-    let descriptionArray = [];
-    if (typeof scraped.description === 'string') {
-      if (scraped.description.includes('\n')) {
-        descriptionArray = scraped.description.split('\n').filter(b => b.trim());
-      } else if (scraped.description.includes('|')) {
-        descriptionArray = scraped.description.split('|').filter(b => b.trim());
-      } else {
-        descriptionArray = [scraped.description];
-      }
-    } else if (Array.isArray(scraped.description)) {
-      descriptionArray = scraped.description;
+    // 🔥 Clean description - remove garbage like "See more product details"
+    let descriptionArray = cleanDescriptionArray(scraped.description);
+    
+    // 🔥 Clean key features
+    let keyFeaturesArray = cleanFeaturesArray(scraped.keyFeatures);
+    
+    // 🔥 If description is still empty, try to extract from product details
+    if (descriptionArray.length === 0 && scraped.description) {
+      let text = typeof scraped.description === 'string' ? scraped.description : JSON.stringify(scraped.description);
+      let sentences = text.split(/\.\s+|\n/);
+      descriptionArray = sentences
+        .map(s => cleanText(s))
+        .filter(s => s.length > 20 && s.length < 200 && !isGarbage(s))
+        .slice(0, 8);
     }
-
-    // 🔥 Generate SEO fields from scraped data
-    const seoFields = generateSeoFields(scraped.name, scraped.brand, scraped.keyFeatures);
+    
+    // 🔥 Fallback: if still empty, add a default
+    if (descriptionArray.length === 0) {
+      descriptionArray = [`Premium ${scraped.name} - High quality product from ${scraped.brand || 'renowned brand'}`];
+    }
+    
+    // 🔥 Limit to max 8 bullet points
+    descriptionArray = descriptionArray.slice(0, 8);
+    keyFeaturesArray = keyFeaturesArray.slice(0, 10);
+    
+    // Generate SEO fields
+    const seoFields = generateSeoFields(scraped.name, scraped.brand, keyFeaturesArray);
 
     // Set form data with SEO fields
     setFormData(prev => ({
@@ -114,11 +185,10 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       sellingPrice: scraped.price || 0,
       mrp: scraped.originalPrice || scraped.price * 1.2 || 0,
       fullDescription: descriptionArray,
-      keyFeatures: scraped.keyFeatures || [],
+      keyFeatures: keyFeaturesArray,
       aboutThisItem: descriptionArray,
-      productHighlights: scraped.keyFeatures || [],
+      productHighlights: keyFeaturesArray,
       images: scraped.images || [],
-      // 🔥 SEO FIELDS - ADDED
       metaTitle: seoFields.metaTitle,
       metaDescription: seoFields.metaDescription,
       metaKeywords: seoFields.metaKeywords,
@@ -135,7 +205,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       setVariations(scraped.variations);
     }
 
-    alert(`✅ "${scraped.name.substring(0, 50)}..." imported to form with SEO fields!`);
+    alert(`✅ Imported ${descriptionArray.length} bullet points and ${keyFeaturesArray.length} features!`);
     
     // Close importer and go to manual form
     if (onProductImported) {
@@ -152,7 +222,8 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     setLoading(true);
     try {
       const scraped = fetchedProduct.scraped;
-      const seoFields = generateSeoFields(scraped.name, scraped.brand, scraped.keyFeatures);
+      const keyFeaturesArray = cleanFeaturesArray(scraped.keyFeatures);
+      const seoFields = generateSeoFields(scraped.name, scraped.brand, keyFeaturesArray);
       
       const productData = {
         name: scraped.name,
@@ -163,9 +234,8 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
         originalPrice: scraped.originalPrice || scraped.price * 1.2,
         stock: 10,
         images: scraped.images || [],
-        description: scraped.description,
-        keyFeatures: scraped.keyFeatures || [],
-        // 🔥 SEO FIELDS - ADDED
+        description: cleanDescriptionArray(scraped.description),
+        keyFeatures: keyFeaturesArray,
         metaTitle: seoFields.metaTitle,
         metaDescription: seoFields.metaDescription,
         metaKeywords: seoFields.metaKeywords,
@@ -306,7 +376,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
             </select>
           </div>
 
-          {/* 🔥 SEO Preview Section - NEW */}
+          {/* 🔥 SEO Preview Section */}
           <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
             <p className="font-medium text-gray-700 mb-2 flex items-center gap-2">
               <span>🔍</span> SEO Preview (Auto-generated)
@@ -320,20 +390,14 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
               </div>
               <div>
                 <span className="text-gray-500">Meta Title:</span>
-                <p className="text-blue-600 text-xs mt-0.5">
+                <p className="text-blue-600 text-xs mt-0.5 break-words">
                   {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).metaTitle}
                 </p>
               </div>
               <div>
                 <span className="text-gray-500">Meta Description:</span>
-                <p className="text-gray-600 text-xs mt-0.5">
+                <p className="text-gray-600 text-xs mt-0.5 break-words">
                   {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).metaDescription}
-                </p>
-              </div>
-              <div>
-                <span className="text-gray-500">Meta Keywords:</span>
-                <p className="text-gray-600 text-xs mt-0.5">
-                  {generateSeoFields(fetchedProduct.scraped.name, fetchedProduct.scraped.brand, fetchedProduct.scraped.keyFeatures).metaKeywords}
                 </p>
               </div>
             </div>
@@ -346,7 +410,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
               <li>✅ Product Name: {fetchedProduct.scraped.name?.substring(0, 50)}...</li>
               <li>✅ Price: ₹{fetchedProduct.scraped.price}</li>
               <li>✅ Images: {fetchedProduct.scraped.images?.length || 0} images</li>
-              <li>✅ Description: {fetchedProduct.scraped.description?.length || 0} characters</li>
               <li>✅ SEO Fields: Auto-generated ✨</li>
             </ul>
           </div>
