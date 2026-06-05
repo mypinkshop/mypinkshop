@@ -28,7 +28,7 @@ app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ========== Cloudflare R2 Configuration (FIXED) ==========
+// ========== Cloudflare R2 Configuration ==========
 const s3 = new AWS.S3({
   endpoint: `http://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   accessKeyId: process.env.R2_ACCESS_KEY_ID,
@@ -280,8 +280,7 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ========== UPLOAD ROUTES (R2 - FIXED) ==========
-// Single image upload
+// ========== UPLOAD ROUTES ==========
 app.post('/api/upload', authMiddleware, upload.single('images'), async (req, res) => {
   try {
     if (!req.file) {
@@ -314,7 +313,6 @@ app.post('/api/upload', authMiddleware, upload.single('images'), async (req, res
   }
 });
 
-// Multiple images upload
 app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -350,7 +348,6 @@ app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), asyn
   }
 });
 
-// Delete image
 app.delete('/api/upload', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { imageUrl } = req.body;
@@ -862,6 +859,9 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
 });
 
 // ========== AMAZON IMPORT ROUTES ==========
+// ==========================================
+// 🔥 FIXED: Brand extraction - Removes "Visit the", "Store", "Shop" garbage text
+// ==========================================
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -919,8 +919,50 @@ const scrapeAmazonProduct = async (url) => {
       if (text) features.push(text);
     });
     
-    let brand = $('#bylineInfo').text().trim();
-    if (!brand) brand = $('#brand').text().trim();
+    // ========== 🔥 FIXED BRAND EXTRACTION - ONLY THIS PART CHANGED ==========
+    let brand = '';
+    
+    // Try to get brand from bylineInfo and clean it
+    const bylineText = $('#bylineInfo').text().trim();
+    if (bylineText) {
+      brand = bylineText
+        .replace(/Visit the/gi, '')
+        .replace(/Store/gi, '')
+        .replace(/Shop/gi, '')
+        .replace(/by/gi, '')
+        .replace(/Brand:/gi, '')
+        .trim();
+    }
+    
+    // If empty, try brand element
+    if (!brand) {
+      brand = $('#brand').text().trim();
+      if (brand) {
+        brand = brand.replace(/Visit the|Store|Shop/gi, '').trim();
+      }
+    }
+    
+    // If still empty, try from product title (between first hyphen)
+    if (!brand && name.includes('-')) {
+      brand = name.split('-')[0].trim();
+    }
+    
+    // If still empty, try "by" in title
+    if (!brand && name.includes(' by ')) {
+      brand = name.split(' by ')[1].split(' ')[0].trim();
+    }
+    
+    // Final cleanup - remove any leading/trailing commas or spaces
+    brand = brand.replace(/^[\s,]+|[\s,]+$/g, '').trim();
+    
+    // If brand contains garbage words, set to empty string
+    if (brand.toLowerCase().includes('visit') || 
+        brand.toLowerCase().includes('store') ||
+        brand.toLowerCase().includes('shop') ||
+        brand.length < 2) {
+      brand = '';
+    }
+    // ========== END OF BRAND FIX ==========
     
     return {
       name,
