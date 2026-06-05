@@ -167,6 +167,7 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 // ========== Product Schema ==========
+// 🔥 FIXED: Description can be either String or Array (Amazon style)
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
@@ -176,7 +177,7 @@ const productSchema = new mongoose.Schema({
   originalPrice: { type: Number, default: 0 },
   stock: { type: Number, default: 0 },
   images: { type: [String], default: [] },
-  description: { type: String, default: '' },
+  description: { type: mongoose.Schema.Types.Mixed, default: '' }, // 🔥 Mixed type - String or Array
   shortDescription: { type: String, default: '' },
   keyFeatures: { type: [String], default: [] },
   rating: { type: Number, default: 4.0 },
@@ -326,9 +327,23 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
+// 🔥 FIXED: Product creation with description handling
 app.post('/api/products', authMiddleware, async (req, res) => {
   try {
     await connectDB();
+    
+    // Handle description - convert array to string if needed
+    let descriptionValue = req.body.description;
+    if (Array.isArray(descriptionValue)) {
+      // Store as array (Amazon style bullet points)
+      descriptionValue = descriptionValue;
+    } else if (typeof descriptionValue === 'string') {
+      // Keep as string
+      descriptionValue = descriptionValue;
+    } else {
+      descriptionValue = '';
+    }
+    
     const product = new Product({
       name: req.body.name,
       brand: req.body.brand || '',
@@ -338,7 +353,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       originalPrice: req.body.originalPrice || req.body.price * 1.2,
       stock: req.body.stock || 0,
       images: req.body.images || [],
-      description: req.body.description || '',
+      description: descriptionValue,
       shortDescription: req.body.shortDescription || '',
       keyFeatures: req.body.keyFeatures || [],
       sizes: req.body.sizes || [],
@@ -357,6 +372,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     await product.save();
     res.status(201).json({ success: true, product });
   } catch (error) {
+    console.error('Add product error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -376,6 +392,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
     if (req.body.sizes !== undefined) product.sizes = req.body.sizes;
     if (req.body.colors !== undefined) product.colors = req.body.colors;
     if (req.body.variants !== undefined) product.variants = req.body.variants;
+    if (req.body.description !== undefined) product.description = req.body.description;
     
     await product.save();
     res.json({ success: true, product });
@@ -798,7 +815,7 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
 
 // ========== AMAZON IMPORT ROUTES ==========
 
-// Amazon Scraper Function
+// Amazon Scraper Function - 🔥 FIXED: Convert description to array
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -839,9 +856,24 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Extract description
+    // 🔥 FIXED: Extract description and convert to array (bullet points)
     let description = $('#productDescription').text().trim();
     if (!description) description = $('#feature-bullets').text().trim();
+    
+    // Convert to array by splitting on new lines and bullet points
+    let descriptionArray = [];
+    if (description) {
+      // Split by new line and bullet points
+      descriptionArray = description
+        .split(/\n|•|\*|\d+\./)
+        .map(line => line.trim())
+        .filter(line => line.length > 10 && line.length < 500);
+      
+      // If no bullet points found, keep as single item
+      if (descriptionArray.length === 0 && description.length > 0) {
+        descriptionArray = [description.substring(0, 500)];
+      }
+    }
     
     // Extract features
     const features = [];
@@ -860,7 +892,7 @@ const scrapeAmazonProduct = async (url) => {
       price: finalPrice,
       originalPrice: finalOriginalPrice,
       images: [...new Set(images)].slice(0, 5),
-      description: description.substring(0, 2000),
+      description: descriptionArray, // 🔥 Now returns array of bullet points
       keyFeatures: features.slice(0, 10)
     };
     
@@ -870,7 +902,7 @@ const scrapeAmazonProduct = async (url) => {
   }
 };
 
-// 🔥 IMPORT FROM AMAZON - Admin AND Vendor both can use (adminMiddleware removed)
+// 🔥 IMPORT FROM AMAZON - Admin AND Vendor both can use
 app.post('/api/import/amazon', authMiddleware, async (req, res) => {
   try {
     const { url } = req.body;
