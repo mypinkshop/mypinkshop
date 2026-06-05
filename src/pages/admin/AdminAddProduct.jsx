@@ -84,7 +84,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     setLoading(false);
   };
 
-  // 🔥 FIXED: Unlimited bullet points (no limit)
   const importToForm = (product) => {
     let descriptionArray = [];
     
@@ -97,7 +96,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
         .filter(item => !isGarbage(item));
     }
     
-    // 🔥 NO LIMIT - Keep all bullet points
     descriptionArray = [...new Set(descriptionArray)];
     
     const keyFeaturesArray = (Array.isArray(product.keyFeatures) ? product.keyFeatures : [])
@@ -121,6 +119,19 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     const keywords = [product.brand, ...keyFeaturesArray].filter(Boolean);
     const metaKeywords = keywords.join(', ');
     
+    // Set variations if available
+    if (product.variations && product.variations.length > 0) {
+      const formattedVariations = product.variations.map((v, idx) => ({
+        id: Date.now() + idx,
+        name: v.name,
+        price: v.price || product.price,
+        mrp: v.mrp || product.originalPrice || product.price * 1.2,
+        stock: v.stock || 10,
+        sku: v.sku || `VAR-${Date.now()}-${idx}`
+      }));
+      setVariations(formattedVariations);
+    }
+    
     setFormData(prev => ({
       ...prev,
       productName: product.name,
@@ -135,7 +146,9 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       metaTitle: metaTitle,
       metaDescription: metaDescription,
       metaKeywords: metaKeywords,
-      slug: slug
+      slug: slug,
+      category: product.detectedCategory || prev.category,
+      subCategory: product.detectedSubCategory || prev.subCategory
     }));
     
     if (product.images && product.images.length > 0) setImages(product.images);
@@ -247,7 +260,6 @@ function AdminAddProduct() {
     metaTitle: '', metaDescription: '', metaKeywords: '', slug: ''
   });
   
-  // 🔥 FIX 1: Default GST 18%
   const [formData, setFormData] = useState({
     productName: '', brand: '', category: '', subCategory: '', images: [],
     mrp: '', sellingPrice: '', tax: 18, sku: '', fullDescription: [], keyFeatures: [],
@@ -259,19 +271,16 @@ function AdminAddProduct() {
   const [variations, setVariations] = useState([]);
   const [variationModalOpen, setVariationModalOpen] = useState(false);
   const [editingVariation, setEditingVariation] = useState(null);
-  // 🔥 FIX 2: Added mrp in variation form
   const [variationForm, setVariationForm] = useState({
     name: '', price: '', mrp: '', stock: '', sku: '', attributes: {}
   });
 
-  // Auto-generate SKU
   const generateSKU = () => {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `SKU-${timestamp}-${random}`;
   };
 
-  // Auto-generate SEO fields
   useEffect(() => {
     if (formData.productName) {
       const slug = formData.productName
@@ -302,7 +311,6 @@ function AdminAddProduct() {
   const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
   const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
 
-  // Complete SubCategories with all options
   const subCategoriesOptions = {
     Skincare: [
       'Face Wash', 'Cleanser', 'Face Scrub', 'Toner', 'Serum', 'Moisturizer', 'Face Cream',
@@ -354,7 +362,6 @@ function AdminAddProduct() {
     ]
   };
 
-  // 🔥 FIX 3: Added Custom option in variations
   const getVariationAttributes = () => {
     switch(formData.category) {
       case 'Skincare': 
@@ -413,7 +420,6 @@ function AdminAddProduct() {
     }
   };
 
-  // 🔥 FIX 4: Save variation with MRP
   const saveVariation = () => {
     if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
     
@@ -527,13 +533,11 @@ function AdminAddProduct() {
 
   const removeImage = (index) => setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
 
-  // 🔥 FIX 5: No limit on bullet points
   const addBulletPoint = () => {
     const text = currentBullet.trim();
     const garbagePhrases = ['see more product details', 'report an issue', 'see more'];
     const isGarbage = garbagePhrases.some(p => text.toLowerCase().includes(p));
     if (text && !isGarbage) {
-      // No limit - can add unlimited bullet points
       setFormData({ ...formData, fullDescription: [...formData.fullDescription, text] });
       setCurrentBullet('');
     } else if (isGarbage) alert('That is garbage text. Please enter valid content.');
@@ -551,7 +555,6 @@ function AdminAddProduct() {
 
   const removeKeyFeature = (index) => setFormData({ ...formData, keyFeatures: formData.keyFeatures.filter((_, i) => i !== index) });
 
-  // 🔥 FIX 6: Brand field with text input (not dropdown below)
   const handleAddNewBrand = () => {
     if (newBrand.trim() && !brands.includes(newBrand.trim())) {
       saveBrands([...brands, newBrand.trim()]);
@@ -568,7 +571,6 @@ function AdminAddProduct() {
 
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
-  // 🔥 FIX 7: Submit with variations stock calculation
   const submitProduct = async () => {
     if (!formData.productName) return alert('Enter product name');
     if (!formData.brand) return alert('Select brand');
@@ -716,7 +718,7 @@ function AdminAddProduct() {
                 />
               </div>
               
-              {/* 🔥 Brand Section - Text input with suggestions (NOT dropdown below) */}
+              {/* Brand Section */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand <span className="text-red-500">*</span></label>
                 <div className="relative">
@@ -942,19 +944,90 @@ function AdminAddProduct() {
               </div>
             </div>
 
-            {/* Variations Section */}
+            {/* Variations Section - FIXED */}
             <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <div><h3 className="font-semibold text-gray-800">Product Variations</h3><p className="text-xs text-gray-500 mt-0.5">{!formData.category && 'Select a category first'}</p></div>
-                {formData.category && <button onClick={() => { setEditingVariation(null); setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', attributes: {} }); setVariationModalOpen(true); }} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg text-sm font-medium hover:shadow-md transition">+ Add {variationAttrs.type}</button>}
+                <div>
+                  <h3 className="font-semibold text-gray-800">Product Variations</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {!formData.category && 'Select a category first'}
+                    {formData.category === 'Skincare' && 'Add different sizes (ml/gm) and variants'}
+                    {formData.category === 'Makeup' && 'Add different shades and finishes'}
+                    {formData.category === 'Hair' && 'Add different sizes and variants'}
+                    {formData.category === 'Clothing' && 'Add different sizes and colors'}
+                    {formData.category === 'Accessories' && 'Add different sizes and colors'}
+                  </p>
+                </div>
+                {formData.category && (
+                  <button
+                    onClick={() => {
+                      setEditingVariation(null);
+                      setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', attributes: {} });
+                      setVariationModalOpen(true);
+                    }}
+                    className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg text-sm font-medium hover:shadow-md transition"
+                  >
+                    + Add {variationAttrs.type}
+                  </button>
+                )}
               </div>
               
-              {!formData.category ? <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first</p></div>
-              : variations.length === 0 ? <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet.</p></div>
-              : <div className="overflow-x-auto"><table className="w-full text-xs sm:text-sm"><thead className="bg-gray-50 border-b"><tr><th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.type}</th>{variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.secondary}</th>}<th className="px-2 sm:px-3 py-2 text-right">Price</th><th className="px-2 sm:px-3 py-2 text-right">MRP</th><th className="px-2 sm:px-3 py-2 text-right">Stock</th><th className="px-2 sm:px-3 py-2 text-left">SKU</th><th className="px-2 sm:px-3 py-2 text-center">Actions</th></tr></thead><tbody className="divide-y">{variations.map(v => (<tr key={v.id} className="hover:bg-pink-50/30"><td className="px-2 sm:px-3 py-2 font-medium">{v.name}</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2">{v.secondaryName || '-'}</td>}<td className="px-2 sm:px-3 py-2 text-right text-pink-600">₹{v.price}</td><td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{v.mrp || v.price * 1.2}</td><td className="px-2 sm:px-3 py-2 text-right">{v.stock}</td><td className="px-2 sm:px-3 py-2 text-xs font-mono">{v.sku}</td><td className="px-2 sm:px-3 py-2 text-center"><div className="flex justify-center gap-2"><button onClick={() => editVariation(v)} className="text-blue-500">✏️</button><button onClick={() => deleteVariation(v.id)} className="text-red-500">🗑️</button></div></td></table>))}</tbody><tfoot className="bg-gray-50 border-t"><tr><td className="px-2 sm:px-3 py-2 font-medium">Total</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2"></td>}<td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td><td className="px-2 sm:px-3 py-2 text-right"></td><td className="px-2 sm:px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td><td colSpan="2"></td></tr></tfoot></table></div>}
+              {!formData.category ? (
+                <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                  <p className="text-yellow-700 text-sm">Select a category first</p>
+                </div>
+              ) : variations.length === 0 ? (
+                <div className="bg-gray-50 rounded-lg p-6 text-center">
+                  <p className="text-gray-400 text-sm">No variations added yet.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-2 sm:px-3 py-2 text-left font-medium text-gray-600">{variationAttrs.type}</th>
+                        {variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left font-medium text-gray-600">{variationAttrs.secondary}</th>}
+                        <th className="px-2 sm:px-3 py-2 text-right font-medium text-gray-600">Price</th>
+                        <th className="px-2 sm:px-3 py-2 text-right font-medium text-gray-600">MRP</th>
+                        <th className="px-2 sm:px-3 py-2 text-right font-medium text-gray-600">Stock</th>
+                        <th className="px-2 sm:px-3 py-2 text-left font-medium text-gray-600">SKU</th>
+                        <th className="px-2 sm:px-3 py-2 text-center font-medium text-gray-600">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {variations.map((variation) => (
+                        <tr key={variation.id} className="hover:bg-pink-50/30">
+                          <td className="px-2 sm:px-3 py-2 font-medium text-gray-800">{variation.name}</td>
+                          {variationAttrs.secondary && <td className="px-2 sm:px-3 py-2 text-gray-600">{variation.secondaryName || '-'}</td>}
+                          <td className="px-2 sm:px-3 py-2 text-right font-medium text-pink-600">₹{variation.price}</td>
+                          <td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{variation.mrp || variation.price * 1.2}</td>
+                          <td className="px-2 sm:px-3 py-2 text-right text-gray-700">{variation.stock}</td>
+                          <td className="px-2 sm:px-3 py-2 text-xs text-gray-500 font-mono">{variation.sku}</td>
+                          <td className="px-2 sm:px-3 py-2 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => editVariation(variation)} className="text-blue-500 hover:text-blue-700 text-sm">✏️</button>
+                              <button onClick={() => deleteVariation(variation.id)} className="text-red-500 hover:text-red-700 text-sm">🗑️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50 border-t border-gray-200">
+                      <tr>
+                        <td className="px-2 sm:px-3 py-2 font-medium text-gray-800">Total</td>
+                        {variationAttrs.secondary && <td className="px-2 sm:px-3 py-2"></td>}
+                        <td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
+                        <td className="px-2 sm:px-3 py-2 text-right"></td>
+                        <td className="px-2 sm:px-3 py-2 text-right font-bold text-gray-800">{variations.reduce((s, v) => s + v.stock, 0)}</td>
+                        <td colSpan="2"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
             </div>
 
-            {/* 🔥 Variation Modal with MRP and Custom Option */}
+            {/* Variation Modal */}
             {variationModalOpen && (
               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
                 <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1041,23 +1114,119 @@ function AdminAddProduct() {
 
             {/* Category Specific Fields */}
             {formData.category === 'Skincare' && (
-              <div className="space-y-4 border-t pt-4"><h3 className="font-medium">🧴 Skincare Details</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-sm font-medium mb-1">Skin Type</label><select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="all">All</option><option value="oily">Oily</option><option value="dry">Dry</option><option value="combination">Combination</option><option value="sensitive">Sensitive</option></select></div><div><label className="block text-sm font-medium mb-1">Key Ingredients</label><input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Vitamin C, Hyaluronic Acid" /></div></div><div><label className="block text-sm font-medium mb-2">Concerns</label><div className="flex flex-wrap gap-2">{skinConcerns.map(c => <label key={c} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, c] : formData.concerns.filter(cn => cn !== c); setFormData({...formData, concerns: updated}); }} /><span className="text-sm">{c}</span></label>)}</div></div></div>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">🧴 Skincare Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Skin Type</label>
+                    <select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="all">All</option>
+                      <option value="oily">Oily</option>
+                      <option value="dry">Dry</option>
+                      <option value="combination">Combination</option>
+                      <option value="sensitive">Sensitive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Key Ingredients</label>
+                    <input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Vitamin C, Hyaluronic Acid" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Concerns</label>
+                  <div className="flex flex-wrap gap-2">
+                    {skinConcerns.map(c => <label key={c} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, c] : formData.concerns.filter(cn => cn !== c); setFormData({...formData, concerns: updated}); }} /><span className="text-sm">{c}</span></label>)}
+                  </div>
+                </div>
+              </div>
             )}
 
             {formData.category === 'Makeup' && (
-              <div className="space-y-4 border-t pt-4"><h3 className="font-medium">💄 Makeup Details</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-sm font-medium mb-1">Shade</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ruby Red" /></div><div><label className="block text-sm font-medium mb-1">Finish</label><select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="">Select</option>{makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}</select></div></div><div><label className="block text-sm font-medium mb-1">Coverage</label><select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="">Select</option>{makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}</select></div></div>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">💄 Makeup Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Shade</label>
+                    <input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ruby Red" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Finish</label>
+                    <select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="">Select</option>
+                      {makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Coverage</label>
+                  <select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="">Select</option>
+                    {makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
             )}
 
             {formData.category === 'Hair' && (
-              <div className="space-y-4 border-t pt-4"><h3 className="font-medium">💇 Hair Details</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-sm font-medium mb-1">Hair Type</label><select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">{hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}</select></div><div><label className="block text-sm font-medium mb-2">Concerns</label><div className="flex flex-wrap gap-2">{hairConcernsList.map(c => <label key={c} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), c] : (formData.hairConcerns || []).filter(cn => cn !== c); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{c}</span></label>)}</div></div></div></div>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">💇 Hair Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Hair Type</label>
+                    <select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      {hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Concerns</label>
+                    <div className="flex flex-wrap gap-2">
+                      {hairConcernsList.map(c => <label key={c} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), c] : (formData.hairConcerns || []).filter(cn => cn !== c); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{c}</span></label>)}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {formData.category === 'Clothing' && (
-              <div className="space-y-4 border-t pt-4"><h3 className="font-medium">👗 Clothing Details</h3><div><label className="block text-sm font-medium mb-1">Fabric</label><input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Cotton, Silk" /></div><div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div></div>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">👗 Clothing Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Fabric</label>
+                    <input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Cotton, Silk" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Gender</label>
+                    <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="unisex">Unisex</option>
+                      <option value="men">Men</option>
+                      <option value="women">Women</option>
+                      <option value="kids">Kids</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             )}
 
             {formData.category === 'Accessories' && (
-              <div className="space-y-4 border-t pt-4"><h3 className="font-medium">💍 Accessories Details</h3><div><label className="block text-sm font-medium mb-1">Material</label><input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Silver, Gold" /></div><div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div></div>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">💍 Accessories Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Material</label>
+                    <input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Silver, Gold" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Gender</label>
+                    <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                      <option value="unisex">Unisex</option>
+                      <option value="men">Men</option>
+                      <option value="women">Women</option>
+                      <option value="kids">Kids</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6 sm:mt-8 pt-4 border-t">
@@ -1074,14 +1243,42 @@ function AdminAddProduct() {
             <p className="text-sm text-gray-500 mb-6">Optimize your product for search engines</p>
             
             <div className="space-y-5">
-              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Product URL Slug</label><div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg"><span className="text-xs text-gray-500">mypinkshop.com/product/</span><code className="text-sm text-pink-600">{seoData.slug || 'product-slug'}</code></div></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title <span className="text-xs text-gray-400">(50-60 chars)</span></label><input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({...seoData, metaTitle: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" /><div className="flex justify-between mt-1"><p className="text-xs text-gray-400">Shows in Google search results</p><span className={`text-xs ${seoData.metaTitle.length > 60 ? 'text-red-500' : 'text-green-500'}`}>{seoData.metaTitle.length}/60</span></div></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description <span className="text-xs text-gray-400">(150-160 chars)</span></label><textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea><div className="flex justify-between mt-1"><p className="text-xs text-gray-400">Shows below title in Google</p><span className={`text-xs ${seoData.metaDescription.length > 160 ? 'text-red-500' : 'text-green-500'}`}>{seoData.metaDescription.length}/160</span></div></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords</label><input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="skincare, vitamin c, anti-aging" /><p className="text-xs text-gray-400 mt-1">Comma separated keywords</p></div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Product URL Slug</label>
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                  <span className="text-xs text-gray-500">mypinkshop.com/product/</span>
+                  <code className="text-sm text-pink-600">{seoData.slug || 'product-slug'}</code>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title <span className="text-xs text-gray-400">(50-60 chars)</span></label>
+                <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({...seoData, metaTitle: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-400">Shows in Google search results</p>
+                  <span className={`text-xs ${seoData.metaTitle.length > 60 ? 'text-red-500' : 'text-green-500'}`}>{seoData.metaTitle.length}/60</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description <span className="text-xs text-gray-400">(150-160 chars)</span></label>
+                <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-400">Shows below title in Google</p>
+                  <span className={`text-xs ${seoData.metaDescription.length > 160 ? 'text-red-500' : 'text-green-500'}`}>{seoData.metaDescription.length}/160</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords</label>
+                <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="skincare, vitamin c, anti-aging" />
+                <p className="text-xs text-gray-400 mt-1">Comma separated keywords</p>
+              </div>
               
               <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
                 <h3 className="text-sm font-semibold text-gray-800 mb-3">📱 Google Search Preview</h3>
-                <div><p className="text-blue-600 text-base font-medium">{seoData.metaTitle || formData.productName || 'Product Title'}</p><p className="text-green-700 text-xs">https://mypinkshop.com/product/{seoData.slug || 'product-slug'}</p><p className="text-gray-600 text-sm mt-1">{seoData.metaDescription || 'Product description...'}</p></div>
+                <div>
+                  <p className="text-blue-600 text-base font-medium">{seoData.metaTitle || formData.productName || 'Product Title'}</p>
+                  <p className="text-green-700 text-xs">https://mypinkshop.com/product/{seoData.slug || 'product-slug'}</p>
+                  <p className="text-gray-600 text-sm mt-1">{seoData.metaDescription || 'Product description...'}</p>
+                </div>
               </div>
             </div>
 
