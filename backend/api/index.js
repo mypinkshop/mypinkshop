@@ -672,7 +672,7 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
       const minDate = new Date();
       minDate.setDate(minDate.getDate() + 3);
       
-      const freeShippingThreshold = 999;
+      const freeShippingThreshold = 499;
       let shippingCharge = 50;
       if (cartTotal >= freeShippingThreshold) {
         shippingCharge = 0;
@@ -694,7 +694,7 @@ app.post('/api/shipping/check-delivery', async (req, res) => {
       });
     }
     
-    const freeShippingThreshold = 999;
+    const freeShippingThreshold = 499;
     let shippingCharge = delivery.shippingCharge;
     if (cartTotal >= freeShippingThreshold) {
       shippingCharge = 0;
@@ -725,7 +725,7 @@ app.get('/api/shipping/settings', async (req, res) => {
   res.json({
     success: true,
     settings: {
-      freeShippingThreshold: 999,
+      freeShippingThreshold: 499,
       cutOffTime: '16:00'
     }
   });
@@ -858,10 +858,8 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// ========== AMAZON IMPORT ROUTES ==========
-// ==========================================
-// 🔥 FIXED: Brand extraction - Removes "Visit the", "Store", "Shop" garbage text
-// ==========================================
+// ========== AMAZON IMPORT ROUTES (FULLY UPGRADED) ==========
+// 🔥 UPGRADED: Full bullet points, auto category, auto subcategory, auto variations
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -869,15 +867,15 @@ const scrapeAmazonProduct = async (url) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive'
       }
     });
     
     const $ = cheerio.load(response.data);
     
+    // ========== PRODUCT NAME ==========
     const name = $('#productTitle').text().trim() || 'Unknown Product';
     
+    // ========== PRICE EXTRACTION ==========
     let price = $('#priceblock_ourprice').text();
     if (!price) price = $('#priceblock_dealprice').text();
     if (!price) price = $('.a-price-whole').first().text();
@@ -889,6 +887,7 @@ const scrapeAmazonProduct = async (url) => {
     const originalMatch = originalPrice.match(/[\d,]+/);
     const finalOriginalPrice = originalMatch ? parseInt(originalMatch[0].replace(/,/g, '')) : 0;
     
+    // ========== IMAGES EXTRACTION ==========
     const images = [];
     $('#imgTagWrapperId img, .a-dynamic-image, #landingImage').each((i, el) => {
       let src = $(el).attr('src') || $(el).attr('data-old-hires');
@@ -898,31 +897,51 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    let description = $('#productDescription').text().trim();
-    if (!description) description = $('#feature-bullets').text().trim();
-    
+    // ========== 🔥 FULL DESCRIPTION - ALL BULLET POINTS (NO LIMIT) ==========
     let descriptionArray = [];
-    if (description) {
-      descriptionArray = description
-        .split(/\n|•|\*|\d+\./)
-        .map(line => line.trim())
-        .filter(line => line.length > 10 && line.length < 500);
-      
-      if (descriptionArray.length === 0 && description.length > 0) {
-        descriptionArray = [description.substring(0, 500)];
+    
+    // Method 1: Get from feature-bullets (Amazon's standard bullet points)
+    $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small, .a-unordered-list .a-list-item').each((i, el) => {
+      let text = $(el).text().trim();
+      if (text && text.length > 10 && text.length < 500) {
+        text = text.replace(/【.*?】/g, '').replace(/\s+/g, ' ').trim();
+        if (!text.includes('See more product details') && !text.includes('Report an issue')) {
+          descriptionArray.push(text);
+        }
+      }
+    });
+    
+    // Method 2: If no bullet points, try productDescription
+    if (descriptionArray.length === 0) {
+      const productDesc = $('#productDescription p, #productDescription span').text().trim();
+      if (productDesc) {
+        let sentences = productDesc.split(/\.\s+|\.\n+|\n+/);
+        for (let sentence of sentences) {
+          let clean = sentence.trim();
+          if (clean.length > 20 && clean.length < 300) {
+            descriptionArray.push(clean);
+          }
+        }
       }
     }
     
+    // Remove duplicates - NO LIMIT on number of bullet points
+    descriptionArray = [...new Set(descriptionArray)];
+    
+    // ========== KEY FEATURES ==========
     const features = [];
     $('#feature-bullets .a-list-item').each((i, el) => {
-      const text = $(el).text().trim();
-      if (text) features.push(text);
+      let text = $(el).text().trim();
+      if (text && text.length > 5 && text.length < 150) {
+        text = text.replace(/【.*?】/g, '').trim();
+        if (!text.includes('See more')) {
+          features.push(text);
+        }
+      }
     });
     
-    // ========== 🔥 FIXED BRAND EXTRACTION - ONLY THIS PART CHANGED ==========
+    // ========== 🔥 BRAND EXTRACTION (CLEAN) ==========
     let brand = '';
-    
-    // Try to get brand from bylineInfo and clean it
     const bylineText = $('#bylineInfo').text().trim();
     if (bylineText) {
       brand = bylineText
@@ -933,36 +952,124 @@ const scrapeAmazonProduct = async (url) => {
         .replace(/Brand:/gi, '')
         .trim();
     }
+    if (!brand) brand = $('#brand').text().trim();
+    if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
+    if (brand && (brand.toLowerCase().includes('visit') || brand.toLowerCase().includes('store'))) brand = '';
     
-    // If empty, try brand element
-    if (!brand) {
-      brand = $('#brand').text().trim();
-      if (brand) {
-        brand = brand.replace(/Visit the|Store|Shop/gi, '').trim();
+    // ========== 🔥 CATEGORY DETECTION ==========
+    const detectCategory = (productName, productDesc) => {
+      const text = (productName + ' ' + productDesc).toLowerCase();
+      const categoryKeywords = {
+        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'face mask', 'eye cream', 'scrub'],
+        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact'],
+        'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga', 'salwar', 'ethnic'],
+        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings', 'necklace', 'bracelet']
+      };
+      
+      for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+        for (const keyword of keywords) {
+          if (text.includes(keyword)) return cat;
+        }
+      }
+      return 'Skincare';
+    };
+    
+    // ========== 🔥 SUBCATEGORY DETECTION ==========
+    const detectSubCategory = (productName, productDesc, category) => {
+      const text = (productName + ' ' + productDesc).toLowerCase();
+      const subCatMap = {
+        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm', 'Body Lotion'],
+        'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
+        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff', 'Hair Fall Control'],
+        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Shorts', 'Skirt', 'Salwar Suit'],
+        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace', 'Bracelet']
+      };
+      
+      const subCats = subCatMap[category] || [];
+      for (const sub of subCats) {
+        if (text.includes(sub.toLowerCase())) return sub;
+      }
+      return '';
+    };
+    
+    // ========== 🔥 VARIATIONS EXTRACTION (SIZE, COLOR, SHADE) ==========
+    const variations = [];
+    
+    // Method 1: Get from variation dropdown
+    $('select[name="dropdown_selected_size_name"], .a-dropdown-container select').each((i, el) => {
+      $(el).find('option').each((j, opt) => {
+        const optText = $(opt).text().trim();
+        if (optText && optText !== 'Select' && optText !== 'Choose' && optText.length < 30) {
+          variations.push({
+            name: optText,
+            price: finalPrice,
+            stock: 10
+          });
+        }
+      });
+    });
+    
+    // Method 2: Get from twister (size/color variations)
+    $('.twisterSwatchWrapper, .a-button-stack .a-button').each((i, el) => {
+      let varText = $(el).find('.a-button-text, .swatchTitle').text().trim();
+      if (varText && varText.length < 30 && varText.length > 0 && !variations.find(v => v.name === varText)) {
+        variations.push({
+          name: varText,
+          price: finalPrice,
+          stock: 10
+        });
+      }
+    });
+    
+    // Method 3: Get from size/color buttons
+    $('#variation_size_name li, #variation_color_name li, .variation_available').each((i, el) => {
+      let varName = $(el).find('.selection, .swatchSelect').text().trim();
+      if (varName && varName.length < 30 && varName.length > 0 && !variations.find(v => v.name === varName)) {
+        variations.push({
+          name: varName,
+          price: finalPrice,
+          stock: 10
+        });
+      }
+    });
+    
+    // Method 4: Look for common size patterns in description
+    if (variations.length === 0) {
+      const descText = descriptionArray.join(' ');
+      const sizePattern = /(\d+(?:\.\d+)?\s*(?:ml|g|kg|L|mg|gm))/gi;
+      const foundSizes = descText.match(sizePattern);
+      if (foundSizes) {
+        [...new Set(foundSizes)].slice(0, 10).forEach(size => {
+          variations.push({
+            name: size,
+            price: finalPrice,
+            stock: 10
+          });
+        });
       }
     }
     
-    // If still empty, try from product title (between first hyphen)
-    if (!brand && name.includes('-')) {
-      brand = name.split('-')[0].trim();
+    // Method 5: Look for common shade/color patterns for makeup/clothing
+    if (variations.length === 0 && (categoryDetected === 'Makeup' || categoryDetected === 'Clothing')) {
+      const descText = descriptionArray.join(' ');
+      const shadePattern = /(Fair|Light|Medium|Tan|Deep|Red|Pink|Nude|Coral|Berry|Mauve|Brown|Black|Purple|Blue|Green|Yellow|Orange|Rose|Maroon|Teal)/gi;
+      const foundShades = descText.match(shadePattern);
+      if (foundShades) {
+        [...new Set(foundShades)].slice(0, 10).forEach(shade => {
+          variations.push({
+            name: shade,
+            price: finalPrice,
+            stock: 10
+          });
+        });
+      }
     }
     
-    // If still empty, try "by" in title
-    if (!brand && name.includes(' by ')) {
-      brand = name.split(' by ')[1].split(' ')[0].trim();
-    }
-    
-    // Final cleanup - remove any leading/trailing commas or spaces
-    brand = brand.replace(/^[\s,]+|[\s,]+$/g, '').trim();
-    
-    // If brand contains garbage words, set to empty string
-    if (brand.toLowerCase().includes('visit') || 
-        brand.toLowerCase().includes('store') ||
-        brand.toLowerCase().includes('shop') ||
-        brand.length < 2) {
-      brand = '';
-    }
-    // ========== END OF BRAND FIX ==========
+    // Detect category and subcategory
+    const descriptionText = descriptionArray.join(' ');
+    const detectedCategory = detectCategory(name, descriptionText);
+    const detectedSubCategory = detectSubCategory(name, descriptionText, detectedCategory);
     
     return {
       name,
@@ -971,7 +1078,10 @@ const scrapeAmazonProduct = async (url) => {
       originalPrice: finalOriginalPrice,
       images: [...new Set(images)].slice(0, 5),
       description: descriptionArray,
-      keyFeatures: features.slice(0, 10)
+      keyFeatures: features.slice(0, 10),
+      detectedCategory: detectedCategory,
+      detectedSubCategory: detectedSubCategory,
+      variations: variations.slice(0, 15)
     };
     
   } catch (error) {
