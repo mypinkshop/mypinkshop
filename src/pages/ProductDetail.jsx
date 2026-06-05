@@ -88,7 +88,7 @@ function ProductDetail() {
     try {
       const response = await fetch(`${API_URL}/api/shipping/check-delivery`, {
         method: 'POST',
-        headers: { 'Content-Type': application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           pincode: pincode, 
           cartTotal: getCurrentPrice(),
@@ -172,32 +172,9 @@ function ProductDetail() {
     return 0;
   };
 
-  const getVariationType = () => {
-    if (!product?.variations || product.variations.length === 0) return null;
-    
-    // Detect variation type from first variation
-    const firstVar = product.variations[0];
-    if (firstVar.name && firstVar.secondaryName) {
-      // This could be size+color, size+fragrance, etc.
-      return { primary: 'option', secondary: 'variant' };
-    }
-    if (firstVar.name) {
-      return { primary: 'option', secondary: null };
-    }
-    return null;
-  };
-
   const getPrimaryOptions = () => {
     if (!product?.variations) return [];
     return [...new Set(product.variations.map(v => v.name).filter(Boolean))];
-  };
-
-  const getSecondaryOptions = (primaryName) => {
-    if (!product?.variations) return [];
-    return product.variations
-      .filter(v => v.name === primaryName)
-      .map(v => v.secondaryName)
-      .filter(Boolean);
   };
 
   const handleVariationChange = (variationId) => {
@@ -374,7 +351,6 @@ function ProductDetail() {
   const isButtonDisabled = currentStock === 0 || quantity < 1;
   const hasVariations = product.variations && product.variations.length > 0;
   const primaryOptions = getPrimaryOptions();
-  const variationType = getVariationType();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -527,7 +503,7 @@ function ProductDetail() {
             {hasVariations && primaryOptions.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
-                  Select {variationType?.primary === 'option' ? 'Option' : 'Variation'}
+                  Select Option
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {product.variations.map((variation) => {
