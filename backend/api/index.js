@@ -11,35 +11,26 @@ const fs = require('fs');
 
 const app = express();
 
-// ========== CORS Configuration ==========
-app.use(cors({
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      'https://mypinkshop.vercel.app',
-      'https://mypinkshop.com',
-      'https://www.mypinkshop.com',
-      'http://localhost:3000',
-      'http://localhost:5173'
-    ];
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for now
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
-}));
-
-app.options('*', (req, res) => {
+// ========== ✅ FIXED CORS ==========
+app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
+  res.header('Access-Control-Max-Age', '86400');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
 });
+
+app.use(cors({
+  origin: '*',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -134,7 +125,7 @@ class ShiprocketService {
 
 const shiprocket = new ShiprocketService();
 
-// ========== Multer Configuration for Image Upload ==========
+// ========== Multer Configuration ==========
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -164,7 +155,7 @@ const upload = multer({
   }
 });
 
-// ========== User Schema ==========
+// ========== Schemas ==========
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -188,7 +179,6 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
-// ========== Product Schema ==========
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
@@ -216,7 +206,6 @@ const productSchema = new mongoose.Schema({
   gender: { type: String, default: 'unisex' },
   weight: { type: String, default: '' },
   dimensions: { type: String, default: '' },
-  // SEO Fields
   metaTitle: { type: String, default: '' },
   metaDescription: { type: String, default: '' },
   metaKeywords: { type: String, default: '' },
@@ -225,7 +214,6 @@ const productSchema = new mongoose.Schema({
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
 
-// ========== Banner Schema ==========
 const bannerSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   subtitle: { type: String, default: '' },
@@ -240,7 +228,6 @@ const bannerSchema = new mongoose.Schema({
 
 const Banner = mongoose.models.Banner || mongoose.model('Banner', bannerSchema);
 
-// ========== Offer Schema ==========
 const offerSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
@@ -257,7 +244,6 @@ const offerSchema = new mongoose.Schema({
 
 const Offer = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
 
-// ========== Coupon Schema ==========
 const couponSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true },
   description: { type: String, default: '' },
@@ -314,7 +300,6 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ========== UPLOAD ROUTES ==========
-// ✅ Single image upload
 app.post('/api/upload', authMiddleware, upload.single('images'), (req, res) => {
   try {
     if (!req.file) {
@@ -335,7 +320,6 @@ app.post('/api/upload', authMiddleware, upload.single('images'), (req, res) => {
   }
 });
 
-// ✅ Multiple images upload
 app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -356,7 +340,6 @@ app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), (req
   }
 });
 
-// ✅ Delete image
 app.delete('/api/upload', authMiddleware, adminMiddleware, (req, res) => {
   try {
     const { imageUrl } = req.body;
@@ -377,7 +360,6 @@ app.delete('/api/upload', authMiddleware, adminMiddleware, (req, res) => {
   }
 });
 
-// Serve static files
 app.use('/uploads', express.static(uploadDir));
 
 // ========== AUTH ROUTES ==========
