@@ -33,6 +33,9 @@ import AdminEditProduct from './pages/admin/AdminEditProduct';
 import AdminOffers from './pages/admin/AdminOffers';
 import AdminBulkUpload from './pages/admin/AdminBulkUpload';
 
+// ✅ Amazon Importer Component Import
+import AmazonImporter from './components/AmazonImporter';
+
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorRegister from './pages/vendor/VendorRegister';
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -81,7 +84,7 @@ function App() {
         <CartProvider>
           <ReviewProvider>
             <Routes>
-              {/* Customer Routes */}
+              {/* ============ CUSTOMER ROUTES ============ */}
               <Route path="/" element={<Home />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/login" element={<Login />} />
@@ -100,14 +103,14 @@ function App() {
               <Route path="/returns" element={<ReturnsPolicy />} />
               <Route path="/faqs" element={<FAQs />} />
 
-              {/* Category Pages */}
+              {/* ============ CATEGORY PAGES ============ */}
               <Route path="/skincare" element={<SkincarePage />} />
               <Route path="/makeup" element={<MakeupPage />} />
               <Route path="/clothing" element={<ClothingPage />} />
               <Route path="/accessories" element={<AccessoriesPage />} />
               <Route path="/hair" element={<HairPage />} />
 
-              {/* 🔥 ADMIN ROUTES */}
+              {/* ============ ADMIN ROUTES ============ */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/vendors" element={<AdminVendors />} />
@@ -131,7 +134,7 @@ function App() {
               <Route path="/admin/offers" element={<AdminOffers />} />
               <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
 
-              {/* 🔥 VENDOR ROUTES */}
+              {/* ============ VENDOR ROUTES ============ */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
               <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
