@@ -5,23 +5,27 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 
-// ✅ CORS - Chrome compatible with function-based origin
+// ========== CORS Configuration ==========
 app.use(cors({
   origin: function(origin, callback) {
     const allowedOrigins = [
       'https://mypinkshop.vercel.app',
       'https://mypinkshop.com',
       'https://www.mypinkshop.com',
-      'http://localhost:3000'
+      'http://localhost:3000',
+      'http://localhost:5173'
     ];
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow all for now
     }
   },
   credentials: true,
@@ -29,23 +33,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
-// ✅ Explicit OPTIONS handler for preflight requests
 app.options('*', (req, res) => {
-  const allowedOrigins = [
-    'https://mypinkshop.vercel.app',
-    'https://mypinkshop.com',
-    'https://www.mypinkshop.com',
-    'http://localhost:3000'
-  ];
-  const origin = req.headers.origin;
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400');
   res.sendStatus(200);
 });
 
@@ -142,6 +134,36 @@ class ShiprocketService {
 
 const shiprocket = new ShiprocketService();
 
+// ========== Multer Configuration for Image Upload ==========
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 10);
+    const ext = path.extname(file.originalname);
+    cb(null, `product-${timestamp}-${randomString}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images are allowed'));
+    }
+  }
+});
+
 // ========== User Schema ==========
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -167,7 +189,6 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 // ========== Product Schema ==========
-// 🔥 FIXED: Description can be either String or Array (Amazon style)
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
@@ -177,7 +198,7 @@ const productSchema = new mongoose.Schema({
   originalPrice: { type: Number, default: 0 },
   stock: { type: Number, default: 0 },
   images: { type: [String], default: [] },
-  description: { type: mongoose.Schema.Types.Mixed, default: '' }, // 🔥 Mixed type - String or Array
+  description: { type: mongoose.Schema.Types.Mixed, default: '' },
   shortDescription: { type: String, default: '' },
   keyFeatures: { type: [String], default: [] },
   rating: { type: Number, default: 4.0 },
@@ -189,11 +210,17 @@ const productSchema = new mongoose.Schema({
   sizes: { type: [String], default: [] },
   colors: { type: [String], default: [] },
   variants: { type: Array, default: [] },
+  variations: { type: Array, default: [] },
   fabric: { type: String, default: '' },
   material: { type: String, default: '' },
   gender: { type: String, default: 'unisex' },
   weight: { type: String, default: '' },
-  dimensions: { type: String, default: '' }
+  dimensions: { type: String, default: '' },
+  // SEO Fields
+  metaTitle: { type: String, default: '' },
+  metaDescription: { type: String, default: '' },
+  metaKeywords: { type: String, default: '' },
+  slug: { type: String, default: '' }
 });
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
@@ -229,6 +256,25 @@ const offerSchema = new mongoose.Schema({
 });
 
 const Offer = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
+
+// ========== Coupon Schema ==========
+const couponSchema = new mongoose.Schema({
+  code: { type: String, required: true, unique: true, uppercase: true },
+  description: { type: String, default: '' },
+  discountType: { type: String, enum: ['percentage', 'fixed'], default: 'percentage' },
+  discountValue: { type: Number, required: true },
+  minOrderValue: { type: Number, default: 0 },
+  maxDiscount: { type: Number, default: 0 },
+  usageLimit: { type: Number, default: 1 },
+  usedCount: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+  startDate: { type: Date, default: Date.now },
+  endDate: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
 
 // ========== Auth Middleware ==========
 const authMiddleware = (req, res, next) => {
@@ -266,6 +312,73 @@ app.get('/api/health', async (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// ========== UPLOAD ROUTES ==========
+// ✅ Single image upload
+app.post('/api/upload', authMiddleware, upload.single('images'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const baseUrl = process.env.BASE_URL || 'https://api.mypinkshop.com';
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      url: imageUrl,
+      message: 'Image uploaded successfully'
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Multiple images upload
+app.post('/api/upload/multiple', authMiddleware, upload.array('images', 5), (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+    
+    const baseUrl = process.env.BASE_URL || 'https://api.mypinkshop.com';
+    const urls = req.files.map(file => `${baseUrl}/uploads/${file.filename}`);
+    
+    res.json({
+      success: true,
+      urls: urls,
+      message: `${urls.length} images uploaded successfully`
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ Delete image
+app.delete('/api/upload', authMiddleware, adminMiddleware, (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Image URL required' });
+    }
+    
+    const filename = imageUrl.split('/').pop();
+    const filepath = path.join(uploadDir, filename);
+    
+    if (fs.existsSync(filepath)) {
+      fs.unlinkSync(filepath);
+    }
+    
+    res.json({ success: true, message: 'Image deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Serve static files
+app.use('/uploads', express.static(uploadDir));
 
 // ========== AUTH ROUTES ==========
 app.post('/api/auth/login', async (req, res) => {
@@ -327,18 +440,14 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// 🔥 FIXED: Product creation with description handling
 app.post('/api/products', authMiddleware, async (req, res) => {
   try {
     await connectDB();
     
-    // Handle description - convert array to string if needed
     let descriptionValue = req.body.description;
     if (Array.isArray(descriptionValue)) {
-      // Store as array (Amazon style bullet points)
       descriptionValue = descriptionValue;
     } else if (typeof descriptionValue === 'string') {
-      // Keep as string
       descriptionValue = descriptionValue;
     } else {
       descriptionValue = '';
@@ -359,11 +468,16 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       sizes: req.body.sizes || [],
       colors: req.body.colors || [],
       variants: req.body.variants || [],
+      variations: req.body.variations || [],
       fabric: req.body.fabric || '',
       material: req.body.material || '',
       gender: req.body.gender || 'unisex',
       weight: req.body.weight || '',
       dimensions: req.body.dimensions || '',
+      metaTitle: req.body.metaTitle || '',
+      metaDescription: req.body.metaDescription || '',
+      metaKeywords: req.body.metaKeywords || '',
+      slug: req.body.slug || '',
       isNew: true,
       status: 'active',
       adminApproved: req.user?.role === 'admin'
@@ -385,15 +499,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    if (req.body.stock !== undefined) product.stock = req.body.stock;
-    if (req.body.status !== undefined) product.status = req.body.status;
-    if (req.body.price !== undefined) product.price = req.body.price;
-    if (req.body.name !== undefined) product.name = req.body.name;
-    if (req.body.sizes !== undefined) product.sizes = req.body.sizes;
-    if (req.body.colors !== undefined) product.colors = req.body.colors;
-    if (req.body.variants !== undefined) product.variants = req.body.variants;
-    if (req.body.description !== undefined) product.description = req.body.description;
-    
+    Object.assign(product, req.body);
     await product.save();
     res.json({ success: true, product });
   } catch (error) {
@@ -435,17 +541,7 @@ app.get('/api/banners/active', async (req, res) => {
 app.post('/api/banners', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
-    const banner = new Banner({
-      title: req.body.title || '',
-      subtitle: req.body.subtitle || '',
-      buttonText: req.body.buttonText || '',
-      link: req.body.link || '/shop',
-      images: req.body.images || [],
-      order: req.body.order || 0,
-      active: req.body.active !== false,
-      showTextOverlay: req.body.showTextOverlay !== false
-    });
-    
+    const banner = new Banner(req.body);
     await banner.save();
     res.status(201).json({ success: true, banner });
   } catch (error) {
@@ -457,17 +553,9 @@ app.put('/api/banners/:id', authMiddleware, adminMiddleware, async (req, res) =>
   try {
     await connectDB();
     const banner = await Banner.findById(req.params.id);
-    if (!banner) {
-      return res.status(404).json({ error: 'Banner not found' });
-    }
+    if (!banner) return res.status(404).json({ error: 'Banner not found' });
     
-    banner.title = req.body.title || banner.title;
-    banner.subtitle = req.body.subtitle || banner.subtitle;
-    banner.buttonText = req.body.buttonText || banner.buttonText;
-    banner.link = req.body.link || banner.link;
-    banner.order = req.body.order !== undefined ? req.body.order : banner.order;
-    banner.active = req.body.active !== undefined ? req.body.active : banner.active;
-    
+    Object.assign(banner, req.body);
     await banner.save();
     res.json({ success: true, banner });
   } catch (error) {
@@ -521,20 +609,7 @@ app.get('/api/offers/all', authMiddleware, adminMiddleware, async (req, res) => 
 app.post('/api/offers/create', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
-    const { title, description, discountValue, minOrderValue } = req.body;
-    
-    if (!title || !description) {
-      return res.status(400).json({ error: 'Title and description required' });
-    }
-    
-    const offer = new Offer({
-      title,
-      description,
-      discountValue: discountValue || 10,
-      minOrderValue: minOrderValue || 499,
-      isActive: true
-    });
-    
+    const offer = new Offer(req.body);
     await offer.save();
     res.status(201).json({ success: true, offer });
   } catch (error) {
@@ -545,24 +620,14 @@ app.post('/api/offers/create', authMiddleware, adminMiddleware, async (req, res)
 app.put('/api/offers/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
-    const { title, description, discountValue, minOrderValue, isActive } = req.body;
-    
     const offer = await Offer.findById(req.params.id);
-    if (!offer) {
-      return res.status(404).json({ error: 'Offer not found' });
-    }
+    if (!offer) return res.status(404).json({ error: 'Offer not found' });
     
-    if (title !== undefined) offer.title = title;
-    if (description !== undefined) offer.description = description;
-    if (discountValue !== undefined) offer.discountValue = discountValue;
-    if (minOrderValue !== undefined) offer.minOrderValue = minOrderValue;
-    if (isActive !== undefined) offer.isActive = isActive;
+    Object.assign(offer, req.body);
     offer.updatedAt = new Date();
-    
     await offer.save();
     res.json({ success: true, offer });
   } catch (error) {
-    console.error('Error in update offer:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -678,11 +743,9 @@ app.get('/api/shipping/settings', async (req, res) => {
 });
 
 // ========== COUPON ROUTES ==========
-const Coupon = require('../models/Coupon');
-
-// Validate coupon (Public)
 app.post('/api/coupons/validate', async (req, res) => {
   try {
+    await connectDB();
     const { code, cartTotal } = req.body;
     const couponCode = code.toUpperCase();
     
@@ -737,9 +800,9 @@ app.post('/api/coupons/validate', async (req, res) => {
   }
 });
 
-// Get all coupons (Admin only)
 app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    await connectDB();
     const coupons = await Coupon.find().sort({ createdAt: -1 });
     res.json(coupons);
   } catch (error) {
@@ -747,27 +810,17 @@ app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
-// Create coupon (Admin only)
 app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { code, description, discountType, discountValue, minOrderValue, maxDiscount, usageLimit, startDate, endDate } = req.body;
-    
-    const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
+    await connectDB();
+    const existingCoupon = await Coupon.findOne({ code: req.body.code.toUpperCase() });
     if (existingCoupon) {
       return res.status(400).json({ error: 'Coupon code already exists' });
     }
     
     const coupon = new Coupon({
-      code: code.toUpperCase(),
-      description,
-      discountType,
-      discountValue,
-      minOrderValue: minOrderValue || 0,
-      maxDiscount: maxDiscount || 0,
-      usageLimit: usageLimit || 1,
-      startDate: startDate || new Date(),
-      endDate: endDate || null,
-      isActive: true
+      ...req.body,
+      code: req.body.code.toUpperCase()
     });
     
     await coupon.save();
@@ -777,24 +830,27 @@ app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res
   }
 });
 
-// Update coupon (Admin only)
 app.put('/api/coupons/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const coupon = await Coupon.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, updatedAt: new Date() },
-      { new: true }
-    );
+    await connectDB();
+    const coupon = await Coupon.findById(req.params.id);
+    if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
+    
+    Object.assign(coupon, req.body);
+    coupon.updatedAt = new Date();
+    await coupon.save();
     res.json({ success: true, coupon });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Toggle coupon status (Admin only)
 app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    await connectDB();
     const coupon = await Coupon.findById(req.params.id);
+    if (!coupon) return res.status(404).json({ error: 'Coupon not found' });
+    
     coupon.isActive = !coupon.isActive;
     await coupon.save();
     res.json({ success: true, isActive: coupon.isActive });
@@ -803,9 +859,9 @@ app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// Delete coupon (Admin only)
 app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    await connectDB();
     await Coupon.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (error) {
@@ -814,8 +870,6 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
 });
 
 // ========== AMAZON IMPORT ROUTES ==========
-
-// Amazon Scraper Function - 🔥 FIXED: Convert description to array
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -830,23 +884,19 @@ const scrapeAmazonProduct = async (url) => {
     
     const $ = cheerio.load(response.data);
     
-    // Extract product name
     const name = $('#productTitle').text().trim() || 'Unknown Product';
     
-    // Extract price
     let price = $('#priceblock_ourprice').text();
     if (!price) price = $('#priceblock_dealprice').text();
     if (!price) price = $('.a-price-whole').first().text();
     const priceMatch = price.match(/[\d,]+/);
     const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
     
-    // Extract original price
     let originalPrice = $('#priceblock_wasprice').text();
     if (!originalPrice) originalPrice = $('.a-text-strike').first().text();
     const originalMatch = originalPrice.match(/[\d,]+/);
     const finalOriginalPrice = originalMatch ? parseInt(originalMatch[0].replace(/,/g, '')) : 0;
     
-    // Extract images
     const images = [];
     $('#imgTagWrapperId img, .a-dynamic-image, #landingImage').each((i, el) => {
       let src = $(el).attr('src') || $(el).attr('data-old-hires');
@@ -856,33 +906,27 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // 🔥 FIXED: Extract description and convert to array (bullet points)
     let description = $('#productDescription').text().trim();
     if (!description) description = $('#feature-bullets').text().trim();
     
-    // Convert to array by splitting on new lines and bullet points
     let descriptionArray = [];
     if (description) {
-      // Split by new line and bullet points
       descriptionArray = description
         .split(/\n|•|\*|\d+\./)
         .map(line => line.trim())
         .filter(line => line.length > 10 && line.length < 500);
       
-      // If no bullet points found, keep as single item
       if (descriptionArray.length === 0 && description.length > 0) {
         descriptionArray = [description.substring(0, 500)];
       }
     }
     
-    // Extract features
     const features = [];
     $('#feature-bullets .a-list-item').each((i, el) => {
       const text = $(el).text().trim();
       if (text) features.push(text);
     });
     
-    // Extract brand
     let brand = $('#bylineInfo').text().trim();
     if (!brand) brand = $('#brand').text().trim();
     
@@ -892,7 +936,7 @@ const scrapeAmazonProduct = async (url) => {
       price: finalPrice,
       originalPrice: finalOriginalPrice,
       images: [...new Set(images)].slice(0, 5),
-      description: descriptionArray, // 🔥 Now returns array of bullet points
+      description: descriptionArray,
       keyFeatures: features.slice(0, 10)
     };
     
@@ -902,7 +946,6 @@ const scrapeAmazonProduct = async (url) => {
   }
 };
 
-// 🔥 IMPORT FROM AMAZON - Admin AND Vendor both can use
 app.post('/api/import/amazon', authMiddleware, async (req, res) => {
   try {
     const { url } = req.body;
@@ -927,6 +970,16 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
     console.error('Import error:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// ========== ERROR HANDLING ==========
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: err.message || 'Something went wrong!' });
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.url} not found` });
 });
 
 module.exports = app;
