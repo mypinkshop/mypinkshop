@@ -14,7 +14,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
 
   const categories = ['Skincare', 'Makeup', 'Hair', 'Clothing', 'Accessories'];
 
-  // Complete SubCategories mapping
   const subCategoriesMap = {
     Skincare: [
       'Face Wash', 'Cleanser', 'Face Scrub', 'Toner', 'Serum', 'Moisturizer', 'Face Cream',
@@ -48,7 +47,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     ]
   };
 
-  // Garbage words to filter out
   const garbageWords = [
     'See more product details', 'Report an issue', 'Product Description',
     'To see our price', 'See more', 'Product details', 'Would you like to',
@@ -59,14 +57,12 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     'Visit the', 'Store', 'Shop', 'Brand:'
   ];
 
-  // Update subcategories when category changes
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
     setAvailableSubCategories(subCategoriesMap[category] || []);
     setSelectedSubCategory('');
   };
 
-  // Helper function to clean text
   const cleanText = (text) => {
     if (!text) return '';
     return text
@@ -79,7 +75,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       .trim();
   };
 
-  // Helper function to check if text is garbage
   const isGarbage = (text) => {
     if (!text || text.length < 15) return true;
     for (const word of garbageWords) {
@@ -88,21 +83,17 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     return false;
   };
 
-  // 🔥 Extract brand from various sources
-  const extractBrand = (scraped, $) => {
+  const extractBrand = (scraped) => {
     let brand = '';
     
-    // Method 1: From scraped brand
     if (scraped.brand && !scraped.brand.includes('Visit')) {
       brand = scraped.brand;
     }
     
-    // Method 2: Clean brand
     if (brand) {
       brand = brand.replace(/Visit the|Store|Shop|by|Brand:/gi, '').trim();
     }
     
-    // Method 3: From title (between hyphens)
     if (!brand && scraped.name && scraped.name.includes('-')) {
       brand = scraped.name.split('-')[0].trim();
     }
@@ -110,7 +101,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     return brand;
   };
 
-  // 🔥 Extract subcategory from product name/description
   const extractSubCategory = (name, description, category) => {
     const subCats = subCategoriesMap[category] || [];
     const searchText = (name + ' ' + (Array.isArray(description) ? description.join(' ') : description)).toLowerCase();
@@ -123,7 +113,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     return '';
   };
 
-  // Helper function to generate SEO fields
   const generateSeoFields = (productName, brand, keyFeatures = []) => {
     const slug = productName
       .toLowerCase()
@@ -166,8 +155,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       const data = await response.json();
 
       if (data.success) {
-        // 🔥 Extract brand and subcategory
-        const cleanBrand = extractBrand(data.scraped, null);
+        const cleanBrand = extractBrand(data.scraped);
         const autoSubCategory = extractSubCategory(
           data.scraped.name, 
           data.scraped.description, 
@@ -192,7 +180,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     }
   };
 
-  // Clean description array
   const cleanDescriptionArray = (description) => {
     let items = [];
     
@@ -210,7 +197,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     return [...new Set(cleaned)];
   };
 
-  // Clean key features array
   const cleanFeaturesArray = (features) => {
     let items = [];
     
@@ -228,7 +214,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     return [...new Set(cleaned)];
   };
 
-  // ✅ Import to form with all fields
+  // 🔥 FIXED: Import to form with all new fields from backend
   const importToForm = () => {
     if (!fetchedProduct?.scraped) return;
 
@@ -243,8 +229,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       let sentences = text.split(/\.\s+|\n/);
       descriptionArray = sentences
         .map(s => cleanText(s))
-        .filter(s => s.length > 20 && s.length < 200 && !isGarbage(s))
-        .slice(0, 8);
+        .filter(s => s.length > 20 && s.length < 200 && !isGarbage(s));
     }
     
     if (descriptionArray.length === 0) {
@@ -253,13 +238,11 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     
     // Clean key features
     let keyFeaturesArray = cleanFeaturesArray(scraped.keyFeatures);
-    descriptionArray = descriptionArray.slice(0, 8);
-    keyFeaturesArray = keyFeaturesArray.slice(0, 10);
     
     // Generate SEO fields
     const seoFields = generateSeoFields(scraped.name, cleanBrand, keyFeaturesArray);
 
-    // Set form data with ALL fields
+    // 🔥 Set form data with ALL fields including new ones
     setFormData(prev => ({
       ...prev,
       productName: scraped.name || '',
@@ -277,7 +260,15 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       metaTitle: seoFields.metaTitle,
       metaDescription: seoFields.metaDescription,
       metaKeywords: seoFields.metaKeywords,
-      slug: seoFields.slug
+      slug: seoFields.slug,
+      // 🔥 New fields from backend
+      ingredients: scraped.ingredients || '',
+      skinType: scraped.skinType || 'all',
+      concerns: scraped.concerns || [],
+      finish: scraped.finish || '',
+      coverage: scraped.coverage || '',
+      hairType: scraped.hairType || 'all',
+      hairConcerns: scraped.hairConcerns || []
     }));
 
     // Set images
@@ -285,9 +276,17 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       setImages(scraped.images);
     }
 
-    // Set variations if any
+    // 🔥 Set variations with MRP
     if (scraped.variations && scraped.variations.length > 0) {
-      setVariations(scraped.variations);
+      const formattedVariations = scraped.variations.map((v, idx) => ({
+        id: Date.now() + idx,
+        name: v.name,
+        price: v.price || scraped.price,
+        mrp: v.mrp || scraped.originalPrice || scraped.price * 1.2,
+        stock: v.stock || 10,
+        sku: v.sku || `VAR-${Date.now()}-${idx}`
+      }));
+      setVariations(formattedVariations);
     }
 
     alert(`✅ Imported: ${descriptionArray.length} bullet points | Category: ${selectedCategory} | SubCategory: ${finalSubCategory || 'Auto-detected'}`);
@@ -322,6 +321,15 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
         metaDescription: seoFields.metaDescription,
         metaKeywords: seoFields.metaKeywords,
         slug: seoFields.slug,
+        // 🔥 New fields
+        ingredients: scraped.ingredients || '',
+        skinType: scraped.skinType || 'all',
+        concerns: scraped.concerns || [],
+        finish: scraped.finish || '',
+        coverage: scraped.coverage || '',
+        hairType: scraped.hairType || 'all',
+        hairConcerns: scraped.hairConcerns || [],
+        variations: scraped.variations || [],
         status: 'active',
         adminApproved: true
       };
@@ -338,7 +346,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       const data = await response.json();
 
       if (data.success) {
-        alert('✅ Product imported successfully!');
+        alert('✅ Product imported successfully with all details!');
         if (onProductImported) onProductImported();
         setStep(1);
         setUrl('');
@@ -366,7 +374,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
           <span className="text-2xl">📦</span> Import from Amazon
-          <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded-full">Auto Brand & Category</span>
+          <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded-full">Auto Brand, Category & Variations</span>
         </h2>
         {step === 2 && (
           <button onClick={resetImporter} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -376,7 +384,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       {step === 1 && (
         <>
           <p className="text-sm text-gray-500 mb-4">
-            Paste Amazon product URL - Brand, Category & SEO fields auto-generated!
+            Paste Amazon product URL - Product details, variations, ingredients, skin type will be auto-detected!
           </p>
           
           <div className="mb-4">
@@ -411,7 +419,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
           </div>
           
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-600">💡 Tip: Brand will be auto-extracted, SubCategory auto-detected from product name!</p>
+            <p className="text-xs text-blue-600">💡 Tip: Product name, price, images, full description, variations, ingredients, skin type, concerns will be auto-detected!</p>
           </div>
         </>
       )}
@@ -437,6 +445,15 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
                   )}
                 </div>
                 <p className="text-xs text-gray-400">⭐ {fetchedProduct.scraped.rating || 'N/A'} reviews</p>
+                {fetchedProduct.scraped.ingredients && (
+                  <p className="text-xs text-purple-600 mt-1">✨ Ingredients: {fetchedProduct.scraped.ingredients.substring(0, 100)}...</p>
+                )}
+                {fetchedProduct.scraped.skinType && fetchedProduct.scraped.skinType !== 'all' && (
+                  <p className="text-xs text-blue-600 mt-1">🧴 Skin Type: {fetchedProduct.scraped.skinType}</p>
+                )}
+                {fetchedProduct.scraped.concerns && fetchedProduct.scraped.concerns.length > 0 && (
+                  <p className="text-xs text-amber-600 mt-1">🎯 Concerns: {fetchedProduct.scraped.concerns.join(', ')}</p>
+                )}
               </div>
             </div>
           </div>
@@ -472,6 +489,23 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
               )}
             </div>
           </div>
+
+          {/* Variations Preview */}
+          {fetchedProduct.scraped.variations && fetchedProduct.scraped.variations.length > 0 && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p className="font-medium text-gray-700 mb-2">📦 Variations Detected ({fetchedProduct.scraped.variations.length})</p>
+              <div className="flex flex-wrap gap-2">
+                {fetchedProduct.scraped.variations.slice(0, 5).map((v, idx) => (
+                  <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
+                    {v.name} - ₹{v.price}
+                  </span>
+                ))}
+                {fetchedProduct.scraped.variations.length > 5 && (
+                  <span className="text-xs text-gray-500">+{fetchedProduct.scraped.variations.length - 5} more</span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* SEO Preview */}
           <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
