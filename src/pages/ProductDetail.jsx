@@ -22,18 +22,15 @@ function ProductDetail() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [activeOffer, setActiveOffer] = useState(null);
   
-  // Variant selection
   const [selectedVariation, setSelectedVariation] = useState(null);
   const [selectedVariationId, setSelectedVariationId] = useState('');
   
-  // Pincode checker
   const [pincode, setPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load active offer from backend
   useEffect(() => {
     const loadActiveOffer = async () => {
       try {
@@ -47,7 +44,6 @@ function ProductDetail() {
     loadActiveOffer();
   }, []);
 
-  // Load product
   useEffect(() => {
     const loadProduct = async () => {
       if (!id || id === 'undefined') {
@@ -353,7 +349,6 @@ function ProductDetail() {
   const currentMrp = getCurrentMrp();
   const discountPercent = getDiscountPercent();
   const hasVariations = product.variations && product.variations.length > 0;
-  // Real stock check - not out of stock if stock > 0
   const isOutOfStock = currentStock === 0;
   const isLowStock = currentStock > 0 && currentStock < 10;
   const isButtonDisabled = isOutOfStock || quantity < 1;
@@ -361,7 +356,6 @@ function ProductDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Dynamic Offer Banner from Admin Panel */}
       {activeOffer && activeOffer.isActive !== false && (
         <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-3 px-4 text-center">
           <p className="text-sm font-medium">
@@ -517,13 +511,13 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Variations Selector - Amazon Style Vertical */}
+            {/* Variations - Horizontal Buttons (Original Style) */}
             {hasVariations && product.variations && product.variations.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
                   Select Option
                 </h3>
-                <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
                   {product.variations.map((variation) => {
                     const variationId = variation.id || variation._id;
                     const displayName = variation.secondaryName 
@@ -535,31 +529,16 @@ function ProductDetail() {
                       <button
                         key={variationId}
                         onClick={() => handleVariationChange(variationId)}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                        className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
                           isSelected
-                            ? 'border-pink-500 bg-pink-50 shadow-md'
-                            : 'border-gray-200 hover:border-pink-300 hover:bg-pink-50/30'
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
+                            : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
                         }`}
                       >
-                        <div className="flex justify-between items-start">
-                          <span className={`font-semibold text-base ${isSelected ? 'text-pink-700' : 'text-gray-800'}`}>
-                            {displayName}
-                          </span>
-                          {isSelected && (
-                            <span className="text-pink-500 text-sm">✓ Selected</span>
-                          )}
-                        </div>
-                        <div className={`my-2 h-px ${isSelected ? 'bg-pink-200' : 'bg-gray-200'}`}></div>
-                        <div className="flex justify-between items-center">
-                          <span className={`text-lg font-bold ${isSelected ? 'text-pink-600' : 'text-gray-800'}`}>
-                            ₹{variation.price}
-                          </span>
-                          {variation.stock > 0 ? (
-                            <span className="text-xs text-green-600">In Stock</span>
-                          ) : (
-                            <span className="text-xs text-red-500">Out of Stock</span>
-                          )}
-                        </div>
+                        {displayName}
+                        {variation.price !== product.price && (
+                          <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
+                        )}
                       </button>
                     );
                   })}
@@ -573,22 +552,14 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Stock Status - Fixed */}
             {isOutOfStock ? (
-              <div className="text-sm text-red-600 font-semibold">
-                ❌ Out of Stock
-              </div>
+              <div className="text-sm text-red-600 font-semibold">❌ Out of Stock</div>
             ) : isLowStock ? (
-              <div className="text-sm text-amber-600 font-semibold">
-                ⚠️ Only {currentStock} left in stock - order soon
-              </div>
+              <div className="text-sm text-amber-600 font-semibold">⚠️ Only {currentStock} left in stock - order soon</div>
             ) : (
-              <div className="text-sm text-green-600">
-                ✅ In Stock ({currentStock} available)
-              </div>
+              <div className="text-sm text-green-600">✅ In Stock ({currentStock} available)</div>
             )}
 
-            {/* Pincode Checker */}
             <div className="border-t border-gray-200 pt-4">
               <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -620,7 +591,6 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Quantity Selector */}
             {!isOutOfStock && (
               <div>
                 <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
@@ -634,7 +604,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button 
                 onClick={handleCartButtonClick}
@@ -662,7 +631,6 @@ function ProductDetail() {
               </button>
             </div>
 
-            {/* Product Details Box */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
               {Object.entries(specifications).slice(0, 5).map(([key, value], idx) => (
                 <div key={idx} className="flex flex-wrap justify-between py-1 gap-2">
@@ -684,7 +652,7 @@ function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs Section - Website Style */}
+        {/* Tabs Section - Website Style (Not Amazon) */}
         <div className="mt-12">
           <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'features', 'specifications', 'reviews'].map(tab => (
