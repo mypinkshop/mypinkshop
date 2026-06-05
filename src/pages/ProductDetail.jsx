@@ -20,8 +20,9 @@ function ProductDetail() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
+  const [activeOffer, setActiveOffer] = useState(null);
   
-  // Variant selection (for products with variations)
+  // Variant selection
   const [selectedVariation, setSelectedVariation] = useState(null);
   const [selectedVariationId, setSelectedVariationId] = useState('');
   
@@ -31,6 +32,20 @@ function ProductDetail() {
   const [checkingDelivery, setCheckingDelivery] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
+
+  // Load active offer from backend
+  useEffect(() => {
+    const loadActiveOffer = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/offers/active-offer`);
+        const data = await response.json();
+        setActiveOffer(data);
+      } catch (error) {
+        console.error('Error loading offer:', error);
+      }
+    };
+    loadActiveOffer();
+  }, []);
 
   // Load product
   useEffect(() => {
@@ -55,7 +70,6 @@ function ProductDetail() {
           setProduct(data);
           setSelectedImage(0);
           
-          // Set default selected variation if variations exist
           if (data.variations && data.variations.length > 0) {
             const defaultVariation = data.variations[0];
             setSelectedVariation(defaultVariation);
@@ -75,7 +89,6 @@ function ProductDetail() {
     loadProduct();
   }, [id]);
 
-  // Pincode delivery check
   const checkDelivery = async () => {
     if (!pincode || pincode.length !== 6) {
       alert('Please enter a valid 6-digit pincode');
@@ -172,11 +185,6 @@ function ProductDetail() {
     return 0;
   };
 
-  const getPrimaryOptions = () => {
-    if (!product?.variations) return [];
-    return [...new Set(product.variations.map(v => v.name).filter(Boolean))];
-  };
-
   const handleVariationChange = (variationId) => {
     const variation = product.variations.find(v => (v.id || v._id) === variationId);
     if (variation) {
@@ -206,7 +214,6 @@ function ProductDetail() {
         stock: getCurrentStock()
       };
       
-      // Add variation details if selected
       if (selectedVariation) {
         cartItem.variationName = selectedVariation.name;
         cartItem.variationSecondary = selectedVariation.secondaryName;
@@ -260,7 +267,6 @@ function ProductDetail() {
     ? product.images 
     : ['https://via.placeholder.com/800x800?text=Product+Image'];
 
-  // Get description as array of bullet points
   const getDescriptionBullets = () => {
     if (product?.description && Array.isArray(product.description)) {
       return product.description.filter(b => b && b.trim());
@@ -280,7 +286,6 @@ function ProductDetail() {
     return [];
   };
 
-  // Get key features as array
   const getKeyFeatures = () => {
     if (product?.keyFeatures && product.keyFeatures.length > 0) {
       return product.keyFeatures;
@@ -288,7 +293,6 @@ function ProductDetail() {
     return [];
   };
 
-  // Get specifications as key-value pairs
   const getSpecifications = () => {
     const specs = {};
     
@@ -348,14 +352,29 @@ function ProductDetail() {
   const currentStock = getCurrentStock();
   const currentMrp = getCurrentMrp();
   const discountPercent = getDiscountPercent();
-  const isButtonDisabled = currentStock === 0 || quantity < 1;
   const hasVariations = product.variations && product.variations.length > 0;
-  const primaryOptions = getPrimaryOptions();
+  // Real stock check - not out of stock if stock > 0
+  const isOutOfStock = currentStock === 0;
+  const isLowStock = currentStock > 0 && currentStock < 10;
+  const isButtonDisabled = isOutOfStock || quantity < 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      <OfferBanner />
+      {/* Dynamic Offer Banner from Admin Panel */}
+      {activeOffer && activeOffer.isActive !== false && (
+        <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-3 px-4 text-center">
+          <p className="text-sm font-medium">
+            {activeOffer.description || activeOffer.title}
+            {activeOffer.discountValue && (
+              <span className="ml-2 inline-block bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                {activeOffer.discountType === 'percentage' ? `${activeOffer.discountValue}% OFF` : `₹${activeOffer.discountValue} OFF`}
+                {activeOffer.minOrderValue > 0 && ` on ₹${activeOffer.minOrderValue}+`}
+              </span>
+            )}
+          </p>
+        </div>
+      )}
 
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
@@ -409,7 +428,6 @@ function ProductDetail() {
         </div>
       </header>
 
-      {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex items-center gap-2 text-sm flex-wrap">
           <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -478,10 +496,10 @@ function ProductDetail() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1">
                 <div className="flex text-yellow-400 text-sm sm:text-base">
-                  {'★'.repeat(Math.floor(product.rating || 4))}
-                  {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+                  {'★'.repeat(Math.floor(product.rating || 0))}
+                  {'☆'.repeat(5 - Math.floor(product.rating || 0))}
                 </div>
-                <span className="text-sm font-medium ml-1">{product.rating || 4}</span>
+                <span className="text-sm font-medium ml-1">{product.rating || 0}</span>
               </div>
               <span className="text-gray-300">|</span>
               <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
@@ -499,13 +517,13 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Variations Selector - For products with variations */}
-            {hasVariations && primaryOptions.length > 0 && (
+            {/* Variations Selector - Amazon Style Vertical */}
+            {hasVariations && product.variations && product.variations.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
                   Select Option
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-3">
                   {product.variations.map((variation) => {
                     const variationId = variation.id || variation._id;
                     const displayName = variation.secondaryName 
@@ -517,16 +535,31 @@ function ProductDetail() {
                       <button
                         key={variationId}
                         onClick={() => handleVariationChange(variationId)}
-                        className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                           isSelected
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
-                            : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
+                            ? 'border-pink-500 bg-pink-50 shadow-md'
+                            : 'border-gray-200 hover:border-pink-300 hover:bg-pink-50/30'
                         }`}
                       >
-                        {displayName}
-                        {variation.price !== product.price && (
-                          <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
-                        )}
+                        <div className="flex justify-between items-start">
+                          <span className={`font-semibold text-base ${isSelected ? 'text-pink-700' : 'text-gray-800'}`}>
+                            {displayName}
+                          </span>
+                          {isSelected && (
+                            <span className="text-pink-500 text-sm">✓ Selected</span>
+                          )}
+                        </div>
+                        <div className={`my-2 h-px ${isSelected ? 'bg-pink-200' : 'bg-gray-200'}`}></div>
+                        <div className="flex justify-between items-center">
+                          <span className={`text-lg font-bold ${isSelected ? 'text-pink-600' : 'text-gray-800'}`}>
+                            ₹{variation.price}
+                          </span>
+                          {variation.stock > 0 ? (
+                            <span className="text-xs text-green-600">In Stock</span>
+                          ) : (
+                            <span className="text-xs text-red-500">Out of Stock</span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
@@ -534,25 +567,28 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Selected Variation Details */}
             {selectedVariation && selectedVariation.sku && (
               <div className="text-xs text-gray-400">
                 SKU: {selectedVariation.sku}
               </div>
             )}
 
-            {/* Stock Status */}
-            {currentStock > 0 ? (
+            {/* Stock Status - Fixed */}
+            {isOutOfStock ? (
+              <div className="text-sm text-red-600 font-semibold">
+                ❌ Out of Stock
+              </div>
+            ) : isLowStock ? (
+              <div className="text-sm text-amber-600 font-semibold">
+                ⚠️ Only {currentStock} left in stock - order soon
+              </div>
+            ) : (
               <div className="text-sm text-green-600">
                 ✅ In Stock ({currentStock} available)
               </div>
-            ) : (
-              <div className="text-sm text-red-600">
-                ❌ Out of Stock
-              </div>
             )}
 
-            {/* PINCODE DELIVERY CHECKER */}
+            {/* Pincode Checker */}
             <div className="border-t border-gray-200 pt-4">
               <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
               <div className="flex flex-col sm:flex-row gap-3">
@@ -585,7 +621,7 @@ function ProductDetail() {
             </div>
 
             {/* Quantity Selector */}
-            {currentStock > 0 && (
+            {!isOutOfStock && (
               <div>
                 <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
                 <div className="flex items-center gap-4 flex-wrap">
@@ -594,7 +630,6 @@ function ProductDetail() {
                     <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
                     <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= currentStock}>+</button>
                   </div>
-                  {quantity === 0 && <span className="text-amber-500 text-sm">⚠ Select quantity</span>}
                 </div>
               </div>
             )}
@@ -612,7 +647,7 @@ function ProductDetail() {
                       : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
                 }`}
               >
-                {addedToCart ? '✓ Go to Cart' : 'Add to Cart'}
+                {isOutOfStock ? 'Out of Stock' : (addedToCart ? '✓ Go to Cart' : 'Add to Cart')}
               </button>
               <button 
                 onClick={handleBuyNow}
@@ -649,7 +684,7 @@ function ProductDetail() {
           </div>
         </div>
 
-        {/* Tabs Section - Amazon Style */}
+        {/* Tabs Section - Website Style */}
         <div className="mt-12">
           <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
             {['description', 'features', 'specifications', 'reviews'].map(tab => (
@@ -666,7 +701,6 @@ function ProductDetail() {
           </div>
 
           <div className="py-6">
-            {/* Amazon Style Description - Bullet Points */}
             {activeTab === 'description' && (
               <div className="space-y-4">
                 {descriptionBullets.length > 0 ? (
@@ -681,17 +715,9 @@ function ProductDetail() {
                 ) : (
                   <p className="text-gray-500 text-center py-8">No description available</p>
                 )}
-                
-                {/* Shipping Info */}
-                <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mt-4">
-                  <h4 className="font-medium text-gray-800 mb-2">Shipping Information</h4>
-                  <p className="text-gray-600 text-sm">Free shipping on orders above ₹999. Usually delivered in 3-5 business days.</p>
-                  <p className="text-xs text-gray-400 mt-2">Returns accepted within 7 days of delivery.</p>
-                </div>
               </div>
             )}
 
-            {/* Key Features - Amazon Style Highlights */}
             {activeTab === 'features' && (
               <div className="space-y-4">
                 {keyFeatures.length > 0 ? (
@@ -709,7 +735,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Specifications - Amazon Style Product Details Table */}
             {activeTab === 'specifications' && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
@@ -740,7 +765,6 @@ function ProductDetail() {
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
