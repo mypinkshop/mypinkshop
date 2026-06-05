@@ -47,6 +47,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     ]
   };
 
+  // 🔥 FIX 1: Added more garbage words including subscribe, buy now, add to cart
   const garbageWords = [
     'See more product details', 'Report an issue', 'Product Description',
     'To see our price', 'See more', 'Product details', 'Would you like to',
@@ -54,7 +55,16 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     'full content visible', 'double tap to read', 'Read more', 'Read less',
     'Loading...', 'Sorry, we couldn\'t load the review', 'Customer Reviews',
     'Top reviews', 'There was a problem', 'Filtered by', 'Sort by',
-    'Visit the', 'Store', 'Shop', 'Brand:'
+    'Visit the', 'Store', 'Shop', 'Brand:',
+    // 🔥 NEW: Button/Action garbage words
+    'Subscribe', 'subscription', 'auto-delivery', 'Subscribe & Save',
+    'One-time purchase', 'Subscribe now', 'save with subscription',
+    'Subscribe and save', 'Auto delivery', 'Subscribe to save',
+    'Buy it with', 'Frequently bought together', 'Customers also bought',
+    'Compare with similar items', 'Sponsored', 'Advertisement',
+    'Buy Now', 'Add to Cart', 'Add to cart', 'Buy now', 'add to cart',
+    'Secure transaction', 'Cash on Delivery', 'COD', 'EMI', 'No cost EMI',
+    'Return policy', 'Exchange policy', 'Warranty', 'Guaranteed'
   ];
 
   const handleCategoryChange = (category) => {
@@ -214,7 +224,50 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     return [...new Set(cleaned)];
   };
 
-  // 🔥 FIXED: Import to form with all new fields from backend
+  // 🔥 FIX 2: Clean variations - remove button/action garbage
+  const cleanVariations = (variations, scraped) => {
+    if (!variations || variations.length === 0) return [];
+    
+    const garbageVariationWords = [
+      'buy', 'cart', 'subscribe', 'save', 'offer', 'deal', 'checkout', 
+      'shipping', 'delivery', 'payment', 'cod', 'emi', 'warranty', 
+      'return', 'exchange', 'secure', 'transaction', 'cash', 'card',
+      'click', 'button', 'link', 'view', 'see', 'more', 'shop', 'order'
+    ];
+    
+    const isValidVariation = (name) => {
+      const lowerName = name.toLowerCase();
+      
+      // Check against garbage words
+      for (const word of garbageVariationWords) {
+        if (lowerName.includes(word)) return false;
+      }
+      
+      // Check if it's just numbers
+      if (/^\d+$/.test(name)) return false;
+      
+      // Check if it's a price format
+      if (/[₹$£€]/.test(name)) return false;
+      
+      // Check length
+      if (name.length < 2 || name.length > 30) return false;
+      
+      return true;
+    };
+    
+    return variations
+      .filter(v => isValidVariation(v.name))
+      .map((v, idx) => ({
+        id: Date.now() + idx,
+        name: v.name,
+        price: v.price || scraped?.price || 0,
+        mrp: v.mrp || scraped?.originalPrice || (scraped?.price || 0) * 1.2,
+        stock: v.stock || 10,
+        sku: v.sku || `VAR-${Date.now()}-${idx}`
+      }));
+  };
+
+  // 🔥 FIX 3: Import to form with cleaned variations
   const importToForm = () => {
     if (!fetchedProduct?.scraped) return;
 
@@ -241,8 +294,10 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     
     // Generate SEO fields
     const seoFields = generateSeoFields(scraped.name, cleanBrand, keyFeaturesArray);
+    
+    // 🔥 Clean variations - remove Buy Now, Subscribe, Add to Cart garbage
+    const cleanedVariations = cleanVariations(scraped.variations, scraped);
 
-    // 🔥 Set form data with ALL fields including new ones
     setFormData(prev => ({
       ...prev,
       productName: scraped.name || '',
@@ -261,7 +316,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       metaDescription: seoFields.metaDescription,
       metaKeywords: seoFields.metaKeywords,
       slug: seoFields.slug,
-      // 🔥 New fields from backend
       ingredients: scraped.ingredients || '',
       skinType: scraped.skinType || 'all',
       concerns: scraped.concerns || [],
@@ -271,25 +325,16 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       hairConcerns: scraped.hairConcerns || []
     }));
 
-    // Set images
     if (scraped.images && scraped.images.length > 0) {
       setImages(scraped.images);
     }
 
-    // 🔥 Set variations with MRP
-    if (scraped.variations && scraped.variations.length > 0) {
-      const formattedVariations = scraped.variations.map((v, idx) => ({
-        id: Date.now() + idx,
-        name: v.name,
-        price: v.price || scraped.price,
-        mrp: v.mrp || scraped.originalPrice || scraped.price * 1.2,
-        stock: v.stock || 10,
-        sku: v.sku || `VAR-${Date.now()}-${idx}`
-      }));
-      setVariations(formattedVariations);
+    // 🔥 Set cleaned variations
+    if (cleanedVariations.length > 0) {
+      setVariations(cleanedVariations);
     }
 
-    alert(`✅ Imported: ${descriptionArray.length} bullet points | Category: ${selectedCategory} | SubCategory: ${finalSubCategory || 'Auto-detected'}`);
+    alert(`✅ Imported: ${descriptionArray.length} bullet points | ${cleanedVariations.length} variations | Category: ${selectedCategory}`);
     
     if (onProductImported) onProductImported();
     setStep(1);
@@ -305,6 +350,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       const finalSubCategory = selectedSubCategory || fetchedProduct.autoSubCategory || '';
       const keyFeaturesArray = cleanFeaturesArray(scraped.keyFeatures);
       const seoFields = generateSeoFields(scraped.name, cleanBrand, keyFeaturesArray);
+      const cleanedVariations = cleanVariations(scraped.variations, scraped);
       
       const productData = {
         name: scraped.name,
@@ -321,7 +367,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
         metaDescription: seoFields.metaDescription,
         metaKeywords: seoFields.metaKeywords,
         slug: seoFields.slug,
-        // 🔥 New fields
         ingredients: scraped.ingredients || '',
         skinType: scraped.skinType || 'all',
         concerns: scraped.concerns || [],
@@ -329,7 +374,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
         coverage: scraped.coverage || '',
         hairType: scraped.hairType || 'all',
         hairConcerns: scraped.hairConcerns || [],
-        variations: scraped.variations || [],
+        variations: cleanedVariations,
         status: 'active',
         adminApproved: true
       };
@@ -346,7 +391,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       const data = await response.json();
 
       if (data.success) {
-        alert('✅ Product imported successfully with all details!');
+        alert('✅ Product imported successfully!');
         if (onProductImported) onProductImported();
         setStep(1);
         setUrl('');
@@ -419,7 +464,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
           </div>
           
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-600">💡 Tip: Product name, price, images, full description, variations, ingredients, skin type, concerns will be auto-detected!</p>
+            <p className="text-xs text-blue-600">💡 Tip: Product details, variations, ingredients, skin type, concerns auto-detected! "Buy Now", "Subscribe" garbage automatically filtered!</p>
           </div>
         </>
       )}
@@ -490,22 +535,25 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
             </div>
           </div>
 
-          {/* Variations Preview */}
-          {fetchedProduct.scraped.variations && fetchedProduct.scraped.variations.length > 0 && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="font-medium text-gray-700 mb-2">📦 Variations Detected ({fetchedProduct.scraped.variations.length})</p>
-              <div className="flex flex-wrap gap-2">
-                {fetchedProduct.scraped.variations.slice(0, 5).map((v, idx) => (
-                  <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
-                    {v.name} - ₹{v.price}
-                  </span>
-                ))}
-                {fetchedProduct.scraped.variations.length > 5 && (
-                  <span className="text-xs text-gray-500">+{fetchedProduct.scraped.variations.length - 5} more</span>
-                )}
+          {/* Variations Preview - Only clean variations */}
+          {(() => {
+            const cleanedVars = cleanVariations(fetchedProduct.scraped.variations, fetchedProduct.scraped);
+            return cleanedVars.length > 0 && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p className="font-medium text-gray-700 mb-2">📦 Variations Detected ({cleanedVars.length})</p>
+                <div className="flex flex-wrap gap-2">
+                  {cleanedVars.slice(0, 5).map((v, idx) => (
+                    <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
+                      {v.name} - ₹{v.price}
+                    </span>
+                  ))}
+                  {cleanedVars.length > 5 && (
+                    <span className="text-xs text-gray-500">+{cleanedVars.length - 5} more</span>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* SEO Preview */}
           <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
