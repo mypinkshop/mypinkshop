@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-// 🔥 AMAZON IMPORTER - Multi-URL Support
+// 🔥 AMAZON IMPORTER - Multi-URL Support (Styled for your website)
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
   const [loading, setLoading] = useState(false);
@@ -95,12 +95,12 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   };
 
   return (
-    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-200 p-6 mb-6 shadow-lg">
-      <h3 className="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-        <span className="text-3xl">📦</span> Import from Amazon
-        <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded-full ml-2">Multi-URL Support</span>
+    <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-200 p-5 mb-6 shadow-sm">
+      <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+        <span className="text-2xl">📦</span> Import from Amazon
+        <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full ml-2">Multi-URL Support</span>
       </h3>
-      <p className="text-sm text-gray-600 mb-4">Paste Amazon product URLs to automatically fetch product details (Up to 20 URLs)</p>
+      <p className="text-sm text-gray-500 mb-4">Paste Amazon product URLs to automatically fetch product details (Up to 20 URLs)</p>
       
       <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
         {urls.map((url, idx) => (
@@ -110,10 +110,10 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
               placeholder="https://www.amazon.in/dp/XXXXXXXXXX"
               value={url}
               onChange={(e) => updateUrl(idx, e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 bg-white"
+              className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400 bg-white text-sm"
             />
             {urls.length > 1 && (
-              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition">
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">
                 ✕
               </button>
             )}
@@ -121,36 +121,36 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
         ))}
       </div>
       
-      <div className="flex gap-3 mb-4">
-        <button onClick={addUrlField} className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition font-medium flex items-center gap-1">
+      <div className="flex flex-wrap gap-3 mb-4">
+        <button onClick={addUrlField} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-sm flex items-center gap-1">
           ➕ Add Another URL ({urls.length}/20)
         </button>
-        <button onClick={fetchAllProducts} disabled={loading} className="px-5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:shadow-lg transition disabled:opacity-50 flex items-center gap-2">
+        <button onClick={fetchAllProducts} disabled={loading} className="px-5 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition disabled:opacity-50 flex items-center gap-2 text-sm">
           {loading ? '⏳ Fetching...' : '🔍 Fetch All Products'}
         </button>
       </div>
       
       {importedProducts.length > 0 && (
-        <div className="mt-4 border-t pt-4">
-          <h4 className="font-semibold text-gray-700 mb-3">📋 Fetched Products ({importedProducts.length})</h4>
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <h4 className="font-medium text-gray-700 mb-3 text-sm">📋 Fetched Products ({importedProducts.length})</h4>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {importedProducts.map((product, idx) => (
-              <div key={idx} className={`p-3 rounded-lg flex justify-between items-center ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-md transition'}`}>
-                <div className="flex-1">
+              <div key={idx} className={`p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-sm transition'}`}>
+                <div className="flex-1 min-w-0">
                   {product.error ? (
                     <>
-                      <p className="text-sm text-red-600 font-medium">❌ Failed: {product.originalUrl}</p>
+                      <p className="text-sm text-red-600 font-medium truncate">❌ Failed: {product.originalUrl}</p>
                       <p className="text-xs text-red-400">{product.error}</p>
                     </>
                   ) : (
                     <>
-                      <p className="font-medium text-gray-800 text-sm">{product.name.substring(0, 60)}...</p>
+                      <p className="font-medium text-gray-800 text-sm truncate">{product.name}</p>
                       <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'}</p>
                     </>
                   )}
                 </div>
                 {!product.error && (
-                  <button onClick={() => importToForm(product)} className="ml-3 px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition whitespace-nowrap">
+                  <button onClick={() => importToForm(product)} className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">
                     📥 Import
                   </button>
                 )}
@@ -461,6 +461,10 @@ function AdminAddProduct() {
 
   const addKeyFeature = () => {
     if (keyFeature.trim()) {
+      if (formData.keyFeatures.length >= 10) {
+        alert('⚠️ Maximum 10 key features allowed!');
+        return;
+      }
       setFormData({ ...formData, keyFeatures: [...formData.keyFeatures, keyFeature.trim()] });
       setKeyFeature('');
     }
@@ -627,32 +631,38 @@ function AdminAddProduct() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="bg-white border-b sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      {/* Sticky Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex items-center gap-4">
-            <Link to="/admin/inventory" className="text-gray-500 hover:text-gray-700"><IconBack /></Link>
+            <Link to="/admin/inventory" className="text-gray-500 hover:text-gray-700 transition">
+              <IconBack />
+            </Link>
             <div>
-              <h1 className="text-xl font-semibold">Add Product</h1>
-              <p className="text-xs text-gray-500">Amazon Style Product Listing</p>
+              <h1 className="text-xl font-semibold text-gray-800">Add New Product</h1>
+              <p className="text-xs text-gray-500 hidden sm:block">Create Amazon-style product listings</p>
             </div>
           </div>
-          <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 py-2 rounded-lg text-sm font-medium">
+          <button 
+            onClick={submitProduct} 
+            disabled={loading} 
+            className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-rose-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:shadow-md transition disabled:opacity-50"
+          >
             {loading ? 'Saving...' : 'Save & Publish'}
           </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Progress Steps - Only 4 Steps (No SEO) */}
-        <div className="bg-white rounded-lg shadow-sm border p-4 mb-8 overflow-x-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Progress Steps - Responsive */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 overflow-x-auto">
           <div className="flex justify-between min-w-[400px]">
-            {['Basic', 'Images', 'Pricing', 'Details'].map((label, idx) => (
+            {['Basic Info', 'Images', 'Pricing', 'Details'].map((label, idx) => (
               <div key={idx} className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= idx + 1 ? 'bg-pink-600 text-white' : 'bg-gray-200 text-gray-400'}`}>
                   {step > idx + 1 ? '✓' : idx + 1}
                 </div>
-                <span className={`text-xs ml-2 ${step >= idx + 1 ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
-                {idx < 3 && <div className="w-8 h-px bg-gray-200 mx-2"></div>}
+                <span className={`text-xs ml-2 hidden sm:inline ${step >= idx + 1 ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
               </div>
             ))}
           </div>
@@ -660,12 +670,12 @@ function AdminAddProduct() {
 
         {/* TABS - Manual vs Import */}
         <div className="mb-6">
-          <div className="flex gap-3 border-b border-gray-200">
+          <div className="flex gap-2 sm:gap-3 border-b border-gray-200">
             <button
               onClick={() => setActiveTab('manual')}
-              className={`px-6 py-3 text-base font-medium rounded-t-lg transition-all ${
+              className={`px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-medium rounded-t-lg transition-all ${
                 activeTab === 'manual' 
-                  ? 'bg-pink-600 text-white shadow-lg' 
+                  ? 'bg-pink-600 text-white shadow-md' 
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -673,9 +683,9 @@ function AdminAddProduct() {
             </button>
             <button
               onClick={() => setActiveTab('import')}
-              className={`px-6 py-3 text-base font-medium rounded-t-lg transition-all ${
+              className={`px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-medium rounded-t-lg transition-all ${
                 activeTab === 'import' 
-                  ? 'bg-purple-600 text-white shadow-lg' 
+                  ? 'bg-purple-600 text-white shadow-md' 
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -699,68 +709,137 @@ function AdminAddProduct() {
           <>
             {/* Step 1 - Basic Information */}
             {step === 1 && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold mb-4">📋 Basic Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Product Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={formData.productName} onChange={(e) => setFormData({...formData, productName: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C Serum" />
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-5">📋 Basic Information</h2>
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Product Name <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={formData.productName} 
+                      onChange={(e) => setFormData({...formData, productName: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 focus:ring-1 focus:ring-pink-400 text-sm"
+                      placeholder="e.g., Vitamin C Serum with Hyaluronic Acid"
+                    />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Brand <span className="text-red-500">*</span></label>
-                    <input type="text" placeholder="Search brand..." value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} className="w-full border rounded-lg px-4 py-2.5" />
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      placeholder="Search or select brand..." 
+                      value={brandSearch} 
+                      onChange={(e) => setBrandSearch(e.target.value)} 
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                    />
                     {brandSearch && (
-                      <div className="mt-1 border rounded-lg max-h-40 overflow-y-auto">
+                      <div className="mt-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto shadow-sm">
                         {filteredBrands.map(b => (
-                          <button key={b} onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">{b}</button>
+                          <button 
+                            key={b} 
+                            onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} 
+                            className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition"
+                          >
+                            {b}
+                          </button>
                         ))}
-                        <button onClick={() => setShowAddBrand(true)} className="w-full text-left px-4 py-2 text-pink-600 text-sm">+ Add new brand</button>
+                        <button 
+                          onClick={() => setShowAddBrand(true)} 
+                          className="w-full text-left px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 transition border-t"
+                        >
+                          + Add new brand
+                        </button>
                       </div>
                     )}
                     {formData.brand && !brandSearch && (
-                      <div className="mt-2 bg-gray-50 px-4 py-2 rounded-lg flex justify-between">
-                        <span>{formData.brand}</span>
-                        <button onClick={() => setFormData({...formData, brand: ''})} className="text-gray-400">✕</button>
+                      <div className="mt-2 bg-pink-50 px-4 py-2 rounded-lg flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">{formData.brand}</span>
+                        <button onClick={() => setFormData({...formData, brand: ''})} className="text-gray-400 hover:text-red-500">✕</button>
                       </div>
                     )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Category <span className="text-red-500">*</span></label>
-                    <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value, subCategory: ''})} className="w-full border rounded-lg px-4 py-2.5">
-                      <option value="">Select Category</option>
-                      {Object.keys(categories).map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Category <span className="text-red-500">*</span></label>
+                      <select 
+                        value={formData.category} 
+                        onChange={(e) => setFormData({...formData, category: e.target.value, subCategory: ''})} 
+                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      >
+                        <option value="">Select Category</option>
+                        {Object.keys(categories).map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Sub Category <span className="text-red-500">*</span></label>
+                      <select 
+                        value={formData.subCategory} 
+                        onChange={(e) => setFormData({...formData, subCategory: e.target.value})} 
+                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={!formData.category}
+                      >
+                        <option value="">Select Sub Category</option>
+                        {formData.category && categories[formData.category]?.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Sub Category <span className="text-red-500">*</span></label>
-                    <select value={formData.subCategory} onChange={(e) => setFormData({...formData, subCategory: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" disabled={!formData.category}>
-                      <option value="">Select Sub Category</option>
-                      {formData.category && categories[formData.category]?.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">SKU (Optional)</label>
-                    <input type="text" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="Auto Generated" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Weight / Dimensions</label>
-                    <input type="text" value={formData.weight} onChange={(e) => setFormData({...formData, weight: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., 250g, 10x5x2 cm" />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU (Optional)</label>
+                      <input 
+                        type="text" 
+                        value={formData.sku} 
+                        onChange={(e) => setFormData({...formData, sku: e.target.value})} 
+                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                        placeholder="Auto-generated"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Weight / Dimensions</label>
+                      <input 
+                        type="text" 
+                        value={formData.weight} 
+                        onChange={(e) => setFormData({...formData, weight: e.target.value})} 
+                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                        placeholder="e.g., 250g, 10x5x2 cm"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-end mt-6"><button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2 rounded-lg">Continue →</button></div>
+                
+                <div className="flex justify-end mt-6">
+                  <button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-pink-700 transition text-sm">
+                    Continue →
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Add Brand Modal */}
             {showAddBrand && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddBrand(false)}>
-                <div className="bg-white rounded-lg max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-                  <div className="p-5 border-b"><h3 className="font-semibold">Add New Brand</h3></div>
+                <div className="bg-white rounded-xl max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-5 border-b border-gray-200">
+                    <h3 className="font-semibold text-gray-800">Add New Brand</h3>
+                  </div>
                   <div className="p-5">
-                    <input type="text" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="Brand name" className="w-full border rounded-lg px-4 py-2" autoFocus />
+                    <input 
+                      type="text" 
+                      value={newBrand} 
+                      onChange={(e) => setNewBrand(e.target.value)} 
+                      placeholder="Enter brand name" 
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      autoFocus 
+                    />
                     <div className="flex gap-3 mt-5">
-                      <button onClick={() => setShowAddBrand(false)} className="flex-1 px-4 py-2 border rounded-lg">Cancel</button>
-                      <button onClick={handleAddNewBrand} className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg">Add</button>
+                      <button onClick={() => setShowAddBrand(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition text-sm">
+                        Cancel
+                      </button>
+                      <button onClick={handleAddNewBrand} className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition text-sm">
+                        Add Brand
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -769,70 +848,117 @@ function AdminAddProduct() {
 
             {/* Step 2 - Images */}
             {step === 2 && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold mb-4">📸 Product Images</h2>
-                <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                  <div className="flex flex-wrap gap-3 mb-4">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-5">📸 Product Images</h2>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-pink-400 transition">
+                  <div className="flex flex-wrap gap-3 mb-4 justify-center">
                     {formData.images.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
-                        <img src={img} className="w-full h-full object-cover" />
-                        <button onClick={() => removeImage(idx)} className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-full text-xs">✕</button>
+                      <div key={idx} className="relative w-20 h-20 bg-gray-100 rounded-lg overflow-hidden shadow-sm">
+                        <img src={img} className="w-full h-full object-cover" alt={`Product ${idx + 1}`} />
+                        <button 
+                          onClick={() => removeImage(idx)} 
+                          className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition"
+                        >
+                          ✕
+                        </button>
                       </div>
                     ))}
                   </div>
                   <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" />
-                  <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-5 py-2 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600">
+                  <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600 hover:bg-pink-50 transition text-sm font-medium">
                     <IconUpload /> {uploadingImages ? 'Uploading...' : 'Choose Images'}
                   </label>
-                  <p className="text-xs text-gray-400 mt-2">Upload up to 5 images (max 5MB each, automatically compressed)</p>
+                  <p className="text-xs text-gray-400 mt-3">Upload up to 5 images (max 5MB each, automatically compressed)</p>
                 </div>
-                <div className="flex justify-between mt-6"><button onClick={() => setStep(1)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2 rounded-lg">Continue →</button></div>
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
+                  <button onClick={() => setStep(1)} className="px-6 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">
+                    ← Back
+                  </button>
+                  <button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-pink-700 transition text-sm">
+                    Continue →
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Step 3 - Pricing */}
             {step === 3 && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold mb-4">💰 Pricing</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div><label className="block text-sm font-medium mb-1">MRP</label><input type="number" value={formData.mrp} onChange={(e) => setFormData({...formData, mrp: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="₹" /></div>
-                  <div><label className="block text-sm font-medium mb-1">Selling Price <span className="text-red-500">*</span></label><input type="number" value={formData.sellingPrice} onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="₹" /></div>
-                  <div><label className="block text-sm font-medium mb-1">Tax (GST) %</label><input type="number" value={formData.tax} onChange={(e) => setFormData({...formData, tax: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" /></div>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-5">💰 Pricing</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">MRP</label>
+                    <input 
+                      type="number" 
+                      value={formData.mrp} 
+                      onChange={(e) => setFormData({...formData, mrp: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      placeholder="₹ 999"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price <span className="text-red-500">*</span></label>
+                    <input 
+                      type="number" 
+                      value={formData.sellingPrice} 
+                      onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      placeholder="₹ 499"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax (GST) %</label>
+                    <input 
+                      type="number" 
+                      value={formData.tax} 
+                      onChange={(e) => setFormData({...formData, tax: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                    />
+                  </div>
                 </div>
-                <div className="flex justify-between mt-6"><button onClick={() => setStep(2)} className="px-6 py-2 border rounded-lg">Back</button><button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2 rounded-lg">Continue →</button></div>
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
+                  <button onClick={() => setStep(2)} className="px-6 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">
+                    ← Back
+                  </button>
+                  <button onClick={goToNextStep} className="bg-pink-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-pink-700 transition text-sm">
+                    Continue →
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Step 4 - Product Details (Amazon Style) */}
             {step === 4 && (
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold mb-4">✨ Product Details</h2>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-5">✨ Product Details</h2>
                 
                 {/* About this item - Bullet Points (Amazon Style) */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     About this item <span className="text-xs text-gray-400 ml-2">(Bullet points - Max 8)</span>
                   </label>
                   <div className="space-y-2 mb-3">
                     {formData.fullDescription.map((bullet, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
-                        <span className="text-pink-500 font-bold ml-2">•</span>
-                        <span className="flex-1 text-sm">{bullet}</span>
-                        <button onClick={() => removeBulletPoint(idx)} className="text-red-400 hover:text-red-600 px-2">✕</button>
+                      <div key={idx} className="flex items-start gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <span className="text-pink-500 font-bold mt-0.5">•</span>
+                        <span className="flex-1 text-sm text-gray-700">{bullet}</span>
+                        <button onClick={() => removeBulletPoint(idx)} className="text-red-400 hover:text-red-600 px-2 text-sm">
+                          ✕
+                        </button>
                       </div>
                     ))}
                   </div>
                   {formData.fullDescription.length < 8 && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input 
                         type="text" 
                         value={currentBullet} 
                         onChange={(e) => setCurrentBullet(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && addBulletPoint()}
                         placeholder="e.g., Dermatologically tested for sensitive skin"
-                        className="flex-1 border rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-500"
+                        className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
                       />
-                      <button onClick={addBulletPoint} className="px-5 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition flex items-center gap-1">
+                      <button onClick={addBulletPoint} className="px-5 py-2.5 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition flex items-center justify-center gap-1 text-sm font-medium">
                         <IconPlus /> Add
                       </button>
                     </div>
@@ -841,27 +967,38 @@ function AdminAddProduct() {
 
                 {/* Product Highlights - Key Features */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-1">Product Highlights</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Product Highlights <span className="text-xs text-gray-400 ml-2">(Key features with ✓)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {formData.keyFeatures.map((f, i) => (
-                      <span key={i} className="bg-gray-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                      <span key={i} className="bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 border border-green-200">
                         ✓ {f}
-                        <button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button>
+                        <button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1 hover:text-red-600">×</button>
                       </span>
                     ))}
                   </div>
-                  <div className="flex gap-2">
-                    <input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} placeholder="e.g., 100% Vegan" className="flex-1 border rounded-lg px-4 py-2" />
-                    <button onClick={addKeyFeature} className="px-4 py-2 bg-gray-100 rounded-lg">Add</button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input 
+                      type="text" 
+                      value={keyFeature} 
+                      onChange={(e) => setKeyFeature(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addKeyFeature()}
+                      placeholder="e.g., 100% Vegan & Cruelty-free"
+                      className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                    />
+                    <button onClick={addKeyFeature} className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">
+                      Add Feature
+                    </button>
                   </div>
                 </div>
 
                 {/* Variations Section */}
-                <div className="border-t pt-4 mb-6">
-                  <div className="flex justify-between items-center mb-4">
+                <div className="border-t border-gray-200 pt-5 mb-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                     <div>
-                      <h3 className="font-medium text-gray-800 text-lg">Product Variations</h3>
-                      <p className="text-xs text-gray-500">
+                      <h3 className="font-semibold text-gray-800">Product Variations</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {formData.category === 'Skincare' && 'Add different sizes (ml/gm) and fragrances'}
                         {formData.category === 'Makeup' && 'Add different shades and finishes'}
                         {formData.category === 'Hair' && 'Add different sizes and fragrances'}
@@ -878,7 +1015,7 @@ function AdminAddProduct() {
                           setVariationForm({ name: '', price: '', stock: '', sku: '', attributes: {} });
                           setVariationModalOpen(true);
                         }}
-                        className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:shadow-lg transition"
+                        className="bg-pink-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition shadow-sm"
                       >
                         + Add {variationAttrs.type}
                       </button>
@@ -896,39 +1033,39 @@ function AdminAddProduct() {
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
-                            <th className="px-4 py-2 text-left">{variationAttrs.type.charAt(0).toUpperCase() + variationAttrs.type.slice(1)}</th>
-                            {variationAttrs.secondary && <th className="px-4 py-2 text-left">{variationAttrs.secondary.charAt(0).toUpperCase() + variationAttrs.secondary.slice(1)}</th>}
-                            <th className="px-4 py-2 text-right">Price (₹)</th>
-                            <th className="px-4 py-2 text-right">Stock</th>
-                            <th className="px-4 py-2 text-left">SKU</th>
-                            <th className="px-4 py-2 text-center">Actions</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">{variationAttrs.type.charAt(0).toUpperCase() + variationAttrs.type.slice(1)}</th>
+                            {variationAttrs.secondary && <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">{variationAttrs.secondary.charAt(0).toUpperCase() + variationAttrs.secondary.slice(1)}</th>}
+                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-600">Price (₹)</th>
+                            <th className="px-3 py-2 text-right text-xs font-medium text-gray-600">Stock</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">SKU</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {variations.map((variation) => (
                             <tr key={variation.id} className="hover:bg-pink-50/30">
-                              <td className="px-4 py-2 font-medium">{variation.name}</td>
-                              {variationAttrs.secondary && <td className="px-4 py-2">{variation.secondaryName || '-'}</td>}
-                              <td className="px-4 py-2 text-right font-medium text-pink-600">₹{variation.price}</td>
-                              <td className="px-4 py-2 text-right">{variation.stock}</td>
-                              <td className="px-4 py-2 text-xs text-gray-500">{variation.sku}</td>
-                              <td className="px-4 py-2 text-center">
+                              <td className="px-3 py-2 font-medium text-gray-800">{variation.name}</td>
+                              {variationAttrs.secondary && <td className="px-3 py-2 text-gray-600">{variation.secondaryName || '-'}</td>}
+                              <td className="px-3 py-2 text-right font-medium text-pink-600">₹{variation.price}</td>
+                              <td className="px-3 py-2 text-right text-gray-700">{variation.stock}</td>
+                              <td className="px-3 py-2 text-xs text-gray-500 font-mono">{variation.sku}</td>
+                              <td className="px-3 py-2 text-center">
                                 <div className="flex justify-center gap-2">
-                                  <button type="button" onClick={() => editVariation(variation)} className="text-blue-500 hover:text-blue-700">✏️</button>
-                                  <button type="button" onClick={() => deleteVariation(variation.id)} className="text-red-500 hover:text-red-700">🗑️</button>
+                                  <button type="button" onClick={() => editVariation(variation)} className="text-blue-500 hover:text-blue-700 text-sm">✏️</button>
+                                  <button type="button" onClick={() => deleteVariation(variation.id)} className="text-red-500 hover:text-red-700 text-sm">🗑️</button>
                                 </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="bg-gray-50">
+                        <tfoot className="bg-gray-50 border-t border-gray-200">
                           <tr>
-                            <td className="px-4 py-2 font-medium">Total</td>
-                            {variationAttrs.secondary && <td></td>}
-                            <td className="px-4 py-2 text-right font-bold text-pink-600">₹{variations.reduce((sum, v) => sum + v.price, 0)}</td>
-                            <td className="px-4 py-2 text-right font-bold">{variations.reduce((sum, v) => sum + v.stock, 0)}</td>
+                            <td className="px-3 py-2 font-medium text-gray-800">Total</td>
+                            {variationAttrs.secondary && <td className="px-3 py-2"></td>}
+                            <td className="px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((sum, v) => sum + v.price, 0)}</td>
+                            <td className="px-3 py-2 text-right font-bold text-gray-800">{variations.reduce((sum, v) => sum + v.stock, 0)}</td>
                             <td colSpan="2"></td>
                           </tr>
                         </tfoot>
@@ -940,16 +1077,20 @@ function AdminAddProduct() {
                 {/* Variation Modal */}
                 {variationModalOpen && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
-                    <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                      <div className="border-b border-pink-100 p-5 flex justify-between items-center">
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+                      <div className="border-b border-gray-200 p-5 flex justify-between items-center">
                         <h3 className="text-lg font-semibold text-gray-800">{editingVariation ? '✏️ Edit Variation' : `✨ Add New ${variationAttrs.type}`}</h3>
-                        <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                        <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
                       </div>
                       
                       <div className="p-5 space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">{variationAttrs.type.charAt(0).toUpperCase() + variationAttrs.type.slice(1)} *</label>
-                          <select value={variationForm.name} onChange={(e) => setVariationForm({...variationForm, name: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500">
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">{variationAttrs.type.charAt(0).toUpperCase() + variationAttrs.type.slice(1)} *</label>
+                          <select 
+                            value={variationForm.name} 
+                            onChange={(e) => setVariationForm({...variationForm, name: e.target.value})} 
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
+                          >
                             <option value="">Select {variationAttrs.type}</option>
                             {variationAttrs.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                           </select>
@@ -957,8 +1098,12 @@ function AdminAddProduct() {
                         
                         {variationAttrs.secondary && (
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">{variationAttrs.secondary.charAt(0).toUpperCase() + variationAttrs.secondary.slice(1)}</label>
-                            <select value={variationForm.attributes.secondary || ''} onChange={(e) => setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: e.target.value}})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500">
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">{variationAttrs.secondary.charAt(0).toUpperCase() + variationAttrs.secondary.slice(1)}</label>
+                            <select 
+                              value={variationForm.attributes.secondary || ''} 
+                              onChange={(e) => setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: e.target.value}})} 
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
+                            >
                               <option value="">Select {variationAttrs.secondary}</option>
                               {variationAttrs.secondaryOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             </select>
@@ -967,23 +1112,45 @@ function AdminAddProduct() {
                         
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
-                            <input type="number" value={variationForm.price} onChange={(e) => setVariationForm({...variationForm, price: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500" placeholder="499" />
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (₹) *</label>
+                            <input 
+                              type="number" 
+                              value={variationForm.price} 
+                              onChange={(e) => setVariationForm({...variationForm, price: e.target.value})} 
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400" 
+                              placeholder="499" 
+                            />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Stock *</label>
-                            <input type="number" value={variationForm.stock} onChange={(e) => setVariationForm({...variationForm, stock: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500" placeholder="10" />
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Stock *</label>
+                            <input 
+                              type="number" 
+                              value={variationForm.stock} 
+                              onChange={(e) => setVariationForm({...variationForm, stock: e.target.value})} 
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400" 
+                              placeholder="10" 
+                            />
                           </div>
                         </div>
                         
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Optional)</label>
-                          <input type="text" value={variationForm.sku} onChange={(e) => setVariationForm({...variationForm, sku: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500" placeholder="Auto-generated" />
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU (Optional)</label>
+                          <input 
+                            type="text" 
+                            value={variationForm.sku} 
+                            onChange={(e) => setVariationForm({...variationForm, sku: e.target.value})} 
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400" 
+                            placeholder="Auto-generated" 
+                          />
                         </div>
                         
                         <div className="flex gap-3 pt-4">
-                          <button type="button" onClick={() => setVariationModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
-                          <button type="button" onClick={saveVariation} className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg font-medium hover:shadow-lg transition">{editingVariation ? 'Update Variation' : 'Add Variation'}</button>
+                          <button type="button" onClick={() => setVariationModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition text-sm">
+                            Cancel
+                          </button>
+                          <button type="button" onClick={saveVariation} className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition text-sm">
+                            {editingVariation ? 'Update Variation' : 'Add Variation'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -992,56 +1159,132 @@ function AdminAddProduct() {
 
                 {/* Category Specific Fields */}
                 {formData.category === 'Skincare' && (
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">Skincare Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium mb-1">Skin Type</label><select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="all">All Skin Types</option><option value="oily">Oily</option><option value="dry">Dry</option><option value="combination">Combination</option><option value="sensitive">Sensitive</option></select></div>
-                      <div><label className="block text-sm font-medium mb-1">Key Ingredients</label><input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Vitamin C, Hyaluronic Acid" /></div>
+                  <div className="space-y-4 border-t border-gray-200 pt-5 mt-4">
+                    <h3 className="font-medium text-gray-800">Skincare Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Skin Type</label>
+                        <select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm">
+                          <option value="all">All Skin Types</option>
+                          <option value="oily">Oily</option>
+                          <option value="dry">Dry</option>
+                          <option value="combination">Combination</option>
+                          <option value="sensitive">Sensitive</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Key Ingredients</label>
+                        <input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Vitamin C, Hyaluronic Acid" />
+                      </div>
                     </div>
-                    <div><label className="block text-sm font-medium mb-1">Skin Concerns</label><div className="flex flex-wrap gap-3">{skinConcerns.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, concern] : formData.concerns.filter(c => c !== concern); setFormData({...formData, concerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns</label>
+                      <div className="flex flex-wrap gap-3">
+                        {skinConcerns.map(concern => (
+                          <label key={concern} className="flex items-center gap-1.5">
+                            <input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, concern] : formData.concerns.filter(c => c !== concern); setFormData({...formData, concerns: updated}); }} />
+                            <span className="text-sm text-gray-600">{concern}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {formData.category === 'Makeup' && (
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">Makeup Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium mb-1">Shade / Color</label><input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Ruby Red" /></div>
-                      <div><label className="block text-sm font-medium mb-1">Finish</label><select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Finish</option>{makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
+                  <div className="space-y-4 border-t border-gray-200 pt-5 mt-4">
+                    <h3 className="font-medium text-gray-800">Makeup Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Shade / Color</label>
+                        <input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Ruby Red" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Finish</label>
+                        <select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm">
+                          <option value="">Select Finish</option>
+                          {makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
                     </div>
-                    <div><label className="block text-sm font-medium mb-1">Coverage</label><select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="">Select Coverage</option>{makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Coverage</label>
+                      <select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm">
+                        <option value="">Select Coverage</option>
+                        {makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
                   </div>
                 )}
 
                 {formData.category === 'Hair' && (
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">Hair Care Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium mb-1">Hair Type</label><select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border rounded-lg px-4 py-2.5">{hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}</select></div>
-                      <div><label className="block text-sm font-medium mb-1">Hair Concerns</label><div className="flex flex-wrap gap-3">{hairConcernsList.map(concern => (<label key={concern} className="flex items-center gap-1"><input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), concern] : (formData.hairConcerns || []).filter(c => c !== concern); setFormData({...formData, hairConcerns: updated}); }} /><span className="text-sm">{concern}</span></label>))}</div></div>
+                  <div className="space-y-4 border-t border-gray-200 pt-5 mt-4">
+                    <h3 className="font-medium text-gray-800">Hair Care Details</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Hair Type</label>
+                        <select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm">
+                          {hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Hair Concerns</label>
+                        <div className="flex flex-wrap gap-3">
+                          {hairConcernsList.map(concern => (
+                            <label key={concern} className="flex items-center gap-1.5">
+                              <input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), concern] : (formData.hairConcerns || []).filter(c => c !== concern); setFormData({...formData, hairConcerns: updated}); }} />
+                              <span className="text-sm text-gray-600">{concern}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {formData.category === 'Clothing' && (
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">Clothing Details</h3>
-                    <div><label className="block text-sm font-medium mb-1">Fabric / Material</label><input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Cotton, Silk, Polyester" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div>
+                  <div className="space-y-4 border-t border-gray-200 pt-5 mt-4">
+                    <h3 className="font-medium text-gray-800">Clothing Details</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Fabric / Material</label>
+                      <input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Cotton, Silk, Polyester" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
+                      <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm">
+                        <option value="unisex">Unisex</option>
+                        <option value="men">Men</option>
+                        <option value="women">Women</option>
+                        <option value="kids">Kids</option>
+                      </select>
+                    </div>
                   </div>
                 )}
 
                 {formData.category === 'Accessories' && (
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium">Accessories Details</h3>
-                    <div><label className="block text-sm font-medium mb-1">Material</label><input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border rounded-lg px-4 py-2.5" placeholder="e.g., Silver, Gold, Leather" /></div>
-                    <div><label className="block text-sm font-medium mb-1">Gender</label><select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-4 py-2.5"><option value="unisex">Unisex</option><option value="men">Men</option><option value="women">Women</option><option value="kids">Kids</option></select></div>
+                  <div className="space-y-4 border-t border-gray-200 pt-5 mt-4">
+                    <h3 className="font-medium text-gray-800">Accessories Details</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Material</label>
+                      <input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Silver, Gold, Leather" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
+                      <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:border-pink-400 text-sm">
+                        <option value="unisex">Unisex</option>
+                        <option value="men">Men</option>
+                        <option value="women">Women</option>
+                        <option value="kids">Kids</option>
+                      </select>
+                    </div>
                   </div>
                 )}
 
-                <div className="flex justify-between mt-6">
-                  <button onClick={() => setStep(3)} className="px-6 py-2 border rounded-lg hover:bg-gray-50 transition">← Back</button>
-                  <button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50">
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-4 border-t border-gray-200">
+                  <button onClick={() => setStep(3)} className="px-6 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">
+                    ← Back
+                  </button>
+                  <button onClick={submitProduct} disabled={loading} className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50 text-sm">
                     {loading ? 'Saving...' : '✓ Submit Product'}
                   </button>
                 </div>
