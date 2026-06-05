@@ -47,7 +47,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     ]
   };
 
-  // 🔥 FIX 1: Added more garbage words including subscribe, buy now, add to cart
   const garbageWords = [
     'See more product details', 'Report an issue', 'Product Description',
     'To see our price', 'See more', 'Product details', 'Would you like to',
@@ -56,7 +55,6 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     'Loading...', 'Sorry, we couldn\'t load the review', 'Customer Reviews',
     'Top reviews', 'There was a problem', 'Filtered by', 'Sort by',
     'Visit the', 'Store', 'Shop', 'Brand:',
-    // 🔥 NEW: Button/Action garbage words
     'Subscribe', 'subscription', 'auto-delivery', 'Subscribe & Save',
     'One-time purchase', 'Subscribe now', 'save with subscription',
     'Subscribe and save', 'Auto delivery', 'Subscribe to save',
@@ -64,7 +62,9 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     'Compare with similar items', 'Sponsored', 'Advertisement',
     'Buy Now', 'Add to Cart', 'Add to cart', 'Buy now', 'add to cart',
     'Secure transaction', 'Cash on Delivery', 'COD', 'EMI', 'No cost EMI',
-    'Return policy', 'Exchange policy', 'Warranty', 'Guaranteed'
+    'Return policy', 'Exchange policy', 'Warranty', 'Guaranteed',
+    'Click to see', 'full view', 'fulfilled', 'non-returnable', 'pay on delivery',
+    'amazon delivered', 'top brand', 'free delivery'
   ];
 
   const handleCategoryChange = (category) => {
@@ -202,7 +202,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     const cleaned = items
       .map(item => cleanText(item))
       .filter(item => !isGarbage(item))
-      .filter(item => item.length > 15 && item.length < 300);
+      .filter(item => item.length > 15 && item.length < 500);
     
     return [...new Set(cleaned)];
   };
@@ -219,12 +219,12 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     const cleaned = items
       .map(item => cleanText(item))
       .filter(item => !isGarbage(item))
-      .filter(item => item.length > 5 && item.length < 150);
+      .filter(item => item.length > 5 && item.length < 200);
     
     return [...new Set(cleaned)];
   };
 
-  // 🔥 FIX 2: Clean variations - remove button/action garbage
+  // 🔥 Clean variations - remove button/action garbage
   const cleanVariations = (variations, scraped) => {
     if (!variations || variations.length === 0) return [];
     
@@ -232,30 +232,39 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       'buy', 'cart', 'subscribe', 'save', 'offer', 'deal', 'checkout', 
       'shipping', 'delivery', 'payment', 'cod', 'emi', 'warranty', 
       'return', 'exchange', 'secure', 'transaction', 'cash', 'card',
-      'click', 'button', 'link', 'view', 'see', 'more', 'shop', 'order'
+      'click', 'button', 'link', 'view', 'see', 'more', 'shop', 'order',
+      'pack of', 'bundle', 'set', 'combo', 'fulfilled', 'non-returnable',
+      'pay on delivery', 'amazon delivered', 'top brand', 'free delivery',
+      'click to see', 'full view', 'gift', 'option', 'available'
     ];
     
     const isValidVariation = (name) => {
+      if (!name) return false;
       const lowerName = name.toLowerCase();
       
-      // Check against garbage words
       for (const word of garbageVariationWords) {
         if (lowerName.includes(word)) return false;
       }
       
-      // Check if it's just numbers
       if (/^\d+$/.test(name)) return false;
-      
-      // Check if it's a price format
       if (/[₹$£€]/.test(name)) return false;
+      if (name.length < 2 || name.length > 40) return false;
       
-      // Check length
-      if (name.length < 2 || name.length > 30) return false;
+      // Valid patterns
+      const validPatterns = [
+        /^\d+\s*(ml|g|kg|L|mg|gm)$/i,
+        /^(xs|s|m|l|xl|xxl|xxxl|free size|one size)$/i,
+        /^(fair|light|medium|tan|deep|red|pink|nude|coral|berry|mauve|brown|black|purple|blue|green|yellow|orange|rose|maroon|teal|beige|ivory)$/i
+      ];
       
-      return true;
+      for (const pattern of validPatterns) {
+        if (pattern.test(lowerName)) return true;
+      }
+      
+      return false;
     };
     
-    return variations
+    const cleaned = variations
       .filter(v => isValidVariation(v.name))
       .map((v, idx) => ({
         id: Date.now() + idx,
@@ -265,9 +274,13 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
         stock: v.stock || 10,
         sku: v.sku || `VAR-${Date.now()}-${idx}`
       }));
+    
+    // Remove duplicates
+    return cleaned.filter((v, i, self) => 
+      i === self.findIndex((t) => t.name === v.name)
+    );
   };
 
-  // 🔥 FIX 3: Import to form with cleaned variations
   const importToForm = () => {
     if (!fetchedProduct?.scraped) return;
 
@@ -282,7 +295,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       let sentences = text.split(/\.\s+|\n/);
       descriptionArray = sentences
         .map(s => cleanText(s))
-        .filter(s => s.length > 20 && s.length < 200 && !isGarbage(s));
+        .filter(s => s.length > 20 && s.length < 300 && !isGarbage(s));
     }
     
     if (descriptionArray.length === 0) {
@@ -295,7 +308,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
     // Generate SEO fields
     const seoFields = generateSeoFields(scraped.name, cleanBrand, keyFeaturesArray);
     
-    // 🔥 Clean variations - remove Buy Now, Subscribe, Add to Cart garbage
+    // Clean variations
     const cleanedVariations = cleanVariations(scraped.variations, scraped);
 
     setFormData(prev => ({
@@ -322,19 +335,20 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       finish: scraped.finish || '',
       coverage: scraped.coverage || '',
       hairType: scraped.hairType || 'all',
-      hairConcerns: scraped.hairConcerns || []
+      hairConcerns: scraped.hairConcerns || [],
+      // 🔥 NEW: Weight field
+      weight: scraped.weight || ''
     }));
 
     if (scraped.images && scraped.images.length > 0) {
       setImages(scraped.images);
     }
 
-    // 🔥 Set cleaned variations
     if (cleanedVariations.length > 0) {
       setVariations(cleanedVariations);
     }
 
-    alert(`✅ Imported: ${descriptionArray.length} bullet points | ${cleanedVariations.length} variations | Category: ${selectedCategory}`);
+    alert(`✅ Imported: ${descriptionArray.length} bullet points | ${cleanedVariations.length} variations | Weight: ${scraped.weight || 'Not detected'}`);
     
     if (onProductImported) onProductImported();
     setStep(1);
@@ -374,6 +388,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
         coverage: scraped.coverage || '',
         hairType: scraped.hairType || 'all',
         hairConcerns: scraped.hairConcerns || [],
+        weight: scraped.weight || '',
         variations: cleanedVariations,
         status: 'active',
         adminApproved: true
@@ -429,7 +444,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
       {step === 1 && (
         <>
           <p className="text-sm text-gray-500 mb-4">
-            Paste Amazon product URL - Product details, variations, ingredients, skin type will be auto-detected!
+            Paste Amazon product URL - Product details, variations, weight, ingredients, skin type will be auto-detected!
           </p>
           
           <div className="mb-4">
@@ -464,7 +479,7 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
           </div>
           
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-600">💡 Tip: Product details, variations, ingredients, skin type, concerns auto-detected! "Buy Now", "Subscribe" garbage automatically filtered!</p>
+            <p className="text-xs text-blue-600">💡 Tip: Product details, variations, weight, ingredients, skin type, concerns auto-detected! "Buy Now", "Subscribe" garbage automatically filtered!</p>
           </div>
         </>
       )}
@@ -498,6 +513,9 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
                 )}
                 {fetchedProduct.scraped.concerns && fetchedProduct.scraped.concerns.length > 0 && (
                   <p className="text-xs text-amber-600 mt-1">🎯 Concerns: {fetchedProduct.scraped.concerns.join(', ')}</p>
+                )}
+                {fetchedProduct.scraped.weight && (
+                  <p className="text-xs text-gray-500 mt-1">⚖️ Weight: {fetchedProduct.scraped.weight}</p>
                 )}
               </div>
             </div>
@@ -535,20 +553,20 @@ function AmazonImporter({ onProductImported, setFormData, setVariations, setImag
             </div>
           </div>
 
-          {/* Variations Preview - Only clean variations */}
+          {/* Variations Preview */}
           {(() => {
             const cleanedVars = cleanVariations(fetchedProduct.scraped.variations, fetchedProduct.scraped);
             return cleanedVars.length > 0 && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <p className="font-medium text-gray-700 mb-2">📦 Variations Detected ({cleanedVars.length})</p>
                 <div className="flex flex-wrap gap-2">
-                  {cleanedVars.slice(0, 5).map((v, idx) => (
+                  {cleanedVars.slice(0, 6).map((v, idx) => (
                     <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-gray-200">
                       {v.name} - ₹{v.price}
                     </span>
                   ))}
-                  {cleanedVars.length > 5 && (
-                    <span className="text-xs text-gray-500">+{cleanedVars.length - 5} more</span>
+                  {cleanedVars.length > 6 && (
+                    <span className="text-xs text-gray-500">+{cleanedVars.length - 6} more</span>
                   )}
                 </div>
               </div>
