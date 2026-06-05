@@ -91,7 +91,11 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       fullDescription: descriptionArray,
       keyFeatures: product.keyFeatures || [],
       aboutThisItem: descriptionArray,
-      productHighlights: product.keyFeatures || []
+      productHighlights: product.keyFeatures || [],
+      // Auto generate SEO fields from product data
+      metaTitle: `${product.name} - ${product.brand || ''} | MyPinkShop`,
+      metaDescription: descriptionArray[0]?.substring(0, 155) || `Buy ${product.name} online at best price`,
+      metaKeywords: [product.brand, product.category, ...(product.keyFeatures || [])].filter(Boolean).join(', ')
     }));
     
     if (product.images && product.images.length > 0) {
@@ -169,7 +173,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       )}
       
       <div className="mt-3 p-2 sm:p-3 bg-blue-50 rounded-lg">
-        <p className="text-xs text-blue-600">💡 Tip: Paste up to 20 Amazon URLs. Products will be fetched and imported one by one.</p>
+        <p className="text-xs text-blue-600">💡 Tip: Paste up to 20 Amazon URLs. SEO fields will be auto-generated!</p>
       </div>
     </div>
   );
@@ -204,6 +208,15 @@ function AdminAddProduct() {
   });
   
   const [activeTab, setActiveTab] = useState('manual');
+  
+  // SEO Fields State
+  const [seoData, setSeoData] = useState({
+    metaTitle: '',
+    metaDescription: '',
+    metaKeywords: '',
+    slug: ''
+  });
+  
   const [formData, setFormData] = useState({
     productName: '',
     brand: '',
@@ -241,6 +254,49 @@ function AdminAddProduct() {
     sku: '',
     attributes: {}
   });
+
+  // Auto-generate SEO fields when product name or brand changes
+  useEffect(() => {
+    if (formData.productName) {
+      const productName = formData.productName;
+      const brand = formData.brand;
+      const category = formData.category;
+      
+      // Generate slug
+      const slug = productName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      // Generate meta title (50-60 chars)
+      let metaTitle = `${productName}`;
+      if (brand) metaTitle = `${productName} - ${brand}`;
+      metaTitle = `${metaTitle} | MyPinkShop`;
+      if (metaTitle.length > 60) {
+        metaTitle = metaTitle.substring(0, 57) + '...';
+      }
+      
+      // Generate meta description (150-160 chars)
+      let metaDescription = `Buy ${productName}`;
+      if (brand) metaDescription += ` by ${brand}`;
+      if (category) metaDescription += ` online at best price.`;
+      metaDescription += ` Shop now at MyPinkShop with free shipping and easy returns.`;
+      if (metaDescription.length > 160) {
+        metaDescription = metaDescription.substring(0, 157) + '...';
+      }
+      
+      // Generate meta keywords
+      const keywords = [brand, category, formData.subCategory, ...formData.keyFeatures].filter(Boolean);
+      const metaKeywords = keywords.join(', ');
+      
+      setSeoData({
+        metaTitle,
+        metaDescription,
+        metaKeywords,
+        slug
+      });
+    }
+  }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures]);
 
   // ============ DEFINE ALL ARRAYS HERE ============
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
@@ -665,6 +721,11 @@ function AdminAddProduct() {
       dimensions: formData.dimensions,
       variations: variations,
       hasVariations: variations.length > 0,
+      // SEO Fields
+      metaTitle: seoData.metaTitle,
+      metaDescription: seoData.metaDescription,
+      metaKeywords: seoData.metaKeywords,
+      slug: seoData.slug,
       status: 'active',
       adminApproved: true,
       isNew: true,
@@ -746,7 +807,7 @@ function AdminAddProduct() {
               </Link>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Add New Product</h1>
-                <p className="text-xs text-gray-400 hidden sm:block">Amazon-style product listing with full category support</p>
+                <p className="text-xs text-gray-400 hidden sm:block">Amazon-style product listing with SEO optimization</p>
               </div>
             </div>
             <button 
@@ -763,8 +824,8 @@ function AdminAddProduct() {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
         {/* Progress Steps */}
         <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-3 sm:p-4 mb-6 overflow-x-auto">
-          <div className="flex justify-between min-w-[300px] sm:min-w-[400px]">
-            {['Basic', 'Images', 'Pricing', 'Details'].map((label, idx) => (
+          <div className="flex justify-between min-w-[300px] sm:min-w-[500px]">
+            {['Basic', 'Images', 'Pricing', 'Details', 'SEO'].map((label, idx) => (
               <div key={idx} className="flex items-center">
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${step >= idx + 1 ? 'bg-pink-600 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
                   {step > idx + 1 ? '✓' : idx + 1}
@@ -1149,7 +1210,7 @@ function AdminAddProduct() {
                   </div>
                 </div>
 
-                {/* Variations Section */}
+                {/* Variations Section - Same as before */}
                 <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                     <div>
@@ -1225,7 +1286,7 @@ function AdminAddProduct() {
                             <td colSpan="2"></td>
                           </tr>
                         </tfoot>
-                       </table>
+                      </table>
                     </div>
                   )}
                 </div>
@@ -1313,7 +1374,7 @@ function AdminAddProduct() {
                   </div>
                 )}
 
-                {/* Category Specific Fields */}
+                {/* Category Specific Fields - Same as before */}
                 {formData.category === 'Skincare' && (
                   <div className="space-y-4 border-t border-gray-200 pt-4 sm:pt-5 mt-4">
                     <h3 className="font-medium text-gray-800">🧴 Skincare Details</h3>
@@ -1447,8 +1508,115 @@ function AdminAddProduct() {
                   <button onClick={() => setStep(3)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">
                     ← Back
                   </button>
+                  <button onClick={() => setStep(5)} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">
+                    Continue to SEO →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 5 - SEO Section (NEW) */}
+            {step === 5 && (
+              <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">🔍 SEO Optimization</h2>
+                <p className="text-sm text-gray-500 mb-6">Optimize your product for search engines (Google, Bing, etc.)</p>
+                
+                <div className="space-y-5">
+                  {/* Slug */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Product URL Slug <span className="text-xs text-gray-400">(Auto-generated)</span>
+                    </label>
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <span className="text-xs text-gray-500">mypinkshop.com/product/</span>
+                      <code className="text-sm text-pink-600 font-medium">{seoData.slug || 'product-slug'}</code>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">🔗 SEO-friendly URL for your product</p>
+                  </div>
+
+                  {/* Meta Title */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Meta Title <span className="text-red-500">*</span>
+                      <span className="text-xs text-gray-400 ml-2">(50-60 characters recommended)</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      value={seoData.metaTitle} 
+                      onChange={(e) => setSeoData({...seoData, metaTitle: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      placeholder="Product Title for SEO"
+                    />
+                    <div className="flex justify-between mt-1">
+                      <p className="text-xs text-gray-400">Shows in Google search results as the clickable headline</p>
+                      <span className={`text-xs font-medium ${seoData.metaTitle.length > 60 ? 'text-red-500' : seoData.metaTitle.length > 50 ? 'text-amber-500' : 'text-green-500'}`}>
+                        {seoData.metaTitle.length}/60 chars
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Meta Description */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Meta Description <span className="text-red-500">*</span>
+                      <span className="text-xs text-gray-400 ml-2">(150-160 characters recommended)</span>
+                    </label>
+                    <textarea 
+                      value={seoData.metaDescription} 
+                      onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} 
+                      rows="3"
+                      className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      placeholder="Brief description of your product for search engines"
+                    />
+                    <div className="flex justify-between mt-1">
+                      <p className="text-xs text-gray-400">Shows below the title in Google search results</p>
+                      <span className={`text-xs font-medium ${seoData.metaDescription.length > 160 ? 'text-red-500' : seoData.metaDescription.length > 150 ? 'text-amber-500' : 'text-green-500'}`}>
+                        {seoData.metaDescription.length}/160 chars
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Meta Keywords */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Meta Keywords
+                      <span className="text-xs text-gray-400 ml-2">(Comma separated)</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      value={seoData.metaKeywords} 
+                      onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      placeholder="e.g., skincare, vitamin c serum, anti-aging, glowing skin"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">🏷️ Keywords that describe your product (helps search engines understand)</p>
+                  </div>
+
+                  {/* SEO Preview */}
+                  <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3">📱 Google Search Preview</h3>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-blue-600 text-base font-medium hover:underline cursor-pointer">
+                          {seoData.metaTitle || formData.productName || 'Product Title'}
+                        </p>
+                        <p className="text-green-700 text-xs">
+                          https://mypinkshop.com/product/{seoData.slug || 'product-slug'}
+                        </p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          {seoData.metaDescription || 'Product description will appear here...'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-4 border-t border-gray-200">
+                  <button onClick={() => setStep(4)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">
+                    ← Back to Details
+                  </button>
                   <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition disabled:opacity-50 text-sm">
-                    {loading ? 'Saving...' : '✓ Submit Product'}
+                    {loading ? 'Saving...' : '✓ Publish Product'}
                   </button>
                 </div>
               </div>
