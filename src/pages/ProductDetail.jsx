@@ -46,18 +46,14 @@ function ProductDetail() {
     loadActiveOffer();
   }, []);
 
-  // Fetch related products
   const fetchRelatedProducts = async (category) => {
     if (!category) return;
-    
     setLoadingRelated(true);
     try {
       const response = await fetch(`${API_URL}/api/products?category=${category}&limit=10`);
       const data = await response.json();
-      
       let related = Array.isArray(data) ? data : data.products || [];
       related = related.filter(p => p._id !== id).slice(0, 6);
-      
       setRelatedProducts(related);
     } catch (error) {
       console.error('Error fetching related products:', error);
@@ -87,8 +83,6 @@ function ProductDetail() {
         if (data && data._id) {
           setProduct(data);
           setSelectedImage(0);
-          
-          // Fetch related products based on category
           fetchRelatedProducts(data.mainCategory || data.category);
           
           if (data.variations && data.variations.length > 0) {
@@ -170,16 +164,12 @@ function ProductDetail() {
   };
 
   const decreaseQuantity = () => {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
-    }
+    if (quantity > 1) setQuantity(quantity - 1);
   };
 
   const increaseQuantity = () => {
     const maxStock = getCurrentStock();
-    if (quantity < maxStock) {
-      setQuantity(quantity + 1);
-    }
+    if (quantity < maxStock) setQuantity(quantity + 1);
   };
 
   const getCurrentPrice = () => {
@@ -200,9 +190,7 @@ function ProductDetail() {
   const getDiscountPercent = () => {
     const mrp = getCurrentMrp();
     const price = getCurrentPrice();
-    if (mrp > price) {
-      return Math.round(((mrp - price) / mrp) * 100);
-    }
+    if (mrp > price) return Math.round(((mrp - price) / mrp) * 100);
     return 0;
   };
 
@@ -211,12 +199,13 @@ function ProductDetail() {
     if (variation) {
       setSelectedVariation(variation);
       setSelectedVariationId(variationId);
+      // Reset quantity when variation changes
+      setQuantity(1);
     }
   };
 
   const handleCartButtonClick = () => {
     if (!product) return;
-    
     if (quantity < 1) {
       alert('Please select at least 1 quantity');
       return;
@@ -239,6 +228,7 @@ function ProductDetail() {
         cartItem.variationName = selectedVariation.name;
         cartItem.variationSecondary = selectedVariation.secondaryName;
         cartItem.variationId = selectedVariation.id || selectedVariation._id;
+        cartItem.variationImage = selectedVariation.image;
       }
       
       addToCart(cartItem);
@@ -248,7 +238,6 @@ function ProductDetail() {
 
   const handleBuyNow = () => {
     if (!product) return;
-    
     if (quantity < 1) {
       alert('Please select at least 1 quantity');
       return;
@@ -268,6 +257,7 @@ function ProductDetail() {
       cartItem.variationName = selectedVariation.name;
       cartItem.variationSecondary = selectedVariation.secondaryName;
       cartItem.variationId = selectedVariation.id || selectedVariation._id;
+      cartItem.variationImage = selectedVariation.image;
     }
     
     addToCart(cartItem);
@@ -308,10 +298,7 @@ function ProductDetail() {
   };
 
   const getKeyFeatures = () => {
-    if (product?.keyFeatures && product.keyFeatures.length > 0) {
-      return product.keyFeatures;
-    }
-    return [];
+    return product?.keyFeatures || [];
   };
 
   const getSpecifications = () => {
@@ -463,13 +450,20 @@ function ProductDetail() {
           {/* Left Column - Images */}
           <div>
             <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex items-center justify-center">
-              <div className="w-full h-full flex items-center justify-center p-4">
+              {/* 🔥 Show variation image if selected variation has image, otherwise show product image */}
+              {selectedVariation?.image ? (
+                <img 
+                  src={selectedVariation.image} 
+                  alt={`${product.name} - ${selectedVariation.name}`} 
+                  className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
+                />
+              ) : (
                 <img 
                   src={productImages[selectedImage]} 
                   alt={product.name} 
                   className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
                 />
-              </div>
+              )}
               <button 
                 onClick={handleWishlistToggle} 
                 className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition z-10"
@@ -481,7 +475,7 @@ function ProductDetail() {
                   {product.badge}
                 </span>
               )}
-              {product.isNew && (
+              {product.isNew && !product.badge && (
                 <span className="absolute bottom-4 left-4 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
                   NEW
                 </span>
@@ -536,13 +530,13 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* Variations - Horizontal Buttons */}
+            {/* 🔥 Variations - With Images */}
             {hasVariations && product.variations && product.variations.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
                   Select Option
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {product.variations.map((variation) => {
                     const variationId = variation.id || variation._id;
                     const displayName = variation.secondaryName 
@@ -554,13 +548,21 @@ function ProductDetail() {
                       <button
                         key={variationId}
                         onClick={() => handleVariationChange(variationId)}
-                        className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                           isSelected
                             ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
                             : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
                         }`}
                       >
-                        {displayName}
+                        {/* 🔥 Variation Image Thumbnail */}
+                        {variation.image && (
+                          <img 
+                            src={variation.image} 
+                            alt={variation.name}
+                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                          />
+                        )}
+                        <span>{displayName}</span>
                         {variation.price !== product.price && (
                           <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
                         )}
@@ -656,23 +658,42 @@ function ProductDetail() {
               </button>
             </div>
 
-            <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm bg-gray-50">
-              {Object.entries(specifications).slice(0, 5).map(([key, value], idx) => (
-                <div key={idx} className="flex flex-wrap justify-between py-1 gap-2">
-                  <span className="text-gray-500">{key}:</span>
-                  <span className="text-gray-800 font-medium text-right">{String(value)}</span>
-                </div>
-              ))}
-              {selectedVariation && (
-                <div className="flex flex-wrap justify-between py-1 gap-2 border-t border-gray-200 pt-2 mt-1">
-                  <span className="text-gray-500">Selected:</span>
-                  <span className="text-gray-800 font-medium text-right">
-                    {selectedVariation.secondaryName 
-                      ? `${selectedVariation.name} - ${selectedVariation.secondaryName}`
-                      : selectedVariation.name}
-                  </span>
-                </div>
-              )}
+            {/* 🔥 IMPROVED Product Details Section */}
+            <div className="border border-pink-100 rounded-xl overflow-hidden bg-gradient-to-r from-pink-50/50 to-white shadow-sm">
+              <div className="bg-pink-100/50 px-4 py-3 border-b border-pink-100">
+                <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="text-pink-500">📋</span> Product Details
+                </h3>
+              </div>
+              <div className="divide-y divide-pink-100">
+                {/* Selected Variation Info */}
+                {selectedVariation && (
+                  <div className="flex flex-wrap justify-between px-4 py-3 gap-2">
+                    <span className="text-gray-600 text-sm">Selected Option:</span>
+                    <span className="text-gray-800 font-medium text-sm text-right">
+                      {selectedVariation.secondaryName 
+                        ? `${selectedVariation.name} - ${selectedVariation.secondaryName}`
+                        : selectedVariation.name}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Dynamic Specifications */}
+                {Object.entries(specifications).map(([key, value], idx) => (
+                  <div key={idx} className="flex flex-wrap justify-between px-4 py-3 gap-2 hover:bg-pink-50/30 transition">
+                    <span className="text-gray-600 text-sm">{key}:</span>
+                    <span className="text-gray-800 font-medium text-sm text-right break-words max-w-[60%]">{String(value)}</span>
+                  </div>
+                ))}
+                
+                {/* Out of stock / Low stock info */}
+                {isLowStock && !isOutOfStock && (
+                  <div className="flex flex-wrap justify-between px-4 py-3 gap-2 bg-amber-50">
+                    <span className="text-amber-700 text-sm">Stock Status:</span>
+                    <span className="text-amber-800 font-medium text-sm">⚠️ Only {currentStock} left</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -688,7 +709,7 @@ function ProductDetail() {
                   activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'
                 }`}
               >
-                {tab === 'description' ? 'About this item' : tab === 'features' ? 'Product Highlights' : tab === 'specifications' ? 'Product Details' : 'Customer Reviews'}
+                {tab === 'description' ? 'About this item' : tab === 'features' ? 'Product Highlights' : tab === 'specifications' ? 'Full Specifications' : 'Customer Reviews'}
               </button>
             ))}
           </div>
@@ -730,7 +751,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Specifications - Pink Gradient Style */}
+            {/* Specifications - Full Table */}
             {activeTab === 'specifications' && (
               <div className="bg-gradient-to-r from-pink-50 to-white rounded-xl overflow-hidden border border-pink-100 shadow-sm">
                 <table className="w-full text-sm">
@@ -765,7 +786,7 @@ function ProductDetail() {
           </div>
         </div>
 
-        {/* 🔥 Related Products - You May Also Like */}
+        {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mt-16">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
