@@ -2,6 +2,102 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 
+// ============================================
+// VARIATION SELECT WITH SEARCH AND CUSTOM INPUT
+// ============================================
+const VariationSelectWithSearch = ({ 
+  label, 
+  options, 
+  value, 
+  onChange, 
+  placeholder = "Select or type..." 
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+  
+  const filteredOptions = options.filter(opt => 
+    opt.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const handleSelect = (selectedValue) => {
+    if (selectedValue === '__CUSTOM__') {
+      setIsCustomMode(true);
+      setCustomValue('');
+    } else {
+      onChange(selectedValue);
+      setSearchTerm('');
+      setIsCustomMode(false);
+    }
+  };
+  
+  const handleSaveCustom = () => {
+    if (customValue.trim()) {
+      onChange(customValue.trim());
+      setIsCustomMode(false);
+      setCustomValue('');
+      setSearchTerm('');
+    }
+  };
+  
+  if (isCustomMode) {
+    return (
+      <div>
+        <label className="block text-sm font-medium mb-1.5">{label}</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customValue}
+            onChange={(e) => setCustomValue(e.target.value)}
+            placeholder="Enter custom value..."
+            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
+            autoFocus
+          />
+          <button onClick={handleSaveCustom} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Save</button>
+          <button onClick={() => setIsCustomMode(false)} className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Cancel</button>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5">{label}</label>
+      <div className="relative">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder={placeholder}
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
+        />
+        {searchTerm && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(opt => (
+                <button key={opt} type="button" onClick={() => handleSelect(opt)} className="w-full text-left px-3 py-2 hover:bg-pink-50 text-sm transition">
+                  {opt}
+                  {value === opt && <span className="float-right text-green-500">✓</span>}
+                </button>
+              ))
+            ) : (
+              <button type="button" onClick={() => handleSelect('__CUSTOM__')} className="w-full text-left px-3 py-2 text-pink-600 hover:bg-pink-50 text-sm border-t">
+                + Add custom "{searchTerm}"
+              </button>
+            )}
+          </div>
+        )}
+        {value && !searchTerm && (
+          <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200 flex justify-between items-center">
+            <span>✓ Selected: {value}</span>
+            <button onClick={() => setIsCustomMode(true)} className="text-xs text-blue-500 hover:text-blue-700">Change</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function AdminEditProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -13,6 +109,16 @@ function AdminEditProduct() {
   const [newBrand, setNewBrand] = useState('');
   const [showAddSubCategory, setShowAddSubCategory] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState('');
+  
+  // 🔥 Variation states
+  const [variations, setVariations] = useState([]);
+  const [selectedVariationIds, setSelectedVariationIds] = useState([]);
+  const [variationModalOpen, setVariationModalOpen] = useState(false);
+  const [editingVariation, setEditingVariation] = useState(null);
+  const [variationForm, setVariationForm] = useState({
+    name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {}
+  });
+  
   const [brands, setBrands] = useState([
     'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'The Face Shop', 
     'Lakmé', 'MyGlamm', 'Plum', 'Wow Skin Science', 'Biotique', 
@@ -58,7 +164,6 @@ function AdminEditProduct() {
     gender: 'unisex'
   });
   
-  const [variations, setVariations] = useState([]);
   const [keyFeatureInput, setKeyFeatureInput] = useState('');
   const [specKeyInput, setSpecKeyInput] = useState('');
   const [specValueInput, setSpecValueInput] = useState('');
@@ -76,6 +181,26 @@ function AdminEditProduct() {
   };
 
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
+
+  // 🔥 Get variation attributes based on category
+  const getVariationAttributes = () => {
+    switch(formData.category) {
+      case 'Skincare': 
+        return { type: 'Size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic'] };
+      case 'Makeup': 
+        return { type: 'Shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry'], secondary: 'Finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'] };
+      case 'Hair': 
+        return { type: 'Size', options: ['100ml', '200ml', '300ml', '500ml', '1L'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free'] };
+      case 'Clothing': 
+        return { type: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'], secondary: 'Color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey'] };
+      case 'Accessories': 
+        return { type: 'Size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable'], secondary: 'Color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor'] };
+      default: 
+        return { type: 'Variant', options: ['Default'], secondary: null, secondaryOptions: [] };
+    }
+  };
+
+  const variationAttrs = getVariationAttributes();
 
   // Load product data from API
   useEffect(() => {
@@ -101,7 +226,7 @@ function AdminEditProduct() {
         if (Array.isArray(product.description)) {
           descriptionArray = product.description;
         } else if (typeof product.description === 'string' && product.description) {
-          descriptionArray = [product.description];
+          descriptionArray = product.description.split('\n').filter(b => b.trim());
         }
 
         setFormData({
@@ -138,7 +263,12 @@ function AdminEditProduct() {
           gender: product.gender || 'unisex'
         });
 
-        setVariations(product.variations || product.variants || []);
+        // 🔥 Load variations properly
+        if (product.variations && product.variations.length > 0) {
+          setVariations(product.variations);
+        } else if (product.variants && product.variants.length > 0) {
+          setVariations(product.variants);
+        }
 
       } catch (error) {
         console.error('Error loading product:', error);
@@ -209,6 +339,105 @@ function AdminEditProduct() {
     return `SKU-${timestamp}-${random}`;
   };
 
+  // 🔥 Variation functions
+  const toggleSelectVariation = (id) => {
+    setSelectedVariationIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllVariations = () => {
+    if (selectedVariationIds.length === variations.length) {
+      setSelectedVariationIds([]);
+    } else {
+      setSelectedVariationIds(variations.map(v => v.id));
+    }
+  };
+
+  const deleteSelectedVariations = () => {
+    if (selectedVariationIds.length === 0) {
+      alert('Please select variations to delete');
+      return;
+    }
+    if (confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
+      setVariations(variations.filter(v => !selectedVariationIds.includes(v.id)));
+      setSelectedVariationIds([]);
+    }
+  };
+
+  const saveVariation = () => {
+    if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
+    
+    const existingIndex = variations.findIndex(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
+    const newVariation = {
+      id: editingVariation?.id || Date.now(),
+      name: variationForm.name,
+      secondaryName: variationForm.attributes.secondary || '',
+      price: parseFloat(variationForm.price) || 0,
+      mrp: parseFloat(variationForm.mrp) || parseFloat(variationForm.price) * 1.2 || 0,
+      stock: parseInt(variationForm.stock) || 0,
+      sku: variationForm.sku || `VAR-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      image: variationForm.image || '',
+      attributes: variationForm.attributes || {}
+    };
+    
+    if (editingVariation) {
+      const updated = [...variations];
+      updated[variations.findIndex(v => v.id === editingVariation.id)] = newVariation;
+      setVariations(updated);
+      alert('✅ Variation updated successfully!');
+    } else {
+      if (existingIndex !== -1) return alert(`⚠️ This ${variationAttrs.type} combination already exists!`);
+      setVariations([...variations, newVariation]);
+      alert(`✅ ${variationAttrs.type} added successfully!`);
+    }
+    setVariationModalOpen(false);
+    setEditingVariation(null);
+    setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} });
+  };
+
+  const editVariation = (variation) => {
+    setEditingVariation(variation);
+    setVariationForm({ 
+      name: variation.name, 
+      price: variation.price, 
+      mrp: variation.mrp || variation.price * 1.2,
+      stock: variation.stock, 
+      sku: variation.sku, 
+      image: variation.image || '',
+      attributes: { secondary: variation.secondaryName || '' } 
+    });
+    setVariationModalOpen(true);
+  };
+
+  const deleteVariation = (variationId) => {
+    if (confirm('Delete this variation?')) setVariations(variations.filter(v => v.id !== variationId));
+  };
+
+  const uploadVariationImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formDataImg = new FormData();
+    formDataImg.append('images', file);
+    
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataImg
+      });
+      const data = await response.json();
+      if (data.url) {
+        setVariationForm({ ...variationForm, image: data.url });
+        alert('✅ Image uploaded!');
+      }
+    } catch (error) {
+      alert('Upload failed');
+    }
+  };
+
   // Image upload handlers
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
@@ -277,7 +506,7 @@ function AdminEditProduct() {
   const addBulletPoint = () => {
     const text = currentBullet.trim();
     if (text) {
-      if (formData.description.length >= 8) return alert('Max 8 bullet points');
+      if (formData.description.length >= 15) return alert('Max 15 bullet points');
       setFormData({ ...formData, description: [...formData.description, text] });
       setCurrentBullet('');
     }
@@ -392,7 +621,6 @@ function AdminEditProduct() {
   const IconBack = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
   const IconUpload = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
   const IconPlus = () => (<svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
-  const IconX = () => (<svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 
   if (loading) {
     return (
@@ -420,7 +648,7 @@ function AdminEditProduct() {
                 </Link>
                 <div>
                   <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Edit Product</h1>
-                  <p className="text-xs text-gray-400 hidden sm:block">Update product details</p>
+                  <p className="text-xs text-gray-400 hidden sm:block">Update product details and variations</p>
                 </div>
               </div>
               <button onClick={handleSubmit} disabled={saving} className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg text-sm font-medium hover:shadow-md transition disabled:opacity-50">
@@ -433,7 +661,7 @@ function AdminEditProduct() {
         {/* Form */}
         <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
           <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form className="space-y-6">
               
               {/* Basic Information */}
               <div className="border-b border-gray-200 pb-4">
@@ -446,22 +674,14 @@ function AdminEditProduct() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
                     <div className="relative">
-                      <input type="text" placeholder="Type brand name..." value={brandSearch} onChange={(e) => setBrandSearch(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                      <input type="text" placeholder="Type brand name..." value={formData.brand} onChange={(e) => { setFormData({...formData, brand: e.target.value}); setBrandSearch(e.target.value); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
                       {brandSearch && (
                         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
-                          {filteredBrands.slice(0, 10).map(b => (
-                            <button key={b} type="button" onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm">{b}</button>
-                          ))}
+                          {filteredBrands.slice(0, 10).map(b => (<button key={b} type="button" onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm">{b}</button>))}
                           <button type="button" onClick={() => setShowAddBrand(true)} className="w-full text-left px-3 sm:px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 border-t font-medium">+ Add new brand "{brandSearch}"</button>
                         </div>
                       )}
                     </div>
-                    {formData.brand && !brandSearch && (
-                      <div className="mt-2 bg-pink-50 px-3 sm:px-4 py-2 rounded-lg flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-700">{formData.brand}</span>
-                        <button type="button" onClick={() => setFormData({...formData, brand: ''})} className="text-gray-400 hover:text-red-500">Change</button>
-                      </div>
-                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Category *</label>
@@ -483,11 +703,15 @@ function AdminEditProduct() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU (Editable)</label>
                     <div className="flex gap-2">
                       <input type="text" name="sku" value={formData.sku} onChange={handleChange} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Auto-generated" />
                       <button type="button" onClick={() => setFormData({...formData, sku: generateSKU()})} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap">🔄 Generate</button>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Weight / Dimensions</label>
+                    <input type="text" name="weight" value={formData.weight} onChange={handleChange} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., 250g" />
                   </div>
                 </div>
               </div>
@@ -522,7 +746,172 @@ function AdminEditProduct() {
                 </div>
               </div>
 
-              {/* Description - About this item */}
+              {/* 🔥 VARIATIONS SECTION */}
+              <div className="border-b border-gray-200 pb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-semibold text-gray-800">🎨 Product Variations</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">{!formData.category && 'Select a category first'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {variations.length > 0 && (
+                      <>
+                        <button type="button" onClick={selectAllVariations} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-200 transition">
+                          {selectedVariationIds.length === variations.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <button type="button" onClick={deleteSelectedVariations} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition">
+                          Delete Selected ({selectedVariationIds.length})
+                        </button>
+                      </>
+                    )}
+                    {formData.category && (
+                      <button type="button" onClick={() => { setEditingVariation(null); setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} }); setVariationModalOpen(true); }} 
+                        className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-5 py-1.5 rounded-lg text-sm font-medium hover:shadow-md transition">
+                        + Add {variationAttrs.type}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {!formData.category ? (
+                  <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first</p></div>
+                ) : variations.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet. Click "Add {variationAttrs.type}" to add.</p></div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm">
+                      <thead className="bg-gray-50">
+                        <tr className="border-b border-gray-200">
+                          <th className="px-3 py-2 text-center w-10">
+                            <input type="checkbox" checked={selectedVariationIds.length === variations.length && variations.length > 0} onChange={selectAllVariations} />
+                          </th>
+                          <th className="px-3 py-2 text-left">{variationAttrs.type}</th>
+                          {variationAttrs.secondary && <th className="px-3 py-2 text-left">{variationAttrs.secondary}</th>}
+                          <th className="px-3 py-2 text-left">Image</th>
+                          <th className="px-3 py-2 text-right">Price</th>
+                          <th className="px-3 py-2 text-right">MRP</th>
+                          <th className="px-3 py-2 text-right">Stock</th>
+                          <th className="px-3 py-2 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {variations.map(v => (
+                          <tr key={v.id} className="hover:bg-pink-50/30">
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={selectedVariationIds.includes(v.id)} onChange={() => toggleSelectVariation(v.id)} />
+                            </td>
+                            <td className="px-3 py-2 font-medium">{v.name}</td>
+                            {variationAttrs.secondary && <td className="px-3 py-2">{v.secondaryName || '-'}</td>}
+                            <td className="px-3 py-2">
+                              {v.image ? (
+                                <img src={v.image} className="w-8 h-8 object-cover rounded" alt="variation" />
+                              ) : (
+                                <span className="text-gray-400 text-xs">No image</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right text-pink-600">₹{v.price}</td>
+                            <td className="px-3 py-2 text-right text-gray-400 line-through">₹{v.mrp}</td>
+                            <td className="px-3 py-2 text-right">{v.stock}</td>
+                            <td className="px-3 py-2 text-center">
+                              <div className="flex justify-center gap-2">
+                                <button type="button" onClick={() => editVariation(v)} className="text-blue-500" title="Edit">✏️</button>
+                                <button type="button" onClick={() => deleteVariation(v.id)} className="text-red-500" title="Delete">🗑️</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50">
+                        <tr className="border-t border-gray-200">
+                          <td colSpan={variationAttrs.secondary ? 4 : 3} className="px-3 py-2 font-medium">Total</td>
+                          <td className="px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
+                          <td className="px-3 py-2 text-right"></td>
+                          <td className="px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Variation Modal */}
+              {variationModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
+                  <div className="bg-white rounded-xl max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">{editingVariation ? 'Edit' : 'Add New'} {variationAttrs.type}</h3>
+                      <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                    </div>
+                    
+                    <div className="p-5 space-y-4">
+                      <VariationSelectWithSearch 
+                        label={`${variationAttrs.type} *`}
+                        options={variationAttrs.options}
+                        value={variationForm.name}
+                        onChange={(val) => setVariationForm({...variationForm, name: val})}
+                        placeholder={`Search or type custom ${variationAttrs.type.toLowerCase()}...`}
+                      />
+                      
+                      {variationAttrs.secondary && (
+                        <VariationSelectWithSearch 
+                          label={variationAttrs.secondary}
+                          options={variationAttrs.secondaryOptions}
+                          value={variationForm.attributes.secondary || ''}
+                          onChange={(val) => setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: val}})}
+                          placeholder={`Search or type custom ${variationAttrs.secondary.toLowerCase()}...`}
+                        />
+                      )}
+                      
+                      {/* Variation Image Upload */}
+                      <div>
+                        <label className="block text-sm font-medium mb-1.5">Variation Image</label>
+                        <div className="flex items-center gap-3">
+                          {variationForm.image ? (
+                            <div className="relative">
+                              <img src={variationForm.image} className="w-16 h-16 object-cover rounded border" alt="variation" />
+                              <button type="button" onClick={() => setVariationForm({...variationForm, image: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">×</button>
+                            </div>
+                          ) : (
+                            <div className="flex-1">
+                              <input type="file" accept="image/*" onChange={uploadVariationImage} className="hidden" id="variationImageUpload" />
+                              <label htmlFor="variationImageUpload" className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 transition">
+                                📷 Upload Image
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">Selling Price *</label>
+                          <input type="number" value={variationForm.price} onChange={(e) => setVariationForm({...variationForm, price: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="499" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">MRP</label>
+                          <input type="number" value={variationForm.mrp} onChange={(e) => setVariationForm({...variationForm, mrp: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="599" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">Stock *</label>
+                          <input type="number" value={variationForm.stock} onChange={(e) => setVariationForm({...variationForm, stock: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="10" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">SKU</label>
+                          <input type="text" value={variationForm.sku} onChange={(e) => setVariationForm({...variationForm, sku: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Auto-generated" />
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-3 pt-4">
+                        <button type="button" onClick={() => setVariationModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+                        <button type="button" onClick={saveVariation} className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg font-medium hover:shadow-md transition">{editingVariation ? 'Update' : 'Add'}</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
               <div className="border-b border-gray-200 pb-4">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">📝 About this item</h2>
                 <div className="space-y-2 mb-3">
@@ -534,7 +923,7 @@ function AdminEditProduct() {
                     </div>
                   ))}
                 </div>
-                {formData.description.length < 8 && (
+                {formData.description.length < 15 && (
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input type="text" value={currentBullet} onChange={(e) => setCurrentBullet(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addBulletPoint()} placeholder="e.g., Dermatologically tested" className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
                     <button type="button" onClick={addBulletPoint} className="px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg hover:shadow-md transition flex items-center justify-center gap-1 text-sm font-medium"><IconPlus /> Add</button>
@@ -588,7 +977,7 @@ function AdminEditProduct() {
               {/* Buttons */}
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200">
                 <Link to="/admin/inventory" className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition text-sm text-center">Cancel</Link>
-                <button type="submit" disabled={saving} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition disabled:opacity-50 text-sm">{saving ? 'Saving...' : '✓ Save Changes'}</button>
+                <button type="button" onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition disabled:opacity-50 text-sm">{saving ? 'Saving...' : '✓ Save Changes'}</button>
               </div>
             </form>
           </div>
