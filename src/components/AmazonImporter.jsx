@@ -1,5 +1,5 @@
 // ============================================
-// AMAZON IMPORTER COMPONENT (FIXED)
+// AMAZON IMPORTER COMPONENT (FULLY FIXED - Category + SubCategory Detection)
 // ============================================
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -27,6 +27,94 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       if (text.toLowerCase().includes(word.toLowerCase())) return true;
     }
     return false;
+  };
+
+  // 🔥 IMPROVED CATEGORY DETECTION - product name + brand + features
+  const detectCategoryFromAllData = (productName, brand = '', features = []) => {
+    const searchText = `${productName} ${brand} ${features.join(' ')}`.toLowerCase();
+    
+    const categoryKeywords = {
+      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss', 'eyeliner', 'bronzer', 'contour', 'setting spray', 'makeup remover', 'bb cream', 'cc cream'],
+      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'face cream', 'lotion', 'toner', 'face mask', 'eye cream', 'scrub', 'vitamin c', 'retinol', 'hyaluronic', 'niacinamide', 'skincare'],
+      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall', 'hair growth', 'dry shampoo', 'hair cream'],
+      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga', 'gown', 'skirt', 'blouse', 'kurta', 'leggings', 'hoodie'],
+      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings', 'necklace', 'bracelet', 'handbag', 'backpack']
+    };
+    
+    // Priority order - Makeup pehle check karo because lipstick etc.
+    const order = ['Makeup', 'Skincare', 'Hair', 'Clothing', 'Accessories'];
+    for (const category of order) {
+      const keywords = categoryKeywords[category];
+      for (const keyword of keywords) {
+        if (searchText.includes(keyword)) {
+          return category;
+        }
+      }
+    }
+    return 'Skincare';
+  };
+
+  // 🔥 SMART SUBCATEGORY DETECTION
+  const detectSubCategory = (productName, category, features = []) => {
+    const name = productName.toLowerCase();
+    const featuresText = features.join(' ').toLowerCase();
+    const searchText = `${name} ${featuresText}`;
+    
+    const subCategoryMap = {
+      'Makeup': {
+        'Lipstick': ['lipstick', 'lip color', 'matte lipstick', 'liquid lipstick'],
+        'Foundation': ['foundation', 'liquid foundation', 'bb cream', 'cc cream', 'compact'],
+        'Kajal': ['kajal', 'kohl', 'eyeliner', 'eye pencil'],
+        'Eyeshadow': ['eyeshadow', 'eye shadow', 'palette'],
+        'Mascara': ['mascara', 'eye mascara'],
+        'Blush': ['blush', 'cheek color', 'blusher'],
+        'Highlighter': ['highlighter', 'illuminator'],
+        'Concealer': ['concealer', 'cover stick']
+      },
+      'Skincare': {
+        'Face Wash': ['face wash', 'cleanser', 'face cleanser', 'washing foam'],
+        'Serum': ['serum', 'face serum', 'vitamin c serum', 'retinol serum'],
+        'Moisturizer': ['moisturizer', 'face cream', 'moisturising cream', 'day cream', 'night cream'],
+        'Sunscreen': ['sunscreen', 'sunblock', 'spf', 'uv protection'],
+        'Face Mask': ['face mask', 'sheet mask', 'clay mask', 'face pack'],
+        'Toner': ['toner', 'face toner', 'astringent'],
+        'Eye Cream': ['eye cream', 'under eye', 'eye gel']
+      },
+      'Hair': {
+        'Shampoo': ['shampoo', 'hair shampoo', 'anti dandruff shampoo'],
+        'Conditioner': ['conditioner', 'hair conditioner', 'conditioning'],
+        'Hair Oil': ['hair oil', 'coconut oil', 'argan oil', 'hair serum oil'],
+        'Hair Mask': ['hair mask', 'hair treatment', 'deep conditioning'],
+        'Hair Serum': ['hair serum', 'hair fall serum', 'hair growth serum'],
+        'Hair Color': ['hair color', 'hair dye', 'hair colour']
+      },
+      'Clothing': {
+        'Saree': ['saree', 'sari', 'banarasi', 'silk saree'],
+        'Kurti': ['kurti', 'kurta', 'ethnic top', 'kurti top'],
+        'Dress': ['dress', 'gown', 'frock', 'maxi dress'],
+        'Jeans': ['jeans', 'denim', 'jeggings', 'jeans pants'],
+        'Top': ['top', 'blouse', 'crop top', 'shirt'],
+        'Lehenga': ['lehenga', 'lehenga choli', 'ghagra']
+      },
+      'Accessories': {
+        'Handbag': ['handbag', 'purse', 'tote bag', 'sling bag'],
+        'Jewelry': ['jewelry', 'necklace', 'earrings', 'bracelet', 'jewellery'],
+        'Watch': ['watch', 'wrist watch', 'analog watch'],
+        'Sunglasses': ['sunglasses', 'sun glasses', 'goggles']
+      }
+    };
+    
+    const categoryMap = subCategoryMap[category];
+    if (!categoryMap) return '';
+    
+    for (const [subCat, keywords] of Object.entries(categoryMap)) {
+      for (const keyword of keywords) {
+        if (searchText.includes(keyword)) {
+          return subCat;
+        }
+      }
+    }
+    return '';
   };
 
   const addUrlField = () => {
@@ -68,7 +156,32 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 
         const data = await response.json();
         if (data.success) {
-          results.push({ ...data.scraped, originalUrl: url });
+          const scraped = data.scraped;
+          
+          // Build features array from description and keyFeatures
+          const features = [];
+          if (Array.isArray(scraped.keyFeatures)) features.push(...scraped.keyFeatures);
+          if (Array.isArray(scraped.description)) features.push(...scraped.description.slice(0, 5));
+          
+          // 🔥 DETECT CATEGORY AND SUBCATEGORY
+          const detectedCategory = detectCategoryFromAllData(
+            scraped.name, 
+            scraped.brand || '', 
+            features
+          );
+          
+          const detectedSubCategory = detectSubCategory(
+            scraped.name, 
+            detectedCategory, 
+            features
+          );
+          
+          results.push({ 
+            ...scraped, 
+            originalUrl: url,
+            detectedCategory: detectedCategory,
+            detectedSubCategory: detectedSubCategory
+          });
         } else {
           results.push({ error: data.error, originalUrl: url });
         }
@@ -79,25 +192,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 
     setImportedProducts(results);
     setLoading(false);
-  };
-
-  // 🔥 Detect category from product name
-  const detectCategoryFromName = (productName) => {
-    const name = productName.toLowerCase();
-    const categoryKeywords = {
-      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
-      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
-      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
-      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
-    };
-    
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      for (const keyword of keywords) {
-        if (name.includes(keyword)) return category;
-      }
-    }
-    return 'Skincare';
   };
 
   const importToForm = (product) => {
@@ -136,8 +230,9 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     const keywords = [product.brand, ...keyFeaturesArray].filter(Boolean);
     const metaKeywords = keywords.join(', ');
     
-    // 🔥 Detect category if not provided
-    const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
+    // Use detected category and subcategory
+    const detectedCategory = product.detectedCategory || 'Skincare';
+    const detectedSubCategory = product.detectedSubCategory || '';
     
     setFormData(prev => ({
       ...prev,
@@ -155,17 +250,18 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       metaKeywords: metaKeywords,
       slug: slug,
       category: detectedCategory,
-      skinType: product.skinType || 'all',
-      concerns: product.concerns || [],
-      ingredients: product.ingredients || '',
-      finish: product.finish || '',
-      coverage: product.coverage || '',
-      shade: product.shade || '',
-      hairType: product.hairType || 'all',
-      hairConcerns: product.hairConcerns || [],
-      fabric: product.fabric || '',
-      material: product.material || '',
-      weight: product.weight || ''
+      subCategory: detectedSubCategory,
+      skinType: 'all',
+      concerns: [],
+      ingredients: '',
+      finish: '',
+      coverage: '',
+      shade: '',
+      hairType: 'all',
+      hairConcerns: [],
+      fabric: '',
+      material: '',
+      weight: ''
     }));
     
     if (product.images && product.images.length > 0) setImages(product.images);
@@ -182,7 +278,13 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       setVariations(formattedVariations);
     }
     
-    alert(`✅ Imported ${descriptionArray.length} bullet points | Category: ${detectedCategory}`);
+    let message = `✅ Imported!\n`;
+    message += `📦 Category: ${detectedCategory}\n`;
+    if (detectedSubCategory) message += `🏷️ SubCategory: ${detectedSubCategory}\n`;
+    message += `📝 Bullet points: ${descriptionArray.length}\n`;
+    message += `🖼️ Images: ${product.images?.length || 0}`;
+    
+    alert(message);
     if (onProductImported) onProductImported();
   };
 
@@ -190,9 +292,9 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border-2 border-pink-200 p-4 sm:p-5 mb-6 shadow-sm">
       <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 flex flex-wrap items-center gap-2">
         <span className="text-2xl">📦</span> Import from Amazon
-        <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full">Multi-URL Support</span>
+        <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full">Smart Detection</span>
       </h3>
-      <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Amazon product URLs (Up to 20 URLs)</p>
+      <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Amazon product URLs - Category & SubCategory auto-detected!</p>
       
       <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
         {urls.map((url, idx) => (
@@ -218,13 +320,13 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
           ➕ Add Another ({urls.length}/20)
         </button>
         <button onClick={fetchAllProducts} disabled={loading} className="px-4 sm:px-5 py-1.5 sm:py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition disabled:opacity-50 text-xs sm:text-sm">
-          {loading ? '⏳ Fetching...' : '🔍 Fetch All'}
+          {loading ? '⏳ Fetching...' : '🔍 Fetch & Detect'}
         </button>
       </div>
       
       {importedProducts.length > 0 && (
         <div className="mt-4 border-t border-gray-100 pt-4">
-          <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Fetched Products ({importedProducts.length})</h4>
+          <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Detected Products ({importedProducts.length})</h4>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {importedProducts.map((product, idx) => (
               <div key={idx} className={`p-2 sm:p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-sm'}`}>
@@ -237,7 +339,12 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
                   ) : (
                     <>
                       <p className="font-medium text-gray-800 text-xs sm:text-sm truncate">{product.name}</p>
-                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'}</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <span className="text-xs bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full">₹{product.price}</span>
+                        {product.brand && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{product.brand}</span>}
+                        <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">{product.detectedCategory}</span>
+                        {product.detectedSubCategory && <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{product.detectedSubCategory}</span>}
+                      </div>
                     </>
                   )}
                 </div>
@@ -253,7 +360,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       )}
       
       <div className="mt-3 p-2 sm:p-3 bg-blue-50 rounded-lg">
-        <p className="text-xs text-blue-600">💡 Tip: Category will be auto-detected! Custom variations will show properly.</p>
+        <p className="text-xs text-blue-600">💡 Smart Detection: Category & SubCategory auto-detected from product name + features!</p>
       </div>
     </div>
   );
