@@ -30,7 +30,7 @@ function AdminInventory() {
     loadInventory();
   }, [navigate]);
 
-  // ✅ Load products from BACKEND API with token
+  // Load products from BACKEND API
   const loadInventory = async () => {
     try {
       setLoading(true);
@@ -54,7 +54,8 @@ function AdminInventory() {
           id: product._id,
           stock: stock,
           price: product.price || product.sellingPrice || 0,
-          status: product.status === 'active' ? status : 'inactive'
+          status: product.status === 'active' ? status : 'inactive',
+          sku: product.sku || 'N/A'
         };
       });
       
@@ -67,7 +68,7 @@ function AdminInventory() {
     }
   };
 
-  // ✅ Update stock in backend with AUTH
+  // Update stock in backend
   const updateStock = async (productId, newStock) => {
     if (newStock < 0) return;
     
@@ -101,7 +102,6 @@ function AdminInventory() {
       if (!response.ok) throw new Error('Update failed');
       
       await loadInventory();
-      // alert(`✓ Stock updated to ${newStock}`);
     } catch (error) {
       console.error('Error updating stock:', error);
       alert('Failed to update stock');
@@ -110,7 +110,7 @@ function AdminInventory() {
     }
   };
 
-  // ✅ Delete product from backend with AUTH
+  // Delete product
   const deleteProduct = async (productId) => {
     const token = getToken();
     if (!token) {
@@ -151,6 +151,7 @@ function AdminInventory() {
     }
   };
 
+  // 🔥 Get status badge with styling
   const getStatusBadge = (status, stock) => {
     if (status === 'inactive') 
       return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Inactive</span>;
@@ -177,6 +178,13 @@ function AdminInventory() {
     { value: 'outofstock', label: 'Out of Stock', icon: '❌' },
   ];
 
+  // Statistics
+  const totalProducts = products.length;
+  const activeCount = products.filter(p => p.status === 'active' && p.stock > 10).length;
+  const lowStockCount = products.filter(p => p.stock > 0 && p.stock < 10).length;
+  const outOfStockCount = products.filter(p => p.stock === 0).length;
+
+  // 🔥 Filter products based on status and category and search
   const filteredProducts = products.filter(p => {
     if (filterStatus !== 'all' && p.status !== filterStatus) return false;
     if (filterCategory !== 'all' && p.mainCategory?.toLowerCase() !== filterCategory && p.category?.toLowerCase() !== filterCategory) return false;
@@ -184,10 +192,10 @@ function AdminInventory() {
     return true;
   });
 
-  const totalProducts = products.length;
-  const activeCount = products.filter(p => p.status === 'active' && p.stock > 10).length;
-  const lowStockCount = products.filter(p => p.stock > 0 && p.stock < 10).length;
-  const outOfStockCount = products.filter(p => p.stock === 0).length;
+  // 🔥 Handle stats card click
+  const handleStatClick = (statusValue) => {
+    setFilterStatus(statusValue);
+  };
 
   if (loading) {
     return (
@@ -204,7 +212,7 @@ function AdminInventory() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-pink-50/30">
       <AdminSidebar />
       
-      {/* Premium Header - Responsive */}
+      {/* Header */}
       <div className="bg-white/95 backdrop-blur-md border-b border-pink-100 px-3 sm:px-6 py-3 sm:py-4 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
@@ -212,7 +220,6 @@ function AdminInventory() {
             <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">Track and manage your product stock levels</p>
           </div>
           
-          {/* Buttons - Responsive */}
           <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
             <Link 
               to="/admin/add-product" 
@@ -234,39 +241,66 @@ function AdminInventory() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Stats Cards - Responsive Grid */}
+          {/* 🔥 Stats Cards - Clickable */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-pink-100 p-3 sm:p-4 hover:shadow-md transition group">
+            {/* Total Products Card */}
+            <button 
+              onClick={() => handleStatClick('all')}
+              className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
+                filterStatus === 'all' ? 'border-pink-500 ring-2 ring-pink-200' : 'border-pink-100'
+              }`}
+            >
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Total Products</p>
                 <span className="text-lg sm:text-xl text-gray-400 group-hover:scale-110 transition">📦</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{totalProducts}</p>
-            </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-green-100 p-3 sm:p-4 hover:shadow-md transition group">
+            </button>
+            
+            {/* In Stock Card - Clickable */}
+            <button 
+              onClick={() => handleStatClick('active')}
+              className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
+                filterStatus === 'active' ? 'border-green-500 ring-2 ring-green-200' : 'border-green-100'
+              }`}
+            >
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">In Stock</p>
                 <span className="text-lg sm:text-xl text-green-500 group-hover:scale-110 transition">✅</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-green-600">{activeCount}</p>
-            </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-amber-100 p-3 sm:p-4 hover:shadow-md transition group">
+            </button>
+            
+            {/* Low Stock Card - Clickable */}
+            <button 
+              onClick={() => handleStatClick('lowstock')}
+              className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
+                filterStatus === 'lowstock' ? 'border-amber-500 ring-2 ring-amber-200' : 'border-amber-100'
+              }`}
+            >
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Low Stock</p>
                 <span className="text-lg sm:text-xl text-amber-500 group-hover:scale-110 transition">⚠️</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-amber-600">{lowStockCount}</p>
-            </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-red-100 p-3 sm:p-4 hover:shadow-md transition group">
+            </button>
+            
+            {/* Out of Stock Card - Clickable */}
+            <button 
+              onClick={() => handleStatClick('outofstock')}
+              className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
+                filterStatus === 'outofstock' ? 'border-red-500 ring-2 ring-red-200' : 'border-red-100'
+              }`}
+            >
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Out of Stock</p>
                 <span className="text-lg sm:text-xl text-red-500 group-hover:scale-110 transition">❌</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-red-600">{outOfStockCount}</p>
-            </div>
+            </button>
           </div>
 
-          {/* Filters Bar - Responsive */}
+          {/* Filters Bar */}
           <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-sm border border-pink-100 mb-6 overflow-hidden">
             <div className="p-3 sm:p-4 border-b border-pink-100">
               <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
@@ -297,7 +331,7 @@ function AdminInventory() {
                   <div className="relative">
                     <input 
                       type="text" 
-                      placeholder="Search..." 
+                      placeholder="Search by name or SKU..." 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full sm:w-48 md:w-64 pl-9 pr-3 py-1.5 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 bg-white"
@@ -308,7 +342,7 @@ function AdminInventory() {
               </div>
             </div>
 
-            {/* Table - Responsive */}
+            {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm">
                 <thead className="bg-gradient-to-r from-pink-50 to-rose-50 border-b border-pink-100">
@@ -355,7 +389,10 @@ function AdminInventory() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-500 text-[10px] sm:text-xs font-mono hidden sm:table-cell">{product.sku?.slice(-8) || 'N/A'}</td>
+                        {/* 🔥 SKU FIXED - Now showing properly */}
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-500 text-[10px] sm:text-xs font-mono hidden sm:table-cell">
+                          {product.sku && product.sku !== 'N/A' ? product.sku.slice(-12) : 'N/A'}
+                        </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 hidden md:table-cell">
                           <span className="text-[10px] sm:text-xs bg-pink-50 text-pink-600 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full capitalize">
                             {product.mainCategory || product.category || 'General'}
@@ -366,8 +403,8 @@ function AdminInventory() {
                           <div className="flex items-center justify-end gap-1 sm:gap-2">
                             <button 
                               onClick={() => updateStock(product.id, product.stock - 1)}
-                              disabled={updatingStock === product.id}
-                              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600 disabled:opacity-50"
+                              disabled={updatingStock === product.id || product.stock === 0}
+                              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               -
                             </button>
@@ -388,7 +425,8 @@ function AdminInventory() {
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                           <div className="flex justify-center gap-1 sm:gap-2">
-                            <Link to={`/admin/edit-product/${product.id}`} className="p-1 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
+                            {/* 🔥 Edit link - Goes to AdminAddProduct with edit mode */}
+                            <Link to={`/admin/add-product?id=${product.id}`} className="p-1 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
                               ✏️
                             </Link>
                             <button 
@@ -416,7 +454,7 @@ function AdminInventory() {
         </div>
       </div>
 
-      {/* Delete Modal - Responsive */}
+      {/* Delete Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4" onClick={() => setShowDeleteModal(false)}>
           <div className="bg-white rounded-xl sm:rounded-2xl max-w-md w-full shadow-2xl animate-fade-in-up mx-3 sm:mx-4" onClick={(e) => e.stopPropagation()}>
