@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 
-// ============================================
-// VARIATION SELECT WITH SEARCH AND CUSTOM INPUT
-// ============================================
 const VariationSelectWithSearch = ({ 
   label, 
   options, 
@@ -210,7 +207,6 @@ function AdminEditProduct() {
           return;
         }
 
-        console.log('Fetching product with ID:', id);
         const response = await fetch(`${API_URL}/api/products/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -218,7 +214,6 @@ function AdminEditProduct() {
         if (!response.ok) throw new Error('Failed to load product');
 
         const product = await response.json();
-        console.log('Loaded product:', product);
 
         let descriptionArray = [];
         if (Array.isArray(product.description)) {
@@ -546,7 +541,7 @@ function AdminEditProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 🔥 FIXED: Proper submit handler with better error handling
+  // 🔥 FIXED: Strong submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -565,6 +560,19 @@ function AdminEditProduct() {
     }
 
     const finalSku = formData.sku || generateSKU();
+
+    // 🔥 CRITICAL: Make sure variations are properly structured
+    const cleanVariations = variations.map(v => ({
+      id: v.id,
+      name: v.name,
+      secondaryName: v.secondaryName || '',
+      price: Number(v.price),
+      mrp: Number(v.mrp) || Number(v.price) * 1.2,
+      stock: Number(v.stock),
+      sku: v.sku || `VAR-${v.id}`,
+      image: v.image || '',
+      attributes: v.attributes || {}
+    }));
 
     const productData = {
       name: formData.name,
@@ -597,12 +605,11 @@ function AdminEditProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-      variations: variations,
+      variations: cleanVariations,
       status: 'active'
     };
 
-    console.log('Sending update request for product:', id);
-    console.log('Product data:', productData);
+    console.log('Saving product with variations:', cleanVariations.length);
 
     try {
       const response = await fetch(`${API_URL}/api/products/${id}`, {
@@ -615,14 +622,12 @@ function AdminEditProduct() {
       });
       
       const responseData = await response.json();
-      console.log('Response status:', response.status);
-      console.log('Response data:', responseData);
       
       if (!response.ok) {
         throw new Error(responseData.error || 'Update failed');
       }
       
-      alert('✅ Product updated successfully!');
+      alert(`✅ Product updated successfully! ${cleanVariations.length} variations saved.`);
       navigate('/admin/inventory');
     } catch (error) {
       console.error('Update error:', error);
