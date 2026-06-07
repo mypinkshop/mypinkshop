@@ -872,10 +872,8 @@ const scrapeAmazonProduct = async (url) => {
     
     const $ = cheerio.load(response.data);
     
-    // ========== 1. PRODUCT NAME ==========
     const name = $('#productTitle').text().trim() || 'Unknown Product';
     
-    // ========== 2. PRICE EXTRACTION ==========
     let price = $('#priceblock_ourprice').text();
     if (!price) price = $('#priceblock_dealprice').text();
     if (!price) price = $('.a-price-whole').first().text();
@@ -887,7 +885,6 @@ const scrapeAmazonProduct = async (url) => {
     const originalMatch = originalPrice.match(/[\d,]+/);
     const finalOriginalPrice = originalMatch ? parseInt(originalMatch[0].replace(/,/g, '')) : 0;
     
-    // ========== 3. IMAGES EXTRACTION ==========
     const images = [];
     $('#imgTagWrapperId img, .a-dynamic-image, #landingImage').each((i, el) => {
       let src = $(el).attr('src') || $(el).attr('data-old-hires');
@@ -897,43 +894,30 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== 4. FULL DESCRIPTION ==========
     let descriptionArray = [];
-    
-    $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small, .a-unordered-list .a-list-item').each((i, el) => {
+    $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small').each((i, el) => {
       let text = $(el).text().trim();
-      if (text && text.length > 10 && text.length < 500) {
+      if (text && text.length > 15 && text.length < 500) {
         text = text.replace(/【.*?】/g, '').replace(/\s+/g, ' ').trim();
-        const garbageWords = ['See more product details', 'Report an issue', 'Product Description', 'To see our price'];
-        let isGarbage = false;
-        for (const gw of garbageWords) {
-          if (text.toLowerCase().includes(gw.toLowerCase())) {
-            isGarbage = true;
-            break;
-          }
-        }
-        if (!isGarbage && text.length > 15) {
+        if (!text.includes('See more') && !text.includes('Report an issue')) {
           descriptionArray.push(text);
         }
       }
     });
-    
     if (descriptionArray.length === 0) {
       const productDesc = $('#productDescription').text().trim();
       if (productDesc) {
         let sentences = productDesc.split(/\.\s+|\.\n+|\n+/);
         for (let sentence of sentences) {
           let clean = sentence.trim();
-          if (clean.length > 25 && clean.length < 300) {
+          if (clean.length > 25 && clean.length < 400) {
             descriptionArray.push(clean);
           }
         }
       }
     }
-    
     descriptionArray = [...new Set(descriptionArray)];
     
-    // ========== 5. KEY FEATURES ==========
     let keyFeaturesArray = [];
     $('#feature-bullets .a-list-item').each((i, el) => {
       let text = $(el).text().trim();
@@ -945,239 +929,92 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== 6. KEY INGREDIENTS ==========
-    let ingredients = '';
-    const fullText = descriptionArray.join(' ') + ' ' + $('#productDescription').text();
-    const ingredientsKeywords = ['ingredients', 'key ingredients', 'what\'s inside', 'formulated with', 'contains', 'active ingredients'];
-    
-    for (const keyword of ingredientsKeywords) {
-      const regex = new RegExp(`${keyword}[\\s:]*([^.]+(?:\\.[^.]*)?)`, 'i');
-      const match = fullText.match(regex);
-      if (match && match[1] && match[1].length > 10) {
-        ingredients = match[1].trim();
-        if (ingredients.length > 10 && ingredients.length < 300) break;
-      }
+    // Weight extraction
+    let weight = '';
+    const weightPattern = /(?:Weight|Item Weight|Product Weight)[:\s]*([\d.]+)\s*(g|kg|ml|gm)/i;
+    const weightMatch = $('body').text().match(weightPattern);
+    if (weightMatch) {
+      weight = weightMatch[1] + weightMatch[2];
+    }
+    if (!weight) {
+      const sizeMatch = $('body').text().match(/(\d+)\s*(g|ml|kg|gm)(?!\s*\/)/i);
+      if (sizeMatch) weight = sizeMatch[1] + sizeMatch[2];
     }
     
-    // ========== 7. SKIN TYPE ==========
-    let skinType = 'all';
-    const skinTypeKeywords = {
-      'oily': ['oily skin', 'excess oil', 'oil control', 'mattifying', 'sebum', 'pore', 'shine'],
-      'dry': ['dry skin', 'hydrating', 'moisturizing', 'nourishing', 'parched', 'dehydrated', 'flaky'],
-      'combination': ['combination skin', 'mixed skin', 't-zone', 'combo'],
-      'sensitive': ['sensitive skin', 'gentle', 'hypoallergenic', 'fragrance free', 'dermatologist tested', 'non-irritating'],
-      'normal': ['normal skin', 'daily use', 'everyday', 'all skin types']
-    };
-    
-    const lowerText = fullText.toLowerCase();
-    for (const [type, keywords] of Object.entries(skinTypeKeywords)) {
-      for (const keyword of keywords) {
-        if (lowerText.includes(keyword)) {
-          skinType = type;
-          break;
-        }
-      }
-    }
-    
-    // ========== 8. CONCERNS ==========
-    const concernsMap = {
-      'Acne': ['acne', 'pimple', 'breakout', 'blemish', 'spot', 'zits', 'clogged pores'],
-      'Aging': ['aging', 'wrinkle', 'fine line', 'anti-aging', 'firming', 'collagen', 'elasticity'],
-      'Pigmentation': ['pigmentation', 'dark spot', 'hyperpigmentation', 'melasma', 'uneven tone', 'sun spot'],
-      'Dryness': ['dryness', 'dehydrated', 'flaky', 'rough skin', 'tightness'],
-      'Dullness': ['dull', 'glow', 'brightening', 'radiance', 'luminous', 'glowing'],
-      'Oil Control': ['oil control', 'sebum', 'mattify', 'shine', 'greasy'],
-      'Redness': ['redness', 'irritation', 'inflammation', 'calming', 'soothing', 'rosacea'],
-      'Dark Spots': ['dark spot', 'sun spot', 'age spot', 'post-acne', 'scar']
-    };
-    
-    const detectedConcerns = [];
-    for (const [concern, keywords] of Object.entries(concernsMap)) {
-      for (const keyword of keywords) {
-        if (lowerText.includes(keyword)) {
-          detectedConcerns.push(concern);
-          break;
-        }
-      }
-    }
-    
-    // ========== 9. BRAND EXTRACTION ==========
     let brand = '';
     const bylineText = $('#bylineInfo').text().trim();
     if (bylineText) {
-      brand = bylineText
-        .replace(/Visit the/gi, '')
-        .replace(/Store/gi, '')
-        .replace(/Shop/gi, '')
-        .replace(/by/gi, '')
-        .replace(/Brand:/gi, '')
-        .trim();
+      brand = bylineText.replace(/Visit the|Store|Shop|by|Brand:/gi, '').trim();
     }
     if (!brand) brand = $('#brand').text().trim();
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
-    if (brand && (brand.toLowerCase().includes('visit') || brand.toLowerCase().includes('store'))) brand = '';
     
-    // ========== 10. 🔥 VARIATIONS EXTRACTION (UPDATED - Handles Table Variations) ==========
+    // ========== VARIATIONS EXTRACTION ==========
     let variations = [];
+    const pageText = $('body').text();
     
-    // Words to filter out (buttons, actions, etc.)
-    const variationFilterWords = [
-      'buy now', 'add to cart', 'subscribe', 'save', 'buy', 'cart',
-      'checkout', 'payment', 'delivery', 'shipping', 'offer', 'deal',
-      'coupon', 'promo', 'discount', 'see all', 'view more', 'shop now',
-      'order now', 'get it', 'fast delivery', 'free shipping', 'subscribe now',
-      'subscribe & save', 'auto delivery', 'one time purchase', 'secure transaction',
-      'cash on delivery', 'cod', 'emi', 'warranty', 'return policy', 'exchange',
-      'click to see', 'full view', 'fulfilled', 'non-returnable', 'pay on delivery',
-      'amazon delivered', 'top brand', 'free delivery', 'secure transaction',
-      'pack of', 'bundle', 'set', 'combo', 'deal of the day'
-    ];
-    
-    const isValidVariation = (text) => {
-      if (!text) return false;
-      const lowerText = text.toLowerCase();
-      for (const word of variationFilterWords) {
-        if (lowerText.includes(word)) return false;
-      }
-      if (/[₹$£€]/.test(text)) return false;
-      if (/^\d+$/.test(text)) return false;
-      if (text.length < 2 || text.length > 40) return false;
-      return true;
-    };
-    
-    // 🔥 METHOD 1: Size dropdown
-    $('#variation_size_name li, .a-dropdown-size select option, select[name="dropdown_selected_size_name"] option').each((i, el) => {
-      let varText = $(el).text().trim();
-      if (varText && varText !== 'Select' && varText !== 'Choose' && varText !== '--') {
-        if (isValidVariation(varText) && !variations.find(v => v.name === varText)) {
-          variations.push({ name: varText, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-        }
-      }
-    });
-    
-    // 🔥 METHOD 2: Color/Shade dropdown
-    $('#variation_color_name li, .a-dropdown-color select option, #variation_color select option').each((i, el) => {
-      let varText = $(el).text().trim();
-      if (varText && varText !== 'Select' && varText !== 'Choose') {
-        if (isValidVariation(varText) && !variations.find(v => v.name === varText)) {
-          variations.push({ name: varText, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-        }
-      }
-    });
-    
-    // 🔥 METHOD 3: Twister swatches
-    $('.twisterSwatchWrapper .swatchElement, .a-button-stack .a-button').each((i, el) => {
-      let varText = $(el).find('.a-button-text, .swatchTitle').last().text().trim();
-      if (!varText) varText = $(el).text().trim();
-      if (isValidVariation(varText) && varText.length > 0 && !variations.find(v => v.name === varText)) {
-        variations.push({ name: varText, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-      }
-    });
-    
-    // 🔥 METHOD 4: Extract sizes from description
-    const sizePattern = /(\d+(?:\.\d+)?)\s*(ml|g|kg|L|mg|gm)/gi;
-    const foundSizes = [];
-    let match;
-    while ((match = sizePattern.exec(fullText)) !== null) {
-      const size = match[1] + match[2];
-      if (!foundSizes.includes(size) && isValidVariation(size)) {
-        foundSizes.push(size);
-      }
-    }
-    foundSizes.slice(0, 10).forEach(size => {
-      if (!variations.find(v => v.name === size)) {
-        variations.push({ name: size, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-      }
-    });
-    
-    // 🔥 METHOD 5: Extract shades/colors from description
-    const shadePattern = /(Fair|Light|Medium|Tan|Deep|Red|Pink|Nude|Coral|Berry|Mauve|Brown|Black|Purple|Blue|Green|Yellow|Orange|Rose|Maroon|Teal|Beige|Ivory)/gi;
-    const foundShades = [];
-    let shadeMatch;
-    while ((shadeMatch = shadePattern.exec(fullText)) !== null) {
-      const shade = shadeMatch[1];
-      if (!foundShades.includes(shade) && isValidVariation(shade)) {
-        foundShades.push(shade);
-      }
-    }
-    foundShades.slice(0, 10).forEach(shade => {
-      if (!variations.find(v => v.name === shade)) {
-        variations.push({ name: shade, price: finalPrice, mrp: finalOriginalPrice || Math.round(finalPrice * 1.2), stock: 10 });
-      }
-    });
-    
-    // 🔥🔥 METHOD 6: NEW - Extract from TABLE variations (like in your screenshot) 🔥🔥
+    // Method 1: Tables
     $('table, .a-dynamic-list, .a-lineitem, [role="table"]').each((i, table) => {
-      $(table).find('tr, .a-row, .a-spacing-small').each((j, row) => {
-        const rowHtml = $(row).html();
-        const rowText = $(row).text().trim();
-        
-        // Look for size pattern in row
-        const sizeMatch = rowText.match(/(\d+)\s*(g|ml|kg|gm)(?:\s*\([^)]*\))?/i);
-        if (sizeMatch) {
-          const size = sizeMatch[0];
-          // Look for price in same row
-          const priceMatch = rowText.match(/₹(\d+(?:,\d+)?)/);
-          const variationPrice = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : finalPrice;
-          
-          if (isValidVariation(size) && !variations.find(v => v.name === size)) {
-            variations.push({ 
-              name: size, 
-              price: variationPrice, 
-              mrp: Math.round(variationPrice * 1.2),
-              stock: 10 
+      const tableText = $(table).text();
+      if (tableText.match(/(\d+\s*(g|ml|kg|gm))/i)) {
+        $(table).find('tr, td, .a-row').each((j, row) => {
+          const rowText = $(row).text();
+          const sizeMatches = rowText.match(/(\d+)\s*(g|ml|kg|gm)/gi);
+          const priceMatches = rowText.match(/₹(\d+(?:,\d+)?)/g);
+          if (sizeMatches) {
+            sizeMatches.forEach((size, idx) => {
+              let price = finalPrice;
+              if (priceMatches && priceMatches[idx]) {
+                price = parseInt(priceMatches[idx].replace(/[₹,]/g, ''));
+              }
+              if (!variations.find(v => v.name === size) && 
+                  !size.match(/buy|cart|subscribe|offer|click|view/i)) {
+                variations.push({ name: size, price: price, mrp: Math.round(price * 1.2), stock: 10 });
+              }
             });
           }
+        });
+      }
+    });
+    
+    // Method 2: Select dropdowns
+    $('select[name*="size"], select[name*="variation"]').each((i, select) => {
+      $(select).find('option').each((j, option) => {
+        let optText = $(option).text().trim();
+        const sizeMatch = optText.match(/(\d+)\s*(g|ml|kg|gm)/i);
+        if (sizeMatch && !variations.find(v => v.name === sizeMatch[0])) {
+          variations.push({ name: sizeMatch[0], price: finalPrice, mrp: Math.round(finalPrice * 1.2), stock: 10 });
         }
       });
     });
     
-    // 🔥 METHOD 7: Extract from span with size and price together
-    $('span, .a-size-base, .a-size-small').each((i, el) => {
-      const text = $(el).text().trim();
-      const sizeMatch = text.match(/(\d+\s*(?:g|ml|gm|kg))\s*[–-]\s*₹(\d+)/i);
-      if (sizeMatch) {
-        const size = sizeMatch[1];
-        const price = parseInt(sizeMatch[2]);
-        if (isValidVariation(size) && !variations.find(v => v.name === size)) {
-          variations.push({ name: size, price: price, mrp: Math.round(price * 1.2), stock: 10 });
+    // Method 3: Scan entire page for sizes
+    const allSizes = pageText.match(/(\d+)\s*(?:g|ml|kg|gm)/gi);
+    if (allSizes) {
+      const uniqueSizes = [...new Set(allSizes)];
+      uniqueSizes.forEach(size => {
+        if (!variations.find(v => v.name === size) && 
+            !size.match(/buy|cart|subscribe|save|offer|click|view/i) &&
+            size.length < 15) {
+          variations.push({ name: size, price: finalPrice, mrp: Math.round(finalPrice * 1.2), stock: 10 });
         }
-      }
-    });
+      });
+    }
     
-    // 🔥 METHOD 8: Look for "Size:" or "Quantity:" labels
-    $('th, td, .a-text-bold, .a-spacing-base').each((i, el) => {
-      const text = $(el).text().trim();
-      if (text.match(/size|quantity|pack/i) && !text.match(/click|view|see/i)) {
-        const parent = $(el).parent();
-        const parentText = parent.text();
-        const sizeMatch = parentText.match(/(\d+\s*(?:g|ml|gm|kg))/i);
-        if (sizeMatch && !variations.find(v => v.name === sizeMatch[0])) {
-          const priceMatch = parentText.match(/₹(\d+)/);
-          const price = priceMatch ? parseInt(priceMatch[1]) : finalPrice;
-          if (isValidVariation(sizeMatch[0])) {
-            variations.push({ name: sizeMatch[0], price: price, mrp: Math.round(price * 1.2), stock: 10 });
-          }
-        }
-      }
-    });
+    // Remove duplicates
+    variations = variations.filter((v, i, self) => i === self.findIndex((t) => t.name === v.name));
+    variations = variations.slice(0, 15);
     
-    // Remove duplicates based on name
-    variations = variations.filter((v, i, self) => 
-      i === self.findIndex((t) => t.name === v.name)
-    );
-    
-    // ========== 11. CATEGORY & SUBCATEGORY ==========
+    // Category detection
     const detectCategory = (productName, productDesc) => {
       const text = (productName + ' ' + productDesc).toLowerCase();
       const categoryKeywords = {
-        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'face mask', 'eye cream', 'scrub'],
-        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact'],
-        'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
-        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
+        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion'],
+        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter'],
+        'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color'],
+        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'jacket'],
+        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet']
       };
-      
       for (const [cat, keywords] of Object.entries(categoryKeywords)) {
         for (const keyword of keywords) {
           if (text.includes(keyword)) return cat;
@@ -1186,16 +1023,19 @@ const scrapeAmazonProduct = async (url) => {
       return 'Skincare';
     };
     
+    const descriptionText = descriptionArray.join(' ');
+    const detectedCategory = detectCategory(name, descriptionText);
+    
+    // 🔥 FIXED: Added detectedSubCategory
     const detectSubCategory = (productName, productDesc, category) => {
       const text = (productName + ' ' + productDesc).toLowerCase();
       const subCatMap = {
-        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
-        'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact'],
-        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff'],
-        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Shorts', 'Skirt'],
-        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings']
+        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream'],
+        'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter'],
+        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket'],
+        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
       };
-      
       const subCats = subCatMap[category] || [];
       for (const sub of subCats) {
         if (text.includes(sub.toLowerCase())) return sub;
@@ -1203,8 +1043,6 @@ const scrapeAmazonProduct = async (url) => {
       return '';
     };
     
-    const descriptionText = descriptionArray.join(' ');
-    const detectedCategory = detectCategory(name, descriptionText);
     const detectedSubCategory = detectSubCategory(name, descriptionText, detectedCategory);
     
     return {
@@ -1217,10 +1055,11 @@ const scrapeAmazonProduct = async (url) => {
       keyFeatures: keyFeaturesArray.slice(0, 10),
       detectedCategory: detectedCategory,
       detectedSubCategory: detectedSubCategory,
-      variations: variations.slice(0, 15),
-      ingredients: ingredients,
-      skinType: skinType,
-      concerns: detectedConcerns.slice(0, 5)
+      variations: variations,
+      weight: weight,
+      ingredients: '',
+      skinType: 'all',
+      concerns: []
     };
     
   } catch (error) {
