@@ -482,6 +482,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== 🔥 FIXED PUT ROUTE - Variations save properly ==========
 app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -490,10 +491,29 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    Object.assign(product, req.body);
+    // 🔥 CRITICAL FIX: Explicitly handle variations and variants
+    // Create a copy of req.body without variations/variants to avoid Object.assign issues
+    const updateData = { ...req.body };
+    
+    // Explicitly set variations if present
+    if (req.body.variations !== undefined) {
+      product.variations = req.body.variations;
+      delete updateData.variations;
+    }
+    
+    // Explicitly set variants if present  
+    if (req.body.variants !== undefined) {
+      product.variants = req.body.variants;
+      delete updateData.variants;
+    }
+    
+    // Apply remaining updates
+    Object.assign(product, updateData);
+    
     await product.save();
     res.json({ success: true, product });
   } catch (error) {
+    console.error('Update product error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -860,7 +880,7 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// ========== 🔥 FULLY FIXED AMAZON IMPORT ==========
+// ========== AMAZON IMPORT ==========
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -876,17 +896,14 @@ const scrapeAmazonProduct = async (url) => {
     const pageText = $('body').text();
     const html = response.data;
     
-    // ========== PRODUCT NAME ==========
     const name = $('#productTitle').text().trim() || 'Unknown Product';
     
-    // ========== PRICE ==========
     let price = $('#priceblock_ourprice').text();
     if (!price) price = $('#priceblock_dealprice').text();
     if (!price) price = $('.a-price-whole').first().text();
     const priceMatch = price.match(/[\d,]+/);
     const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
     
-    // ========== MRP ==========
     let originalPrice = 0;
     const mrpMatch = html.match(/M\.?R\.?P\.?\s*:?\s*[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
     if (mrpMatch) {
@@ -902,7 +919,6 @@ const scrapeAmazonProduct = async (url) => {
       originalPrice = Math.round(finalPrice * 1.2);
     }
     
-    // ========== IMAGES ==========
     const images = [];
     $('#imgTagWrapperId img, .a-dynamic-image, #landingImage').each((i, el) => {
       let src = $(el).attr('src') || $(el).attr('data-old-hires');
@@ -912,7 +928,6 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== DESCRIPTION ==========
     let descriptionArray = [];
     $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small').each((i, el) => {
       let text = $(el).text().trim();
@@ -937,7 +952,6 @@ const scrapeAmazonProduct = async (url) => {
     }
     descriptionArray = [...new Set(descriptionArray)];
     
-    // ========== KEY FEATURES ==========
     let keyFeaturesArray = [];
     $('#feature-bullets .a-list-item').each((i, el) => {
       let text = $(el).text().trim();
@@ -949,7 +963,6 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== WEIGHT ==========
     let weight = '';
     const weightMatch1 = html.match(/Item Weight\s*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
     if (weightMatch1) {
@@ -962,32 +975,23 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    // ========== 🔥 IMPROVED INGREDIENTS ==========
     let ingredients = '';
-    
-    // Pattern 1: Active Ingredients
     const ingredientsMatch1 = html.match(/Active Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br|\(|\)|\n)/i);
     if (ingredientsMatch1 && ingredientsMatch1[1] && ingredientsMatch1[1].length > 5) {
       ingredients = ingredientsMatch1[1].trim();
     }
-    
-    // Pattern 2: Ingredients
     if (!ingredients) {
       const ingredientsMatch2 = html.match(/Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br|\(|\)|\n)/i);
       if (ingredientsMatch2 && ingredientsMatch2[1] && ingredientsMatch2[1].length > 5) {
         ingredients = ingredientsMatch2[1].trim();
       }
     }
-    
-    // Pattern 3: Key Ingredients
     if (!ingredients) {
       const ingredientsMatch3 = html.match(/Key Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br|\(|\)|\n)/i);
       if (ingredientsMatch3 && ingredientsMatch3[1] && ingredientsMatch3[1].length > 5) {
         ingredients = ingredientsMatch3[1].trim();
       }
     }
-    
-    // Pattern 4: Product detail table
     if (!ingredients) {
       $('table, .a-keyvalue, .product-detail-table').each((i, table) => {
         $(table).find('tr').each((j, row) => {
@@ -1001,8 +1005,6 @@ const scrapeAmazonProduct = async (url) => {
         if (ingredients) return false;
       });
     }
-    
-    // Clean ingredients
     if (ingredients && ingredients.length > 300) {
       ingredients = ingredients.substring(0, 300);
     }
@@ -1010,14 +1012,12 @@ const scrapeAmazonProduct = async (url) => {
       ingredients = ingredients.replace(/see more|read more|click here/i, '').trim();
     }
     
-    // ========== DIMENSIONS ==========
     let dimensions = '';
     const dimMatch = html.match(/Product Dimensions\s*:?\s*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i);
     if (dimMatch) {
       dimensions = `${dimMatch[1]} x ${dimMatch[2]} x ${dimMatch[3]} cm`;
     }
     
-    // ========== BRAND ==========
     let brand = '';
     const bylineText = $('#bylineInfo').text().trim();
     if (bylineText) {
@@ -1026,7 +1026,6 @@ const scrapeAmazonProduct = async (url) => {
     if (!brand) brand = $('#brand').text().trim();
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
     
-    // ========== VARIATIONS ==========
     let variations = [];
     
     $('table, .a-dynamic-list, .a-lineitem, [role="table"]').each((i, table) => {
@@ -1077,11 +1076,9 @@ const scrapeAmazonProduct = async (url) => {
     variations = variations.filter((v, i, self) => i === self.findIndex((t) => t.name === v.name));
     variations = variations.slice(0, 15);
     
-    // ========== CATEGORY DETECTION ==========
     const detectCategory = (productName, productDesc, keyFeatures) => {
       const text = `${productName} ${productDesc} ${keyFeatures.join(' ')}`.toLowerCase();
       
-      // MAKEUP FIRST
       const makeupKeywords = [
         'lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 
         'highlighter', 'concealer', 'primer', 'compact', 'lip gloss', 'lip liner',
@@ -1094,7 +1091,6 @@ const scrapeAmazonProduct = async (url) => {
         if (text.includes(keyword)) return 'Makeup';
       }
       
-      // SKINCARE SECOND
       const skincareKeywords = [
         'face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 
         'lotion', 'toner', 'mask', 'eye cream', 'scrub', 'face cream', 
@@ -1106,19 +1102,16 @@ const scrapeAmazonProduct = async (url) => {
         if (text.includes(keyword)) return 'Skincare';
       }
       
-      // HAIR THIRD
       const hairKeywords = ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'];
       for (const keyword of hairKeywords) {
         if (text.includes(keyword)) return 'Hair';
       }
       
-      // CLOTHING FOURTH
       const clothingKeywords = ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'];
       for (const keyword of clothingKeywords) {
         if (text.includes(keyword)) return 'Clothing';
       }
       
-      // ACCESSORIES FIFTH
       const accessoriesKeywords = ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings'];
       for (const keyword of accessoriesKeywords) {
         if (text.includes(keyword)) return 'Accessories';
@@ -1130,7 +1123,6 @@ const scrapeAmazonProduct = async (url) => {
     const descriptionText = descriptionArray.join(' ');
     const detectedCategory = detectCategory(name, descriptionText, keyFeaturesArray);
     
-    // ========== SUBCATEGORY DETECTION ==========
     const detectSubCategory = (productName, productDesc, category) => {
       const text = `${productName} ${productDesc}`.toLowerCase();
       
@@ -1151,7 +1143,6 @@ const scrapeAmazonProduct = async (url) => {
     
     const detectedSubCategory = detectSubCategory(name, descriptionText, detectedCategory);
     
-    // ========== RETURN ==========
     return {
       name,
       brand: brand || '',
