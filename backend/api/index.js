@@ -860,7 +860,7 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// ========== 🔥 FULLY FIXED AMAZON IMPORT (MRP + INGREDIENTS + WEIGHT) ==========
+// ========== 🔥 FINAL FIXED AMAZON IMPORT (Exact Patterns) ==========
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -886,53 +886,20 @@ const scrapeAmazonProduct = async (url) => {
     const priceMatch = price.match(/[\d,]+/);
     const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
     
-    // ========== 🔥 EXACT MRP DETECTION - "M.R.P.: ₹XXX" PATTERN ==========
+    // ========== EXACT MRP DETECTION ==========
     let originalPrice = 0;
     
-    // PATTERN 1: M.R.P.: ₹XXX (Most common in Amazon India)
-    const mrpPattern1 = html.match(/M\.?R\.?P\.?\s*:?\s*[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
-    if (mrpPattern1) {
-      originalPrice = parseInt(mrpPattern1[1].replace(/,/g, ''));
+    // Pattern: M.R.P.: ₹XXX or M.R.P. ₹XXX
+    const mrpMatch = html.match(/M\.?R\.?P\.?\s*:?\s*[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
+    if (mrpMatch) {
+      originalPrice = parseInt(mrpMatch[1].replace(/,/g, ''));
     }
     
-    // PATTERN 2: M.R.P. ₹XXX (without colon)
+    // Pattern: List Price:
     if (!originalPrice) {
-      const mrpPattern2 = html.match(/M\.?R\.?P\.?\s+[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
-      if (mrpPattern2) {
-        originalPrice = parseInt(mrpPattern2[1].replace(/,/g, ''));
-      }
-    }
-    
-    // PATTERN 3: List Price: ₹XXX
-    if (!originalPrice) {
-      const listPriceMatch = html.match(/List Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
-      if (listPriceMatch) {
-        originalPrice = parseInt(listPriceMatch[1].replace(/,/g, ''));
-      }
-    }
-    
-    // PATTERN 4: Was: ₹XXX
-    if (!originalPrice) {
-      const wasPriceMatch = html.match(/Was[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
-      if (wasPriceMatch) {
-        originalPrice = parseInt(wasPriceMatch[1].replace(/,/g, ''));
-      }
-    }
-    
-    // PATTERN 5: Price: ₹XXX (only if > finalPrice)
-    if (!originalPrice) {
-      const priceMatch2 = html.match(/Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
-      if (priceMatch2) {
-        const p = parseInt(priceMatch2[1].replace(/,/g, ''));
-        if (p > finalPrice) originalPrice = p;
-      }
-    }
-    
-    // PATTERN 6: Deal price ke saath strike-through price
-    if (!originalPrice) {
-      const strikeMatch = html.match(/<span class="a-price a-text-price"[^>]*>.*?<span class="a-offscreen">[₹]?\s*(\d+(?:,\d+)?)<\/span>/i);
-      if (strikeMatch) {
-        originalPrice = parseInt(strikeMatch[1].replace(/,/g, ''));
+      const listMatch = html.match(/List Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
+      if (listMatch) {
+        originalPrice = parseInt(listMatch[1].replace(/,/g, ''));
       }
     }
     
@@ -950,7 +917,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== DESCRIPTION BULLET POINTS ==========
+    // ========== DESCRIPTION ==========
     let descriptionArray = [];
     $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small').each((i, el) => {
       let text = $(el).text().trim();
@@ -987,60 +954,90 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== 🔥 INGREDIENTS EXTRACTION ==========
-    let ingredients = '';
-    const ingredientPatterns = [
-      () => html.match(/Ingredients[:\s]*([^<>.]+?)(?:\.|$)/i),
-      () => html.match(/Key Ingredients[:\s]*([^<>.]+?)(?:\.|$)/i),
-      () => html.match(/成分[:\s]*([^<>.]+)/i),
-      () => pageText.match(/Ingredients:\s*([^.]+)/i)
-    ];
-    
-    for (const pattern of ingredientPatterns) {
-      const match = pattern();
-      if (match && match[1] && match[1].length > 5 && match[1].length < 500) {
-        ingredients = match[1].trim();
-        break;
-      }
-    }
-    
-    // ========== WEIGHT EXTRACTION ==========
+    // ========== 🔥 WEIGHT EXTRACTION - Exact "Item Weight" Pattern ==========
     let weight = '';
-    const weightPatterns = [
-      () => html.match(/Item Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
-      () => html.match(/Product Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
-      () => html.match(/Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
-      () => pageText.match(/Package Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
-      () => pageText.match(/(\d+)\s*(g|ml|kg|gm)(?!\s*\/)/i),
-      () => name.match(/(\d+)\s*(g|ml|kg|gm)/i)
-    ];
     
-    for (const pattern of weightPatterns) {
-      const match = pattern();
-      if (match && match[1]) {
-        let value = match[1];
-        let unit = match[2] || 'g';
-        if (unit === 'gram' || unit === 'grams') unit = 'g';
-        if (unit === 'milliliter' || unit === 'millilitre') unit = 'ml';
-        weight = `${value}${unit}`;
-        break;
+    // Pattern 1: Item Weight : 250 g (with spaces)
+    const weightMatch1 = html.match(/Item Weight\s*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
+    if (weightMatch1) {
+      weight = `${weightMatch1[1]}${weightMatch1[2] === 'gram' || weightMatch1[2] === 'grams' ? 'g' : weightMatch1[2]}`;
+    }
+    
+    // Pattern 2: Item Weight ‏: 250 g (with special char)
+    if (!weight) {
+      const weightMatch2 = html.match(/Item Weight\s*[‏]*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
+      if (weightMatch2) {
+        weight = `${weightMatch2[1]}${weightMatch2[2] === 'gram' || weightMatch2[2] === 'grams' ? 'g' : weightMatch2[2]}`;
       }
     }
     
-    // ========== DIMENSIONS EXTRACTION ==========
-    let dimensions = '';
-    const dimPatterns = [
-      () => html.match(/Product Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
-      () => html.match(/Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
-      () => pageText.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\s*(?:cm|mm)/i)
-    ];
-    
-    for (const pattern of dimPatterns) {
-      const match = pattern();
-      if (match) {
-        dimensions = `${match[1]} x ${match[2]} x ${match[3]} cm`;
-        break;
+    // Pattern 3: Product Weight
+    if (!weight) {
+      const weightMatch3 = html.match(/Product Weight\s*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
+      if (weightMatch3) {
+        weight = `${weightMatch3[1]}${weightMatch3[2] === 'gram' || weightMatch3[2] === 'grams' ? 'g' : weightMatch3[2]}`;
       }
+    }
+    
+    // Pattern 4: From product name
+    if (!weight) {
+      const nameWeight = name.match(/(\d+)\s*(g|ml|kg|gm)/i);
+      if (nameWeight) {
+        weight = `${nameWeight[1]}${nameWeight[2]}`;
+      }
+    }
+    
+    // ========== 🔥 INGREDIENTS EXTRACTION - Exact "Active Ingredients" Pattern ==========
+    let ingredients = '';
+    
+    // Pattern 1: Active Ingredients: xxx
+    const ingredientsMatch1 = html.match(/Active Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
+    if (ingredientsMatch1 && ingredientsMatch1[1]) {
+      ingredients = ingredientsMatch1[1].trim();
+    }
+    
+    // Pattern 2: Ingredients: xxx
+    if (!ingredients) {
+      const ingredientsMatch2 = html.match(/Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
+      if (ingredientsMatch2 && ingredientsMatch2[1]) {
+        ingredients = ingredientsMatch2[1].trim();
+      }
+    }
+    
+    // Pattern 3: Key Ingredients: xxx
+    if (!ingredients) {
+      const ingredientsMatch3 = html.match(/Key Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
+      if (ingredientsMatch3 && ingredientsMatch3[1]) {
+        ingredients = ingredientsMatch3[1].trim();
+      }
+    }
+    
+    // Pattern 4: From detail table
+    if (!ingredients) {
+      $('table').each((i, table) => {
+        const tableHtml = $(table).html();
+        if (tableHtml && (tableHtml.includes('Ingredients') || tableHtml.includes('Active'))) {
+          $(table).find('tr').each((j, row) => {
+            const label = $(row).find('th, td:first-child').text().trim();
+            const value = $(row).find('td:last-child').text().trim();
+            if ((label.includes('Ingredients') || label.includes('Active')) && value && value.length > 5) {
+              ingredients = value;
+            }
+          });
+        }
+      });
+    }
+    
+    // Limit ingredients length
+    if (ingredients && ingredients.length > 300) {
+      ingredients = ingredients.substring(0, 300);
+    }
+    
+    // ========== DIMENSIONS ==========
+    let dimensions = '';
+    const dimMatch = html.match(/Product Dimensions\s*:?\s*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i);
+    if (dimMatch) {
+      dimensions = `${dimMatch[1]} x ${dimMatch[2]} x ${dimMatch[3]} cm`;
     }
     
     // ========== BRAND ==========
@@ -1052,7 +1049,7 @@ const scrapeAmazonProduct = async (url) => {
     if (!brand) brand = $('#brand').text().trim();
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
     
-    // ========== VARIATIONS EXTRACTION ==========
+    // ========== VARIATIONS ==========
     let variations = [];
     
     $('table, .a-dynamic-list, .a-lineitem, [role="table"]').each((i, table) => {
