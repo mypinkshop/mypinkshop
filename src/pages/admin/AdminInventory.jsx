@@ -15,12 +15,10 @@ function AdminInventory() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Get token function
   const getToken = () => {
     return localStorage.getItem('adminToken') || localStorage.getItem('token');
   };
 
-  // Auth check
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -30,7 +28,6 @@ function AdminInventory() {
     loadInventory();
   }, [navigate]);
 
-  // Load products from BACKEND API
   const loadInventory = async () => {
     try {
       setLoading(true);
@@ -68,7 +65,6 @@ function AdminInventory() {
     }
   };
 
-  // Update stock in backend
   const updateStock = async (productId, newStock) => {
     if (newStock < 0) return;
     
@@ -110,7 +106,6 @@ function AdminInventory() {
     }
   };
 
-  // Delete product
   const deleteProduct = async (productId) => {
     const token = getToken();
     if (!token) {
@@ -151,7 +146,6 @@ function AdminInventory() {
     }
   };
 
-  // 🔥 Get status badge with styling
   const getStatusBadge = (status, stock) => {
     if (status === 'inactive') 
       return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Inactive</span>;
@@ -178,13 +172,11 @@ function AdminInventory() {
     { value: 'outofstock', label: 'Out of Stock', icon: '❌' },
   ];
 
-  // Statistics
   const totalProducts = products.length;
   const activeCount = products.filter(p => p.status === 'active' && p.stock > 10).length;
   const lowStockCount = products.filter(p => p.stock > 0 && p.stock < 10).length;
   const outOfStockCount = products.filter(p => p.stock === 0).length;
 
-  // 🔥 Filter products based on status and category and search
   const filteredProducts = products.filter(p => {
     if (filterStatus !== 'all' && p.status !== filterStatus) return false;
     if (filterCategory !== 'all' && p.mainCategory?.toLowerCase() !== filterCategory && p.category?.toLowerCase() !== filterCategory) return false;
@@ -192,7 +184,6 @@ function AdminInventory() {
     return true;
   });
 
-  // 🔥 Handle stats card click
   const handleStatClick = (statusValue) => {
     setFilterStatus(statusValue);
   };
@@ -241,9 +232,8 @@ function AdminInventory() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* 🔥 Stats Cards - Clickable */}
+          {/* Stats Cards - Clickable */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            {/* Total Products Card */}
             <button 
               onClick={() => handleStatClick('all')}
               className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
@@ -257,7 +247,6 @@ function AdminInventory() {
               <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{totalProducts}</p>
             </button>
             
-            {/* In Stock Card - Clickable */}
             <button 
               onClick={() => handleStatClick('active')}
               className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
@@ -271,7 +260,6 @@ function AdminInventory() {
               <p className="text-xl sm:text-2xl font-bold text-green-600">{activeCount}</p>
             </button>
             
-            {/* Low Stock Card - Clickable */}
             <button 
               onClick={() => handleStatClick('lowstock')}
               className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
@@ -285,7 +273,6 @@ function AdminInventory() {
               <p className="text-xl sm:text-2xl font-bold text-amber-600">{lowStockCount}</p>
             </button>
             
-            {/* Out of Stock Card - Clickable */}
             <button 
               onClick={() => handleStatClick('outofstock')}
               className={`bg-white rounded-xl sm:rounded-2xl shadow-sm border p-3 sm:p-4 hover:shadow-md transition-all group text-left w-full ${
@@ -389,7 +376,6 @@ function AdminInventory() {
                             </div>
                           </div>
                         </td>
-                        {/* 🔥 SKU FIXED - Now showing properly */}
                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-500 text-[10px] sm:text-xs font-mono hidden sm:table-cell">
                           {product.sku && product.sku !== 'N/A' ? product.sku.slice(-12) : 'N/A'}
                         </td>
@@ -425,8 +411,8 @@ function AdminInventory() {
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                           <div className="flex justify-center gap-1 sm:gap-2">
-                            {/* 🔥 Edit link - Goes to AdminAddProduct with edit mode */}
-                            <Link to={`/admin/add-product?id=${product.id}`} className="p-1 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
+                            {/* 🔥 FIXED: Edit button - sahi route pe bhej raha hai */}
+                            <Link to={`/admin/edit-product/${product.id}`} className="p-1 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
                               ✏️
                             </Link>
                             <button 
