@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link }react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 
 function AdminInventory() {
@@ -46,7 +46,6 @@ function AdminInventory() {
         else if (stock < 10) status = 'lowstock';
         else status = 'active';
         
-        // 🔥 FIXED: SKU properly map karo - multiple possible field names
         const skuValue = product.sku || product.SKU || product.productCode || product.code || 'N/A';
         
         return {
@@ -379,7 +378,6 @@ function AdminInventory() {
                             </div>
                           </div>
                         </td>
-                        {/* 🔥 SKU - Now showing properly */}
                         <td className="px-2 sm:px-4 py-2 sm:py-3">
                           <span className="text-gray-500 text-[10px] sm:text-xs font-mono bg-gray-50 px-2 py-1 rounded-full block w-fit">
                             {product.sku && product.sku !== 'N/A' ? product.sku : 'N/A'}
