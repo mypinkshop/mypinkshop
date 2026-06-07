@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link }react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 
 function AdminInventory() {
@@ -46,13 +46,16 @@ function AdminInventory() {
         else if (stock < 10) status = 'lowstock';
         else status = 'active';
         
+        // 🔥 FIXED: SKU properly map karo - multiple possible field names
+        const skuValue = product.sku || product.SKU || product.productCode || product.code || 'N/A';
+        
         return {
           ...product,
           id: product._id,
           stock: stock,
           price: product.price || product.sellingPrice || 0,
           status: product.status === 'active' ? status : 'inactive',
-          sku: product.sku || 'N/A'
+          sku: skuValue
         };
       });
       
@@ -376,8 +379,11 @@ function AdminInventory() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-500 text-[10px] sm:text-xs font-mono hidden sm:table-cell">
-                          {product.sku && product.sku !== 'N/A' ? product.sku.slice(-12) : 'N/A'}
+                        {/* 🔥 SKU - Now showing properly */}
+                        <td className="px-2 sm:px-4 py-2 sm:py-3">
+                          <span className="text-gray-500 text-[10px] sm:text-xs font-mono bg-gray-50 px-2 py-1 rounded-full block w-fit">
+                            {product.sku && product.sku !== 'N/A' ? product.sku : 'N/A'}
+                          </span>
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 hidden md:table-cell">
                           <span className="text-[10px] sm:text-xs bg-pink-50 text-pink-600 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full capitalize">
@@ -411,7 +417,6 @@ function AdminInventory() {
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                           <div className="flex justify-center gap-1 sm:gap-2">
-                            {/* 🔥 FIXED: Edit button - sahi route pe bhej raha hai */}
                             <Link to={`/admin/edit-product/${product.id}`} className="p-1 sm:p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
                               ✏️
                             </Link>
@@ -457,7 +462,7 @@ function AdminInventory() {
                 )}
                 <div>
                   <p className="font-semibold text-gray-800 text-sm sm:text-base">{productToDelete.name}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-400">SKU: {productToDelete.sku?.slice(-8) || 'N/A'}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-400">SKU: {productToDelete.sku || 'N/A'}</p>
                 </div>
               </div>
               <p className="text-gray-500 text-xs sm:text-sm mb-5 sm:mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
