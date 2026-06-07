@@ -183,6 +183,7 @@ const productSchema = new mongoose.Schema({
   gender: { type: String, default: 'unisex' },
   weight: { type: String, default: '' },
   dimensions: { type: String, default: '' },
+  ingredients: { type: String, default: '' },
   metaTitle: { type: String, default: '' },
   metaDescription: { type: String, default: '' },
   metaKeywords: { type: String, default: '' },
@@ -463,6 +464,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       gender: req.body.gender || 'unisex',
       weight: req.body.weight || '',
       dimensions: req.body.dimensions || '',
+      ingredients: req.body.ingredients || '',
       metaTitle: req.body.metaTitle || '',
       metaDescription: req.body.metaDescription || '',
       metaKeywords: req.body.metaKeywords || '',
@@ -858,7 +860,7 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// ========== 🔥 FULLY FIXED AMAZON IMPORT ROUTES ==========
+// ========== 🔥 FULLY FIXED AMAZON IMPORT (MRP + INGREDIENTS + WEIGHT) ==========
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -872,6 +874,7 @@ const scrapeAmazonProduct = async (url) => {
     
     const $ = cheerio.load(response.data);
     const pageText = $('body').text();
+    const html = response.data;
     
     // ========== PRODUCT NAME ==========
     const name = $('#productTitle').text().trim() || 'Unknown Product';
@@ -883,29 +886,53 @@ const scrapeAmazonProduct = async (url) => {
     const priceMatch = price.match(/[\d,]+/);
     const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
     
-    // ========== EXACT MRP DETECTION (IMPROVED) ==========
+    // ========== 🔥 EXACT MRP DETECTION - "M.R.P.: ₹XXX" PATTERN ==========
     let originalPrice = 0;
     
-    const mrpPatterns = [
-      () => $('#priceblock_wasprice').text(),
-      () => $('.a-text-strike').first().text(),
-      () => $('span.a-price.a-text-price span.a-offscreen').first().text(),
-      () => $('span.a-price.a-text-price').first().text().replace(/[^0-9]/g, ''),
-      () => pageText.match(/M\.?R\.?P[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
-      () => pageText.match(/Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
-      () => pageText.match(/Original Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
-      () => pageText.match(/List Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
-      () => pageText.match(/Was[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || ''
-    ];
+    // PATTERN 1: M.R.P.: ₹XXX (Most common in Amazon India)
+    const mrpPattern1 = html.match(/M\.?R\.?P\.?\s*:?\s*[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
+    if (mrpPattern1) {
+      originalPrice = parseInt(mrpPattern1[1].replace(/,/g, ''));
+    }
     
-    for (const pattern of mrpPatterns) {
-      const result = pattern();
-      if (result) {
-        const cleanPrice = result.toString().replace(/[^0-9]/g, '');
-        if (cleanPrice && parseInt(cleanPrice) > finalPrice) {
-          originalPrice = parseInt(cleanPrice);
-          break;
-        }
+    // PATTERN 2: M.R.P. ₹XXX (without colon)
+    if (!originalPrice) {
+      const mrpPattern2 = html.match(/M\.?R\.?P\.?\s+[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
+      if (mrpPattern2) {
+        originalPrice = parseInt(mrpPattern2[1].replace(/,/g, ''));
+      }
+    }
+    
+    // PATTERN 3: List Price: ₹XXX
+    if (!originalPrice) {
+      const listPriceMatch = html.match(/List Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
+      if (listPriceMatch) {
+        originalPrice = parseInt(listPriceMatch[1].replace(/,/g, ''));
+      }
+    }
+    
+    // PATTERN 4: Was: ₹XXX
+    if (!originalPrice) {
+      const wasPriceMatch = html.match(/Was[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
+      if (wasPriceMatch) {
+        originalPrice = parseInt(wasPriceMatch[1].replace(/,/g, ''));
+      }
+    }
+    
+    // PATTERN 5: Price: ₹XXX (only if > finalPrice)
+    if (!originalPrice) {
+      const priceMatch2 = html.match(/Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
+      if (priceMatch2) {
+        const p = parseInt(priceMatch2[1].replace(/,/g, ''));
+        if (p > finalPrice) originalPrice = p;
+      }
+    }
+    
+    // PATTERN 6: Deal price ke saath strike-through price
+    if (!originalPrice) {
+      const strikeMatch = html.match(/<span class="a-price a-text-price"[^>]*>.*?<span class="a-offscreen">[₹]?\s*(\d+(?:,\d+)?)<\/span>/i);
+      if (strikeMatch) {
+        originalPrice = parseInt(strikeMatch[1].replace(/,/g, ''));
       }
     }
     
@@ -923,7 +950,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== DESCRIPTION ==========
+    // ========== DESCRIPTION BULLET POINTS ==========
     let descriptionArray = [];
     $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small').each((i, el) => {
       let text = $(el).text().trim();
@@ -960,15 +987,32 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== WEIGHT EXTRACTION (IMPROVED) ==========
+    // ========== 🔥 INGREDIENTS EXTRACTION ==========
+    let ingredients = '';
+    const ingredientPatterns = [
+      () => html.match(/Ingredients[:\s]*([^<>.]+?)(?:\.|$)/i),
+      () => html.match(/Key Ingredients[:\s]*([^<>.]+?)(?:\.|$)/i),
+      () => html.match(/成分[:\s]*([^<>.]+)/i),
+      () => pageText.match(/Ingredients:\s*([^.]+)/i)
+    ];
+    
+    for (const pattern of ingredientPatterns) {
+      const match = pattern();
+      if (match && match[1] && match[1].length > 5 && match[1].length < 500) {
+        ingredients = match[1].trim();
+        break;
+      }
+    }
+    
+    // ========== WEIGHT EXTRACTION ==========
     let weight = '';
     const weightPatterns = [
-      () => pageText.match(/Item Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
-      () => pageText.match(/Product Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
-      () => pageText.match(/Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => html.match(/Item Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => html.match(/Product Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => html.match(/Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
       () => pageText.match(/Package Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
       () => pageText.match(/(\d+)\s*(g|ml|kg|gm)(?!\s*\/)/i),
-      () => pageText.match(/(\d+(?:\.\d+)?)\s*(?:g|gm|gram|grams|ml|mL)/i)
+      () => name.match(/(\d+)\s*(g|ml|kg|gm)/i)
     ];
     
     for (const pattern of weightPatterns) {
@@ -983,18 +1027,11 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    if (!weight) {
-      const nameWeightMatch = name.match(/(\d+)\s*(g|ml|kg|gm)/i);
-      if (nameWeightMatch) {
-        weight = `${nameWeightMatch[1]}${nameWeightMatch[2]}`;
-      }
-    }
-    
     // ========== DIMENSIONS EXTRACTION ==========
     let dimensions = '';
     const dimPatterns = [
-      () => pageText.match(/Product Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
-      () => pageText.match(/Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
+      () => html.match(/Product Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
+      () => html.match(/Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
       () => pageText.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\s*(?:cm|mm)/i)
     ];
     
@@ -1002,23 +1039,6 @@ const scrapeAmazonProduct = async (url) => {
       const match = pattern();
       if (match) {
         dimensions = `${match[1]} x ${match[2]} x ${match[3]} cm`;
-        break;
-      }
-    }
-    
-    // ========== ITEM TYPE NAME ==========
-    let itemTypeName = '';
-    const itemTypePatterns = [
-      () => $('th:contains("Item Type Name")').next('td').text().trim(),
-      () => $('th:contains("Item Type")').next('td').text().trim(),
-      () => $('th:contains("Product Type")').next('td').text().trim(),
-      () => $('th:contains("Manufacturer")').next('td').text().trim()
-    ];
-    
-    for (const pattern of itemTypePatterns) {
-      const result = pattern();
-      if (result && result.length > 2 && result.length < 50) {
-        itemTypeName = result;
         break;
       }
     }
@@ -1032,7 +1052,7 @@ const scrapeAmazonProduct = async (url) => {
     if (!brand) brand = $('#brand').text().trim();
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
     
-    // ========== VARIATIONS ==========
+    // ========== VARIATIONS EXTRACTION ==========
     let variations = [];
     
     $('table, .a-dynamic-list, .a-lineitem, [role="table"]').each((i, table) => {
@@ -1085,7 +1105,7 @@ const scrapeAmazonProduct = async (url) => {
     
     // ========== CATEGORY DETECTION ==========
     const detectCategory = (productName, productDesc) => {
-      const text = (productName + ' ' + productDesc + ' ' + itemTypeName).toLowerCase();
+      const text = (productName + ' ' + productDesc).toLowerCase();
       const categoryKeywords = {
         'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
         'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
@@ -1108,7 +1128,7 @@ const scrapeAmazonProduct = async (url) => {
     
     // ========== SUBCATEGORY DETECTION ==========
     const detectSubCategory = (productName, productDesc, category) => {
-      const text = (productName + ' ' + productDesc + ' ' + itemTypeName).toLowerCase();
+      const text = (productName + ' ' + productDesc).toLowerCase();
       const subCatMap = {
         'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
         'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
@@ -1136,11 +1156,10 @@ const scrapeAmazonProduct = async (url) => {
       keyFeatures: keyFeaturesArray.slice(0, 10),
       detectedCategory: detectedCategory,
       detectedSubCategory: detectedSubCategory,
-      itemTypeName: itemTypeName,
       variations: variations,
       weight: weight,
       dimensions: dimensions,
-      ingredients: '',
+      ingredients: ingredients,
       skinType: 'all',
       concerns: []
     };
