@@ -10,7 +10,7 @@ const AWS = require('aws-sdk');
 
 const app = express();
 
-// ========== CORS - MOST PERMISSIVE ==========
+// ========== CORS ==========
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
@@ -41,7 +41,7 @@ const s3 = new AWS.S3({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
 const PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
-// ========== Multer (Memory Storage for Vercel) ==========
+// ========== Multer ==========
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
@@ -879,14 +879,14 @@ const scrapeAmazonProduct = async (url) => {
     // ========== PRODUCT NAME ==========
     const name = $('#productTitle').text().trim() || 'Unknown Product';
     
-    // ========== PRICE (Selling Price) ==========
+    // ========== PRICE ==========
     let price = $('#priceblock_ourprice').text();
     if (!price) price = $('#priceblock_dealprice').text();
     if (!price) price = $('.a-price-whole').first().text();
     const priceMatch = price.match(/[\d,]+/);
     const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
     
-    // ========== EXACT MRP DETECTION ==========
+    // ========== MRP ==========
     let originalPrice = 0;
     const mrpMatch = html.match(/M\.?R\.?P\.?\s*:?\s*[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
     if (mrpMatch) {
@@ -949,7 +949,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== WEIGHT EXTRACTION ==========
+    // ========== WEIGHT ==========
     let weight = '';
     const weightMatch1 = html.match(/Item Weight\s*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
     if (weightMatch1) {
@@ -962,20 +962,52 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    // ========== INGREDIENTS EXTRACTION ==========
+    // ========== 🔥 IMPROVED INGREDIENTS ==========
     let ingredients = '';
-    const ingredientsMatch1 = html.match(/Active Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
-    if (ingredientsMatch1 && ingredientsMatch1[1]) {
+    
+    // Pattern 1: Active Ingredients
+    const ingredientsMatch1 = html.match(/Active Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br|\(|\)|\n)/i);
+    if (ingredientsMatch1 && ingredientsMatch1[1] && ingredientsMatch1[1].length > 5) {
       ingredients = ingredientsMatch1[1].trim();
     }
+    
+    // Pattern 2: Ingredients
     if (!ingredients) {
-      const ingredientsMatch2 = html.match(/Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
-      if (ingredientsMatch2 && ingredientsMatch2[1]) {
+      const ingredientsMatch2 = html.match(/Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br|\(|\)|\n)/i);
+      if (ingredientsMatch2 && ingredientsMatch2[1] && ingredientsMatch2[1].length > 5) {
         ingredients = ingredientsMatch2[1].trim();
       }
     }
+    
+    // Pattern 3: Key Ingredients
+    if (!ingredients) {
+      const ingredientsMatch3 = html.match(/Key Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br|\(|\)|\n)/i);
+      if (ingredientsMatch3 && ingredientsMatch3[1] && ingredientsMatch3[1].length > 5) {
+        ingredients = ingredientsMatch3[1].trim();
+      }
+    }
+    
+    // Pattern 4: Product detail table
+    if (!ingredients) {
+      $('table, .a-keyvalue, .product-detail-table').each((i, table) => {
+        $(table).find('tr').each((j, row) => {
+          const label = $(row).find('th, td:first-child').text().trim();
+          const value = $(row).find('td:last-child').text().trim();
+          if ((label.toLowerCase().includes('ingredient') || label.toLowerCase().includes('active')) && value && value.length > 5) {
+            ingredients = value;
+            return false;
+          }
+        });
+        if (ingredients) return false;
+      });
+    }
+    
+    // Clean ingredients
     if (ingredients && ingredients.length > 300) {
       ingredients = ingredients.substring(0, 300);
+    }
+    if (ingredients) {
+      ingredients = ingredients.replace(/see more|read more|click here/i, '').trim();
     }
     
     // ========== DIMENSIONS ==========
@@ -1045,11 +1077,11 @@ const scrapeAmazonProduct = async (url) => {
     variations = variations.filter((v, i, self) => i === self.findIndex((t) => t.name === v.name));
     variations = variations.slice(0, 15);
     
-    // ========== 🔥 CATEGORY DETECTION - MAKEUP PRIORITY ==========
+    // ========== CATEGORY DETECTION ==========
     const detectCategory = (productName, productDesc, keyFeatures) => {
       const text = `${productName} ${productDesc} ${keyFeatures.join(' ')}`.toLowerCase();
       
-      // MAKEUP KEYWORDS
+      // MAKEUP FIRST
       const makeupKeywords = [
         'lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 
         'highlighter', 'concealer', 'primer', 'compact', 'lip gloss', 'lip liner',
@@ -1058,14 +1090,11 @@ const scrapeAmazonProduct = async (url) => {
         'eyebrow', 'eye pencil', 'kohl', 'face powder', 'loose powder',
         'compact powder', 'color corrector', 'makeup fixer'
       ];
-      
       for (const keyword of makeupKeywords) {
-        if (text.includes(keyword)) {
-          return 'Makeup';
-        }
+        if (text.includes(keyword)) return 'Makeup';
       }
       
-      // SKINCARE KEYWORDS
+      // SKINCARE SECOND
       const skincareKeywords = [
         'face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 
         'lotion', 'toner', 'mask', 'eye cream', 'scrub', 'face cream', 
@@ -1073,26 +1102,23 @@ const scrapeAmazonProduct = async (url) => {
         'niacinamide', 'acne', 'pimple', 'spot treatment', 'face mist',
         'lip balm', 'facial oil'
       ];
-      
       for (const keyword of skincareKeywords) {
-        if (text.includes(keyword)) {
-          return 'Skincare';
-        }
+        if (text.includes(keyword)) return 'Skincare';
       }
       
-      // HAIR KEYWORDS
+      // HAIR THIRD
       const hairKeywords = ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'];
       for (const keyword of hairKeywords) {
         if (text.includes(keyword)) return 'Hair';
       }
       
-      // CLOTHING KEYWORDS
+      // CLOTHING FOURTH
       const clothingKeywords = ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'];
       for (const keyword of clothingKeywords) {
         if (text.includes(keyword)) return 'Clothing';
       }
       
-      // ACCESSORIES KEYWORDS
+      // ACCESSORIES FIFTH
       const accessoriesKeywords = ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings'];
       for (const keyword of accessoriesKeywords) {
         if (text.includes(keyword)) return 'Accessories';
@@ -1125,7 +1151,7 @@ const scrapeAmazonProduct = async (url) => {
     
     const detectedSubCategory = detectSubCategory(name, descriptionText, detectedCategory);
     
-    // ========== RETURN COMPLETE DATA ==========
+    // ========== RETURN ==========
     return {
       name,
       brand: brand || '',
