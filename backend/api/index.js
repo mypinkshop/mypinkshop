@@ -860,7 +860,7 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// ========== 🔥 FINAL FIXED AMAZON IMPORT (Exact Patterns) ==========
+// ========== 🔥 FULLY FIXED AMAZON IMPORT ==========
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -888,21 +888,16 @@ const scrapeAmazonProduct = async (url) => {
     
     // ========== EXACT MRP DETECTION ==========
     let originalPrice = 0;
-    
-    // Pattern: M.R.P.: ₹XXX or M.R.P. ₹XXX
     const mrpMatch = html.match(/M\.?R\.?P\.?\s*:?\s*[₹]?\s*(\d+(?:,\d+)?(?:\.\d+)?)/i);
     if (mrpMatch) {
       originalPrice = parseInt(mrpMatch[1].replace(/,/g, ''));
     }
-    
-    // Pattern: List Price:
     if (!originalPrice) {
       const listMatch = html.match(/List Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i);
       if (listMatch) {
         originalPrice = parseInt(listMatch[1].replace(/,/g, ''));
       }
     }
-    
     if (originalPrice === 0 || originalPrice <= finalPrice) {
       originalPrice = Math.round(finalPrice * 1.2);
     }
@@ -954,32 +949,12 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // ========== 🔥 WEIGHT EXTRACTION - Exact "Item Weight" Pattern ==========
+    // ========== WEIGHT EXTRACTION ==========
     let weight = '';
-    
-    // Pattern 1: Item Weight : 250 g (with spaces)
     const weightMatch1 = html.match(/Item Weight\s*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
     if (weightMatch1) {
       weight = `${weightMatch1[1]}${weightMatch1[2] === 'gram' || weightMatch1[2] === 'grams' ? 'g' : weightMatch1[2]}`;
     }
-    
-    // Pattern 2: Item Weight ‏: 250 g (with special char)
-    if (!weight) {
-      const weightMatch2 = html.match(/Item Weight\s*[‏]*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
-      if (weightMatch2) {
-        weight = `${weightMatch2[1]}${weightMatch2[2] === 'gram' || weightMatch2[2] === 'grams' ? 'g' : weightMatch2[2]}`;
-      }
-    }
-    
-    // Pattern 3: Product Weight
-    if (!weight) {
-      const weightMatch3 = html.match(/Product Weight\s*:?\s*([\d.]+)\s*(g|kg|gm|gram|grams)/i);
-      if (weightMatch3) {
-        weight = `${weightMatch3[1]}${weightMatch3[2] === 'gram' || weightMatch3[2] === 'grams' ? 'g' : weightMatch3[2]}`;
-      }
-    }
-    
-    // Pattern 4: From product name
     if (!weight) {
       const nameWeight = name.match(/(\d+)\s*(g|ml|kg|gm)/i);
       if (nameWeight) {
@@ -987,48 +962,18 @@ const scrapeAmazonProduct = async (url) => {
       }
     }
     
-    // ========== 🔥 INGREDIENTS EXTRACTION - Exact "Active Ingredients" Pattern ==========
+    // ========== INGREDIENTS EXTRACTION ==========
     let ingredients = '';
-    
-    // Pattern 1: Active Ingredients: xxx
     const ingredientsMatch1 = html.match(/Active Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
     if (ingredientsMatch1 && ingredientsMatch1[1]) {
       ingredients = ingredientsMatch1[1].trim();
     }
-    
-    // Pattern 2: Ingredients: xxx
     if (!ingredients) {
       const ingredientsMatch2 = html.match(/Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
       if (ingredientsMatch2 && ingredientsMatch2[1]) {
         ingredients = ingredientsMatch2[1].trim();
       }
     }
-    
-    // Pattern 3: Key Ingredients: xxx
-    if (!ingredients) {
-      const ingredientsMatch3 = html.match(/Key Ingredients\s*:?\s*([^<>.]+?)(?:\.|$|<br)/i);
-      if (ingredientsMatch3 && ingredientsMatch3[1]) {
-        ingredients = ingredientsMatch3[1].trim();
-      }
-    }
-    
-    // Pattern 4: From detail table
-    if (!ingredients) {
-      $('table').each((i, table) => {
-        const tableHtml = $(table).html();
-        if (tableHtml && (tableHtml.includes('Ingredients') || tableHtml.includes('Active'))) {
-          $(table).find('tr').each((j, row) => {
-            const label = $(row).find('th, td:first-child').text().trim();
-            const value = $(row).find('td:last-child').text().trim();
-            if ((label.includes('Ingredients') || label.includes('Active')) && value && value.length > 5) {
-              ingredients = value;
-            }
-          });
-        }
-      });
-    }
-    
-    // Limit ingredients length
     if (ingredients && ingredients.length > 300) {
       ingredients = ingredients.substring(0, 300);
     }
@@ -1100,39 +1045,77 @@ const scrapeAmazonProduct = async (url) => {
     variations = variations.filter((v, i, self) => i === self.findIndex((t) => t.name === v.name));
     variations = variations.slice(0, 15);
     
-    // ========== CATEGORY DETECTION ==========
-    const detectCategory = (productName, productDesc) => {
-      const text = (productName + ' ' + productDesc).toLowerCase();
-      const categoryKeywords = {
-        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
-        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
-        'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
-        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
-      };
-      const order = ['Makeup', 'Skincare', 'Hair', 'Clothing', 'Accessories'];
-      for (const cat of order) {
-        const keywords = categoryKeywords[cat];
-        for (const keyword of keywords) {
-          if (text.includes(keyword)) return cat;
+    // ========== 🔥 CATEGORY DETECTION - MAKEUP PRIORITY ==========
+    const detectCategory = (productName, productDesc, keyFeatures) => {
+      const text = `${productName} ${productDesc} ${keyFeatures.join(' ')}`.toLowerCase();
+      
+      // MAKEUP KEYWORDS
+      const makeupKeywords = [
+        'lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 
+        'highlighter', 'concealer', 'primer', 'compact', 'lip gloss', 'lip liner',
+        'eyeliner', 'bronzer', 'contour', 'setting spray', 'makeup remover', 
+        'bb cream', 'cc cream', 'lip stain', 'lip oil', 'lip plumper',
+        'eyebrow', 'eye pencil', 'kohl', 'face powder', 'loose powder',
+        'compact powder', 'color corrector', 'makeup fixer'
+      ];
+      
+      for (const keyword of makeupKeywords) {
+        if (text.includes(keyword)) {
+          return 'Makeup';
         }
       }
+      
+      // SKINCARE KEYWORDS
+      const skincareKeywords = [
+        'face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 
+        'lotion', 'toner', 'mask', 'eye cream', 'scrub', 'face cream', 
+        'night cream', 'day cream', 'vitamin c', 'retinol', 'hyaluronic', 
+        'niacinamide', 'acne', 'pimple', 'spot treatment', 'face mist',
+        'lip balm', 'facial oil'
+      ];
+      
+      for (const keyword of skincareKeywords) {
+        if (text.includes(keyword)) {
+          return 'Skincare';
+        }
+      }
+      
+      // HAIR KEYWORDS
+      const hairKeywords = ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'];
+      for (const keyword of hairKeywords) {
+        if (text.includes(keyword)) return 'Hair';
+      }
+      
+      // CLOTHING KEYWORDS
+      const clothingKeywords = ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'];
+      for (const keyword of clothingKeywords) {
+        if (text.includes(keyword)) return 'Clothing';
+      }
+      
+      // ACCESSORIES KEYWORDS
+      const accessoriesKeywords = ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings'];
+      for (const keyword of accessoriesKeywords) {
+        if (text.includes(keyword)) return 'Accessories';
+      }
+      
       return 'Skincare';
     };
     
     const descriptionText = descriptionArray.join(' ');
-    const detectedCategory = detectCategory(name, descriptionText);
+    const detectedCategory = detectCategory(name, descriptionText, keyFeaturesArray);
     
     // ========== SUBCATEGORY DETECTION ==========
     const detectSubCategory = (productName, productDesc, category) => {
-      const text = (productName + ' ' + productDesc).toLowerCase();
+      const text = `${productName} ${productDesc}`.toLowerCase();
+      
       const subCatMap = {
         'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
         'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
-        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff'],
-        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Skirt', 'Blouse'],
-        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace']
+        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
       };
+      
       const subCats = subCatMap[category] || [];
       for (const sub of subCats) {
         if (text.includes(sub.toLowerCase())) return sub;
