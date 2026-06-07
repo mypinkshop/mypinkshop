@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
 // ============================================
-// AMAZON IMPORTER COMPONENT (FIXED)
+// AMAZON IMPORTER COMPONENT (FIXED - Category Detection)
 // ============================================
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -30,6 +30,49 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       if (text.toLowerCase().includes(word.toLowerCase())) return true;
     }
     return false;
+  };
+
+  // 🔥 IMPROVED: Better category detection from product name
+  const detectCategoryFromName = (productName) => {
+    const name = productName.toLowerCase();
+    
+    const categoryKeywords = {
+      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub', 'face cream', 'night cream', 'day cream', 'spot treatment', 'acne', 'pimple', 'vitamin c', 'retinol', 'hyaluronic', 'niacinamide'],
+      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss', 'lip liner', 'eyeliner', 'bronzer', 'contour', 'setting spray', 'makeup remover', 'bb cream', 'cc cream', 'lip stain'],
+      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall', 'hair growth', 'dry shampoo', 'leave in', 'hair cream', 'hair butter', 'scalp', 'curly hair', 'anti dandruff'],
+      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga', 'gown', 'skirt', 'blouse', 'kurta', 'salwar', 'leggings', 'joggers', 'hoodie', 'sweater', 'cardigan', 'ethnic', 'western'],
+      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings', 'necklace', 'bracelet', 'ring', 'hair band', 'scrunchie', 'cap', 'hat', 'handbag', 'tote', 'backpack']
+    };
+    
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      for (const keyword of keywords) {
+        if (name.includes(keyword)) {
+          return category;
+        }
+      }
+    }
+    return 'Skincare'; // Default
+  };
+
+  // 🔥 IMPROVED: Better subcategory detection
+  const detectSubCategoryFromName = (productName, category) => {
+    const name = productName.toLowerCase();
+    
+    const subCategoryMap = {
+      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm', 'Night Cream', 'Day Cream', 'Acne Treatment', 'Spot Corrector'],
+      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss', 'Eyeliner', 'Setting Spray'],
+      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff', 'Hair Fall Control', 'Hair Growth Serum'],
+      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Skirt', 'Blouse', 'Kurta', 'Leggings'],
+      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace', 'Bracelet']
+    };
+    
+    const subCats = subCategoryMap[category] || [];
+    for (const sub of subCats) {
+      if (name.includes(sub.toLowerCase())) {
+        return sub;
+      }
+    }
+    return ''; // Will let user select manually
   };
 
   const addUrlField = () => {
@@ -71,7 +114,16 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 
         const data = await response.json();
         if (data.success) {
-          results.push({ ...data.scraped, originalUrl: url });
+          // 🔥 FIX: Detect category immediately
+          const detectedCat = detectCategoryFromName(data.scraped.name);
+          const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
+          
+          results.push({ 
+            ...data.scraped, 
+            originalUrl: url,
+            detectedCategory: detectedCat,
+            detectedSubCategory: detectedSub
+          });
         } else {
           results.push({ error: data.error, originalUrl: url });
         }
@@ -82,49 +134,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 
     setImportedProducts(results);
     setLoading(false);
-  };
-
-  // 🔥 FIXED: Detect category from product name
-  const detectCategoryFromName = (productName) => {
-    const name = productName.toLowerCase();
-    
-    const categoryKeywords = {
-      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
-      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
-      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga', 'gown'],
-      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings', 'necklace']
-    };
-    
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      for (const keyword of keywords) {
-        if (name.includes(keyword)) {
-          return category;
-        }
-      }
-    }
-    return 'Skincare';
-  };
-
-  // 🔥 FIXED: Detect subcategory from product name
-  const detectSubCategoryFromName = (productName, category) => {
-    const name = productName.toLowerCase();
-    
-    const subCategoryMap = {
-      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
-      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact'],
-      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff'],
-      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Shorts', 'Skirt'],
-      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace']
-    };
-    
-    const subCats = subCategoryMap[category] || [];
-    for (const sub of subCats) {
-      if (name.includes(sub.toLowerCase())) {
-        return sub;
-      }
-    }
-    return '';
   };
 
   const importToForm = (product) => {
@@ -163,7 +172,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     const keywords = [product.brand, ...keyFeaturesArray].filter(Boolean);
     const metaKeywords = keywords.join(', ');
     
-    // 🔥 Detect category from product name if not provided
+    // 🔥 Use detected category (now available from fetch)
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
     
@@ -211,7 +220,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       setVariations(formattedVariations);
     }
     
-    alert(`✅ Imported ${descriptionArray.length} bullet points | Category: ${detectedCategory}`);
+    alert(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''} | ${descriptionArray.length} bullet points`);
     if (onProductImported) onProductImported();
   };
 
@@ -266,7 +275,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
                   ) : (
                     <>
                       <p className="font-medium text-gray-800 text-xs sm:text-sm truncate">{product.name}</p>
-                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'}</p>
+                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'} | 🏷️ {product.detectedCategory || detectCategoryFromName(product.name)}</p>
                     </>
                   )}
                 </div>
@@ -282,7 +291,132 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       )}
       
       <div className="mt-3 p-2 sm:p-3 bg-blue-50 rounded-lg">
-        <p className="text-xs text-blue-600">💡 Tip: Paste up to 20 Amazon URLs. Category and SubCategory will be auto-detected!</p>
+        <p className="text-xs text-blue-600">💡 Tip: Category and SubCategory auto-detected from product name!</p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// VARIATION SELECT WITH SEARCH AND CUSTOM INPUT
+// ============================================
+const VariationSelectWithSearch = ({ 
+  label, 
+  options, 
+  value, 
+  onChange, 
+  placeholder = "Select or type..." 
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+  
+  const filteredOptions = options.filter(opt => 
+    opt.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const handleSelect = (selectedValue) => {
+    if (selectedValue === '__CUSTOM__') {
+      setIsCustomMode(true);
+      setCustomValue('');
+    } else {
+      onChange(selectedValue);
+      setSearchTerm('');
+      setIsCustomMode(false);
+    }
+  };
+  
+  const handleSaveCustom = () => {
+    if (customValue.trim()) {
+      onChange(customValue.trim());
+      setIsCustomMode(false);
+      setCustomValue('');
+      setSearchTerm('');
+    }
+  };
+  
+  if (isCustomMode) {
+    return (
+      <div>
+        <label className="block text-sm font-medium mb-1.5">{label}</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customValue}
+            onChange={(e) => setCustomValue(e.target.value)}
+            placeholder="Enter custom value..."
+            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
+            autoFocus
+          />
+          <button
+            onClick={handleSaveCustom}
+            className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => setIsCustomMode(false)}
+            className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        </div>
+        {value && !isCustomMode && (
+          <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200">
+            ✓ Current: {value}
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5">{label}</label>
+      <div className="relative">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder={placeholder}
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
+        />
+        {searchTerm && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => handleSelect(opt)}
+                  className="w-full text-left px-3 py-2 hover:bg-pink-50 text-sm transition"
+                >
+                  {opt}
+                  {value === opt && <span className="float-right text-green-500">✓</span>}
+                </button>
+              ))
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSelect('__CUSTOM__')}
+                className="w-full text-left px-3 py-2 text-pink-600 hover:bg-pink-50 text-sm border-t"
+              >
+                + Add custom "{searchTerm}"
+              </button>
+            )}
+          </div>
+        )}
+        {value && !searchTerm && (
+          <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200 flex justify-between items-center">
+            <span>✓ Selected: {value}</span>
+            <button 
+              onClick={() => setIsCustomMode(true)}
+              className="text-xs text-blue-500 hover:text-blue-700"
+            >
+              Change
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -415,17 +549,17 @@ function AdminAddProduct() {
   const getVariationAttributes = () => {
     switch(formData.category) {
       case 'Skincare': 
-        return { type: 'size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml', 'Custom'], secondary: 'variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic', 'Custom'] };
+        return { type: 'Size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic'] };
       case 'Makeup': 
-        return { type: 'shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry', 'Custom'], secondary: 'finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Custom'] };
+        return { type: 'Shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry'], secondary: 'Finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'] };
       case 'Hair': 
-        return { type: 'size', options: ['100ml', '200ml', '300ml', '500ml', '1L', 'Custom'], secondary: 'variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free', 'Custom'] };
+        return { type: 'Size', options: ['100ml', '200ml', '300ml', '500ml', '1L'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free'] };
       case 'Clothing': 
-        return { type: 'size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size', 'Custom'], secondary: 'color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey', 'Custom'] };
+        return { type: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'], secondary: 'Color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey'] };
       case 'Accessories': 
-        return { type: 'size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable', 'Custom'], secondary: 'color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor', 'Custom'] };
+        return { type: 'Size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable'], secondary: 'Color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor'] };
       default: 
-        return { type: 'variant', options: ['Default', 'Custom'], secondary: null, secondaryOptions: [] };
+        return { type: 'Variant', options: ['Default'], secondary: null, secondaryOptions: [] };
     }
   };
 
@@ -704,7 +838,6 @@ function AdminAddProduct() {
 
   const currentSubCategories = getCurrentSubCategories();
 
-  // 🔥 Category Specific JSX
   const renderCategorySpecificFields = () => {
     switch(formData.category) {
       case 'Skincare':
@@ -1055,7 +1188,7 @@ function AdminAddProduct() {
                   </div>
                 </div>
 
-                {/* Variations Section */}
+                {/* Variations Section - UPDATED WITH SEARCH */}
                 <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                     <div><h3 className="font-semibold text-gray-800">Product Variations</h3><p className="text-xs text-gray-500 mt-0.5">{!formData.category && 'Select a category first'}</p></div>
@@ -1064,10 +1197,10 @@ function AdminAddProduct() {
                   
                   {!formData.category ? <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first</p></div>
                   : variations.length === 0 ? <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet.</p></div>
-                  : <div className="overflow-x-auto"><table className="w-full text-xs sm:text-sm"><thead className="bg-gray-50 border-b border-gray-200"><tr><th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.type}</th>{variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.secondary}</th>}<th className="px-2 sm:px-3 py-2 text-right">Price</th><th className="px-2 sm:px-3 py-2 text-right">MRP</th><th className="px-2 sm:px-3 py-2 text-right">Stock</th><th className="px-2 sm:px-3 py-2 text-left">SKU</th><th className="px-2 sm:px-3 py-2 text-center">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{variations.map(v => (<tr key={v.id} className="hover:bg-pink-50/30"><td className="px-2 sm:px-3 py-2 font-medium">{v.name}</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2">{v.secondaryName || '-'}<tr>}<td className="px-2 sm:px-3 py-2 text-right text-pink-600">₹{v.price}</td><td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{v.mrp || v.price * 1.2}</td><td className="px-2 sm:px-3 py-2 text-right">{v.stock}</td><td className="px-2 sm:px-3 py-2 text-xs font-mono">{v.sku}</td><td className="px-2 sm:px-3 py-2 text-center"><div className="flex justify-center gap-2"><button onClick={() => editVariation(v)} className="text-blue-500">✏️</button><button onClick={() => deleteVariation(v.id)} className="text-red-500">🗑️</button></div></td></tr>))}</tbody><tfoot className="bg-gray-50 border-t border-gray-200"><tr><td className="px-2 sm:px-3 py-2 font-medium">Total</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2"></td>}<td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td><td className="px-2 sm:px-3 py-2 text-right"></td><td className="px-2 sm:px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td><td colSpan="2"></td></tr></tfoot></tr></div>}
+                  : <div className="overflow-x-auto"><table className="w-full text-xs sm:text-sm"><thead className="bg-gray-50 border-b border-gray-200"><tr><th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.type}</th>{variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.secondary}</th>}<th className="px-2 sm:px-3 py-2 text-right">Price</th><th className="px-2 sm:px-3 py-2 text-right">MRP</th><th className="px-2 sm:px-3 py-2 text-right">Stock</th><th className="px-2 sm:px-3 py-2 text-left">SKU</th><th className="px-2 sm:px-3 py-2 text-center">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{variations.map(v => (<tr key={v.id} className="hover:bg-pink-50/30"><td className="px-2 sm:px-3 py-2 font-medium">{v.name}</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2">{v.secondaryName || '-'}</td>}<td className="px-2 sm:px-3 py-2 text-right text-pink-600">₹{v.price}</td><td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{v.mrp || v.price * 1.2}</td><td className="px-2 sm:px-3 py-2 text-right">{v.stock}</td><td className="px-2 sm:px-3 py-2 text-xs font-mono">{v.sku}</td><td className="px-2 sm:px-3 py-2 text-center"><div className="flex justify-center gap-2"><button onClick={() => editVariation(v)} className="text-blue-500">✏️</button><button onClick={() => deleteVariation(v.id)} className="text-red-500">🗑️</button></div></td></tr>))}</tbody><tfoot className="bg-gray-50 border-t border-gray-200"><tr><td className="px-2 sm:px-3 py-2 font-medium">Total</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2"></td>}<td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td><td className="px-2 sm:px-3 py-2 text-right"></td><td className="px-2 sm:px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td><td colSpan="2"></td></tr></tfoot></table></div>}
                 </div>
 
-                {/* 🔥 Variation Modal with Custom Value Display */}
+                {/* 🔥 UPDATED Variation Modal with Search */}
                 {variationModalOpen && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
                     <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1077,65 +1210,24 @@ function AdminAddProduct() {
                       </div>
                       
                       <div className="p-4 sm:p-5 space-y-4">
-                        {/* Primary Option with Custom */}
-                        <div>
-                          <label className="block text-sm font-medium mb-1.5">{variationAttrs.type} *</label>
-                          <div className="flex gap-2">
-                            <select 
-                              value={variationForm.name} 
-                              onChange={(e) => {
-                                if (e.target.value === 'Custom') {
-                                  const customValue = prompt(`Enter custom ${variationAttrs.type}:`);
-                                  if (customValue && customValue.trim()) {
-                                    setVariationForm({...variationForm, name: customValue.trim()});
-                                  }
-                                } else {
-                                  setVariationForm({...variationForm, name: e.target.value});
-                                }
-                              }} 
-                              className="flex-1 border rounded-lg px-3 py-2 text-sm bg-white"
-                            >
-                              <option value="">Select {variationAttrs.type}</option>
-                              {variationAttrs.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          </div>
-                          {/* 🔥 Show custom value if entered */}
-                          {variationForm.name && !variationAttrs.options.includes(variationForm.name) && (
-                            <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200">
-                              ✓ Custom: {variationForm.name}
-                            </div>
-                          )}
-                        </div>
+                        {/* Primary Option with Search */}
+                        <VariationSelectWithSearch 
+                          label={`${variationAttrs.type} *`}
+                          options={variationAttrs.options}
+                          value={variationForm.name}
+                          onChange={(val) => setVariationForm({...variationForm, name: val})}
+                          placeholder={`Search or type custom ${variationAttrs.type.toLowerCase()}...`}
+                        />
                         
-                        {/* Secondary Option with Custom */}
+                        {/* Secondary Option with Search */}
                         {variationAttrs.secondary && (
-                          <div>
-                            <label className="block text-sm font-medium mb-1.5">{variationAttrs.secondary}</label>
-                            <div className="flex gap-2">
-                              <select 
-                                value={variationForm.attributes.secondary || ''} 
-                                onChange={(e) => {
-                                  if (e.target.value === 'Custom') {
-                                    const customValue = prompt(`Enter custom ${variationAttrs.secondary}:`);
-                                    if (customValue && customValue.trim()) {
-                                      setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: customValue.trim()}});
-                                    }
-                                  } else {
-                                    setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: e.target.value}});
-                                  }
-                                }} 
-                                className="flex-1 border rounded-lg px-3 py-2 text-sm bg-white"
-                              >
-                                <option value="">Select {variationAttrs.secondary}</option>
-                                {variationAttrs.secondaryOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                            {variationForm.attributes.secondary && !variationAttrs.secondaryOptions.includes(variationForm.attributes.secondary) && (
-                              <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200">
-                                ✓ Custom: {variationForm.attributes.secondary}
-                              </div>
-                            )}
-                          </div>
+                          <VariationSelectWithSearch 
+                            label={variationAttrs.secondary}
+                            options={variationAttrs.secondaryOptions}
+                            value={variationForm.attributes.secondary || ''}
+                            onChange={(val) => setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: val}})}
+                            placeholder={`Search or type custom ${variationAttrs.secondary.toLowerCase()}...`}
+                          />
                         )}
                         
                         {/* Price, MRP, Stock, SKU */}
@@ -1167,7 +1259,7 @@ function AdminAddProduct() {
                   </div>
                 )}
 
-                {/* 🔥 Category Specific Fields */}
+                {/* Category Specific Fields */}
                 {renderCategorySpecificFields()}
 
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6 sm:mt-8 pt-4 border-t">
