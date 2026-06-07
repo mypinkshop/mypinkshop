@@ -858,7 +858,7 @@ app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// ========== 🔥 FULLY UPGRADED AMAZON IMPORT ROUTES ==========
+// ========== 🔥 FULLY FIXED AMAZON IMPORT ROUTES ==========
 const scrapeAmazonProduct = async (url) => {
   try {
     const response = await axios.get(url, {
@@ -871,20 +871,49 @@ const scrapeAmazonProduct = async (url) => {
     });
     
     const $ = cheerio.load(response.data);
+    const pageText = $('body').text();
     
+    // ========== PRODUCT NAME ==========
     const name = $('#productTitle').text().trim() || 'Unknown Product';
     
+    // ========== PRICE (Selling Price) ==========
     let price = $('#priceblock_ourprice').text();
     if (!price) price = $('#priceblock_dealprice').text();
     if (!price) price = $('.a-price-whole').first().text();
     const priceMatch = price.match(/[\d,]+/);
     const finalPrice = priceMatch ? parseInt(priceMatch[0].replace(/,/g, '')) : 0;
     
-    let originalPrice = $('#priceblock_wasprice').text();
-    if (!originalPrice) originalPrice = $('.a-text-strike').first().text();
-    const originalMatch = originalPrice.match(/[\d,]+/);
-    const finalOriginalPrice = originalMatch ? parseInt(originalMatch[0].replace(/,/g, '')) : 0;
+    // ========== EXACT MRP DETECTION (IMPROVED) ==========
+    let originalPrice = 0;
     
+    const mrpPatterns = [
+      () => $('#priceblock_wasprice').text(),
+      () => $('.a-text-strike').first().text(),
+      () => $('span.a-price.a-text-price span.a-offscreen').first().text(),
+      () => $('span.a-price.a-text-price').first().text().replace(/[^0-9]/g, ''),
+      () => pageText.match(/M\.?R\.?P[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
+      () => pageText.match(/Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
+      () => pageText.match(/Original Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
+      () => pageText.match(/List Price[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || '',
+      () => pageText.match(/Was[:\s]*[₹]?\s*(\d+(?:,\d+)?)/i)?.[1] || ''
+    ];
+    
+    for (const pattern of mrpPatterns) {
+      const result = pattern();
+      if (result) {
+        const cleanPrice = result.toString().replace(/[^0-9]/g, '');
+        if (cleanPrice && parseInt(cleanPrice) > finalPrice) {
+          originalPrice = parseInt(cleanPrice);
+          break;
+        }
+      }
+    }
+    
+    if (originalPrice === 0 || originalPrice <= finalPrice) {
+      originalPrice = Math.round(finalPrice * 1.2);
+    }
+    
+    // ========== IMAGES ==========
     const images = [];
     $('#imgTagWrapperId img, .a-dynamic-image, #landingImage').each((i, el) => {
       let src = $(el).attr('src') || $(el).attr('data-old-hires');
@@ -894,6 +923,7 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
+    // ========== DESCRIPTION ==========
     let descriptionArray = [];
     $('#feature-bullets .a-list-item, #feature-bullets .a-spacing-small').each((i, el) => {
       let text = $(el).text().trim();
@@ -918,6 +948,7 @@ const scrapeAmazonProduct = async (url) => {
     }
     descriptionArray = [...new Set(descriptionArray)];
     
+    // ========== KEY FEATURES ==========
     let keyFeaturesArray = [];
     $('#feature-bullets .a-list-item').each((i, el) => {
       let text = $(el).text().trim();
@@ -929,18 +960,70 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Weight extraction
+    // ========== WEIGHT EXTRACTION (IMPROVED) ==========
     let weight = '';
-    const weightPattern = /(?:Weight|Item Weight|Product Weight)[:\s]*([\d.]+)\s*(g|kg|ml|gm)/i;
-    const weightMatch = $('body').text().match(weightPattern);
-    if (weightMatch) {
-      weight = weightMatch[1] + weightMatch[2];
-    }
-    if (!weight) {
-      const sizeMatch = $('body').text().match(/(\d+)\s*(g|ml|kg|gm)(?!\s*\/)/i);
-      if (sizeMatch) weight = sizeMatch[1] + sizeMatch[2];
+    const weightPatterns = [
+      () => pageText.match(/Item Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => pageText.match(/Product Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => pageText.match(/Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => pageText.match(/Package Weight[:\s]*([\d.]+)\s*(g|kg|gm|gram|grams)/i),
+      () => pageText.match(/(\d+)\s*(g|ml|kg|gm)(?!\s*\/)/i),
+      () => pageText.match(/(\d+(?:\.\d+)?)\s*(?:g|gm|gram|grams|ml|mL)/i)
+    ];
+    
+    for (const pattern of weightPatterns) {
+      const match = pattern();
+      if (match && match[1]) {
+        let value = match[1];
+        let unit = match[2] || 'g';
+        if (unit === 'gram' || unit === 'grams') unit = 'g';
+        if (unit === 'milliliter' || unit === 'millilitre') unit = 'ml';
+        weight = `${value}${unit}`;
+        break;
+      }
     }
     
+    if (!weight) {
+      const nameWeightMatch = name.match(/(\d+)\s*(g|ml|kg|gm)/i);
+      if (nameWeightMatch) {
+        weight = `${nameWeightMatch[1]}${nameWeightMatch[2]}`;
+      }
+    }
+    
+    // ========== DIMENSIONS EXTRACTION ==========
+    let dimensions = '';
+    const dimPatterns = [
+      () => pageText.match(/Product Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
+      () => pageText.match(/Dimensions[:\s]*([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*(?:cm|mm|inch)/i),
+      () => pageText.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*(\d+)\s*(?:cm|mm)/i)
+    ];
+    
+    for (const pattern of dimPatterns) {
+      const match = pattern();
+      if (match) {
+        dimensions = `${match[1]} x ${match[2]} x ${match[3]} cm`;
+        break;
+      }
+    }
+    
+    // ========== ITEM TYPE NAME ==========
+    let itemTypeName = '';
+    const itemTypePatterns = [
+      () => $('th:contains("Item Type Name")').next('td').text().trim(),
+      () => $('th:contains("Item Type")').next('td').text().trim(),
+      () => $('th:contains("Product Type")').next('td').text().trim(),
+      () => $('th:contains("Manufacturer")').next('td').text().trim()
+    ];
+    
+    for (const pattern of itemTypePatterns) {
+      const result = pattern();
+      if (result && result.length > 2 && result.length < 50) {
+        itemTypeName = result;
+        break;
+      }
+    }
+    
+    // ========== BRAND ==========
     let brand = '';
     const bylineText = $('#bylineInfo').text().trim();
     if (bylineText) {
@@ -949,11 +1032,9 @@ const scrapeAmazonProduct = async (url) => {
     if (!brand) brand = $('#brand').text().trim();
     if (!brand && name.includes('-')) brand = name.split('-')[0].trim();
     
-    // ========== VARIATIONS EXTRACTION ==========
+    // ========== VARIATIONS ==========
     let variations = [];
-    const pageText = $('body').text();
     
-    // Method 1: Tables
     $('table, .a-dynamic-list, .a-lineitem, [role="table"]').each((i, table) => {
       const tableText = $(table).text();
       if (tableText.match(/(\d+\s*(g|ml|kg|gm))/i)) {
@@ -963,13 +1044,13 @@ const scrapeAmazonProduct = async (url) => {
           const priceMatches = rowText.match(/₹(\d+(?:,\d+)?)/g);
           if (sizeMatches) {
             sizeMatches.forEach((size, idx) => {
-              let price = finalPrice;
+              let priceVal = finalPrice;
               if (priceMatches && priceMatches[idx]) {
-                price = parseInt(priceMatches[idx].replace(/[₹,]/g, ''));
+                priceVal = parseInt(priceMatches[idx].replace(/[₹,]/g, ''));
               }
               if (!variations.find(v => v.name === size) && 
                   !size.match(/buy|cart|subscribe|offer|click|view/i)) {
-                variations.push({ name: size, price: price, mrp: Math.round(price * 1.2), stock: 10 });
+                variations.push({ name: size, price: priceVal, mrp: Math.round(priceVal * 1.2), stock: 10 });
               }
             });
           }
@@ -977,7 +1058,6 @@ const scrapeAmazonProduct = async (url) => {
       }
     });
     
-    // Method 2: Select dropdowns
     $('select[name*="size"], select[name*="variation"]').each((i, select) => {
       $(select).find('option').each((j, option) => {
         let optText = $(option).text().trim();
@@ -988,7 +1068,6 @@ const scrapeAmazonProduct = async (url) => {
       });
     });
     
-    // Method 3: Scan entire page for sizes
     const allSizes = pageText.match(/(\d+)\s*(?:g|ml|kg|gm)/gi);
     if (allSizes) {
       const uniqueSizes = [...new Set(allSizes)];
@@ -1001,21 +1080,22 @@ const scrapeAmazonProduct = async (url) => {
       });
     }
     
-    // Remove duplicates
     variations = variations.filter((v, i, self) => i === self.findIndex((t) => t.name === v.name));
     variations = variations.slice(0, 15);
     
-    // Category detection
+    // ========== CATEGORY DETECTION ==========
     const detectCategory = (productName, productDesc) => {
-      const text = (productName + ' ' + productDesc).toLowerCase();
+      const text = (productName + ' ' + productDesc + ' ' + itemTypeName).toLowerCase();
       const categoryKeywords = {
-        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion'],
-        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter'],
-        'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color'],
-        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'jacket'],
-        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet']
+        'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
+        'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
+        'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+        'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+        'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
       };
-      for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      const order = ['Makeup', 'Skincare', 'Hair', 'Clothing', 'Accessories'];
+      for (const cat of order) {
+        const keywords = categoryKeywords[cat];
         for (const keyword of keywords) {
           if (text.includes(keyword)) return cat;
         }
@@ -1026,15 +1106,15 @@ const scrapeAmazonProduct = async (url) => {
     const descriptionText = descriptionArray.join(' ');
     const detectedCategory = detectCategory(name, descriptionText);
     
-    // 🔥 FIXED: Added detectedSubCategory
+    // ========== SUBCATEGORY DETECTION ==========
     const detectSubCategory = (productName, productDesc, category) => {
-      const text = (productName + ' ' + productDesc).toLowerCase();
+      const text = (productName + ' ' + productDesc + ' ' + itemTypeName).toLowerCase();
       const subCatMap = {
-        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream'],
-        'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter'],
-        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
-        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket'],
-        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
+        'Makeup': ['Lipstick', 'Foundation', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
+        'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+        'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff'],
+        'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Skirt', 'Blouse'],
+        'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace']
       };
       const subCats = subCatMap[category] || [];
       for (const sub of subCats) {
@@ -1045,18 +1125,21 @@ const scrapeAmazonProduct = async (url) => {
     
     const detectedSubCategory = detectSubCategory(name, descriptionText, detectedCategory);
     
+    // ========== RETURN COMPLETE DATA ==========
     return {
       name,
       brand: brand || '',
       price: finalPrice,
-      originalPrice: finalOriginalPrice,
+      originalPrice: originalPrice,
       images: [...new Set(images)].slice(0, 5),
-      description: descriptionArray,
+      description: descriptionArray.slice(0, 15),
       keyFeatures: keyFeaturesArray.slice(0, 10),
       detectedCategory: detectedCategory,
       detectedSubCategory: detectedSubCategory,
+      itemTypeName: itemTypeName,
       variations: variations,
       weight: weight,
+      dimensions: dimensions,
       ingredients: '',
       skinType: 'all',
       concerns: []
