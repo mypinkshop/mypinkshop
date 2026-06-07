@@ -110,7 +110,7 @@ function AdminEditProduct() {
   const [showAddSubCategory, setShowAddSubCategory] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState('');
   
-  // 🔥 Variation states
+  // Variation states
   const [variations, setVariations] = useState([]);
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [variationModalOpen, setVariationModalOpen] = useState(false);
@@ -182,7 +182,6 @@ function AdminEditProduct() {
 
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
 
-  // 🔥 Get variation attributes based on category
   const getVariationAttributes = () => {
     switch(formData.category) {
       case 'Skincare': 
@@ -221,7 +220,7 @@ function AdminEditProduct() {
 
         const product = await response.json();
 
-        // Handle description - if array keep as is, if string convert to array
+        // Handle description
         let descriptionArray = [];
         if (Array.isArray(product.description)) {
           descriptionArray = product.description;
@@ -263,7 +262,7 @@ function AdminEditProduct() {
           gender: product.gender || 'unisex'
         });
 
-        // 🔥 Load variations properly
+        // Load variations - preserve existing IDs
         if (product.variations && product.variations.length > 0) {
           setVariations(product.variations);
         } else if (product.variants && product.variants.length > 0) {
@@ -339,7 +338,7 @@ function AdminEditProduct() {
     return `SKU-${timestamp}-${random}`;
   };
 
-  // 🔥 Variation functions
+  // 🔥 FIXED: Variation functions with proper ID handling
   const toggleSelectVariation = (id) => {
     setSelectedVariationIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -365,10 +364,10 @@ function AdminEditProduct() {
     }
   };
 
+  // 🔥 FIXED: Save variation with proper ID (use existing ID if editing)
   const saveVariation = () => {
     if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
     
-    const existingIndex = variations.findIndex(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
     const newVariation = {
       id: editingVariation?.id || Date.now(),
       name: variationForm.name,
@@ -382,12 +381,16 @@ function AdminEditProduct() {
     };
     
     if (editingVariation) {
-      const updated = [...variations];
-      updated[variations.findIndex(v => v.id === editingVariation.id)] = newVariation;
+      // Update existing variation
+      const updated = variations.map(v => 
+        v.id === editingVariation.id ? newVariation : v
+      );
       setVariations(updated);
       alert('✅ Variation updated successfully!');
     } else {
-      if (existingIndex !== -1) return alert(`⚠️ This ${variationAttrs.type} combination already exists!`);
+      // Check for duplicate
+      const exists = variations.some(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
+      if (exists) return alert(`⚠️ This ${variationAttrs.type} combination already exists!`);
       setVariations([...variations, newVariation]);
       alert(`✅ ${variationAttrs.type} added successfully!`);
     }
@@ -411,7 +414,10 @@ function AdminEditProduct() {
   };
 
   const deleteVariation = (variationId) => {
-    if (confirm('Delete this variation?')) setVariations(variations.filter(v => v.id !== variationId));
+    if (confirm('Delete this variation?')) {
+      setVariations(variations.filter(v => v.id !== variationId));
+      setSelectedVariationIds(prev => prev.filter(id => id !== variationId));
+    }
   };
 
   const uploadVariationImage = async (e) => {
@@ -551,6 +557,7 @@ function AdminEditProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // 🔥 FIXED: Submit handler with proper variations data
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -572,7 +579,7 @@ function AdminEditProduct() {
       mainCategory: formData.category,
       price: parseFloat(formData.price),
       originalPrice: parseFloat(formData.originalPrice) || parseFloat(formData.price) * 1.2,
-      tax: parseFloat(formData.tax),
+      tax: parseFloat(formData.tax) || 5,
       stock: parseInt(formData.stock) || 0,
       sku: finalSku,
       images: formData.images,
@@ -596,7 +603,7 @@ function AdminEditProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-      variations: variations,
+      variations: variations, // 🔥 Send variations as is with their IDs
       status: 'active'
     };
 
@@ -607,11 +614,15 @@ function AdminEditProduct() {
         body: JSON.stringify(productData)
       });
       
-      if (!response.ok) throw new Error('Update failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Update failed');
+      }
       
       alert('✅ Product updated successfully!');
       navigate('/admin/inventory');
     } catch (error) {
+      console.error('Update error:', error);
       alert(`❌ ${error.message}`);
     } finally {
       setSaving(false);
@@ -746,7 +757,7 @@ function AdminEditProduct() {
                 </div>
               </div>
 
-              {/* 🔥 VARIATIONS SECTION */}
+              {/* Variations Section */}
               <div className="border-b border-gray-200 pb-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                   <div>
