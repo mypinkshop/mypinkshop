@@ -32,47 +32,37 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     return false;
   };
 
-  // 🔥 IMPROVED: Better category detection from product name
   const detectCategoryFromName = (productName) => {
     const name = productName.toLowerCase();
-    
     const categoryKeywords = {
-      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub', 'face cream', 'night cream', 'day cream', 'spot treatment', 'acne', 'pimple', 'vitamin c', 'retinol', 'hyaluronic', 'niacinamide'],
-      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss', 'lip liner', 'eyeliner', 'bronzer', 'contour', 'setting spray', 'makeup remover', 'bb cream', 'cc cream', 'lip stain'],
-      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall', 'hair growth', 'dry shampoo', 'leave in', 'hair cream', 'hair butter', 'scalp', 'curly hair', 'anti dandruff'],
-      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga', 'gown', 'skirt', 'blouse', 'kurta', 'salwar', 'leggings', 'joggers', 'hoodie', 'sweater', 'cardigan', 'ethnic', 'western'],
-      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings', 'necklace', 'bracelet', 'ring', 'hair band', 'scrunchie', 'cap', 'hat', 'handbag', 'tote', 'backpack']
+      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
+      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
+      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
     };
-    
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
       for (const keyword of keywords) {
-        if (name.includes(keyword)) {
-          return category;
-        }
+        if (name.includes(keyword)) return category;
       }
     }
-    return 'Skincare'; // Default
+    return 'Skincare';
   };
 
-  // 🔥 IMPROVED: Better subcategory detection
   const detectSubCategoryFromName = (productName, category) => {
     const name = productName.toLowerCase();
-    
     const subCategoryMap = {
-      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm', 'Night Cream', 'Day Cream', 'Acne Treatment', 'Spot Corrector'],
-      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss', 'Eyeliner', 'Setting Spray'],
-      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff', 'Hair Fall Control', 'Hair Growth Serum'],
-      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga', 'Skirt', 'Blouse', 'Kurta', 'Leggings'],
-      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet', 'Earrings', 'Necklace', 'Bracelet']
+      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
+      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
     };
-    
     const subCats = subCategoryMap[category] || [];
     for (const sub of subCats) {
-      if (name.includes(sub.toLowerCase())) {
-        return sub;
-      }
+      if (name.includes(sub.toLowerCase())) return sub;
     }
-    return ''; // Will let user select manually
+    return '';
   };
 
   const addUrlField = () => {
@@ -114,7 +104,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 
         const data = await response.json();
         if (data.success) {
-          // 🔥 FIX: Detect category immediately
           const detectedCat = detectCategoryFromName(data.scraped.name);
           const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
           
@@ -159,20 +148,29 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     
+    // 🔥 Improved Meta Tags with longer limits
     let metaTitle = `${product.name}`;
     if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
     metaTitle = `${metaTitle} | MyPinkShop`;
-    if (metaTitle.length > 60) metaTitle = metaTitle.substring(0, 57) + '...';
+    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
     
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
     metaDescription += ` online at best price. Shop now at MyPinkShop.`;
-    if (metaDescription.length > 160) metaDescription = metaDescription.substring(0, 157) + '...';
+    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
     
-    const keywords = [product.brand, ...keyFeaturesArray].filter(Boolean);
-    const metaKeywords = keywords.join(', ');
+    // 🔥 Auto generate keywords from category, brand, features
+    const autoKeywords = [
+      product.brand,
+      ...keyFeaturesArray.slice(0, 5),
+      product.detectedCategory,
+      product.detectedSubCategory,
+      'online shopping',
+      'best price',
+      'MyPinkShop'
+    ].filter(Boolean);
+    const metaKeywords = [...new Set(autoKeywords)].join(', ');
     
-    // 🔥 Use detected category (now available from fetch)
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
     
@@ -193,17 +191,10 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       slug: slug,
       category: detectedCategory,
       subCategory: detectedSubCategory,
-      skinType: product.skinType || 'all',
-      concerns: product.concerns || [],
+      weight: product.weight || '',
       ingredients: product.ingredients || '',
-      finish: product.finish || '',
-      coverage: product.coverage || '',
-      shade: product.shade || '',
-      hairType: product.hairType || 'all',
-      hairConcerns: product.hairConcerns || [],
-      fabric: product.fabric || '',
-      material: product.material || '',
-      weight: product.weight || ''
+      skinType: product.skinType || 'all',
+      concerns: product.concerns || []
     }));
     
     if (product.images && product.images.length > 0) setImages(product.images);
@@ -215,12 +206,14 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
         price: v.price || product.price,
         mrp: v.mrp || product.originalPrice || product.price * 1.2,
         stock: v.stock || 10,
-        sku: v.sku || `VAR-${Date.now()}-${idx}`
+        sku: v.sku || `VAR-${Date.now()}-${idx}`,
+        image: v.image || '',
+        attributes: v.attributes || {}
       }));
       setVariations(formattedVariations);
     }
     
-    alert(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''} | ${descriptionArray.length} bullet points`);
+    alert(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''}`);
     if (onProductImported) onProductImported();
   };
 
@@ -275,7 +268,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
                   ) : (
                     <>
                       <p className="font-medium text-gray-800 text-xs sm:text-sm truncate">{product.name}</p>
-                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'} | 🏷️ {product.detectedCategory || detectCategoryFromName(product.name)}</p>
+                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'} | 🏷️ {product.detectedCategory}</p>
                     </>
                   )}
                 </div>
@@ -291,7 +284,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       )}
       
       <div className="mt-3 p-2 sm:p-3 bg-blue-50 rounded-lg">
-        <p className="text-xs text-blue-600">💡 Tip: Category and SubCategory auto-detected from product name!</p>
+        <p className="text-xs text-blue-600">💡 Tip: Category, SubCategory, SEO tags auto-detected!</p>
       </div>
     </div>
   );
@@ -348,24 +341,9 @@ const VariationSelectWithSearch = ({
             className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
             autoFocus
           />
-          <button
-            onClick={handleSaveCustom}
-            className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
-          >
-            Save
-          </button>
-          <button
-            onClick={() => setIsCustomMode(false)}
-            className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
-          >
-            Cancel
-          </button>
+          <button onClick={handleSaveCustom} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Save</button>
+          <button onClick={() => setIsCustomMode(false)} className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Cancel</button>
         </div>
-        {value && !isCustomMode && (
-          <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200">
-            ✓ Current: {value}
-          </div>
-        )}
       </div>
     );
   }
@@ -385,22 +363,13 @@ const VariationSelectWithSearch = ({
           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
             {filteredOptions.length > 0 ? (
               filteredOptions.map(opt => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => handleSelect(opt)}
-                  className="w-full text-left px-3 py-2 hover:bg-pink-50 text-sm transition"
-                >
+                <button key={opt} type="button" onClick={() => handleSelect(opt)} className="w-full text-left px-3 py-2 hover:bg-pink-50 text-sm transition">
                   {opt}
                   {value === opt && <span className="float-right text-green-500">✓</span>}
                 </button>
               ))
             ) : (
-              <button
-                type="button"
-                onClick={() => handleSelect('__CUSTOM__')}
-                className="w-full text-left px-3 py-2 text-pink-600 hover:bg-pink-50 text-sm border-t"
-              >
+              <button type="button" onClick={() => handleSelect('__CUSTOM__')} className="w-full text-left px-3 py-2 text-pink-600 hover:bg-pink-50 text-sm border-t">
                 + Add custom "{searchTerm}"
               </button>
             )}
@@ -409,12 +378,7 @@ const VariationSelectWithSearch = ({
         {value && !searchTerm && (
           <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200 flex justify-between items-center">
             <span>✓ Selected: {value}</span>
-            <button 
-              onClick={() => setIsCustomMode(true)}
-              className="text-xs text-blue-500 hover:text-blue-700"
-            >
-              Change
-            </button>
+            <button onClick={() => setIsCustomMode(true)} className="text-xs text-blue-500 hover:text-blue-700">Change</button>
           </div>
         )}
       </div>
@@ -433,6 +397,9 @@ function AdminAddProduct() {
   const [newBrand, setNewBrand] = useState('');
   const [showAddSubCategory, setShowAddSubCategory] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState('');
+  const [selectedVariationIds, setSelectedVariationIds] = useState([]);
+  const [expandedVariationId, setExpandedVariationId] = useState(null);
+  
   const [brands, setBrands] = useState([
     'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'The Face Shop', 
     'Lakmé', 'MyGlamm', 'Plum', 'Wow Skin Science', 'Biotique', 
@@ -465,7 +432,7 @@ function AdminAddProduct() {
   const [variationModalOpen, setVariationModalOpen] = useState(false);
   const [editingVariation, setEditingVariation] = useState(null);
   const [variationForm, setVariationForm] = useState({
-    name: '', price: '', mrp: '', stock: '', sku: '', attributes: {}
+    name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {}
   });
 
   const generateSKU = () => {
@@ -474,6 +441,7 @@ function AdminAddProduct() {
     return `SKU-${timestamp}-${random}`;
   };
 
+  // 🔥 Auto-generate meta tags
   useEffect(() => {
     if (formData.productName) {
       const slug = formData.productName
@@ -481,18 +449,30 @@ function AdminAddProduct() {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
       
+      // Meta Title - 100 chars limit
       let metaTitle = `${formData.productName}`;
       if (formData.brand) metaTitle = `${formData.productName} - ${formData.brand}`;
       metaTitle = `${metaTitle} | MyPinkShop`;
-      if (metaTitle.length > 60) metaTitle = metaTitle.substring(0, 57) + '...';
+      if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
       
+      // Meta Description - 200 chars limit
       let metaDescription = `Buy ${formData.productName}`;
       if (formData.brand) metaDescription += ` by ${formData.brand}`;
-      metaDescription += ` online at best price. Shop now at MyPinkShop.`;
-      if (metaDescription.length > 160) metaDescription = metaDescription.substring(0, 157) + '...';
+      metaDescription += ` at best price. ✓ Free Shipping ✓ COD ✓ Best Quality. Shop now at MyPinkShop!`;
+      if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
       
-      const keywords = [formData.brand, formData.category, formData.subCategory, ...formData.keyFeatures].filter(Boolean);
-      const metaKeywords = keywords.join(', ');
+      // 🔥 Auto-generate keywords from category, brand, features
+      const autoKeywords = [
+        formData.brand,
+        formData.category,
+        formData.subCategory,
+        ...formData.keyFeatures.slice(0, 5),
+        'online shopping',
+        'best price',
+        'free shipping',
+        'MyPinkShop'
+      ].filter(Boolean);
+      const metaKeywords = [...new Set(autoKeywords)].join(', ');
       
       setSeoData({ metaTitle, metaDescription, metaKeywords, slug });
     }
@@ -604,6 +584,32 @@ function AdminAddProduct() {
     }
   };
 
+  // 🔥 Variation functions with select all, multiple delete, and images
+  const toggleSelectVariation = (id) => {
+    setSelectedVariationIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllVariations = () => {
+    if (selectedVariationIds.length === variations.length) {
+      setSelectedVariationIds([]);
+    } else {
+      setSelectedVariationIds(variations.map(v => v.id));
+    }
+  };
+
+  const deleteSelectedVariations = () => {
+    if (selectedVariationIds.length === 0) {
+      alert('Please select variations to delete');
+      return;
+    }
+    if (confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
+      setVariations(variations.filter(v => !selectedVariationIds.includes(v.id)));
+      setSelectedVariationIds([]);
+    }
+  };
+
   const saveVariation = () => {
     if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
     
@@ -615,7 +621,9 @@ function AdminAddProduct() {
       price: parseFloat(variationForm.price) || 0,
       mrp: parseFloat(variationForm.mrp) || parseFloat(variationForm.price) * 1.2 || 0,
       stock: parseInt(variationForm.stock) || 0,
-      sku: variationForm.sku || `VAR-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`
+      sku: variationForm.sku || `VAR-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      image: variationForm.image || '',
+      attributes: variationForm.attributes || {}
     };
     
     if (editingVariation) {
@@ -630,7 +638,7 @@ function AdminAddProduct() {
     }
     setVariationModalOpen(false);
     setEditingVariation(null);
-    setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', attributes: {} });
+    setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} });
   };
 
   const editVariation = (variation) => {
@@ -641,6 +649,7 @@ function AdminAddProduct() {
       mrp: variation.mrp || variation.price * 1.2,
       stock: variation.stock, 
       sku: variation.sku, 
+      image: variation.image || '',
       attributes: { secondary: variation.secondaryName || '' } 
     });
     setVariationModalOpen(true);
@@ -648,6 +657,30 @@ function AdminAddProduct() {
 
   const deleteVariation = (variationId) => {
     if (confirm('Delete this variation?')) setVariations(variations.filter(v => v.id !== variationId));
+  };
+
+  const uploadVariationImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formDataImg = new FormData();
+    formDataImg.append('images', file);
+    
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataImg
+      });
+      const data = await response.json();
+      if (data.url) {
+        setVariationForm({ ...variationForm, image: data.url });
+        alert('✅ Image uploaded!');
+      }
+    } catch (error) {
+      alert('Upload failed');
+    }
   };
 
   const setImages = (images) => setFormData(prev => ({ ...prev, images }));
@@ -985,7 +1018,7 @@ function AdminAddProduct() {
               <Link to="/admin/inventory" className="text-gray-500 hover:text-pink-600 transition p-1"><IconBack /></Link>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Add New Product</h1>
-                <p className="text-xs text-gray-400 hidden sm:block">Category-wise product listing</p>
+                <p className="text-xs text-gray-400 hidden sm:block">Category-wise product listing with variation images</p>
               </div>
             </div>
             <button onClick={submitProduct} disabled={loading} className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg text-sm font-medium hover:shadow-md transition disabled:opacity-50">
@@ -1153,7 +1186,7 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* Step 4 - Product Details */}
+            {/* Step 4 - Product Details with Improved Variations */}
             {step === 4 && (
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">✨ Product Details</h2>
@@ -1188,23 +1221,160 @@ function AdminAddProduct() {
                   </div>
                 </div>
 
-                {/* Variations Section - UPDATED WITH SEARCH */}
+                {/* 🔥 IMPROVED Variations Section with Select All + Multiple Delete + Images */}
                 <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                    <div><h3 className="font-semibold text-gray-800">Product Variations</h3><p className="text-xs text-gray-500 mt-0.5">{!formData.category && 'Select a category first'}</p></div>
-                    {formData.category && <button onClick={() => { setEditingVariation(null); setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', attributes: {} }); setVariationModalOpen(true); }} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg text-sm font-medium hover:shadow-md transition">+ Add {variationAttrs.type}</button>}
+                    <div>
+                      <h3 className="font-semibold text-gray-800">Product Variations</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">{!formData.category && 'Select a category first'}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {variations.length > 0 && (
+                        <>
+                          <button onClick={selectAllVariations} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-200 transition">
+                            {selectedVariationIds.length === variations.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                          <button onClick={deleteSelectedVariations} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition">
+                            Delete Selected ({selectedVariationIds.length})
+                          </button>
+                        </>
+                      )}
+                      {formData.category && (
+                        <button onClick={() => { setEditingVariation(null); setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} }); setVariationModalOpen(true); }} 
+                          className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg text-sm font-medium hover:shadow-md transition">
+                          + Add {variationAttrs.type}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
-                  {!formData.category ? <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first</p></div>
-                  : variations.length === 0 ? <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet.</p></div>
-                  : <div className="overflow-x-auto"><table className="w-full text-xs sm:text-sm"><thead className="bg-gray-50 border-b border-gray-200"><tr><th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.type}</th>{variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.secondary}</th>}<th className="px-2 sm:px-3 py-2 text-right">Price</th><th className="px-2 sm:px-3 py-2 text-right">MRP</th><th className="px-2 sm:px-3 py-2 text-right">Stock</th><th className="px-2 sm:px-3 py-2 text-left">SKU</th><th className="px-2 sm:px-3 py-2 text-center">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{variations.map(v => (<tr key={v.id} className="hover:bg-pink-50/30"><td className="px-2 sm:px-3 py-2 font-medium">{v.name}</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2">{v.secondaryName || '-'}</td>}<td className="px-2 sm:px-3 py-2 text-right text-pink-600">₹{v.price}</td><td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{v.mrp || v.price * 1.2}</td><td className="px-2 sm:px-3 py-2 text-right">{v.stock}</td><td className="px-2 sm:px-3 py-2 text-xs font-mono">{v.sku}</td><td className="px-2 sm:px-3 py-2 text-center"><div className="flex justify-center gap-2"><button onClick={() => editVariation(v)} className="text-blue-500">✏️</button><button onClick={() => deleteVariation(v.id)} className="text-red-500">🗑️</button></div></td></tr>))}</tbody><tfoot className="bg-gray-50 border-t border-gray-200"><tr><td className="px-2 sm:px-3 py-2 font-medium">Total</td>{variationAttrs.secondary && <td className="px-2 sm:px-3 py-2"></td>}<td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td><td className="px-2 sm:px-3 py-2 text-right"></td><td className="px-2 sm:px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td><td colSpan="2"></td></tr></tfoot></table></div>}
+                  {!formData.category ? (
+                    <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first</p></div>
+                  ) : variations.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet.</p></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-2 sm:px-3 py-2 text-center w-8">
+                              <input type="checkbox" checked={selectedVariationIds.length === variations.length && variations.length > 0} onChange={selectAllVariations} />
+                            </th>
+                            <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.type}</th>
+                            {variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.secondary}</th>}
+                            <th className="px-2 sm:px-3 py-2 text-left">Image</th>
+                            <th className="px-2 sm:px-3 py-2 text-right">Price</th>
+                            <th className="px-2 sm:px-3 py-2 text-right">MRP</th>
+                            <th className="px-2 sm:px-3 py-2 text-right">Stock</th>
+                            <th className="px-2 sm:px-3 py-2 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {variations.map(v => (
+                            <tr key={v.id} className="hover:bg-pink-50/30 cursor-pointer" onClick={() => setExpandedVariationId(expandedVariationId === v.id ? null : v.id)}>
+                              <td className="px-2 sm:px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" checked={selectedVariationIds.includes(v.id)} onChange={() => toggleSelectVariation(v.id)} />
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 font-medium">{v.name}</td>
+                              {variationAttrs.secondary && <td className="px-2 sm:px-3 py-2">{v.secondaryName || '-'}</td>}
+                              <td className="px-2 sm:px-3 py-2">
+                                {v.image ? (
+                                  <img src={v.image} className="w-8 h-8 object-cover rounded" alt="variation" />
+                                ) : (
+                                  <span className="text-gray-400 text-xs">No image</span>
+                                )}
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 text-right text-pink-600">₹{v.price}</td>
+                              <td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{v.mrp || v.price * 1.2}</td>
+                              <td className="px-2 sm:px-3 py-2 text-right">{v.stock}</td>
+                              <td className="px-2 sm:px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-center gap-2">
+                                  <button onClick={() => editVariation(v)} className="text-blue-500">✏️</button>
+                                  <button onClick={() => deleteVariation(v.id)} className="text-red-500">🗑️</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 border-t border-gray-200">
+                          <tr>
+                            <td colSpan={variationAttrs.secondary ? 5 : 4} className="px-2 sm:px-3 py-2 font-medium">Total</td>
+                            <td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
+                            <td className="px-2 sm:px-3 py-2 text-right"></td>
+                            <td className="px-2 sm:px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
-                {/* 🔥 UPDATED Variation Modal with Search */}
+                {/* 🔥 Expanded Variation Details Modal */}
+                {expandedVariationId && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setExpandedVariationId(null)}>
+                    <div className="bg-white rounded-xl max-w-2xl w-full shadow-xl mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-5 flex justify-between items-center">
+                        <h3 className="text-base sm:text-lg font-semibold">Variation Details</h3>
+                        <button onClick={() => setExpandedVariationId(null)} className="text-gray-400 text-2xl">×</button>
+                      </div>
+                      <div className="p-4 sm:p-5">
+                        {(() => {
+                          const v = variations.find(v => v.id === expandedVariationId);
+                          if (!v) return null;
+                          return (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">{variationAttrs.type}</label>
+                                  <p className="text-base font-semibold">{v.name}</p>
+                                </div>
+                                {variationAttrs.secondary && (
+                                  <div>
+                                    <label className="text-sm font-medium text-gray-600">{variationAttrs.secondary}</label>
+                                    <p className="text-base">{v.secondaryName || '-'}</p>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Variation Image</label>
+                                {v.image ? (
+                                  <img src={v.image} className="w-32 h-32 object-cover rounded-lg border mt-2" alt="variation" />
+                                ) : (
+                                  <p className="text-gray-400 text-sm mt-1">No image uploaded</p>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">Selling Price</label>
+                                  <p className="text-lg font-bold text-pink-600">₹{v.price}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">MRP</label>
+                                  <p className="text-lg text-gray-500 line-through">₹{v.mrp}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600">Stock</label>
+                                  <p className="text-lg">{v.stock} units</p>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">SKU</label>
+                                <p className="text-sm font-mono bg-gray-100 p-2 rounded">{v.sku}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Variation Modal with Image Upload */}
                 {variationModalOpen && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
-                      <div className="border-b border-gray-200 p-4 sm:p-5 flex justify-between">
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-5 flex justify-between">
                         <h3 className="text-base sm:text-lg font-semibold">{editingVariation ? 'Edit' : 'Add New'} {variationAttrs.type}</h3>
                         <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 text-2xl">×</button>
                       </div>
@@ -1229,6 +1399,27 @@ function AdminAddProduct() {
                             placeholder={`Search or type custom ${variationAttrs.secondary.toLowerCase()}...`}
                           />
                         )}
+                        
+                        {/* Variation Image Upload */}
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">Variation Image (Optional)</label>
+                          <div className="flex gap-2 items-center">
+                            {variationForm.image ? (
+                              <div className="relative">
+                                <img src={variationForm.image} className="w-16 h-16 object-cover rounded border" alt="variation" />
+                                <button onClick={() => setVariationForm({...variationForm, image: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs">×</button>
+                              </div>
+                            ) : (
+                              <div className="flex-1">
+                                <input type="file" accept="image/*" onChange={uploadVariationImage} className="hidden" id="variationImageUpload" />
+                                <label htmlFor="variationImageUpload" className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200">
+                                  📷 Upload Image
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Upload image for this variation (like shade swatch)</p>
+                        </div>
                         
                         {/* Price, MRP, Stock, SKU */}
                         <div className="grid grid-cols-2 gap-3">
@@ -1269,21 +1460,52 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* Step 5 - SEO Section */}
+            {/* Step 5 - SEO Section with updated limits */}
             {step === 5 && (
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">🔍 SEO Optimization</h2>
                 <p className="text-sm text-gray-500 mb-6">Optimize your product for search engines</p>
                 
                 <div className="space-y-5">
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Product URL Slug</label><div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg"><span className="text-xs text-gray-500">mypinkshop.com/product/</span><code className="text-sm text-pink-600">{seoData.slug || 'product-slug'}</code></div></div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title <span className="text-xs text-gray-400">(50-60 chars)</span></label><input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({...seoData, metaTitle: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" /><div className="flex justify-between mt-1"><p className="text-xs text-gray-400">Shows in Google search results</p><span className={`text-xs ${seoData.metaTitle.length > 60 ? 'text-red-500' : 'text-green-500'}`}>{seoData.metaTitle.length}/60</span></div></div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description <span className="text-xs text-gray-400">(150-160 chars)</span></label><textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea><div className="flex justify-between mt-1"><p className="text-xs text-gray-400">Shows below title in Google</p><span className={`text-xs ${seoData.metaDescription.length > 160 ? 'text-red-500' : 'text-green-500'}`}>{seoData.metaDescription.length}/160</span></div></div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords</label><input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="skincare, vitamin c, anti-aging" /><p className="text-xs text-gray-400 mt-1">Comma separated keywords</p></div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Product URL Slug</label>
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                      <span className="text-xs text-gray-500">mypinkshop.com/product/</span>
+                      <code className="text-sm text-pink-600">{seoData.slug || 'product-slug'}</code>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title <span className="text-xs text-gray-400">(50-100 chars)</span></label>
+                    <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({...seoData, metaTitle: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    <div className="flex justify-between mt-1">
+                      <p className="text-xs text-gray-400">Shows in Google search results</p>
+                      <span className={`text-xs ${seoData.metaTitle.length > 100 ? 'text-red-500' : seoData.metaTitle.length > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{seoData.metaTitle.length}/100</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description <span className="text-xs text-gray-400">(120-200 chars)</span></label>
+                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <div className="flex justify-between mt-1">
+                      <p className="text-xs text-gray-400">Shows below title in Google</p>
+                      <span className={`text-xs ${seoData.metaDescription.length > 200 ? 'text-red-500' : seoData.metaDescription.length < 120 ? 'text-yellow-500' : 'text-green-500'}`}>{seoData.metaDescription.length}/200</span>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords <span className="text-xs text-gray-400">(Auto-generated, comma separated)</span></label>
+                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="skincare, vitamin c, anti-aging" />
+                    <p className="text-xs text-gray-400 mt-1">Auto-generated from brand, category, and features</p>
+                  </div>
                   
                   <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
                     <h3 className="text-sm font-semibold text-gray-800 mb-3">📱 Google Search Preview</h3>
-                    <div><p className="text-blue-600 text-base font-medium">{seoData.metaTitle || formData.productName || 'Product Title'}</p><p className="text-green-700 text-xs">https://mypinkshop.com/product/{seoData.slug || 'product-slug'}</p><p className="text-gray-600 text-sm mt-1">{seoData.metaDescription || 'Product description...'}</p></div>
+                    <div>
+                      <p className="text-blue-600 text-base font-medium truncate">{seoData.metaTitle || formData.productName || 'Product Title'}</p>
+                      <p className="text-green-700 text-xs truncate">https://mypinkshop.com/product/{seoData.slug || 'product-slug'}</p>
+                      <p className="text-gray-600 text-sm mt-1 line-clamp-2">{seoData.metaDescription || 'Product description...'}</p>
+                    </div>
                   </div>
                 </div>
 
