@@ -110,7 +110,6 @@ function AdminEditProduct() {
   const [showAddSubCategory, setShowAddSubCategory] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState('');
   
-  // Variation states
   const [variations, setVariations] = useState([]);
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [variationModalOpen, setVariationModalOpen] = useState(false);
@@ -171,7 +170,6 @@ function AdminEditProduct() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Categories with subcategories
   const categories = {
     'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Lip Balm', 'Toner', 'Face Scrub', 'Body Lotion', 'Body Wash'],
     'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer', 'Primer', 'Setting Spray'],
@@ -212,6 +210,7 @@ function AdminEditProduct() {
           return;
         }
 
+        console.log('Fetching product with ID:', id);
         const response = await fetch(`${API_URL}/api/products/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -219,8 +218,8 @@ function AdminEditProduct() {
         if (!response.ok) throw new Error('Failed to load product');
 
         const product = await response.json();
+        console.log('Loaded product:', product);
 
-        // Handle description
         let descriptionArray = [];
         if (Array.isArray(product.description)) {
           descriptionArray = product.description;
@@ -262,7 +261,6 @@ function AdminEditProduct() {
           gender: product.gender || 'unisex'
         });
 
-        // Load variations - preserve existing IDs
         if (product.variations && product.variations.length > 0) {
           setVariations(product.variations);
         } else if (product.variants && product.variants.length > 0) {
@@ -280,7 +278,6 @@ function AdminEditProduct() {
     if (id) loadProduct();
   }, [id, navigate]);
 
-  // Load brands from localStorage
   useEffect(() => {
     const savedBrands = localStorage.getItem('brandsList');
     if (savedBrands) setBrands(JSON.parse(savedBrands));
@@ -338,7 +335,6 @@ function AdminEditProduct() {
     return `SKU-${timestamp}-${random}`;
   };
 
-  // 🔥 FIXED: Variation functions with proper ID handling
   const toggleSelectVariation = (id) => {
     setSelectedVariationIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -364,7 +360,6 @@ function AdminEditProduct() {
     }
   };
 
-  // 🔥 FIXED: Save variation with proper ID (use existing ID if editing)
   const saveVariation = () => {
     if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
     
@@ -381,14 +376,12 @@ function AdminEditProduct() {
     };
     
     if (editingVariation) {
-      // Update existing variation
       const updated = variations.map(v => 
         v.id === editingVariation.id ? newVariation : v
       );
       setVariations(updated);
       alert('✅ Variation updated successfully!');
     } else {
-      // Check for duplicate
       const exists = variations.some(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
       if (exists) return alert(`⚠️ This ${variationAttrs.type} combination already exists!`);
       setVariations([...variations, newVariation]);
@@ -444,7 +437,6 @@ function AdminEditProduct() {
     }
   };
 
-  // Image upload handlers
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -508,7 +500,6 @@ function AdminEditProduct() {
     setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
   };
 
-  // Description bullet points
   const addBulletPoint = () => {
     const text = currentBullet.trim();
     if (text) {
@@ -522,7 +513,6 @@ function AdminEditProduct() {
     setFormData({ ...formData, description: formData.description.filter((_, i) => i !== index) });
   };
 
-  // Key features
   const addKeyFeature = () => {
     if (keyFeatureInput.trim()) {
       if (formData.keyFeatures.length >= 10) return alert('Max 10 features');
@@ -535,7 +525,6 @@ function AdminEditProduct() {
     setFormData({ ...formData, keyFeatures: formData.keyFeatures.filter((_, i) => i !== index) });
   };
 
-  // Specifications
   const addSpecification = () => {
     if (specKeyInput.trim() && specValueInput.trim()) {
       setFormData({
@@ -557,7 +546,7 @@ function AdminEditProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 🔥 FIXED: Submit handler with proper variations data
+  // 🔥 FIXED: Proper submit handler with better error handling
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -568,7 +557,12 @@ function AdminEditProduct() {
 
     setSaving(true);
     const token = localStorage.getItem('adminToken');
-    if (!token) { alert('Session expired'); setSaving(false); return; }
+    if (!token) { 
+      alert('Session expired. Please login again.');
+      navigate('/admin/login');
+      setSaving(false);
+      return; 
+    }
 
     const finalSku = formData.sku || generateSKU();
 
@@ -603,27 +597,36 @@ function AdminEditProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-      variations: variations, // 🔥 Send variations as is with their IDs
+      variations: variations,
       status: 'active'
     };
+
+    console.log('Sending update request for product:', id);
+    console.log('Product data:', productData);
 
     try {
       const response = await fetch(`${API_URL}/api/products/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(productData)
       });
       
+      const responseData = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response data:', responseData);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Update failed');
+        throw new Error(responseData.error || 'Update failed');
       }
       
       alert('✅ Product updated successfully!');
       navigate('/admin/inventory');
     } catch (error) {
       console.error('Update error:', error);
-      alert(`❌ ${error.message}`);
+      alert(`❌ Update failed: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -649,7 +652,6 @@ function AdminEditProduct() {
       <AdminSidebar />
       
       <div className="md:ml-64">
-        {/* Header */}
         <div className="bg-white/95 backdrop-blur-md border-b border-pink-100 sticky top-0 z-40 shadow-sm">
           <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -669,7 +671,6 @@ function AdminEditProduct() {
           </div>
         </div>
 
-        {/* Form */}
         <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
           <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
             <form className="space-y-6">
@@ -874,7 +875,6 @@ function AdminEditProduct() {
                         />
                       )}
                       
-                      {/* Variation Image Upload */}
                       <div>
                         <label className="block text-sm font-medium mb-1.5">Variation Image</label>
                         <div className="flex items-center gap-3">
