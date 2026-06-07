@@ -30,6 +30,9 @@ function ProductDetail() {
   const [pincode, setPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
+  
+  // 🔥 State for dynamic gallery images
+  const [galleryImages, setGalleryImages] = useState([]);
 
   const API_URL = 'https://api.mypinkshop.com';
 
@@ -62,6 +65,28 @@ function ProductDetail() {
     }
   };
 
+  // 🔥 Function to update gallery based on selected variation
+  const updateGalleryForVariation = (variation, productImagesList) => {
+    if (!variation || !variation.image || variation.image.length === 0) {
+      // No variation image, show all product images
+      setGalleryImages([...productImagesList]);
+      setSelectedImage(0);
+      return;
+    }
+    
+    // Variation has images - replace first N images with variation images
+    const variationImages = Array.isArray(variation.image) ? variation.image : [variation.image];
+    const productImagesListArr = Array.isArray(productImagesList) ? productImagesList : [productImagesList];
+    
+    // Create new gallery: variation images first, then remaining product images
+    const newGallery = [...variationImages];
+    const remainingProductImages = productImagesListArr.slice(variationImages.length);
+    newGallery.push(...remainingProductImages);
+    
+    setGalleryImages(newGallery);
+    setSelectedImage(0); // Reset to first image
+  };
+
   useEffect(() => {
     const loadProduct = async () => {
       if (!id || id === 'undefined') {
@@ -82,13 +107,22 @@ function ProductDetail() {
         
         if (data && data._id) {
           setProduct(data);
+          
+          // Set initial gallery images from product
+          const productImgs = data.images && data.images.length > 0 
+            ? data.images 
+            : ['https://via.placeholder.com/800x800?text=Product+Image'];
+          setGalleryImages([...productImgs]);
           setSelectedImage(0);
+          
           fetchRelatedProducts(data.mainCategory || data.category);
           
           if (data.variations && data.variations.length > 0) {
             const defaultVariation = data.variations[0];
             setSelectedVariation(defaultVariation);
             setSelectedVariationId(defaultVariation.id || defaultVariation._id);
+            // 🔥 Update gallery for default variation
+            updateGalleryForVariation(defaultVariation, productImgs);
           }
         } else {
           setProduct(null);
@@ -177,9 +211,17 @@ function ProductDetail() {
     return product?.price || product?.sellingPrice || 0;
   };
 
+  // 🔥 FIXED: Proper stock check for variations
   const getCurrentStock = () => {
-    if (selectedVariation?.stock !== undefined) return selectedVariation.stock;
-    return product?.stock || 0;
+    // If variation is selected, use variation stock
+    if (selectedVariation && selectedVariation.stock !== undefined && selectedVariation.stock !== null) {
+      return selectedVariation.stock;
+    }
+    // Otherwise use product stock
+    if (product?.stock !== undefined && product?.stock !== null) {
+      return product.stock;
+    }
+    return 0;
   };
 
   const getCurrentMrp = () => {
@@ -199,8 +241,13 @@ function ProductDetail() {
     if (variation) {
       setSelectedVariation(variation);
       setSelectedVariationId(variationId);
-      // Reset quantity when variation changes
-      setQuantity(1);
+      setQuantity(1); // Reset quantity to 1 when variation changes
+      
+      // 🔥 Update gallery based on selected variation
+      const productImgs = product.images && product.images.length > 0 
+        ? product.images 
+        : ['https://via.placeholder.com/800x800?text=Product+Image'];
+      updateGalleryForVariation(variation, productImgs);
     }
   };
 
@@ -208,6 +255,13 @@ function ProductDetail() {
     if (!product) return;
     if (quantity < 1) {
       alert('Please select at least 1 quantity');
+      return;
+    }
+    
+    // Check stock before adding to cart
+    const currentStock = getCurrentStock();
+    if (quantity > currentStock) {
+      alert(`Only ${currentStock} items available in stock`);
       return;
     }
     
@@ -219,7 +273,7 @@ function ProductDetail() {
         name: product.name, 
         price: getCurrentPrice(),
         quantity: quantity,
-        image: product.images && product.images[0] ? product.images[0] : null,
+        image: galleryImages[0] || (product.images && product.images[0]) || null,
         category: product.category,
         stock: getCurrentStock()
       };
@@ -243,12 +297,18 @@ function ProductDetail() {
       return;
     }
     
+    const currentStock = getCurrentStock();
+    if (quantity > currentStock) {
+      alert(`Only ${currentStock} items available in stock`);
+      return;
+    }
+    
     const cartItem = { 
       id: product._id,
       name: product.name, 
       price: getCurrentPrice(),
       quantity: quantity,
-      image: product.images && product.images[0] ? product.images[0] : null,
+      image: galleryImages[0] || (product.images && product.images[0]) || null,
       category: product.category,
       stock: getCurrentStock()
     };
@@ -357,7 +417,7 @@ function ProductDetail() {
   const keyFeatures = getKeyFeatures();
   const specifications = getSpecifications();
   const currentPrice = getCurrentPrice();
-  const currentStock = getCurrentStock();
+  const currentStock = getCurrentStock(); // 🔥 Now this will get correct stock from variation
   const currentMrp = getCurrentMrp();
   const discountPercent = getDiscountPercent();
   const hasVariations = product.variations && product.variations.length > 0;
@@ -447,23 +507,14 @@ function ProductDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
-          {/* Left Column - Images */}
+          {/* Left Column - Dynamic Gallery Images */}
           <div>
             <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex items-center justify-center">
-              {/* 🔥 Show variation image if selected variation has image, otherwise show product image */}
-              {selectedVariation?.image ? (
-                <img 
-                  src={selectedVariation.image} 
-                  alt={`${product.name} - ${selectedVariation.name}`} 
-                  className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
-                />
-              ) : (
-                <img 
-                  src={productImages[selectedImage]} 
-                  alt={product.name} 
-                  className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
-                />
-              )}
+              <img 
+                src={galleryImages[selectedImage] || productImages[0]} 
+                alt={product.name} 
+                className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
+              />
               <button 
                 onClick={handleWishlistToggle} 
                 className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition z-10"
@@ -482,9 +533,10 @@ function ProductDetail() {
               )}
             </div>
             
-            {productImages.length > 1 && (
+            {/* Thumbnails - Dynamic based on gallery */}
+            {galleryImages.length > 1 && (
               <div className="flex gap-2 sm:gap-3 mt-4 overflow-x-auto pb-2 scrollbar-hide">
-                {productImages.map((img, idx) => (
+                {galleryImages.map((img, idx) => (
                   <button 
                     key={idx} 
                     onClick={() => setSelectedImage(idx)} 
@@ -543,18 +595,22 @@ function ProductDetail() {
                       ? `${variation.name} - ${variation.secondaryName}`
                       : variation.name;
                     const isSelected = selectedVariationId === variationId;
+                    const variationStock = variation.stock !== undefined ? variation.stock : 0;
+                    const isVariationOutOfStock = variationStock === 0;
                     
                     return (
                       <button
                         key={variationId}
                         onClick={() => handleVariationChange(variationId)}
+                        disabled={isVariationOutOfStock}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                           isSelected
                             ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
-                            : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
+                            : isVariationOutOfStock
+                              ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                              : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
                         }`}
                       >
-                        {/* 🔥 Variation Image Thumbnail */}
                         {variation.image && (
                           <img 
                             src={variation.image} 
@@ -565,6 +621,9 @@ function ProductDetail() {
                         <span>{displayName}</span>
                         {variation.price !== product.price && (
                           <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
+                        )}
+                        {isVariationOutOfStock && (
+                          <span className="ml-1 text-xs text-red-500">(Out of Stock)</span>
                         )}
                       </button>
                     );
@@ -579,6 +638,7 @@ function ProductDetail() {
               </div>
             )}
 
+            {/* 🔥 FIXED: Stock status - Now shows correct variation stock */}
             {isOutOfStock ? (
               <div className="text-sm text-red-600 font-semibold">❌ Out of Stock</div>
             ) : isLowStock ? (
@@ -658,7 +718,7 @@ function ProductDetail() {
               </button>
             </div>
 
-            {/* 🔥 IMPROVED Product Details Section */}
+            {/* Product Details Box */}
             <div className="border border-pink-100 rounded-xl overflow-hidden bg-gradient-to-r from-pink-50/50 to-white shadow-sm">
               <div className="bg-pink-100/50 px-4 py-3 border-b border-pink-100">
                 <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
@@ -666,7 +726,6 @@ function ProductDetail() {
                 </h3>
               </div>
               <div className="divide-y divide-pink-100">
-                {/* Selected Variation Info */}
                 {selectedVariation && (
                   <div className="flex flex-wrap justify-between px-4 py-3 gap-2">
                     <span className="text-gray-600 text-sm">Selected Option:</span>
@@ -678,7 +737,6 @@ function ProductDetail() {
                   </div>
                 )}
                 
-                {/* Dynamic Specifications */}
                 {Object.entries(specifications).map(([key, value], idx) => (
                   <div key={idx} className="flex flex-wrap justify-between px-4 py-3 gap-2 hover:bg-pink-50/30 transition">
                     <span className="text-gray-600 text-sm">{key}:</span>
@@ -686,7 +744,6 @@ function ProductDetail() {
                   </div>
                 ))}
                 
-                {/* Out of stock / Low stock info */}
                 {isLowStock && !isOutOfStock && (
                   <div className="flex flex-wrap justify-between px-4 py-3 gap-2 bg-amber-50">
                     <span className="text-amber-700 text-sm">Stock Status:</span>
@@ -715,7 +772,6 @@ function ProductDetail() {
           </div>
 
           <div className="py-6">
-            {/* Description */}
             {activeTab === 'description' && (
               <div className="space-y-4">
                 {descriptionBullets.length > 0 ? (
@@ -733,7 +789,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Features */}
             {activeTab === 'features' && (
               <div className="space-y-4">
                 {keyFeatures.length > 0 ? (
@@ -751,7 +806,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Specifications - Full Table */}
             {activeTab === 'specifications' && (
               <div className="bg-gradient-to-r from-pink-50 to-white rounded-xl overflow-hidden border border-pink-100 shadow-sm">
                 <table className="w-full text-sm">
@@ -779,7 +833,6 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* Reviews */}
             {activeTab === 'reviews' && (
               <ReviewSection productId={id} />
             )}
