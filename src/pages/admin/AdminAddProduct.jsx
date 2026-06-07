@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
 // ============================================
-// AMAZON IMPORTER COMPONENT (FIXED - Category Detection)
+// AMAZON IMPORTER COMPONENT
 // ============================================
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -148,18 +148,19 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     
-    // 🔥 Improved Meta Tags with longer limits
+    // Meta Title - 100 chars
     let metaTitle = `${product.name}`;
     if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
     metaTitle = `${metaTitle} | MyPinkShop`;
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
     
+    // Meta Description - 200 chars
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
     metaDescription += ` online at best price. Shop now at MyPinkShop.`;
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
     
-    // 🔥 Auto generate keywords from category, brand, features
+    // Auto generate keywords
     const autoKeywords = [
       product.brand,
       ...keyFeaturesArray.slice(0, 5),
@@ -441,7 +442,7 @@ function AdminAddProduct() {
     return `SKU-${timestamp}-${random}`;
   };
 
-  // 🔥 Auto-generate meta tags
+  // Auto-generate meta tags
   useEffect(() => {
     if (formData.productName) {
       const slug = formData.productName
@@ -461,7 +462,7 @@ function AdminAddProduct() {
       metaDescription += ` at best price. ✓ Free Shipping ✓ COD ✓ Best Quality. Shop now at MyPinkShop!`;
       if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
       
-      // 🔥 Auto-generate keywords from category, brand, features
+      // Auto-generate keywords from category, brand, features
       const autoKeywords = [
         formData.brand,
         formData.category,
@@ -584,7 +585,7 @@ function AdminAddProduct() {
     }
   };
 
-  // 🔥 Variation functions with select all, multiple delete, and images
+  // Variation functions
   const toggleSelectVariation = (id) => {
     setSelectedVariationIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -1186,7 +1187,7 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* Step 4 - Product Details with Improved Variations */}
+            {/* Step 4 - Product Details with IMPROVED Variations */}
             {step === 4 && (
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">✨ Product Details</h2>
@@ -1221,28 +1222,40 @@ function AdminAddProduct() {
                   </div>
                 </div>
 
-                {/* 🔥 IMPROVED Variations Section with Select All + Multiple Delete + Images */}
+                {/* 🔥 IMPROVED VARIATIONS SECTION with Select All, Delete Selected, Images */}
                 <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                    <div>
-                      <h3 className="font-semibold text-gray-800">Product Variations</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">{!formData.category && 'Select a category first'}</p>
-                    </div>
+                  {/* Button Bar - Yeh sabse upar hoga */}
+                  <div className="flex flex-wrap justify-between items-center gap-3 mb-4 pb-3 border-b border-gray-100">
                     <div className="flex gap-2">
                       {variations.length > 0 && (
                         <>
-                          <button onClick={selectAllVariations} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs hover:bg-gray-200 transition">
+                          <button
+                            onClick={selectAllVariations}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center gap-1"
+                          >
+                            <input type="checkbox" checked={selectedVariationIds.length === variations.length && variations.length > 0} readOnly className="w-3.5 h-3.5" />
                             {selectedVariationIds.length === variations.length ? 'Deselect All' : 'Select All'}
                           </button>
-                          <button onClick={deleteSelectedVariations} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition">
-                            Delete Selected ({selectedVariationIds.length})
+                          <button
+                            onClick={deleteSelectedVariations}
+                            className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition flex items-center gap-1"
+                          >
+                            🗑️ Delete Selected ({selectedVariationIds.length})
                           </button>
                         </>
                       )}
+                    </div>
+                    <div>
                       {formData.category && (
-                        <button onClick={() => { setEditingVariation(null); setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} }); setVariationModalOpen(true); }} 
-                          className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg text-sm font-medium hover:shadow-md transition">
-                          + Add {variationAttrs.type}
+                        <button 
+                          onClick={() => { 
+                            setEditingVariation(null); 
+                            setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} }); 
+                            setVariationModalOpen(true); 
+                          }} 
+                          className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:shadow-md transition flex items-center gap-1"
+                        >
+                          <span className="text-lg">+</span> Add {variationAttrs.type}
                         </button>
                       )}
                     </div>
@@ -1251,46 +1264,46 @@ function AdminAddProduct() {
                   {!formData.category ? (
                     <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first</p></div>
                   ) : variations.length === 0 ? (
-                    <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet.</p></div>
+                    <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet. Click "Add {variationAttrs.type}" to add.</p></div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs sm:text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-2 sm:px-3 py-2 text-center w-8">
+                      <table className="w-full text-xs sm:text-sm border border-gray-200 rounded-lg">
+                        <thead className="bg-gray-50">
+                          <tr className="border-b border-gray-200">
+                            <th className="px-3 py-2 text-center w-10">
                               <input type="checkbox" checked={selectedVariationIds.length === variations.length && variations.length > 0} onChange={selectAllVariations} />
                             </th>
-                            <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.type}</th>
-                            {variationAttrs.secondary && <th className="px-2 sm:px-3 py-2 text-left">{variationAttrs.secondary}</th>}
-                            <th className="px-2 sm:px-3 py-2 text-left">Image</th>
-                            <th className="px-2 sm:px-3 py-2 text-right">Price</th>
-                            <th className="px-2 sm:px-3 py-2 text-right">MRP</th>
-                            <th className="px-2 sm:px-3 py-2 text-right">Stock</th>
-                            <th className="px-2 sm:px-3 py-2 text-center">Actions</th>
+                            <th className="px-3 py-2 text-left">{variationAttrs.type}</th>
+                            {variationAttrs.secondary && <th className="px-3 py-2 text-left">{variationAttrs.secondary}</th>}
+                            <th className="px-3 py-2 text-left">Image</th>
+                            <th className="px-3 py-2 text-right">Price</th>
+                            <th className="px-3 py-2 text-right">MRP</th>
+                            <th className="px-3 py-2 text-right">Stock</th>
+                            <th className="px-3 py-2 text-center">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {variations.map(v => (
-                            <tr key={v.id} className="hover:bg-pink-50/30 cursor-pointer" onClick={() => setExpandedVariationId(expandedVariationId === v.id ? null : v.id)}>
-                              <td className="px-2 sm:px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                            <tr key={v.id} className="hover:bg-pink-50/30 cursor-pointer transition" onClick={() => setExpandedVariationId(expandedVariationId === v.id ? null : v.id)}>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                 <input type="checkbox" checked={selectedVariationIds.includes(v.id)} onChange={() => toggleSelectVariation(v.id)} />
                               </td>
-                              <td className="px-2 sm:px-3 py-2 font-medium">{v.name}</td>
-                              {variationAttrs.secondary && <td className="px-2 sm:px-3 py-2">{v.secondaryName || '-'}</td>}
-                              <td className="px-2 sm:px-3 py-2">
+                              <td className="px-3 py-2 font-medium">{v.name}</td>
+                              {variationAttrs.secondary && <td className="px-3 py-2">{v.secondaryName || '-'}</td>}
+                              <td className="px-3 py-2">
                                 {v.image ? (
-                                  <img src={v.image} className="w-8 h-8 object-cover rounded" alt="variation" />
+                                  <img src={v.image} className="w-10 h-10 object-cover rounded border" alt="variation" />
                                 ) : (
                                   <span className="text-gray-400 text-xs">No image</span>
                                 )}
                               </td>
-                              <td className="px-2 sm:px-3 py-2 text-right text-pink-600">₹{v.price}</td>
-                              <td className="px-2 sm:px-3 py-2 text-right text-gray-500 line-through">₹{v.mrp || v.price * 1.2}</td>
-                              <td className="px-2 sm:px-3 py-2 text-right">{v.stock}</td>
-                              <td className="px-2 sm:px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                              <td className="px-3 py-2 text-right text-pink-600 font-medium">₹{v.price}</td>
+                              <td className="px-3 py-2 text-right text-gray-400 line-through">₹{v.mrp}</td>
+                              <td className="px-3 py-2 text-right">{v.stock}</td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex justify-center gap-2">
-                                  <button onClick={() => editVariation(v)} className="text-blue-500">✏️</button>
-                                  <button onClick={() => deleteVariation(v.id)} className="text-red-500">🗑️</button>
+                                  <button onClick={() => editVariation(v)} className="text-blue-500 hover:text-blue-700" title="Edit">✏️</button>
+                                  <button onClick={() => deleteVariation(v.id)} className="text-red-500 hover:text-red-700" title="Delete">🗑️</button>
                                 </div>
                               </td>
                             </tr>
@@ -1298,10 +1311,10 @@ function AdminAddProduct() {
                         </tbody>
                         <tfoot className="bg-gray-50 border-t border-gray-200">
                           <tr>
-                            <td colSpan={variationAttrs.secondary ? 5 : 4} className="px-2 sm:px-3 py-2 font-medium">Total</td>
-                            <td className="px-2 sm:px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
-                            <td className="px-2 sm:px-3 py-2 text-right"></td>
-                            <td className="px-2 sm:px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td>
+                            <td colSpan={variationAttrs.secondary ? 4 : 3} className="px-3 py-2 font-medium">Total</td>
+                            <td className="px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
+                            <td className="px-3 py-2 text-right"></td>
+                            <td className="px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td>
                             <td></td>
                           </tr>
                         </tfoot>
@@ -1310,15 +1323,15 @@ function AdminAddProduct() {
                   )}
                 </div>
 
-                {/* 🔥 Expanded Variation Details Modal */}
+                {/* Expanded Variation Details Modal */}
                 {expandedVariationId && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setExpandedVariationId(null)}>
-                    <div className="bg-white rounded-xl max-w-2xl w-full shadow-xl mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-5 flex justify-between items-center">
-                        <h3 className="text-base sm:text-lg font-semibold">Variation Details</h3>
-                        <button onClick={() => setExpandedVariationId(null)} className="text-gray-400 text-2xl">×</button>
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+                      <div className="border-b border-gray-200 p-4 flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Variation Details</h3>
+                        <button onClick={() => setExpandedVariationId(null)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
                       </div>
-                      <div className="p-4 sm:p-5">
+                      <div className="p-5">
                         {(() => {
                           const v = variations.find(v => v.id === expandedVariationId);
                           if (!v) return null;
@@ -1326,41 +1339,41 @@ function AdminAddProduct() {
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">{variationAttrs.type}</label>
-                                  <p className="text-base font-semibold">{v.name}</p>
+                                  <label className="text-xs text-gray-500">{variationAttrs.type}</label>
+                                  <p className="font-semibold">{v.name}</p>
                                 </div>
                                 {variationAttrs.secondary && (
                                   <div>
-                                    <label className="text-sm font-medium text-gray-600">{variationAttrs.secondary}</label>
-                                    <p className="text-base">{v.secondaryName || '-'}</p>
+                                    <label className="text-xs text-gray-500">{variationAttrs.secondary}</label>
+                                    <p className="font-semibold">{v.secondaryName || '-'}</p>
                                   </div>
                                 )}
                               </div>
                               <div>
-                                <label className="text-sm font-medium text-gray-600">Variation Image</label>
+                                <label className="text-xs text-gray-500">Variation Image</label>
                                 {v.image ? (
-                                  <img src={v.image} className="w-32 h-32 object-cover rounded-lg border mt-2" alt="variation" />
+                                  <img src={v.image} className="w-24 h-24 object-cover rounded-lg border mt-1" alt="variation" />
                                 ) : (
                                   <p className="text-gray-400 text-sm mt-1">No image uploaded</p>
                                 )}
                               </div>
                               <div className="grid grid-cols-3 gap-4">
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">Selling Price</label>
+                                  <label className="text-xs text-gray-500">Price</label>
                                   <p className="text-lg font-bold text-pink-600">₹{v.price}</p>
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">MRP</label>
-                                  <p className="text-lg text-gray-500 line-through">₹{v.mrp}</p>
+                                  <label className="text-xs text-gray-500">MRP</label>
+                                  <p className="text-sm text-gray-400 line-through">₹{v.mrp}</p>
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">Stock</label>
-                                  <p className="text-lg">{v.stock} units</p>
+                                  <label className="text-xs text-gray-500">Stock</label>
+                                  <p className="text-lg">{v.stock}</p>
                                 </div>
                               </div>
                               <div>
-                                <label className="text-sm font-medium text-gray-600">SKU</label>
-                                <p className="text-sm font-mono bg-gray-100 p-2 rounded">{v.sku}</p>
+                                <label className="text-xs text-gray-500">SKU</label>
+                                <p className="text-xs font-mono bg-gray-100 p-2 rounded">{v.sku}</p>
                               </div>
                             </div>
                           );
@@ -1373,14 +1386,13 @@ function AdminAddProduct() {
                 {/* Variation Modal with Image Upload */}
                 {variationModalOpen && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 sm:p-5 flex justify-between">
-                        <h3 className="text-base sm:text-lg font-semibold">{editingVariation ? 'Edit' : 'Add New'} {variationAttrs.type}</h3>
-                        <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 text-2xl">×</button>
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">{editingVariation ? 'Edit' : 'Add New'} {variationAttrs.type}</h3>
+                        <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
                       </div>
                       
-                      <div className="p-4 sm:p-5 space-y-4">
-                        {/* Primary Option with Search */}
+                      <div className="p-5 space-y-4">
                         <VariationSelectWithSearch 
                           label={`${variationAttrs.type} *`}
                           options={variationAttrs.options}
@@ -1389,7 +1401,6 @@ function AdminAddProduct() {
                           placeholder={`Search or type custom ${variationAttrs.type.toLowerCase()}...`}
                         />
                         
-                        {/* Secondary Option with Search */}
                         {variationAttrs.secondary && (
                           <VariationSelectWithSearch 
                             label={variationAttrs.secondary}
@@ -1402,33 +1413,32 @@ function AdminAddProduct() {
                         
                         {/* Variation Image Upload */}
                         <div>
-                          <label className="block text-sm font-medium mb-1.5">Variation Image (Optional)</label>
-                          <div className="flex gap-2 items-center">
+                          <label className="block text-sm font-medium mb-1.5">Variation Image</label>
+                          <div className="flex items-center gap-3">
                             {variationForm.image ? (
                               <div className="relative">
                                 <img src={variationForm.image} className="w-16 h-16 object-cover rounded border" alt="variation" />
-                                <button onClick={() => setVariationForm({...variationForm, image: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs">×</button>
+                                <button onClick={() => setVariationForm({...variationForm, image: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">×</button>
                               </div>
                             ) : (
                               <div className="flex-1">
                                 <input type="file" accept="image/*" onChange={uploadVariationImage} className="hidden" id="variationImageUpload" />
-                                <label htmlFor="variationImageUpload" className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200">
+                                <label htmlFor="variationImageUpload" className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 transition">
                                   📷 Upload Image
                                 </label>
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">Upload image for this variation (like shade swatch)</p>
+                          <p className="text-xs text-gray-400 mt-1">Upload image for this variation (like shade swatch or size)</p>
                         </div>
                         
-                        {/* Price, MRP, Stock, SKU */}
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-sm font-medium mb-1.5">Selling Price (₹) *</label>
+                            <label className="block text-sm font-medium mb-1.5">Selling Price *</label>
                             <input type="number" value={variationForm.price} onChange={(e) => setVariationForm({...variationForm, price: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="499" />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium mb-1.5">MRP (₹)</label>
+                            <label className="block text-sm font-medium mb-1.5">MRP</label>
                             <input type="number" value={variationForm.mrp} onChange={(e) => setVariationForm({...variationForm, mrp: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="599" />
                           </div>
                           <div>
@@ -1442,8 +1452,8 @@ function AdminAddProduct() {
                         </div>
                         
                         <div className="flex gap-3 pt-4">
-                          <button onClick={() => setVariationModalOpen(false)} className="flex-1 px-3 py-2 border rounded-lg text-gray-700">Cancel</button>
-                          <button onClick={saveVariation} className="flex-1 px-3 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg font-medium">{editingVariation ? 'Update' : 'Add'}</button>
+                          <button onClick={() => setVariationModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+                          <button onClick={saveVariation} className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg font-medium hover:shadow-md transition">{editingVariation ? 'Update' : 'Add'}</button>
                         </div>
                       </div>
                     </div>
@@ -1494,9 +1504,9 @@ function AdminAddProduct() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords <span className="text-xs text-gray-400">(Auto-generated, comma separated)</span></label>
-                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="skincare, vitamin c, anti-aging" />
-                    <p className="text-xs text-gray-400 mt-1">Auto-generated from brand, category, and features</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords <span className="text-xs text-gray-400">(Auto-generated)</span></label>
+                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">Auto-generated from brand, category, and product features</p>
                   </div>
                   
                   <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
