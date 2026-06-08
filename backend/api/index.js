@@ -482,7 +482,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== 🔥 FIXED PUT ROUTE - Variations save properly ==========
+// ========== 🔥 FINAL FIXED PUT ROUTE - Complete variations support ==========
 app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -491,26 +491,22 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    // 🔥 CRITICAL FIX: Explicitly handle variations and variants
-    // Create a copy of req.body without variations/variants to avoid Object.assign issues
-    const updateData = { ...req.body };
-    
-    // Explicitly set variations if present
+    // 🔥 CRITICAL: Directly assign variations array as received from frontend
+    // This handles ADD, UPDATE, and DELETE of variations
     if (req.body.variations !== undefined) {
       product.variations = req.body.variations;
-      delete updateData.variations;
     }
     
-    // Explicitly set variants if present  
     if (req.body.variants !== undefined) {
       product.variants = req.body.variants;
-      delete updateData.variants;
     }
     
-    // Apply remaining updates
-    Object.assign(product, updateData);
+    // Remove variations/variants from body to avoid double assignment
+    const { variations, variants, ...otherData } = req.body;
+    Object.assign(product, otherData);
     
     await product.save();
+    
     res.json({ success: true, product });
   } catch (error) {
     console.error('Update product error:', error);
