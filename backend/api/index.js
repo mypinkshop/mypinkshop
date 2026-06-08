@@ -273,7 +273,7 @@ reviewSchema.statics.getAverageRating = async function(productId) {
 
 const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
 
-// ========== ORDER SCHEMA (simplified for reviews) ==========
+// ========== ORDER SCHEMA ==========
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   name: String,
@@ -296,6 +296,26 @@ const orderSchema = new mongoose.Schema({
 });
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
+
+// ========== WISHLIST SCHEMA ==========
+const wishlistItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  addedAt: { type: Date, default: Date.now }
+});
+
+const wishlistSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  items: [wishlistItemSchema],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+wishlistSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
+const Wishlist = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);
 
 // ========== Auth Middleware ==========
 const authMiddleware = (req, res, next) => {
@@ -824,6 +844,108 @@ app.delete('/api/reviews/:reviewId', authMiddleware, async (req, res) => {
     await review.deleteOne();
     res.json({ success: true });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== WISHLIST ROUTES ==========
+
+// Get user wishlist
+app.get('/api/wishlist', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    let wishlist = await Wishlist.findOne({ userId }).populate('items.productId');
+    
+    if (!wishlist) {
+      return res.json([]);
+    }
+    
+    const formattedWishlist = wishlist.items.map(item => ({
+      _id: item.productId._id,
+      id: item.productId._id,
+      name: item.productId.name,
+      price: item.productId.price,
+      originalPrice: item.productId.originalPrice,
+      image: item.productId.images?.[0] || null,
+      brand: item.productId.brand,
+      category: item.productId.category,
+      addedAt: item.addedAt
+    }));
+    
+    res.json(formattedWishlist);
+  } catch (error) {
+    console.error('Get wishlist error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add to wishlist
+app.post('/api/wishlist', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { productId } = req.body;
+    
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID required' });
+    }
+    
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    let wishlist = await Wishlist.findOne({ userId });
+    
+    if (!wishlist) {
+      wishlist = new Wishlist({ userId, items: [{ productId }] });
+    } else {
+      const existingItem = wishlist.items.find(item => item.productId.toString() === productId);
+      if (existingItem) {
+        return res.status(400).json({ error: 'Product already in wishlist' });
+      }
+      wishlist.items.push({ productId });
+    }
+    
+    await wishlist.save();
+    
+    res.json({ success: true, message: 'Added to wishlist', count: wishlist.items.length });
+  } catch (error) {
+    console.error('Add to wishlist error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove from wishlist
+app.delete('/api/wishlist/:productId', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { productId } = req.params;
+    
+    const wishlist = await Wishlist.findOne({ userId });
+    
+    if (!wishlist) {
+      return res.status(404).json({ error: 'Wishlist not found' });
+    }
+    
+    wishlist.items = wishlist.items.filter(item => item.productId.toString() !== productId);
+    await wishlist.save();
+    
+    res.json({ success: true, message: 'Removed from wishlist', count: wishlist.items.length });
+  } catch (error) {
+    console.error('Remove from wishlist error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear wishlist
+app.delete('/api/wishlist/clear/all', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await Wishlist.findOneAndDelete({ userId });
+    res.json({ success: true, message: 'Wishlist cleared' });
+  } catch (error) {
+    console.error('Clear wishlist error:', error);
     res.status(500).json({ error: error.message });
   }
 });
