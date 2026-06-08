@@ -143,6 +143,7 @@ export const WishlistProvider = ({ children }) => {
     return wishlist.some(item => (item._id === id || item.id === id));
   };
 
+  // 🔥 FIXED: Clear wishlist with correct URL
   const clearWishlist = async () => {
     setWishlist([]);
     setWishlistCount(0);
@@ -151,7 +152,7 @@ export const WishlistProvider = ({ children }) => {
     const token = getToken();
     if (token) {
       try {
-        await fetch(`${API_URL}/api/wishlist/clear`, {
+        await fetch(`${API_URL}/api/wishlist/clear/all`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
