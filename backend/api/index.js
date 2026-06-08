@@ -187,7 +187,8 @@ const productSchema = new mongoose.Schema({
   metaTitle: { type: String, default: '' },
   metaDescription: { type: String, default: '' },
   metaKeywords: { type: String, default: '' },
-  slug: { type: String, default: '' }
+  slug: { type: String, default: '' },
+  reviewCount: { type: Number, default: 0 }
 });
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
@@ -239,6 +240,62 @@ const couponSchema = new mongoose.Schema({
 });
 
 const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
+
+// ========== REVIEW SCHEMA ==========
+const reviewSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
+  rating: { type: Number, required: true, min: 1, max: 5 },
+  title: { type: String, default: '', trim: true, maxlength: 100 },
+  comment: { type: String, required: true, trim: true, maxlength: 2000 },
+  images: { type: [String], default: [] },
+  videos: { type: [String], default: [] },
+  status: { type: String, enum: ['pending', 'approved', 'rejected', 'spam'], default: 'pending' },
+  isVerifiedPurchase: { type: Boolean, default: false },
+  helpful: { type: Number, default: 0 },
+  helpfulUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  adminNote: { type: String, default: '' },
+  reviewedAt: { type: Date, default: Date.now },
+  approvedAt: { type: Date }
+}, { timestamps: true });
+
+reviewSchema.index({ productId: 1, status: 1 });
+reviewSchema.index({ userId: 1, productId: 1 }, { unique: true });
+
+reviewSchema.statics.getAverageRating = async function(productId) {
+  const result = await this.aggregate([
+    { $match: { productId: mongoose.Types.ObjectId(productId), status: 'approved' } },
+    { $group: { _id: '$productId', avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+  ]);
+  return { rating: result[0]?.avgRating || 0, count: result[0]?.count || 0 };
+};
+
+const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
+
+// ========== ORDER SCHEMA (simplified for reviews) ==========
+const orderItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  name: String,
+  price: Number,
+  quantity: Number,
+  image: String,
+  variationName: String,
+  variationSecondary: String
+});
+
+const orderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  items: [orderItemSchema],
+  total: Number,
+  status: { type: String, enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'], default: 'pending' },
+  paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+  address: Object,
+  createdAt: { type: Date, default: Date.now },
+  deliveredAt: Date
+});
+
+const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
 // ========== Auth Middleware ==========
 const authMiddleware = (req, res, next) => {
@@ -370,6 +427,39 @@ app.delete('/api/upload', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
+// ========== REVIEW UPLOAD ROUTE ==========
+app.post('/api/reviews/upload', authMiddleware, upload.array('media', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const uploadedUrls = [];
+    for (const file of req.files) {
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileExtension = file.originalname.split('.').pop();
+      const folder = file.mimetype.startsWith('image/') ? 'review-images' : 'review-videos';
+      const filename = `${folder}/${timestamp}-${randomString}.${fileExtension}`;
+
+      const params = {
+        Bucket: BUCKET_NAME,
+        Key: filename,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      };
+
+      await s3.upload(params).promise();
+      uploadedUrls.push(`${PUBLIC_URL}/${filename}`);
+    }
+
+    res.json({ success: true, urls: uploadedUrls });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== AUTH ROUTES ==========
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -482,7 +572,6 @@ app.post('/api/products', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== 🔥 FINAL FIXED PUT ROUTE - Complete variations support ==========
 app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -491,8 +580,6 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    // 🔥 CRITICAL: Directly assign variations array as received from frontend
-    // This handles ADD, UPDATE, and DELETE of variations
     if (req.body.variations !== undefined) {
       product.variations = req.body.variations;
     }
@@ -501,12 +588,10 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       product.variants = req.body.variants;
     }
     
-    // Remove variations/variants from body to avoid double assignment
     const { variations, variants, ...otherData } = req.body;
     Object.assign(product, otherData);
     
     await product.save();
-    
     res.json({ success: true, product });
   } catch (error) {
     console.error('Update product error:', error);
@@ -518,6 +603,225 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
   try {
     await connectDB();
     await Product.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== REVIEW ROUTES ==========
+
+// Check if user can review
+app.get('/api/reviews/can-review/:productId', authMiddleware, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user.id;
+    
+    const order = await Order.findOne({
+      userId,
+      'items.productId': productId,
+      status: 'delivered'
+    });
+    
+    const existingReview = await Review.findOne({ productId, userId, orderId: order?._id });
+    
+    res.json({
+      canReview: !!order && !existingReview,
+      alreadyReviewed: !!existingReview,
+      orderId: order?._id
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create review
+app.post('/api/reviews', authMiddleware, async (req, res) => {
+  try {
+    const { productId, orderId, rating, title, comment, images, videos } = req.body;
+    const userId = req.user.id;
+    
+    const order = await Order.findOne({
+      _id: orderId,
+      userId,
+      'items.productId': productId,
+      status: 'delivered'
+    });
+    
+    if (!order) {
+      return res.status(403).json({ error: 'You can only review products after delivery' });
+    }
+    
+    const existingReview = await Review.findOne({ productId, userId, orderId });
+    if (existingReview) {
+      return res.status(400).json({ error: 'You have already reviewed this product' });
+    }
+    
+    const review = new Review({
+      productId,
+      userId,
+      orderId,
+      rating,
+      title: title || '',
+      comment,
+      images: images || [],
+      videos: videos || [],
+      isVerifiedPurchase: true,
+      status: 'pending'
+    });
+    
+    await review.save();
+    res.status(201).json({ success: true, review, message: 'Review submitted! Awaiting admin approval.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get approved reviews for product
+app.get('/api/reviews/product/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    
+    const reviews = await Review.find({ productId, status: 'approved' })
+      .populate('userId', 'name')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    
+    const total = await Review.countDocuments({ productId, status: 'approved' });
+    const avgRating = await Review.getAverageRating(productId);
+    
+    res.json({
+      reviews,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      averageRating: avgRating.rating,
+      totalReviews: avgRating.count
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark review as helpful
+app.patch('/api/reviews/:reviewId/helpful', authMiddleware, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    
+    const review = await Review.findById(reviewId);
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    
+    if (review.helpfulUsers.includes(userId)) {
+      return res.json({ helpful: review.helpful });
+    }
+    
+    review.helpful += 1;
+    review.helpfulUsers.push(userId);
+    await review.save();
+    res.json({ helpful: review.helpful });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get pending reviews
+app.get('/api/reviews/admin/pending', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const reviews = await Review.find({ status: 'pending' })
+      .populate('userId', 'name email')
+      .populate('productId', 'name images')
+      .sort({ createdAt: -1 });
+    res.json(reviews);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get all reviews
+app.get('/api/reviews/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const filter = {};
+    if (status && status !== 'all') filter.status = status;
+    
+    const reviews = await Review.find(filter)
+      .populate('userId', 'name email')
+      .populate('productId', 'name images')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    
+    const total = await Review.countDocuments(filter);
+    res.json({ reviews, total, page: parseInt(page), pages: Math.ceil(total / limit) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Approve review
+app.patch('/api/reviews/admin/:reviewId/approve', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { adminNote } = req.body;
+    
+    const review = await Review.findById(reviewId);
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    
+    review.status = 'approved';
+    review.approvedAt = new Date();
+    if (adminNote) review.adminNote = adminNote;
+    await review.save();
+    
+    const avgRating = await Review.getAverageRating(review.productId);
+    await Product.findByIdAndUpdate(review.productId, { rating: avgRating.rating, reviewCount: avgRating.count });
+    
+    res.json({ success: true, review });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Reject review
+app.patch('/api/reviews/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { adminNote } = req.body;
+    
+    const review = await Review.findById(reviewId);
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    
+    review.status = 'rejected';
+    if (adminNote) review.adminNote = adminNote;
+    await review.save();
+    res.json({ success: true, review });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Delete review
+app.delete('/api/reviews/admin/:reviewId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await Review.findByIdAndDelete(req.params.reviewId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// User: Delete own review
+app.delete('/api/reviews/:reviewId', authMiddleware, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    
+    const review = await Review.findOne({ _id: reviewId, userId });
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    
+    await review.deleteOne();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
