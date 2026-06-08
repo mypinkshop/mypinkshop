@@ -541,7 +541,6 @@ function AdminEditProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 🔥 FIXED: Strong submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -561,7 +560,6 @@ function AdminEditProduct() {
 
     const finalSku = formData.sku || generateSKU();
 
-    // 🔥 CRITICAL: Make sure variations are properly structured
     const cleanVariations = variations.map(v => ({
       id: v.id,
       name: v.name,
@@ -608,8 +606,6 @@ function AdminEditProduct() {
       variations: cleanVariations,
       status: 'active'
     };
-
-    console.log('Saving product with variations:', cleanVariations.length);
 
     try {
       const response = await fetch(`${API_URL}/api/products/${id}`, {
