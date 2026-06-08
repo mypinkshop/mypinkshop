@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import { useReviews } from '../../context/ReviewContext';
@@ -6,106 +6,148 @@ import { useReviews } from '../../context/ReviewContext';
 function AdminReviews() {
   const navigate = useNavigate();
   const { 
-    getAllPendingReviews, 
-    getAllApprovedReviews,
+    fetchPendingReviews,
+    fetchAllReviews,
     approveReview, 
     rejectReview, 
     deleteReview 
   } = useReviews();
   
   const [activeTab, setActiveTab] = useState('pending');
-  const [pendingReviews, setPendingReviews] = useState([]);
-  const [approvedReviews, setApprovedReviews] = useState([]);
-  const [filteredPending, setFilteredPending] = useState([]);
-  const [filteredApproved, setFilteredApproved] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [selectedReview, setSelectedReview] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [adminNote, setAdminNote] = useState('');
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [actionType, setActionType] = useState(null);
+  const [actionReviewId, setActionReviewId] = useState(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRating, setFilterRating] = useState('all');
-  const [products, setProducts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalReviews, setTotalReviews] = useState(0);
+  
+  const API_URL = 'https://api.mypinkshop.com';
+  const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
 
+  // Auth check
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = getToken();
     if (!token) {
       navigate('/admin/login');
       return;
     }
-    loadReviews();
-    loadProducts();
   }, [navigate]);
 
-  const loadProducts = () => {
-    const allProducts = JSON.parse(localStorage.getItem('adminProductsList') || '[]');
-    const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
-    setProducts(approvedProducts);
-  };
-
-  const loadReviews = () => {
-    const pending = getAllPendingReviews();
-    const approved = getAllApprovedReviews();
-    setPendingReviews(pending);
-    setApprovedReviews(approved);
-    setFilteredPending(pending);
-    setFilteredApproved(approved);
-    setLoading(false);
-  };
+  // Load reviews based on active tab
+  const loadReviews = useCallback(async () => {
+    setLoading(true);
+    const token = getToken();
+    if (!token) {
+      navigate('/admin/login');
+      return;
+    }
+    
+    try {
+      let data;
+      if (activeTab === 'pending') {
+        const response = await fetch(`${API_URL}/api/reviews/admin/pending`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        data = await response.json();
+        setReviews(data);
+        setTotalReviews(data.length);
+        setTotalPages(1);
+      } else {
+        const response = await fetch(`${API_URL}/api/reviews/admin/all?status=${activeTab}&page=${currentPage}&limit=20`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        data = await response.json();
+        setReviews(data.reviews || []);
+        setTotalReviews(data.total || 0);
+        setTotalPages(data.pages || 1);
+      }
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, currentPage, navigate]);
 
   useEffect(() => {
-    let filtered = [...(activeTab === 'pending' ? pendingReviews : approvedReviews)];
-    
+    loadReviews();
+  }, [loadReviews]);
+
+  // Filter reviews
+  const filteredReviews = reviews.filter(review => {
     if (searchTerm) {
-      filtered = filtered.filter(r => 
-        r.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.title?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const searchLower = searchTerm.toLowerCase();
+      const userName = review.userId?.name?.toLowerCase() || '';
+      const userEmail = review.userId?.email?.toLowerCase() || '';
+      const productName = review.productId?.name?.toLowerCase() || '';
+      const comment = review.comment?.toLowerCase() || '';
+      if (!userName.includes(searchLower) && !userEmail.includes(searchLower) && 
+          !productName.includes(searchLower) && !comment.includes(searchLower)) {
+        return false;
+      }
     }
-    
-    if (filterRating !== 'all') {
-      filtered = filtered.filter(r => r.rating === parseInt(filterRating));
+    if (filterRating !== 'all' && review.rating !== parseInt(filterRating)) {
+      return false;
     }
-    
-    if (activeTab === 'pending') {
-      setFilteredPending(filtered);
+    return true;
+  });
+
+  const handleApprove = async (reviewId) => {
+    setActionLoading(true);
+    const success = await approveReview(reviewId, adminNote);
+    if (success) {
+      await loadReviews();
+      alert('✅ Review approved successfully!');
     } else {
-      setFilteredApproved(filtered);
+      alert('❌ Failed to approve review');
     }
-  }, [searchTerm, filterRating, activeTab, pendingReviews, approvedReviews]);
-
-  const getProductName = (productId) => {
-    const product = products.find(p => p.id == productId);
-    return product?.name || `Product #${productId}`;
+    setActionLoading(false);
+    setShowNoteModal(false);
+    setAdminNote('');
   };
 
-  const getProductBrand = (productId) => {
-    const product = products.find(p => p.id == productId);
-    return product?.brand || 'Unknown';
+  const handleReject = async (reviewId) => {
+    setActionLoading(true);
+    const success = await rejectReview(reviewId, adminNote);
+    if (success) {
+      await loadReviews();
+      alert('❌ Review rejected');
+    } else {
+      alert('❌ Failed to reject review');
+    }
+    setActionLoading(false);
+    setShowNoteModal(false);
+    setAdminNote('');
   };
 
-  const handleApprove = (reviewId) => {
-    if (window.confirm('Approve this review?')) {
-      approveReview(reviewId);
-      loadReviews();
-      alert('✓ Review approved successfully!');
+  const handleDelete = async (reviewId, productId) => {
+    if (!window.confirm('Delete this review permanently? This action cannot be undone.')) return;
+    
+    setActionLoading(true);
+    const success = await deleteReview(reviewId, productId);
+    if (success) {
+      await loadReviews();
+      alert('🗑 Review deleted successfully');
+    } else {
+      alert('❌ Failed to delete review');
     }
+    setActionLoading(false);
   };
 
-  const handleReject = (reviewId) => {
-    if (window.confirm('Reject this review?')) {
-      rejectReview(reviewId);
-      loadReviews();
-      alert('✗ Review rejected');
-    }
-  };
-
-  const handleDelete = (productId, reviewId) => {
-    if (window.confirm('Delete this review permanently?')) {
-      deleteReview(productId, reviewId);
-      loadReviews();
-      alert('🗑 Review deleted');
-    }
+  const openActionModal = (reviewId, type) => {
+    setActionReviewId(reviewId);
+    setActionType(type);
+    setAdminNote('');
+    setShowNoteModal(true);
   };
 
   const getStars = (rating) => {
@@ -126,9 +168,18 @@ function AdminReviews() {
   const clearFilters = () => {
     setSearchTerm('');
     setFilterRating('all');
+    setCurrentPage(1);
   };
 
-  if (loading) {
+  // Stats
+  const pendingCount = reviews.filter(r => r.status === 'pending').length;
+  const approvedCount = reviews.filter(r => r.status === 'approved').length;
+  const rejectedCount = reviews.filter(r => r.status === 'rejected').length;
+  const avgRating = approvedCount > 0 
+    ? (reviews.filter(r => r.status === 'approved').reduce((sum, r) => sum + r.rating, 0) / approvedCount).toFixed(1)
+    : '0';
+
+  if (loading && !reviews.length) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
@@ -136,62 +187,53 @@ function AdminReviews() {
     );
   }
 
-  const currentData = activeTab === 'pending' ? filteredPending : filteredApproved;
-
   return (
     <div className="min-h-screen bg-gray-100">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="md:ml-64">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-40 shadow-sm">
-          <div className="flex justify-between items-center">
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 sticky top-0 z-40 shadow-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
-              <h1 className="text-xl font-semibold text-gray-800">Review Management</h1>
-              <p className="text-sm text-gray-500">Manage customer reviews and ratings across all brands</p>
+              <h1 className="text-xl font-semibold text-gray-800">📝 Review Management</h1>
+              <p className="text-sm text-gray-500">Manage customer reviews and ratings</p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search by customer or review..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64 pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-              </div>
+            <div className="relative w-full sm:w-64">
+              <input 
+                type="text" 
+                placeholder="Search by customer, product..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
-            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-yellow-500">
-              <p className="text-sm text-gray-500">Pending Reviews</p>
-              <p className="text-2xl font-bold text-yellow-600">{pendingReviews.length}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-yellow-500">
+              <p className="text-xs text-gray-500">Pending</p>
+              <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-green-500">
-              <p className="text-sm text-gray-500">Approved Reviews</p>
-              <p className="text-2xl font-bold text-green-600">{approvedReviews.length}</p>
+            <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-green-500">
+              <p className="text-xs text-gray-500">Approved</p>
+              <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
-              <p className="text-sm text-gray-500">Total Reviews</p>
-              <p className="text-2xl font-bold text-blue-600">{pendingReviews.length + approvedReviews.length}</p>
+            <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-red-500">
+              <p className="text-xs text-gray-500">Rejected</p>
+              <p className="text-2xl font-bold text-red-600">{rejectedCount}</p>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
-              <p className="text-sm text-gray-500">Avg Rating</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {approvedReviews.length > 0 
-                  ? (approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length).toFixed(1)
-                  : '0'}
-                ★
-              </p>
+            <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-purple-500">
+              <p className="text-xs text-gray-500">Avg Rating</p>
+              <p className="text-2xl font-bold text-purple-600">{avgRating} ★</p>
             </div>
           </div>
 
-          {/* Filters Row */}
+          {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
             <div className="flex flex-wrap gap-4 items-center">
               <div className="flex items-center gap-2">
@@ -202,11 +244,11 @@ function AdminReviews() {
                   className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
                 >
                   <option value="all">All Ratings</option>
-                  <option value="5">5 ★ (Excellent)</option>
-                  <option value="4">4 ★ (Good)</option>
-                  <option value="3">3 ★ (Average)</option>
-                  <option value="2">2 ★ (Poor)</option>
-                  <option value="1">1 ★ (Bad)</option>
+                  <option value="5">5 ★</option>
+                  <option value="4">4 ★</option>
+                  <option value="3">3 ★</option>
+                  <option value="2">2 ★</option>
+                  <option value="1">1 ★</option>
                 </select>
               </div>
               
@@ -219,25 +261,37 @@ function AdminReviews() {
               
               {(searchTerm || filterRating !== 'all') && (
                 <span className="text-xs text-gray-400">
-                  Showing {currentData.length} of {activeTab === 'pending' ? pendingReviews.length : approvedReviews.length} reviews
+                  Showing {filteredReviews.length} of {reviews.length} reviews
                 </span>
               )}
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-4 border-b border-gray-200 mb-6">
+          <div className="flex gap-2 border-b border-gray-200 mb-6 overflow-x-auto">
             <button
-              onClick={() => setActiveTab('pending')}
-              className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}
+              onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
+              className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              Pending ({pendingReviews.length})
+              Pending ({pendingCount})
             </button>
             <button
-              onClick={() => setActiveTab('approved')}
-              className={`px-4 py-2 text-sm font-medium transition ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500'}`}
+              onClick={() => { setActiveTab('approved'); setCurrentPage(1); }}
+              className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              Approved ({approvedReviews.length})
+              Approved ({approvedCount})
+            </button>
+            <button
+              onClick={() => { setActiveTab('rejected'); setCurrentPage(1); }}
+              className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'rejected' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Rejected ({rejectedCount})
+            </button>
+            <button
+              onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
+              className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'all' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              All ({reviews.length})
             </button>
           </div>
 
@@ -247,8 +301,7 @@ function AdminReviews() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-4 py-3 text-left">Product / Brand</th>
-                    <th className="px-4 py-3 text-left">Customer</th>
+                    <th className="px-4 py-3 text-left">Product / Customer</th>
                     <th className="px-4 py-3 text-center">Rating</th>
                     <th className="px-4 py-3 text-left">Review</th>
                     <th className="px-4 py-3 text-center">Date</th>
@@ -257,9 +310,9 @@ function AdminReviews() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {currentData.length === 0 ? (
+                  {filteredReviews.length === 0 ? (
                     <tr>
-                      <td colSpan={activeTab === 'approved' ? 7 : 6} className="px-4 py-12 text-center text-gray-400">
+                      <td colSpan={activeTab === 'approved' ? 6 : 5} className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">⭐</div>
                         <p>No {activeTab} reviews found</p>
                         {(searchTerm || filterRating !== 'all') && (
@@ -268,40 +321,30 @@ function AdminReviews() {
                       </td>
                     </tr>
                   ) : (
-                    currentData.map((review) => (
-                      <tr key={review.id} className="hover:bg-gray-50">
+                    filteredReviews.map((review) => (
+                      <tr key={review._id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
-                          <div>
-                            <p className="font-medium text-gray-800">{getProductName(review.productId)}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Brand: {getProductBrand(review.productId)}</p>
-                            <p className="text-xs text-gray-400">ID: #{review.productId}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="font-medium text-gray-800">{review.userName}</p>
-                            <p className="text-xs text-gray-400">{review.userEmail}</p>
-                          </div>
+                          <p className="font-medium text-gray-800 text-sm">{review.productId?.name || 'Unknown Product'}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">by {review.userId?.name || review.userId?.email || 'Anonymous'}</p>
+                          <p className="text-[10px] text-gray-400">{review.productId?.brand || ''}</p>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <div className="flex flex-col items-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRatingBadge(review.rating)}`}>
-                              {review.rating} ★
-                            </span>
-                            <span className="text-xs text-gray-400 mt-1">{getStars(review.rating)}</span>
-                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRatingBadge(review.rating)}`}>
+                            {review.rating} ★
+                          </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div>
-                            <p className="font-semibold text-gray-800 text-sm">{review.title}</p>
-                            <p className="text-gray-500 text-xs line-clamp-2 max-w-[200px] mt-0.5">{review.comment}</p>
-                            {review.images && review.images.length > 0 && (
-                              <span className="text-xs text-blue-500 mt-1 inline-flex items-center gap-1">📸 {review.images.length} images</span>
-                            )}
-                          </div>
+                          <p className="font-semibold text-gray-800 text-sm">{review.title || 'No title'}</p>
+                          <p className="text-gray-500 text-xs line-clamp-2 max-w-[250px] mt-0.5">{review.comment}</p>
+                          {review.images?.length > 0 && (
+                            <span className="text-xs text-blue-500 mt-1 inline-flex items-center gap-1">📸 {review.images.length} images</span>
+                          )}
+                          {review.isVerifiedPurchase && (
+                            <span className="text-xs text-green-600 ml-2">✓ Verified</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                          {new Date(review.date).toLocaleDateString()}
+                          {new Date(review.createdAt).toLocaleDateString()}
                         </td>
                         {activeTab === 'approved' && (
                           <td className="px-4 py-3 text-center">{review.helpful || 0} 👍</td>
@@ -310,14 +353,47 @@ function AdminReviews() {
                           <div className="flex justify-center gap-2">
                             {activeTab === 'pending' ? (
                               <>
-                                <button onClick={() => handleApprove(review.id)} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition" title="Approve">✓</button>
-                                <button onClick={() => handleReject(review.id)} className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition" title="Reject">✗</button>
-                                <button onClick={() => { setSelectedReview(review); setShowDetails(true); }} className="px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition" title="View">👁️</button>
+                                <button 
+                                  onClick={() => openActionModal(review._id, 'approve')} 
+                                  disabled={actionLoading}
+                                  className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 transition disabled:opacity-50" 
+                                  title="Approve"
+                                >
+                                  ✓
+                                </button>
+                                <button 
+                                  onClick={() => openActionModal(review._id, 'reject')} 
+                                  disabled={actionLoading}
+                                  className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition disabled:opacity-50" 
+                                  title="Reject"
+                                >
+                                  ✗
+                                </button>
+                                <button 
+                                  onClick={() => { setSelectedReview(review); setShowDetails(true); }} 
+                                  className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition" 
+                                  title="View"
+                                >
+                                  👁️
+                                </button>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => handleDelete(review.productId, review.id)} className="text-red-500 hover:text-red-700 transition" title="Delete">🗑️</button>
-                                <button onClick={() => { setSelectedReview(review); setShowDetails(true); }} className="text-blue-500 hover:text-blue-700 transition" title="View">👁️</button>
+                                <button 
+                                  onClick={() => handleDelete(review._id, review.productId?._id)} 
+                                  disabled={actionLoading}
+                                  className="text-red-500 hover:text-red-700 transition disabled:opacity-50" 
+                                  title="Delete"
+                                >
+                                  🗑️
+                                </button>
+                                <button 
+                                  onClick={() => { setSelectedReview(review); setShowDetails(true); }} 
+                                  className="text-blue-500 hover:text-blue-700 transition" 
+                                  title="View"
+                                >
+                                  👁️
+                                </button>
                               </>
                             )}
                           </div>
@@ -330,13 +406,65 @@ function AdminReviews() {
             </div>
           </div>
 
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 mt-6">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded-lg text-sm disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-1 text-sm">Page {currentPage} of {totalPages}</span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 border rounded-lg text-sm disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
+
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-400">
-              Showing {currentData.length} of {activeTab === 'pending' ? pendingReviews.length : approvedReviews.length} reviews
+              Showing {filteredReviews.length} of {reviews.length} reviews
             </p>
           </div>
         </div>
       </div>
+
+      {/* Admin Note Modal */}
+      {showNoteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowNoteModal(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b p-4">
+              <h3 className="text-lg font-semibold">{actionType === 'approve' ? 'Approve' : 'Reject'} Review</h3>
+            </div>
+            <div className="p-5">
+              <label className="block text-sm font-medium mb-2">Admin Note (Optional)</label>
+              <textarea
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+                rows="3"
+                placeholder="Add a note for the customer..."
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-pink-500"
+              />
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => actionType === 'approve' ? handleApprove(actionReviewId) : handleReject(actionReviewId)}
+                  disabled={actionLoading}
+                  className={`flex-1 py-2 rounded-lg text-white ${actionType === 'approve' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} disabled:opacity-50`}
+                >
+                  {actionLoading ? 'Processing...' : (actionType === 'approve' ? '✓ Approve' : '✗ Reject')}
+                </button>
+                <button onClick={() => setShowNoteModal(false)} className="flex-1 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Review Details Modal */}
       {showDetails && selectedReview && (
@@ -344,18 +472,18 @@ function AdminReviews() {
           <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
               <h3 className="text-lg font-semibold">Review Details</h3>
-              <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-xs text-gray-500">Product</p>
-                <p className="font-medium">{getProductName(selectedReview.productId)}</p>
-                <p className="text-xs text-gray-400 mt-1">Brand: {getProductBrand(selectedReview.productId)}</p>
+                <p className="font-medium">{selectedReview.productId?.name || 'Unknown Product'}</p>
+                <p className="text-xs text-gray-400 mt-1">{selectedReview.productId?.brand || ''}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Customer</p>
-                <p className="font-medium">{selectedReview.userName}</p>
-                <p className="text-xs text-gray-400">{selectedReview.userEmail}</p>
+                <p className="font-medium">{selectedReview.userId?.name || 'Anonymous'}</p>
+                <p className="text-xs text-gray-400">{selectedReview.userId?.email || ''}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Rating</p>
@@ -363,18 +491,20 @@ function AdminReviews() {
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRatingBadge(selectedReview.rating)}`}>
                     {selectedReview.rating} ★
                   </span>
-                  <span className="text-yellow-500">{getStars(selectedReview.rating)}</span>
+                  <span className="text-yellow-500 text-sm">{getStars(selectedReview.rating)}</span>
                 </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">Title</p>
-                <p className="font-medium">{selectedReview.title}</p>
-              </div>
+              {selectedReview.title && (
+                <div>
+                  <p className="text-xs text-gray-500">Title</p>
+                  <p className="font-medium">{selectedReview.title}</p>
+                </div>
+              )}
               <div>
                 <p className="text-xs text-gray-500">Review</p>
                 <p className="text-gray-600 text-sm">{selectedReview.comment}</p>
               </div>
-              {selectedReview.images && selectedReview.images.length > 0 && (
+              {selectedReview.images?.length > 0 && (
                 <div>
                   <p className="text-xs text-gray-500 mb-2">Images ({selectedReview.images.length})</p>
                   <div className="flex gap-2 flex-wrap">
@@ -384,14 +514,35 @@ function AdminReviews() {
                   </div>
                 </div>
               )}
+              {selectedReview.adminNote && (
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-xs text-blue-600">Admin Note</p>
+                  <p className="text-sm text-blue-700">{selectedReview.adminNote}</p>
+                </div>
+              )}
               <div className="flex gap-3 pt-4 border-t">
-                {activeTab === 'pending' ? (
+                {selectedReview.status === 'pending' ? (
                   <>
-                    <button onClick={() => { handleApprove(selectedReview.id); setShowDetails(false); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">Approve</button>
-                    <button onClick={() => { handleReject(selectedReview.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">Reject</button>
+                    <button 
+                      onClick={() => { openActionModal(selectedReview._id, 'approve'); setShowDetails(false); }} 
+                      className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => { openActionModal(selectedReview._id, 'reject'); setShowDetails(false); }} 
+                      className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
+                    >
+                      Reject
+                    </button>
                   </>
                 ) : (
-                  <button onClick={() => { handleDelete(selectedReview.productId, selectedReview.id); setShowDetails(false); }} className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">Delete</button>
+                  <button 
+                    onClick={() => { handleDelete(selectedReview._id, selectedReview.productId?._id); setShowDetails(false); }} 
+                    className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
+                  >
+                    Delete Review
+                  </button>
                 )}
                 <button onClick={() => setShowDetails(false)} className="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50">Close</button>
               </div>
