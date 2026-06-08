@@ -31,7 +31,7 @@ function ProductDetail() {
   const [deliveryStatus, setDeliveryStatus] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   
-  // 🔥 State for dynamic gallery images
+  // State for dynamic gallery images
   const [galleryImages, setGalleryImages] = useState([]);
 
   const API_URL = 'https://api.mypinkshop.com';
@@ -65,10 +65,17 @@ function ProductDetail() {
     }
   };
 
-  // 🔥 Function to update gallery based on selected variation
-  const updateGalleryForVariation = (variation, productImagesList) => {
+  // 🔥 FIXED: Function to update gallery based on selected variation - ONLY FOR CLOTHING
+  const updateGalleryForVariation = (variation, productImagesList, isClothing) => {
+    // If not clothing category, always show product images
+    if (!isClothing) {
+      setGalleryImages([...productImagesList]);
+      setSelectedImage(0);
+      return;
+    }
+    
+    // Only for Clothing - variation images replace product images
     if (!variation || !variation.image || variation.image.length === 0) {
-      // No variation image, show all product images
       setGalleryImages([...productImagesList]);
       setSelectedImage(0);
       return;
@@ -84,7 +91,7 @@ function ProductDetail() {
     newGallery.push(...remainingProductImages);
     
     setGalleryImages(newGallery);
-    setSelectedImage(0); // Reset to first image
+    setSelectedImage(0);
   };
 
   useEffect(() => {
@@ -108,6 +115,9 @@ function ProductDetail() {
         if (data && data._id) {
           setProduct(data);
           
+          // Check if category is Clothing
+          const isClothing = data.mainCategory === 'Clothing' || data.category === 'Clothing';
+          
           // Set initial gallery images from product
           const productImgs = data.images && data.images.length > 0 
             ? data.images 
@@ -121,8 +131,8 @@ function ProductDetail() {
             const defaultVariation = data.variations[0];
             setSelectedVariation(defaultVariation);
             setSelectedVariationId(defaultVariation.id || defaultVariation._id);
-            // 🔥 Update gallery for default variation
-            updateGalleryForVariation(defaultVariation, productImgs);
+            // 🔥 Update gallery for default variation (only for Clothing)
+            updateGalleryForVariation(defaultVariation, productImgs, isClothing);
           }
         } else {
           setProduct(null);
@@ -211,13 +221,10 @@ function ProductDetail() {
     return product?.price || product?.sellingPrice || 0;
   };
 
-  // 🔥 FIXED: Proper stock check for variations
   const getCurrentStock = () => {
-    // If variation is selected, use variation stock
     if (selectedVariation && selectedVariation.stock !== undefined && selectedVariation.stock !== null) {
       return selectedVariation.stock;
     }
-    // Otherwise use product stock
     if (product?.stock !== undefined && product?.stock !== null) {
       return product.stock;
     }
@@ -241,13 +248,14 @@ function ProductDetail() {
     if (variation) {
       setSelectedVariation(variation);
       setSelectedVariationId(variationId);
-      setQuantity(1); // Reset quantity to 1 when variation changes
+      setQuantity(1);
       
-      // 🔥 Update gallery based on selected variation
+      // 🔥 Update gallery based on selected variation (only for Clothing)
+      const isClothing = product.mainCategory === 'Clothing' || product.category === 'Clothing';
       const productImgs = product.images && product.images.length > 0 
         ? product.images 
         : ['https://via.placeholder.com/800x800?text=Product+Image'];
-      updateGalleryForVariation(variation, productImgs);
+      updateGalleryForVariation(variation, productImgs, isClothing);
     }
   };
 
@@ -258,7 +266,6 @@ function ProductDetail() {
       return;
     }
     
-    // Check stock before adding to cart
     const currentStock = getCurrentStock();
     if (quantity > currentStock) {
       alert(`Only ${currentStock} items available in stock`);
@@ -417,13 +424,14 @@ function ProductDetail() {
   const keyFeatures = getKeyFeatures();
   const specifications = getSpecifications();
   const currentPrice = getCurrentPrice();
-  const currentStock = getCurrentStock(); // 🔥 Now this will get correct stock from variation
+  const currentStock = getCurrentStock();
   const currentMrp = getCurrentMrp();
   const discountPercent = getDiscountPercent();
   const hasVariations = product.variations && product.variations.length > 0;
   const isOutOfStock = currentStock === 0;
   const isLowStock = currentStock > 0 && currentStock < 10;
   const isButtonDisabled = isOutOfStock || quantity < 1;
+  const isClothing = product.mainCategory === 'Clothing' || product.category === 'Clothing';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -582,7 +590,7 @@ function ProductDetail() {
               )}
             </div>
 
-            {/* 🔥 Variations - With Images */}
+            {/* Variations - With Images */}
             {hasVariations && product.variations && product.variations.length > 0 && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-800 mb-3">
@@ -611,7 +619,7 @@ function ProductDetail() {
                               : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
                         }`}
                       >
-                        {variation.image && (
+                        {variation.image && isClothing && (
                           <img 
                             src={variation.image} 
                             alt={variation.name}
@@ -638,7 +646,7 @@ function ProductDetail() {
               </div>
             )}
 
-            {/* 🔥 FIXED: Stock status - Now shows correct variation stock */}
+            {/* Stock status */}
             {isOutOfStock ? (
               <div className="text-sm text-red-600 font-semibold">❌ Out of Stock</div>
             ) : isLowStock ? (
