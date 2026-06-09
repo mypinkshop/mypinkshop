@@ -32,7 +32,6 @@ export const AuthProvider = ({ children }) => {
 
   // ========== PASSWORD-BASED METHODS ==========
   
-  // Register with password
   const registerWithPassword = async (name, email, password, role = 'buyer') => {
     try {
       const res = await fetch(`${API_URL}/auth/password/register`, {
@@ -62,7 +61,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Login with password
   const loginWithPassword = async (email, password) => {
     try {
       const res = await fetch(`${API_URL}/auth/password/login`, {
@@ -94,7 +92,6 @@ export const AuthProvider = ({ children }) => {
 
   // ========== OTP-BASED METHODS ==========
   
-  // Send OTP
   const sendOTP = async (email) => {
     try {
       const res = await fetch(`${API_URL}/auth/send-otp`, {
@@ -110,7 +107,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Verify OTP and login/register
   const verifyOTP = async (email, otp) => {
     try {
       const res = await fetch(`${API_URL}/auth/verify`, {
@@ -140,7 +136,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Resend OTP
   const resendOTP = async (email) => {
     try {
       const res = await fetch(`${API_URL}/auth/resend`, {
@@ -175,6 +170,22 @@ export const AuthProvider = ({ children }) => {
   const getCurrentUser = () => user;
   const getToken = () => token || localStorage.getItem('token');
 
+  // ========== ALIASES FOR COMPATIBILITY ==========
+  // These make sure existing Login/Register components work
+  
+  const register = async (name, email, password, role) => {
+    return await registerWithPassword(name, email, password, role);
+  };
+
+  const login = async (email, password) => {
+    // If it's OTP login (password is 'otp_login'), don't do anything
+    if (password === 'otp_login') {
+      return { success: true };
+    }
+    // Otherwise do password login
+    return await loginWithPassword(email, password);
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -187,6 +198,9 @@ export const AuthProvider = ({ children }) => {
       sendOTP,
       verifyOTP,
       resendOTP,
+      // Aliases for compatibility
+      register,     // ✅ ADDED
+      login,        // ✅ ADDED
       // Common methods
       logout,
       isAuthenticated,
