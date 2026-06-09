@@ -57,7 +57,7 @@ const sendOTPEmail = async (email, otp) => {
   }
 
   const mailOptions = {
-    from: `"MyPinkShop" <noreply@myinkshop.com>`,
+    from: `"MyPinkShop" <noreply@mypinkshop.com>`,
     to: email,
     subject: '🔐 Your MyPinkShop Login OTP',
     html: `
