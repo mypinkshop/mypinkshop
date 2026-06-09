@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -10,11 +10,20 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [offer, setOffer] = useState(null);
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
   const API_URL = 'https://api.mypinkshop.com';
+
+  // Fetch offer banner from backend
+  useEffect(() => {
+    fetch(`${API_URL}/api/offers/active-offer`)
+      .then(res => res.json())
+      .then(data => setOffer(data))
+      .catch(err => console.error('Offer fetch error:', err));
+  }, []);
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
@@ -27,7 +36,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${API_URL}/api/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -70,7 +79,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/verify`, {
+      const response = await fetch(`${API_URL}/api/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp })
@@ -108,7 +117,7 @@ function Login() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/resend`, {
+      const response = await fetch(`${API_URL}/api/otp/resend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -140,11 +149,11 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-      {/* Top Bar */}
+      {/* Premium Top Bar - Dynamic Offer Banner from Backend */}
       <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
         <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
           <span>✨</span>
-          <span>Free Shipping on ₹999+</span>
+          <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
           <span className="hidden sm:inline">•</span>
           <span>Extra 10% off on first order</span>
           <span className="hidden sm:inline">•</span>
