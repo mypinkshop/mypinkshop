@@ -4,12 +4,29 @@ const nodemailer = require('nodemailer');
 const OTP = require('../models/OTP');
 const User = require('../models/User');
 
-// Email transporter configuration
+// ========== ZOHO MAIL TRANSPORTER CONFIGURATION ==========
+// Free plan ke liye: host 'smtp.zoho.com', port 587, secure false
+// Paid plan ke liye: host 'smtppro.zoho.com', port 465, secure true
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.ZOHO_HOST || 'smtppro.zoho.com',  // smtp.zoho.com for free
+  port: process.env.ZOHO_PORT || 465,                  // 587 for free plan
+  secure: process.env.ZOHO_SECURE === 'true' || true,  // false for free plan
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: process.env.ZOHO_USER,      // info@myinkshop.com
+    pass: process.env.ZOHO_PASSWORD    // App specific password
+  },
+  tls: {
+    rejectUnauthorized: false  // SSL issues ke liye
+  }
+});
+
+// Verify transporter connection on startup
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('Zoho SMTP connection error:', error);
+  } else {
+    console.log('Zoho SMTP is ready to send emails');
   }
 });
 
@@ -18,10 +35,10 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP to email
+// Send OTP to email using noreply@myinkshop.com
 const sendOTPEmail = async (email, otp) => {
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.ZOHO_FROM_EMAIL || 'noreply@myinkshop.com',  // noreply alias
     to: email,
     subject: 'Your MyPinkShop Login OTP',
     html: `
@@ -54,7 +71,14 @@ const sendOTPEmail = async (email, otp) => {
     `
   };
   
-  await transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Send email error:', error);
+    throw error;
+  }
 };
 
 // ========== SEND OTP ==========
@@ -64,6 +88,12 @@ router.post('/send', async (req, res) => {
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
     }
     
     // Delete existing OTPs for this email
@@ -93,7 +123,16 @@ router.post('/send', async (req, res) => {
     
   } catch (error) {
     console.error('Send OTP error:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
+    
+    // Handle specific nodemailer errors
+    if (error.code === 'EAUTH') {
+      return res.status(500).json({ error: 'Email authentication failed. Check Zoho credentials.' });
+    }
+    if (error.code === 'ECONNECTION') {
+      return res.status(500).json({ error: 'Cannot connect to email server. Check network.' });
+    }
+    
+    res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
   }
 });
 
@@ -113,6 +152,8 @@ router.post('/verify', async (req, res) => {
     }
     
     if (otpRecord.expiresAt < new Date()) {
+      // Delete expired OTP
+      await OTP.deleteOne({ _id: otpRecord._id });
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
     }
     
