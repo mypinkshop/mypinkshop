@@ -1,24 +1,21 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState('email'); // 'email' or 'otp'
+  const [step, setStep] = useState('email');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  const { login } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Step 1: Send OTP
   const handleSendOTP = async (e) => {
     e.preventDefault();
     if (!email) {
@@ -42,7 +39,6 @@ function Login() {
         setStep('otp');
         setResendTimer(60);
         
-        // Start countdown timer for resend
         const timer = setInterval(() => {
           setResendTimer((prev) => {
             if (prev <= 1) {
@@ -63,7 +59,6 @@ function Login() {
     }
   };
 
-  // Step 2: Verify OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     if (!otp || otp.length !== 6) {
@@ -84,18 +79,12 @@ function Login() {
       const data = await response.json();
 
       if (data.success && data.token) {
-        // Store JWT token
         localStorage.setItem('token', data.token);
         localStorage.setItem('userRole', data.user?.role || 'buyer');
         localStorage.setItem('userEmail', data.user?.email || email);
         localStorage.setItem('userName', data.user?.name || email.split('@')[0]);
         localStorage.setItem('userId', data.user?._id || '');
         
-        if (login) {
-          await login(email, 'otp_login');
-        }
-        
-        // Redirect based on role
         if (data.user?.role === 'admin') {
           navigate('/admin/dashboard');
         } else if (data.user?.role === 'vendor') {
@@ -114,7 +103,6 @@ function Login() {
     }
   };
 
-  // Resend OTP
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
     
@@ -139,7 +127,7 @@ function Login() {
             return prev - 1;
           });
         }, 1000);
-        setError(''); // Clear any previous errors
+        setError('');
       } else {
         setError(data.error || 'Failed to resend OTP');
       }
@@ -152,8 +140,7 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-      
-      {/* Premium Top Bar */}
+      {/* Top Bar */}
       <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
         <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
           <span>✨</span>
@@ -166,7 +153,7 @@ function Login() {
         </div>
       </div>
 
-      {/* Premium Header */}
+      {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -214,7 +201,6 @@ function Login() {
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
         <div className="max-w-md w-full">
-          {/* Login Form - OTP Based */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -233,7 +219,6 @@ function Login() {
             )}
 
             {step === 'email' ? (
-              // Step 1: Email Input
               <form onSubmit={handleSendOTP} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -269,7 +254,6 @@ function Login() {
                 </button>
               </form>
             ) : (
-              // Step 2: OTP Input
               <form onSubmit={handleVerifyOTP} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -351,7 +335,7 @@ function Login() {
         </div>
       </main>
 
-      {/* Premium Footer */}
+      {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
