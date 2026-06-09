@@ -10,30 +10,32 @@ console.log('SENDER_USERNAME exists:', !!process.env.SENDER_USERNAME);
 console.log('SENDER_PASSWORD exists:', !!process.env.SENDER_PASSWORD);
 console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 
-// ========== SENDER.NET SMTP TRANSPORTER ==========
+// ========== SENDER.NET SMTP TRANSPORTER (Official Settings) ==========
 let transporter;
 
 try {
   transporter = nodemailer.createTransport({
     host: 'smtp.sender.net',
     port: 587,
-    secure: false,  // TLS on port 587
+    secure: false,  // TLS required
     auth: {
-      user: process.env.SENDER_USERNAME,   // SMTP username (auto-generated)
-      pass: process.env.SENDER_PASSWORD    // SMTP password
+      user: process.env.SENDER_USERNAME,
+      pass: process.env.SENDER_PASSWORD
     },
     tls: {
       rejectUnauthorized: false,
-      ciphers: 'SSLv3'
-    }
+      minVersion: 'TLSv1.2'
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000
   });
 
-  // Verify transporter connection on startup
+  // Verify transporter connection
   transporter.verify((error, success) => {
     if (error) {
       console.error('❌ Sender.net SMTP connection error:', error.message);
       console.error('Error code:', error.code);
-      console.log('⚠️ Will run in MOCK MODE (OTP will be logged, not sent)');
     } else {
       console.log('✅ Sender.net SMTP is ready to send emails');
     }
@@ -43,19 +45,22 @@ try {
   transporter = null;
 }
 
-// ========== MOCK OTP MODE (When SMTP fails) ==========
+// Generate OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Send OTP Email
 const sendOTPEmail = async (email, otp) => {
-  // If transporter is not available, use mock mode
   if (!transporter) {
     console.log('🔐 MOCK MODE - OTP for', email, ':', otp);
-    console.log('👉 Please use this OTP in the verification step:', otp);
     return true;
   }
 
   const mailOptions = {
     from: `"MyPinkShop" <noreply@myinkshop.com>`,
     to: email,
-    subject: 'Your MyPinkShop Login OTP',
+    subject: '🔐 Your MyPinkShop Login OTP',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
@@ -74,7 +79,7 @@ const sendOTPEmail = async (email, otp) => {
             ${otp}
           </div>
           
-          <p style="color: #6b7280; font-size: 14px;">This OTP is valid for 10 minutes.</p>
+          <p style="color: #6b7280; font-size: 14px;">This OTP is valid for <strong>10 minutes</strong>.</p>
           <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">If you didn't request this, please ignore this email.</p>
         </div>
         
@@ -92,15 +97,9 @@ const sendOTPEmail = async (email, otp) => {
     return true;
   } catch (error) {
     console.error('❌ Send email error:', error.message);
-    console.log('⚠️ Falling back to MOCK MODE');
-    console.log('🔐 MOCK OTP for', email, ':', otp);
-    return true; // Still return true so user can test
+    console.log('🔐 Falling back to MOCK MODE - OTP for', email, ':', otp);
+    return true;
   }
-};
-
-// Generate random 6-digit OTP
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 // ========== TEST ROUTE ==========
@@ -112,12 +111,34 @@ router.get('/test', async (req, res) => {
       SENDER_USERNAME: process.env.SENDER_USERNAME ? '✅ Set' : '❌ Missing',
       SENDER_PASSWORD: process.env.SENDER_PASSWORD ? '✅ Set' : '❌ Missing',
       JWT_SECRET: process.env.JWT_SECRET ? '✅ Set' : '❌ Missing'
-    },
-    smtpConfig: {
-      host: 'smtp.sender.net',
-      port: 587
     }
   });
+});
+
+// ========== TEST SMTP CONNECTION ==========
+router.get('/test-smtp', async (req, res) => {
+  try {
+    if (!transporter) {
+      return res.status(500).json({ success: false, error: 'Transporter not initialized' });
+    }
+    await transporter.verify();
+    res.json({ 
+      success: true, 
+      message: 'SMTP connection successful!',
+      credentials: {
+        host: 'smtp.sender.net',
+        port: 587,
+        userExists: !!process.env.SENDER_USERNAME,
+        passExists: !!process.env.SENDER_PASSWORD
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      code: error.code
+    });
+  }
 });
 
 // ========== SEND OTP ==========
@@ -149,14 +170,12 @@ router.post('/send', async (req, res) => {
     
     await newOTP.save();
     
-    // Send OTP via email (will use mock mode if SMTP fails)
     await sendOTPEmail(email, otp);
     
     res.json({ 
       success: true, 
       message: 'OTP sent successfully',
-      expiresIn: 600,
-      note: process.env.SENDER_USERNAME ? 'Email sent via Sender.net' : 'Using mock mode - Check Vercel logs for OTP'
+      expiresIn: 600
     });
     
   } catch (error) {
@@ -165,7 +184,7 @@ router.post('/send', async (req, res) => {
   }
 });
 
-// ========== VERIFY OTP AND LOGIN ==========
+// ========== VERIFY OTP ==========
 router.post('/verify', async (req, res) => {
   try {
     const { email, otp } = req.body;
