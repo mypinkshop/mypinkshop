@@ -4,33 +4,26 @@ const nodemailer = require('nodemailer');
 const OTP = require('../models/OTP');
 const User = require('../models/User');
 
-// ========== ZOHO MAIL TRANSPORTER CONFIGURATION ==========
-// ✅ FIXED FOR FREE PLAN: smtp.zoho.com, port 587, secure false
+// ========== GMAIL SMTP TRANSPORTER CONFIGURATION ==========
+// ✅ Using Gmail SMTP (Free & Working)
 
 const transporter = nodemailer.createTransport({
-  host: process.env.ZOHO_HOST || 'smtp.zoho.com',     // ✅ smtp.zoho.com for free plan
-  port: process.env.ZOHO_PORT || 587,                  // ✅ 587 for free plan
-  secure: process.env.ZOHO_SECURE === 'true' || false, // ✅ false for free plan
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.ZOHO_USER,      // info@myinkshop.com
-    pass: process.env.ZOHO_PASSWORD    // App specific password
-  },
-  tls: {
-    rejectUnauthorized: false,
-    ciphers: 'SSLv3'
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 20000
+    user: process.env.GMAIL_USER,      // Your Gmail address
+    pass: process.env.GMAIL_APP_PASSWORD    // Gmail App Password
+  }
 });
 
 // Verify transporter connection on startup
 transporter.verify((error, success) => {
   if (error) {
-    console.error('❌ Zoho SMTP connection error:', error.message);
+    console.error('❌ Gmail SMTP connection error:', error.message);
     console.error('Error code:', error.code);
   } else {
-    console.log('✅ Zoho SMTP is ready to send emails (Free Plan)');
+    console.log('✅ Gmail SMTP is ready to send emails');
   }
 });
 
@@ -42,7 +35,7 @@ const generateOTP = () => {
 // Send OTP to email using noreply@myinkshop.com
 const sendOTPEmail = async (email, otp) => {
   const mailOptions = {
-    from: process.env.ZOHO_FROM_EMAIL || 'noreply@myinkshop.com',
+    from: 'noreply@myinkshop.com',
     to: email,
     subject: 'Your MyPinkShop Login OTP',
     html: `
@@ -86,18 +79,17 @@ const sendOTPEmail = async (email, otp) => {
   }
 };
 
-// ========== TEST ROUTE (Check Zoho Connection) ==========
+// ========== TEST ROUTE ==========
 router.get('/test', async (req, res) => {
   try {
     await transporter.verify();
     res.json({ 
       success: true, 
-      message: 'Zoho SMTP is working!',
+      message: 'Gmail SMTP is working!',
       config: {
-        host: transporter.options.host,
-        port: transporter.options.port,
-        secure: transporter.options.secure,
-        user: transporter.options.auth?.user
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false
       }
     });
   } catch (error) {
@@ -118,13 +110,11 @@ router.post('/send', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
     
-    // Delete existing OTPs for this email
     await OTP.deleteMany({ email });
     
     const otp = generateOTP();
@@ -139,8 +129,6 @@ router.post('/send', async (req, res) => {
     });
     
     await newOTP.save();
-    
-    // Send OTP via email
     await sendOTPEmail(email, otp);
     
     res.json({ 
@@ -152,15 +140,11 @@ router.post('/send', async (req, res) => {
   } catch (error) {
     console.error('❌ Send OTP error:', error.message);
     
-    // Handle specific nodemailer errors
     if (error.code === 'EAUTH') {
-      return res.status(500).json({ error: 'Email authentication failed. Please check Zoho credentials and ensure 2FA is enabled.' });
+      return res.status(500).json({ error: 'Email authentication failed. Check Gmail credentials and ensure 2FA is enabled.' });
     }
     if (error.code === 'ECONNECTION') {
-      return res.status(500).json({ error: 'Cannot connect to email server. Check network and firewall.' });
-    }
-    if (error.code === 'ESOCKET') {
-      return res.status(500).json({ error: 'Connection timeout. Please try again.' });
+      return res.status(500).json({ error: 'Cannot connect to email server.' });
     }
     
     res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
