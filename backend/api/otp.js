@@ -10,14 +10,14 @@ console.log('SENDER_USERNAME exists:', !!process.env.SENDER_USERNAME);
 console.log('SENDER_PASSWORD exists:', !!process.env.SENDER_PASSWORD);
 console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 
-// ========== SENDER.NET SMTP TRANSPORTER (Official Settings) ==========
+// ========== SENDER.NET SMTP TRANSPORTER (DEBUG MODE ON) ==========
 let transporter;
 
 try {
   transporter = nodemailer.createTransport({
     host: 'smtp.sender.net',
     port: 587,
-    secure: false,  // TLS required
+    secure: false,
     auth: {
       user: process.env.SENDER_USERNAME,
       pass: process.env.SENDER_PASSWORD
@@ -26,9 +26,8 @@ try {
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2'
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000
+    debug: true,      // ✅ Debug mode ON
+    logger: true      // ✅ Logger ON
   });
 
   // Verify transporter connection
@@ -94,15 +93,15 @@ const sendOTPEmail = async (email, otp) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ Email sent successfully:', info.messageId);
-    return true;
+    return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Send email error:', error.message);
-    console.log('🔐 Falling back to MOCK MODE - OTP for', email, ':', otp);
-    return true;
+    console.error('Full error details:', error);
+    return { success: false, error: error.message, code: error.code };
   }
 };
 
-// ========== TEST ROUTE ==========
+// ========== TEST ROUTES ==========
 router.get('/test', async (req, res) => {
   res.json({ 
     success: true, 
@@ -141,6 +140,27 @@ router.get('/test-smtp', async (req, res) => {
   }
 });
 
+// ========== SEND TEST EMAIL DIRECTLY ==========
+router.get('/send-test', async (req, res) => {
+  try {
+    if (!transporter) {
+      return res.status(500).json({ success: false, error: 'Transporter not initialized' });
+    }
+    
+    const testEmail = req.query.email || 'your-email@gmail.com'; // apni email daal
+    const result = await sendOTPEmail(testEmail, '123456');
+    
+    res.json({ 
+      success: result.success,
+      message: result.success ? 'Test email sent!' : 'Failed to send',
+      error: result.error,
+      code: result.code
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ========== SEND OTP ==========
 router.post('/send', async (req, res) => {
   try {
@@ -170,7 +190,15 @@ router.post('/send', async (req, res) => {
     
     await newOTP.save();
     
-    await sendOTPEmail(email, otp);
+    const result = await sendOTPEmail(email, otp);
+    
+    if (!result.success) {
+      return res.status(500).json({ 
+        error: 'Failed to send OTP', 
+        details: result.error,
+        code: result.code 
+      });
+    }
     
     res.json({ 
       success: true, 
@@ -266,7 +294,12 @@ router.post('/resend', async (req, res) => {
     });
     
     await newOTP.save();
-    await sendOTPEmail(email, otp);
+    
+    const result = await sendOTPEmail(email, otp);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: 'Failed to resend OTP', details: result.error });
+    }
     
     res.json({ 
       success: true, 
