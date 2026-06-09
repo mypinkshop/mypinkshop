@@ -7,7 +7,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const multer = require('multer');
 const AWS = require('aws-sdk');
-const otpRoutes = require('./otp');  // ✅ FIXED: './api/otp' se './otp' kar diya
+const otpRoutes = require('./otp');
 
 const app = express();
 
@@ -56,18 +56,68 @@ const upload = multer({
   }
 });
 
-// ========== MongoDB Connection ==========
-let isConnected = false;
+// ========== MongoDB Connection - FIXED ==========
 const connectDB = async () => {
-  if (isConnected) return;
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    isConnected = true;
-    console.log('✅ MongoDB Connected');
+    if (mongoose.connection.readyState === 1) {
+      console.log('✅ MongoDB already connected');
+      return;
+    }
+    
+    const opts = {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4,
+      connectTimeoutMS: 10000,
+      retryWrites: true,
+      retryReads: true
+    };
+    
+    await mongoose.connect(process.env.MONGO_URI, opts);
+    console.log('✅ MongoDB Connected Successfully');
   } catch (error) {
-    console.error('❌ MongoDB Error:', error.message);
+    console.error('❌ MongoDB Connection Error:', error.message);
+    // Don't throw - let retry logic handle it
   }
 };
+
+// Connect immediately
+connectDB();
+
+// Connection event handlers
+mongoose.connection.on('connected', () => {
+  console.log('✅ Mongoose connected to MongoDB Atlas');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ Mongoose connection error:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ Mongoose disconnected, attempting to reconnect...');
+  setTimeout(connectDB, 5000);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await mongoose.connection.close();
+  process.exit(0);
+});
+
+// Helper middleware to ensure DB connection for each request
+const ensureDB = async (req, res, next) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
+// Apply DB check to all API routes
+app.use('/api', ensureDB);
 
 // ========== Shiprocket Service ==========
 class ShiprocketService {
@@ -266,7 +316,7 @@ reviewSchema.index({ userId: 1, productId: 1 }, { unique: true });
 
 reviewSchema.statics.getAverageRating = async function(productId) {
   const result = await this.aggregate([
-    { $match: { productId: mongoose.Types.ObjectId(productId), status: 'approved' } },
+    { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
     { $group: { _id: '$productId', avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
   ]);
   return { rating: result[0]?.avgRating || 0, count: result[0]?.count || 0 };
@@ -348,15 +398,24 @@ app.get('/', (req, res) => {
 
 app.get('/api/health', async (req, res) => {
   try {
-    await connectDB();
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
     res.json({ 
       status: 'ok', 
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      database: dbStatus,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.json({ status: 'ok', database: 'connecting...', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', database: 'error', timestamp: new Date().toISOString() });
   }
+});
+
+app.get('/api/test-db', async (req, res) => {
+  const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.json({
+    readyState: mongoose.connection.readyState,
+    status: states[mongoose.connection.readyState] || 'unknown',
+    mongodbUriSet: !!process.env.MONGO_URI
+  });
 });
 
 // ========== UPLOAD ROUTES ==========
@@ -1020,13 +1079,18 @@ app.get('/api/offers/active-offer', async (req, res) => {
     }).sort({ createdAt: -1 });
     
     res.json(offer || {
-      title: 'Free Shipping',
-      description: 'FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF',
-      discountValue: 10,
-      minOrderValue: 499
+      title: 'FREE SHIPPING',
+      description: 'FREE SHIPPING ON ALL ORDERS • NO MINIMUM ORDER',
+      discountValue: 0,
+      minOrderValue: 0
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.json({
+      title: 'FREE SHIPPING',
+      description: 'FREE SHIPPING ON ALL ORDERS • NO MINIMUM ORDER',
+      discountValue: 0,
+      minOrderValue: 0
+    });
   }
 });
 
@@ -1090,73 +1154,29 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// ========== SHIPPING ROUTES ==========
+// ========== SHIPPING ROUTES - ALWAYS FREE ==========
 app.post('/api/shipping/check-delivery', async (req, res) => {
   try {
     const { pincode, cartTotal, weight = 0.5 } = req.body;
-    const pickupPincode = '208021';
     
-    let delivery;
-    let useMock = false;
+    // ALWAYS FREE SHIPPING - No charges
+    const estimatedDate = new Date();
+    estimatedDate.setDate(estimatedDate.getDate() + 5);
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() + 3);
     
-    try {
-      await shiprocket.getAuthToken();
-      delivery = await shiprocket.getEstimatedDelivery(pickupPincode, pincode, weight);
-      
-      if (!delivery.deliverable) {
-        useMock = true;
-      }
-    } catch (shiprocketError) {
-      console.error('Shiprocket API error:', shiprocketError.message);
-      useMock = true;
-    }
-    
-    if (useMock || !delivery || !delivery.deliverable) {
-      const estimatedDate = new Date();
-      estimatedDate.setDate(estimatedDate.getDate() + 5);
-      const minDate = new Date();
-      minDate.setDate(minDate.getDate() + 3);
-      
-      const freeShippingThreshold = 499;
-      let shippingCharge = 50;
-      if (cartTotal >= freeShippingThreshold) {
-        shippingCharge = 0;
-      }
-      
-      return res.json({
-        success: true,
-        deliverable: true,
-        shippingCharge: shippingCharge,
-        estimatedDelivery: {
-          minDate: minDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-          maxDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-          minDays: 3,
-          maxDays: 5
-        },
-        courierName: 'Standard Delivery',
-        freeShippingThreshold: freeShippingThreshold,
-        cutOffTime: '16:00'
-      });
-    }
-    
-    const freeShippingThreshold = 499;
-    let shippingCharge = delivery.shippingCharge;
-    if (cartTotal >= freeShippingThreshold) {
-      shippingCharge = 0;
-    }
-    
-    res.json({
+    return res.json({
       success: true,
       deliverable: true,
-      shippingCharge: shippingCharge,
+      shippingCharge: 0,
       estimatedDelivery: {
-        minDate: delivery.estimatedDate,
-        maxDate: delivery.estimatedDate,
-        minDays: delivery.estimatedDays,
-        maxDays: delivery.estimatedDays
+        minDate: minDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        maxDate: estimatedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        minDays: 3,
+        maxDays: 5
       },
-      courierName: delivery.courierName,
-      freeShippingThreshold: freeShippingThreshold,
+      courierName: 'Free Express Delivery',
+      freeShippingThreshold: 0,
       cutOffTime: '16:00'
     });
     
@@ -1170,7 +1190,7 @@ app.get('/api/shipping/settings', async (req, res) => {
   res.json({
     success: true,
     settings: {
-      freeShippingThreshold: 499,
+      freeShippingThreshold: 0,
       cutOffTime: '16:00'
     }
   });
