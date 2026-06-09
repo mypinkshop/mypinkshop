@@ -7,7 +7,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const multer = require('multer');
 const AWS = require('aws-sdk');
-const otpRoutes = require('./api/otp');
+const otpRoutes = require('./otp');  // ✅ FIXED: './api/otp' se './otp' kar diya
 
 const app = express();
 
@@ -1615,6 +1615,7 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 // ========== OTP ROUTES ==========
 app.use('/api/otp', otpRoutes);
 
