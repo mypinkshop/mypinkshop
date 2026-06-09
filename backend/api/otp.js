@@ -6,32 +6,36 @@ const User = require('../models/User');
 
 // ========== CHECK ENVIRONMENT VARIABLES FIRST ==========
 console.log('🔍 Checking environment variables:');
-console.log('SMTP_USER exists:', !!process.env.SMTP_USER);
-console.log('SMTP_PASS exists:', !!process.env.SMTP_PASS);
+console.log('SENDER_USERNAME exists:', !!process.env.SENDER_USERNAME);
+console.log('SENDER_PASSWORD exists:', !!process.env.SENDER_PASSWORD);
 console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 
-// ========== GMAIL SMTP TRANSPORTER ==========
+// ========== SENDER.NET SMTP TRANSPORTER ==========
 let transporter;
 
 try {
   transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,  // ✅ Using 465 with secure: true (more reliable)
-    secure: true,
+    host: 'smtp.sender.net',
+    port: 587,
+    secure: false,  // TLS on port 587
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
+      user: process.env.SENDER_USERNAME,   // SMTP username (auto-generated)
+      pass: process.env.SENDER_PASSWORD    // SMTP password
+    },
+    tls: {
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
     }
   });
 
   // Verify transporter connection on startup
   transporter.verify((error, success) => {
     if (error) {
-      console.error('❌ SMTP connection error:', error.message);
+      console.error('❌ Sender.net SMTP connection error:', error.message);
       console.error('Error code:', error.code);
       console.log('⚠️ Will run in MOCK MODE (OTP will be logged, not sent)');
     } else {
-      console.log('✅ SMTP is ready to send emails');
+      console.log('✅ Sender.net SMTP is ready to send emails');
     }
   });
 } catch (error) {
@@ -105,9 +109,13 @@ router.get('/test', async (req, res) => {
     success: true, 
     message: 'OTP API is running',
     envVars: {
-      SMTP_USER: process.env.SMTP_USER ? '✅ Set' : '❌ Missing',
-      SMTP_PASS: process.env.SMTP_PASS ? '✅ Set' : '❌ Missing',
+      SENDER_USERNAME: process.env.SENDER_USERNAME ? '✅ Set' : '❌ Missing',
+      SENDER_PASSWORD: process.env.SENDER_PASSWORD ? '✅ Set' : '❌ Missing',
       JWT_SECRET: process.env.JWT_SECRET ? '✅ Set' : '❌ Missing'
+    },
+    smtpConfig: {
+      host: 'smtp.sender.net',
+      port: 587
     }
   });
 });
@@ -148,7 +156,7 @@ router.post('/send', async (req, res) => {
       success: true, 
       message: 'OTP sent successfully',
       expiresIn: 600,
-      note: process.env.SMTP_USER ? 'Email sent via Gmail' : 'Using mock mode - Check Vercel logs for OTP'
+      note: process.env.SENDER_USERNAME ? 'Email sent via Sender.net' : 'Using mock mode - Check Vercel logs for OTP'
     });
     
   } catch (error) {
