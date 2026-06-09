@@ -5,28 +5,32 @@ const OTP = require('../models/OTP');
 const User = require('../models/User');
 
 // ========== ZOHO MAIL TRANSPORTER CONFIGURATION ==========
-// Free plan ke liye: host 'smtp.zoho.com', port 587, secure false
-// Paid plan ke liye: host 'smtppro.zoho.com', port 465, secure true
+// ✅ FIXED FOR FREE PLAN: smtp.zoho.com, port 587, secure false
 
 const transporter = nodemailer.createTransport({
-  host: process.env.ZOHO_HOST || 'smtppro.zoho.com',  // smtp.zoho.com for free
-  port: process.env.ZOHO_PORT || 465,                  // 587 for free plan
-  secure: process.env.ZOHO_SECURE === 'true' || true,  // false for free plan
+  host: process.env.ZOHO_HOST || 'smtp.zoho.com',     // ✅ smtp.zoho.com for free plan
+  port: process.env.ZOHO_PORT || 587,                  // ✅ 587 for free plan
+  secure: process.env.ZOHO_SECURE === 'true' || false, // ✅ false for free plan
   auth: {
     user: process.env.ZOHO_USER,      // info@myinkshop.com
     pass: process.env.ZOHO_PASSWORD    // App specific password
   },
   tls: {
-    rejectUnauthorized: false  // SSL issues ke liye
-  }
+    rejectUnauthorized: false,
+    ciphers: 'SSLv3'
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 20000
 });
 
 // Verify transporter connection on startup
 transporter.verify((error, success) => {
   if (error) {
-    console.error('Zoho SMTP connection error:', error);
+    console.error('❌ Zoho SMTP connection error:', error.message);
+    console.error('Error code:', error.code);
   } else {
-    console.log('Zoho SMTP is ready to send emails');
+    console.log('✅ Zoho SMTP is ready to send emails (Free Plan)');
   }
 });
 
@@ -38,7 +42,7 @@ const generateOTP = () => {
 // Send OTP to email using noreply@myinkshop.com
 const sendOTPEmail = async (email, otp) => {
   const mailOptions = {
-    from: process.env.ZOHO_FROM_EMAIL || 'noreply@myinkshop.com',  // noreply alias
+    from: process.env.ZOHO_FROM_EMAIL || 'noreply@myinkshop.com',
     to: email,
     subject: 'Your MyPinkShop Login OTP',
     html: `
@@ -73,13 +77,37 @@ const sendOTPEmail = async (email, otp) => {
   
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', info.messageId);
+    console.log('✅ Email sent successfully:', info.messageId);
     return true;
   } catch (error) {
-    console.error('Send email error:', error);
+    console.error('❌ Send email error:', error.message);
+    console.error('Error code:', error.code);
     throw error;
   }
 };
+
+// ========== TEST ROUTE (Check Zoho Connection) ==========
+router.get('/test', async (req, res) => {
+  try {
+    await transporter.verify();
+    res.json({ 
+      success: true, 
+      message: 'Zoho SMTP is working!',
+      config: {
+        host: transporter.options.host,
+        port: transporter.options.port,
+        secure: transporter.options.secure,
+        user: transporter.options.auth?.user
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      code: error.code
+    });
+  }
+});
 
 // ========== SEND OTP ==========
 router.post('/send', async (req, res) => {
@@ -100,7 +128,7 @@ router.post('/send', async (req, res) => {
     await OTP.deleteMany({ email });
     
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
     
     const newOTP = new OTP({
       email,
@@ -118,18 +146,21 @@ router.post('/send', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'OTP sent to your email address',
-      expiresIn: 600 // 10 minutes in seconds
+      expiresIn: 600
     });
     
   } catch (error) {
-    console.error('Send OTP error:', error);
+    console.error('❌ Send OTP error:', error.message);
     
     // Handle specific nodemailer errors
     if (error.code === 'EAUTH') {
-      return res.status(500).json({ error: 'Email authentication failed. Check Zoho credentials.' });
+      return res.status(500).json({ error: 'Email authentication failed. Please check Zoho credentials and ensure 2FA is enabled.' });
     }
     if (error.code === 'ECONNECTION') {
-      return res.status(500).json({ error: 'Cannot connect to email server. Check network.' });
+      return res.status(500).json({ error: 'Cannot connect to email server. Check network and firewall.' });
+    }
+    if (error.code === 'ESOCKET') {
+      return res.status(500).json({ error: 'Connection timeout. Please try again.' });
     }
     
     res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
@@ -152,30 +183,25 @@ router.post('/verify', async (req, res) => {
     }
     
     if (otpRecord.expiresAt < new Date()) {
-      // Delete expired OTP
       await OTP.deleteOne({ _id: otpRecord._id });
       return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
     }
     
-    // Mark OTP as verified
     otpRecord.verified = true;
     await otpRecord.save();
     
-    // Find or create user
     let user = await User.findOne({ email });
     
     if (!user) {
-      // Create new user
       user = new User({
         name: email.split('@')[0],
         email,
-        password: Math.random().toString(36).substring(2, 15), // random password
+        password: Math.random().toString(36).substring(2, 15),
         role: 'buyer'
       });
       await user.save();
     }
     
-    // Generate JWT token
     const jwt = require('jsonwebtoken');
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
@@ -196,7 +222,7 @@ router.post('/verify', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Verify OTP error:', error);
+    console.error('❌ Verify OTP error:', error.message);
     res.status(500).json({ error: 'Failed to verify OTP' });
   }
 });
@@ -210,7 +236,6 @@ router.post('/resend', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    // Delete existing OTPs
     await OTP.deleteMany({ email });
     
     const otp = generateOTP();
@@ -233,7 +258,7 @@ router.post('/resend', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Resend OTP error:', error);
+    console.error('❌ Resend OTP error:', error.message);
     res.status(500).json({ error: 'Failed to resend OTP' });
   }
 });
