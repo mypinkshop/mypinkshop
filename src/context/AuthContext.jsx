@@ -12,20 +12,30 @@ export const AuthProvider = ({ children }) => {
   const API_URL = 'https://api.mypinkshop.com/api';
 
   useEffect(() => {
-    // Check if user is logged in (localStorage)
     const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const storedUserEmail = localStorage.getItem('userEmail');
+    const storedUserName = localStorage.getItem('userName');
+    const storedUserRole = localStorage.getItem('userRole');
+    const storedUserId = localStorage.getItem('userId');
     
-    if (storedToken && storedUser) {
+    if (storedToken && storedUserEmail) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser({
+        _id: storedUserId,
+        email: storedUserEmail,
+        name: storedUserName,
+        role: storedUserRole
+      });
     }
     setLoading(false);
   }, []);
 
-  const register = async (name, email, password, role = 'buyer') => {
+  // ========== PASSWORD-BASED METHODS ==========
+  
+  // Register with password
+  const registerWithPassword = async (name, email, password, role = 'buyer') => {
     try {
-      const res = await fetch(`${API_URL}/auth/register`, {
+      const res = await fetch(`${API_URL}/auth/password/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, role }),
@@ -33,23 +43,29 @@ export const AuthProvider = ({ children }) => {
       
       const data = await res.json();
       
-      if (res.ok) {
+      if (res.ok && data.success) {
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data));
+        localStorage.setItem('userEmail', data.user.email);
+        localStorage.setItem('userName', data.user.name);
+        localStorage.setItem('userRole', data.user.role);
+        localStorage.setItem('userId', data.user._id);
+        
         setToken(data.token);
-        setUser(data);
-        return { success: true, data };
+        setUser(data.user);
+        
+        return { success: true, data: data.user };
       } else {
-        return { success: false, error: data.message };
+        return { success: false, error: data.error || 'Registration failed' };
       }
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
-  const login = async (email, password) => {
+  // Login with password
+  const loginWithPassword = async (email, password) => {
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(`${API_URL}/auth/password/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -57,29 +73,126 @@ export const AuthProvider = ({ children }) => {
       
       const data = await res.json();
       
-      if (res.ok) {
+      if (res.ok && data.success) {
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data));
+        localStorage.setItem('userEmail', data.user.email);
+        localStorage.setItem('userName', data.user.name);
+        localStorage.setItem('userRole', data.user.role);
+        localStorage.setItem('userId', data.user._id);
+        
         setToken(data.token);
-        setUser(data);
-        return { success: true, data };
+        setUser(data.user);
+        
+        return { success: true, data: data.user };
       } else {
-        return { success: false, error: data.message };
+        return { success: false, error: data.error || 'Invalid email or password' };
       }
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
+  // ========== OTP-BASED METHODS ==========
+  
+  // Send OTP
+  const sendOTP = async (email) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await res.json();
+      return { success: res.ok, ...data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Verify OTP and login/register
+  const verifyOTP = async (email, otp) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userEmail', data.user?.email || email);
+        localStorage.setItem('userName', data.user?.name || email.split('@')[0]);
+        localStorage.setItem('userRole', data.user?.role || 'buyer');
+        localStorage.setItem('userId', data.user?._id || '');
+        
+        setToken(data.token);
+        setUser(data.user || { email, name: email.split('@')[0], role: 'buyer' });
+        
+        return { success: true, data: data.user };
+      } else {
+        return { success: false, error: data.error || 'Invalid OTP' };
+      }
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Resend OTP
+  const resendOTP = async (email) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await res.json();
+      return { success: res.ok, ...data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // ========== COMMON METHODS ==========
+  
   const logout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
     setToken(null);
     setUser(null);
   };
 
+  const isAuthenticated = () => {
+    return !!token && !!localStorage.getItem('token');
+  };
+
+  const getCurrentUser = () => user;
+  const getToken = () => token || localStorage.getItem('token');
+
   return (
-    <AuthContext.Provider value={{ user, loading, token, register, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      token,
+      // Password-based methods
+      registerWithPassword,
+      loginWithPassword,
+      // OTP-based methods
+      sendOTP,
+      verifyOTP,
+      resendOTP,
+      // Common methods
+      logout,
+      isAuthenticated,
+      getCurrentUser,
+      getToken
+    }}>
       {children}
     </AuthContext.Provider>
   );
