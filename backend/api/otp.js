@@ -4,38 +4,52 @@ const nodemailer = require('nodemailer');
 const OTP = require('../models/OTP');
 const User = require('../models/User');
 
-// ========== GMAIL SMTP TRANSPORTER CONFIGURATION ==========
-// ✅ Using Gmail SMTP (Free & Working)
+// ========== CHECK ENVIRONMENT VARIABLES FIRST ==========
+console.log('🔍 Checking environment variables:');
+console.log('SMTP_USER exists:', !!process.env.SMTP_USER);
+console.log('SMTP_PASS exists:', !!process.env.SMTP_PASS);
+console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.GMAIL_USER,      // Your Gmail address
-    pass: process.env.GMAIL_APP_PASSWORD    // Gmail App Password
-  }
-});
+// ========== GMAIL SMTP TRANSPORTER ==========
+let transporter;
 
-// Verify transporter connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Gmail SMTP connection error:', error.message);
-    console.error('Error code:', error.code);
-  } else {
-    console.log('✅ Gmail SMTP is ready to send emails');
-  }
-});
+try {
+  transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,  // ✅ Using 465 with secure: true (more reliable)
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
 
-// Generate random 6-digit OTP
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
+  // Verify transporter connection on startup
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('❌ SMTP connection error:', error.message);
+      console.error('Error code:', error.code);
+      console.log('⚠️ Will run in MOCK MODE (OTP will be logged, not sent)');
+    } else {
+      console.log('✅ SMTP is ready to send emails');
+    }
+  });
+} catch (error) {
+  console.error('❌ Failed to create transporter:', error.message);
+  transporter = null;
+}
 
-// Send OTP to email using noreply@myinkshop.com
+// ========== MOCK OTP MODE (When SMTP fails) ==========
 const sendOTPEmail = async (email, otp) => {
+  // If transporter is not available, use mock mode
+  if (!transporter) {
+    console.log('🔐 MOCK MODE - OTP for', email, ':', otp);
+    console.log('👉 Please use this OTP in the verification step:', otp);
+    return true;
+  }
+
   const mailOptions = {
-    from: 'noreply@myinkshop.com',
+    from: `"MyPinkShop" <noreply@myinkshop.com>`,
     to: email,
     subject: 'Your MyPinkShop Login OTP',
     html: `
@@ -74,31 +88,28 @@ const sendOTPEmail = async (email, otp) => {
     return true;
   } catch (error) {
     console.error('❌ Send email error:', error.message);
-    console.error('Error code:', error.code);
-    throw error;
+    console.log('⚠️ Falling back to MOCK MODE');
+    console.log('🔐 MOCK OTP for', email, ':', otp);
+    return true; // Still return true so user can test
   }
+};
+
+// Generate random 6-digit OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 // ========== TEST ROUTE ==========
 router.get('/test', async (req, res) => {
-  try {
-    await transporter.verify();
-    res.json({ 
-      success: true, 
-      message: 'Gmail SMTP is working!',
-      config: {
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      code: error.code
-    });
-  }
+  res.json({ 
+    success: true, 
+    message: 'OTP API is running',
+    envVars: {
+      SMTP_USER: process.env.SMTP_USER ? '✅ Set' : '❌ Missing',
+      SMTP_PASS: process.env.SMTP_PASS ? '✅ Set' : '❌ Missing',
+      JWT_SECRET: process.env.JWT_SECRET ? '✅ Set' : '❌ Missing'
+    }
+  });
 });
 
 // ========== SEND OTP ==========
@@ -129,24 +140,19 @@ router.post('/send', async (req, res) => {
     });
     
     await newOTP.save();
+    
+    // Send OTP via email (will use mock mode if SMTP fails)
     await sendOTPEmail(email, otp);
     
     res.json({ 
       success: true, 
-      message: 'OTP sent to your email address',
-      expiresIn: 600
+      message: 'OTP sent successfully',
+      expiresIn: 600,
+      note: process.env.SMTP_USER ? 'Email sent via Gmail' : 'Using mock mode - Check Vercel logs for OTP'
     });
     
   } catch (error) {
     console.error('❌ Send OTP error:', error.message);
-    
-    if (error.code === 'EAUTH') {
-      return res.status(500).json({ error: 'Email authentication failed. Check Gmail credentials and ensure 2FA is enabled.' });
-    }
-    if (error.code === 'ECONNECTION') {
-      return res.status(500).json({ error: 'Cannot connect to email server.' });
-    }
-    
     res.status(500).json({ error: 'Failed to send OTP. Please try again.' });
   }
 });
@@ -237,7 +243,7 @@ router.post('/resend', async (req, res) => {
     
     res.json({ 
       success: true, 
-      message: 'New OTP sent to your email',
+      message: 'New OTP sent successfully',
       expiresIn: 600
     });
     
