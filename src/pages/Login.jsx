@@ -4,18 +4,10 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
 function Login() {
-  const [loginMethod, setLoginMethod] = useState('otp'); // 'otp' or 'password'
-  
-  // OTP State
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState('email');
-  const [resendTimer, setResendTimer] = useState(0);
-  
   // Password State
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState(null);
@@ -37,130 +29,7 @@ function Login() {
       .catch(err => console.error('Offer fetch error:', err));
   }, []);
 
-  // ========== OTP LOGIN METHODS ==========
-  const handleSendOTP = async (e) => {
-    e.preventDefault();
-    if (!email) {
-      setError('❌ Please enter your email address');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-
-    try {
-      const response = await fetch(`${API_URL}/api/otp/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setStep('otp');
-        setResendTimer(60);
-        
-        const timer = setInterval(() => {
-          setResendTimer((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
-        setError(data.error || '❌ Failed to send OTP. Please try again.');
-      }
-    } catch (err) {
-      console.error('Send OTP error:', err);
-      setError('❌ Network issue. Please check your connection.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    if (!otp || otp.length !== 6) {
-      setError('❌ Please enter a valid 6-digit OTP');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-
-    try {
-      const response = await fetch(`${API_URL}/api/otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp })
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userRole', data.user?.role || 'buyer');
-        localStorage.setItem('userEmail', data.user?.email || email);
-        localStorage.setItem('userName', data.user?.name || email.split('@')[0]);
-        localStorage.setItem('userId', data.user?._id || '');
-        
-        if (data.user?.role === 'admin') {
-          navigate('/admin/dashboard');
-        } else if (data.user?.role === 'vendor') {
-          navigate('/vendor/dashboard');
-        } else {
-          navigate('/');
-        }
-      } else {
-        setError(data.error || '❌ Invalid OTP. Please try again.');
-      }
-    } catch (err) {
-      console.error('Verify OTP error:', err);
-      setError('❌ Network issue. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOTP = async () => {
-    if (resendTimer > 0) return;
-    
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/otp/resend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setResendTimer(60);
-        const timer = setInterval(() => {
-          setResendTimer((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-        setError('');
-      } else {
-        setError(data.error || 'Failed to resend OTP');
-      }
-    } catch (err) {
-      setError('Failed to resend OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ========== PASSWORD LOGIN METHODS ==========
+  // ========== PASSWORD LOGIN ==========
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     if (!email || !password) {
@@ -205,6 +74,7 @@ function Login() {
     }
   };
 
+  // ========== FORGOT PASSWORD ==========
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     if (!resetEmail) {
@@ -213,6 +83,7 @@ function Login() {
     }
 
     setLoading(true);
+    setError('');
     try {
       const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
         method: 'POST',
@@ -308,169 +179,75 @@ function Login() {
                 <p className="text-gray-500 text-sm mt-1">Sign in to continue shopping</p>
               </div>
 
-              {/* Tab Switcher */}
-              <div className="flex gap-2 mb-6 bg-pink-50/50 p-1 rounded-xl">
-                <button
-                  onClick={() => { setLoginMethod('otp'); setStep('email'); setError(''); setOtp(''); }}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-                    loginMethod === 'otp' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'text-gray-600 hover:text-pink-500'
-                  }`}
-                >
-                  🔐 OTP Login
-                </button>
-                <button
-                  onClick={() => { setLoginMethod('password'); setError(''); }}
-                  className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-                    loginMethod === 'password' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' : 'text-gray-600 hover:text-pink-500'
-                  }`}
-                >
-                  🔑 Password Login
-                </button>
-              </div>
-
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
                   <span>⚠️</span> {error}
                 </div>
               )}
 
-              {/* OTP LOGIN FORM */}
-              {loginMethod === 'otp' && (
-                <>
-                  {step === 'email' ? (
-                    <form onSubmit={handleSendOTP} className="space-y-5">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Email Address
-                        </label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                          placeholder="Enter your email address"
-                          required
-                          autoComplete="email"
-                        />
-                        <p className="text-xs text-gray-400 mt-2">
-                          We'll send you a 6-digit OTP to verify your email.
-                        </p>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all disabled:opacity-50"
-                      >
-                        {loading ? 'Sending OTP...' : 'Continue with Email'}
-                      </button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleVerifyOTP} className="space-y-5">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Enter 6-digit OTP
-                        </label>
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-center text-2xl tracking-widest"
-                          placeholder="000000"
-                          required
-                          autoFocus
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all disabled:opacity-50"
-                      >
-                        {loading ? 'Verifying...' : 'Verify & Login'}
-                      </button>
-
-                      <div className="text-center">
-                        <button
-                          type="button"
-                          onClick={handleResendOTP}
-                          disabled={resendTimer > 0}
-                          className="text-sm text-pink-600 hover:underline transition disabled:opacity-50"
-                        >
-                          {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setStep('email'); setOtp(''); setError(''); }}
-                          className="text-sm text-gray-500 hover:text-pink-600 transition ml-4"
-                        >
-                          Use different email
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </>
-              )}
-
               {/* PASSWORD LOGIN FORM */}
-              {loginMethod === 'password' && (
-                <form onSubmit={handlePasswordLogin} className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Address
+              <form onSubmit={handlePasswordLogin} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    placeholder="Enter your email address"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Password
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-xs text-pink-600 hover:underline transition"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                      placeholder="Enter your email address"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-10"
+                      placeholder="Enter your password"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition"
+                    >
+                      {showPassword ? '👁️' : '🔒'}
+                    </button>
                   </div>
+                </div>
 
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Password
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowForgotPassword(true)}
-                        className="text-xs text-pink-600 hover:underline transition"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-10"
-                        placeholder="Enter your password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition"
-                      >
-                        {showPassword ? '👁️' : '🔒'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all disabled:opacity-50"
-                  >
-                    {loading ? 'Signing in...' : 'Sign In'}
-                  </button>
-                </form>
-              )}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Signing in...
+                    </span>
+                  ) : (
+                    'Sign In'
+                  )}
+                </button>
+              </form>
 
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
