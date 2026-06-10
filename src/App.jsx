@@ -1,5 +1,4 @@
 import { Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Login from './pages/Login';
@@ -88,89 +87,82 @@ function App() {
         <CartProvider>
           <ReviewProvider>
             <Routes>
-              {/* ============ PAGES WITHOUT HEADER/FOOTER (Only Auth Pages) ============ */}
+              {/* ============ CUSTOMER ROUTES ============ */}
+              <Route path="/" element={<Home />} />
+              <Route path="/cart" element={<Cart />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
+              <Route path="/verify-email/:token" element={<VerifyEmail />} />
+              <Route path="/my-orders" element={<MyOrders />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/shop" element={<Shop />} />
+              <Route path="/track-order/:orderId" element={<TrackOrder />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/contact" element={<ContactUs />} />
+              <Route path="/shipping" element={<ShippingInfo />} />
+              <Route path="/returns" element={<ReturnsPolicy />} />
+              <Route path="/faqs" element={<FAQs />} />
+
+              {/* ============ CATEGORY PAGES ============ */}
+              <Route path="/skincare" element={<SkincarePage />} />
+              <Route path="/makeup" element={<MakeupPage />} />
+              <Route path="/clothing" element={<ClothingPage />} />
+              <Route path="/accessories" element={<AccessoriesPage />} />
+              <Route path="/hair" element={<HairPage />} />
+
+              {/* ============ ADMIN ROUTES ============ */}
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/vendors" element={<AdminVendors />} />
+              <Route path="/admin/brand-applications" element={<AdminBrandApplications />} />
+              <Route path="/admin/products" element={<AdminProducts />} />
+              <Route path="/admin/categories" element={<AdminCategories />} />
+              <Route path="/admin/orders" element={<AdminOrders />} />
+              <Route path="/admin/customers" element={<AdminCustomers />} />
+              <Route path="/admin/reports" element={<AdminReports />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/inventory" element={<AdminInventory />} />
+              <Route path="/admin/advertising" element={<AdminAdvertising />} />
+              <Route path="/admin/payments" element={<AdminPayments />} />
+              <Route path="/admin/add-product" element={<AdminAddProduct />} />
+              <Route path="/admin/shipping" element={<AdminShipping />} />
+              <Route path="/admin/tax" element={<AdminTax />} />
+              <Route path="/admin/coupons" element={<AdminCoupons />} />
+              <Route path="/admin/banners" element={<AdminBanners />} />
+              <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
+              <Route path="/admin/reviews" element={<AdminReviews />} />
+              <Route path="/admin/offers" element={<AdminOffers />} />
+              <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
+
+              {/* ============ VENDOR ROUTES ============ */}
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
-
-              {/* ============ PAGES WITH HEADER/FOOTER ============ */}
-              <Route element={<Layout />}>
-                {/* Main Pages */}
-                <Route path="/" element={<Home />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/my-orders" element={<MyOrders />} />
-                <Route path="/product/:id" element={<ProductDetail />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/wishlist" element={<Wishlist />} />
-                <Route path="/shop" element={<Shop />} />
-                <Route path="/track-order/:orderId" element={<TrackOrder />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/contact" element={<ContactUs />} />
-                <Route path="/shipping" element={<ShippingInfo />} />
-                <Route path="/returns" element={<ReturnsPolicy />} />
-                <Route path="/faqs" element={<FAQs />} />
-
-                {/* Auth Pages WITH Header/Footer (except login/register) */}
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password/:token" element={<ResetPassword />} />
-                <Route path="/verify-email/:token" element={<VerifyEmail />} />
-
-                {/* Category Pages */}
-                <Route path="/skincare" element={<SkincarePage />} />
-                <Route path="/makeup" element={<MakeupPage />} />
-                <Route path="/clothing" element={<ClothingPage />} />
-                <Route path="/accessories" element={<AccessoriesPage />} />
-                <Route path="/hair" element={<HairPage />} />
-
-                {/* Admin Dashboard */}
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                <Route path="/admin/vendors" element={<AdminVendors />} />
-                <Route path="/admin/brand-applications" element={<AdminBrandApplications />} />
-                <Route path="/admin/products" element={<AdminProducts />} />
-                <Route path="/admin/categories" element={<AdminCategories />} />
-                <Route path="/admin/orders" element={<AdminOrders />} />
-                <Route path="/admin/customers" element={<AdminCustomers />} />
-                <Route path="/admin/reports" element={<AdminReports />} />
-                <Route path="/admin/settings" element={<AdminSettings />} />
-                <Route path="/admin/inventory" element={<AdminInventory />} />
-                <Route path="/admin/advertising" element={<AdminAdvertising />} />
-                <Route path="/admin/payments" element={<AdminPayments />} />
-                <Route path="/admin/add-product" element={<AdminAddProduct />} />
-                <Route path="/admin/shipping" element={<AdminShipping />} />
-                <Route path="/admin/tax" element={<AdminTax />} />
-                <Route path="/admin/coupons" element={<AdminCoupons />} />
-                <Route path="/admin/banners" element={<AdminBanners />} />
-                <Route path="/admin/edit-product/:id" element={<AdminEditProduct />} />
-                <Route path="/admin/reviews" element={<AdminReviews />} />
-                <Route path="/admin/offers" element={<AdminOffers />} />
-                <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
-
-                {/* Vendor Dashboard */}
-                <Route path="/vendor/dashboard" element={<VendorDashboard />} />
-                <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
-                <Route path="/vendor/business-details" element={<VendorBusinessDetails />} />
-                <Route path="/vendor/products" element={<VendorProducts />} />
-                <Route path="/vendor/add-product" element={<VendorAddProduct />} />
-                <Route path="/vendor/orders" element={<VendorOrders />} />
-                <Route path="/vendor/earnings" element={<VendorEarnings />} />
-                <Route path="/vendor/ads" element={<VendorAds />} />
-                <Route path="/vendor/shipping" element={<VendorShipping />} />
-                <Route path="/vendor/tax" element={<VendorTax />} />
-                <Route path="/vendor/reports" element={<VendorReports />} />
-                <Route path="/vendor/settings" element={<VendorSettings />} />
-                <Route path="/vendor/account-health" element={<VendorAccountHealth />} />
-                <Route path="/vendor/returns" element={<VendorReturns />} />
-                <Route path="/vendor/coupons" element={<VendorCoupons />} />
-                <Route path="/vendor/order-reports" element={<VendorOrderReports />} />
-                <Route path="/vendor/permissions" element={<VendorUserPermissions />} />
-                <Route path="/vendor/fba" element={<VendorFBA />} />
-                <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
-                <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />
-              </Route>
+              <Route path="/vendor/brand-application" element={<VendorBrandApplication />} />
+              <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+              <Route path="/vendor/business-details" element={<VendorBusinessDetails />} />
+              <Route path="/vendor/products" element={<VendorProducts />} />
+              <Route path="/vendor/add-product" element={<VendorAddProduct />} />
+              <Route path="/vendor/orders" element={<VendorOrders />} />
+              <Route path="/vendor/earnings" element={<VendorEarnings />} />
+              <Route path="/vendor/ads" element={<VendorAds />} />
+              <Route path="/vendor/shipping" element={<VendorShipping />} />
+              <Route path="/vendor/tax" element={<VendorTax />} />
+              <Route path="/vendor/reports" element={<VendorReports />} />
+              <Route path="/vendor/settings" element={<VendorSettings />} />
+              <Route path="/vendor/account-health" element={<VendorAccountHealth />} />
+              <Route path="/vendor/returns" element={<VendorReturns />} />
+              <Route path="/vendor/coupons" element={<VendorCoupons />} />
+              <Route path="/vendor/order-reports" element={<VendorOrderReports />} />
+              <Route path="/vendor/permissions" element={<VendorUserPermissions />} />
+              <Route path="/vendor/fba" element={<VendorFBA />} />
+              <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
+              <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />
             </Routes>
           </ReviewProvider>
         </CartProvider>
