@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useNavigate }react-rouer-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 
-// Premium Product Card Component
+// Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -159,7 +159,6 @@ function HairPage() {
   const [loading, setLoading] = useState(true);
   const [offer, setOffer] = useState(null);
   
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedConcern, setSelectedConcern] = useState('all');
@@ -171,7 +170,6 @@ function HairPage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Fetch offer banner
   useEffect(() => {
     fetch(`${API_URL}/api/offers/active-offer`)
       .then(res => res.json())
@@ -179,7 +177,6 @@ function HairPage() {
       .catch(err => console.error('Offer fetch error:', err));
   }, []);
 
-  // Load products
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -210,7 +207,6 @@ function HairPage() {
     loadProducts();
   }, []);
 
-  // Filter and sort
   useEffect(() => {
     let filtered = [...products];
 
@@ -318,12 +314,11 @@ function HairPage() {
     { id: 'newest', name: 'Newest' },
   ];
 
-  // SEO Schema (Hidden from UI but visible to Google)
   const generateCategorySchema = () => ({
     "@context": "https://schema.org",
     "@type": "ItemList",
     "name": "Hair Care Products - MyPinkShop",
-    "description": "Shop premium hair care products including shampoos, conditioners, serums, oils, and masks for healthy, beautiful hair.",
+    "description": "Shop premium hair care products for healthy, beautiful hair.",
     "numberOfItems": filteredProducts.length,
     "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
       "@type": "ListItem",
@@ -363,16 +358,12 @@ function HairPage() {
         <meta property="og:description" content="Shop premium hair care products for healthy, beautiful hair." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/hair" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Hair Care Products - MyPinkShop" />
-        <meta name="twitter:description" content="Shop premium hair care products. Free shipping available." />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
             <span>✨</span>
@@ -385,7 +376,6 @@ function HairPage() {
           </div>
         </div>
 
-        {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -439,7 +429,6 @@ function HairPage() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -448,21 +437,18 @@ function HairPage() {
           </div>
         </div>
 
-        {/* Title Section - Clean & Beautiful */}
         <div className="max-w-7xl mx-auto px-4 pb-8">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Hair Care Collection 💇‍♀️</h1>
           <p className="text-gray-500 mt-2">Premium products for healthy, beautiful hair</p>
         </div>
 
-        {/* SEO Content - Visually Hidden (For Google Only) */}
         <div className="hidden">
           <h2>Premium Hair Care Products Online in India</h2>
-          <p>Shop the best hair care products at MyPinkShop. From nourishing shampoos to deep conditioning masks, find everything you need for gorgeous, healthy hair. Our collection includes products for all hair types - dry, oily, curly, damaged, and color-treated hair. Trusted brands, affordable prices, and free shipping on orders above ₹999. Whether you're dealing with hair fall, dandruff, frizz, or just want to maintain healthy hair, we have the right products for you.</p>
+          <p>Shop the best hair care products at MyPinkShop. From nourishing shampoos to deep conditioning masks, find everything you need for gorgeous, healthy hair. Our collection includes products for all hair types - dry, oily, curly, damaged, and color-treated hair. Trusted brands, affordable prices, and free shipping on orders above ₹999.</p>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 pb-16">
           
-          {/* Filter Bar */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               
@@ -493,7 +479,6 @@ function HairPage() {
               </select>
             </div>
 
-            {/* Active Filters */}
             {(selectedSubcategory !== 'all' || selectedConcern !== 'all' || selectedBrand !== 'all' || selectedHairType !== 'all' || priceRange !== 'all' || searchTerm) && (
               <div className="flex flex-wrap gap-2 mt-4">
                 {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
@@ -507,7 +492,6 @@ function HairPage() {
             )}
           </div>
 
-          {/* Mobile Filters Modal */}
           {showFilters && (
             <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
               <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -527,12 +511,10 @@ function HairPage() {
             </div>
           )}
 
-          {/* Results Count */}
           <div className="mb-6">
             <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-pink-600">{products.length}</span> products</p>
           </div>
           
-          {/* Products Grid */}
           {filteredProducts.length === 0 ? (
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-16 text-center border border-pink-100">
               <div className="text-6xl mb-4">💇‍♀️</div>
@@ -549,7 +531,6 @@ function HairPage() {
           )}
         </div>
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 text-center">
             <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
