@@ -164,11 +164,9 @@ function ClothingPage() {
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedSize, setSelectedSize] = useState('all');
   const [selectedGender, setSelectedGender] = useState('all');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
-  const [priceRange, setPriceRange] = useState('all');
 
   const API_URL = 'https://api.mypinkshop.com';
 
@@ -254,8 +252,6 @@ function ClothingPage() {
         default: break;
       }
     }
-    if (minPrice) min = parseFloat(minPrice);
-    if (maxPrice) max = parseFloat(maxPrice);
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
 
     switch(sortBy) {
@@ -267,7 +263,7 @@ function ClothingPage() {
     }
     
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, selectedSize, selectedGender, minPrice, maxPrice, sortBy, products, priceRange]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, selectedSize, selectedGender, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -276,10 +272,8 @@ function ClothingPage() {
     setSelectedBrand('all');
     setSelectedSize('all');
     setSelectedGender('all');
-    setMinPrice('');
-    setMaxPrice('');
-    setSortBy('default');
     setPriceRange('all');
+    setSortBy('default');
   };
 
   const categories = useMemo(() => {
@@ -297,13 +291,23 @@ function ClothingPage() {
     return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
   }, [products]);
 
-  const sizesList = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  const sizesList = [
+    { id: 'all', name: 'All Sizes' },
+    { id: 'XS', name: 'XS' },
+    { id: 'S', name: 'S' },
+    { id: 'M', name: 'M' },
+    { id: 'L', name: 'L' },
+    { id: 'XL', name: 'XL' },
+    { id: 'XXL', name: 'XXL' },
+    { id: '3XL', name: '3XL' },
+  ];
+
   const genderOptions = [
     { id: 'all', name: 'All Genders' },
     { id: 'women', name: "Women's" },
     { id: 'men', name: "Men's" },
     { id: 'kids', name: "Kids" },
-    { id: 'unisex', name: "Unisex" }
+    { id: 'unisex', name: "Unisex" },
   ];
 
   const priceRanges = [
@@ -361,7 +365,7 @@ function ClothingPage() {
     <>
       <Helmet>
         <title>Clothing for Women - Dresses, Tops, Kurtis & Jeans | MyPinkShop</title>
-        <meta name="description" content="Shop trendy clothing for women at MyPinkShop. Explore dresses, tops, kurtis, jeans, skirts, and ethnic wear. ✓Free Shipping ✓Easy Returns ✓Best Prices. Shop now!" />
+        <meta name="description" content="Shop trendy clothing for women at MyPinkShop. Explore dresses, tops, kurtis, jeans, skirts, and ethnic wear. Free shipping available. Shop now!" />
         <meta name="keywords" content="clothing for women, women's clothing, dresses, tops, kurtis, jeans, ethnic wear, buy clothes online" />
         <link rel="canonical" href="https://www.mypinkshop.com/clothing" />
         <meta property="og:title" content="Clothing for Women - MyPinkShop" />
@@ -370,7 +374,7 @@ function ClothingPage() {
         <meta property="og:url" content="https://www.mypinkshop.com/clothing" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Clothing for Women - MyPinkShop" />
-        <meta name="twitter:description" content="Shop trendy clothing for women. Best prices, free shipping." />
+        <meta name="twitter:description" content="Shop trendy clothing for women. Free shipping available." />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
@@ -474,134 +478,45 @@ function ClothingPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               
               <div className="hidden md:flex flex-wrap gap-3">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                 </select>
-
-                <select
-                  value={selectedSubcategory}
-                  onChange={(e) => setSelectedSubcategory(e.target.value)}
-                  className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  {subcategories.map(sub => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))}
+                <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
                 </select>
-
-                <select
-                  value={selectedBrand}
-                  onChange={(e) => setSelectedBrand(e.target.value)}
-                  className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  {brands.map(brand => (
-                    <option key={brand.id} value={brand.id}>{brand.name}</option>
-                  ))}
+                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                 </select>
-
-                <select
-                  value={selectedSize}
-                  onChange={(e) => setSelectedSize(e.target.value)}
-                  className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  <option value="all">All Sizes</option>
-                  {sizesList.map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
+                <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {sizesList.map(size => <option key={size.id} value={size.id}>{size.name}</option>)}
                 </select>
-
-                <select
-                  value={selectedGender}
-                  onChange={(e) => setSelectedGender(e.target.value)}
-                  className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  {genderOptions.map(g => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
+                <select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {genderOptions.map(gender => <option key={gender.id} value={gender.id}>{gender.name}</option>)}
                 </select>
-
-                <select
-                  value={priceRange}
-                  onChange={(e) => setPriceRange(e.target.value)}
-                  className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-                >
-                  {priceRanges.map(range => (
-                    <option key={range.id} value={range.id}>{range.name}</option>
-                  ))}
+                <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {priceRanges.map(range => <option key={range.id} value={range.id}>{range.name}</option>)}
                 </select>
               </div>
 
-              <button 
-                onClick={() => setShowFilters(!showFilters)} 
-                className="md:hidden px-5 py-2 border border-pink-200 rounded-full text-sm flex items-center gap-2 bg-white"
-              >
-                <span>Filters</span>
-                <span>🔽</span>
+              <button onClick={() => setShowFilters(!showFilters)} className="md:hidden px-5 py-2 border border-pink-200 rounded-full text-sm flex items-center gap-2 bg-white">
+                Filters 🔽
               </button>
 
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-5 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                {sortOptions.map(option => (
-                  <option key={option.id} value={option.id}>{option.name}</option>
-                ))}
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-5 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                {sortOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </div>
 
             {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedSize !== 'all' || selectedGender !== 'all' || priceRange !== 'all' || searchTerm) && (
               <div className="flex flex-wrap gap-2 mt-4">
-                {selectedCategory !== 'all' && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    {selectedCategory}
-                    <button onClick={() => setSelectedCategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                {selectedSubcategory !== 'all' && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    {selectedSubcategory}
-                    <button onClick={() => setSelectedSubcategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                {selectedBrand !== 'all' && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    {selectedBrand}
-                    <button onClick={() => setSelectedBrand('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                {selectedSize !== 'all' && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    Size: {selectedSize}
-                    <button onClick={() => setSelectedSize('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                {selectedGender !== 'all' && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    {genderOptions.find(g => g.id === selectedGender)?.name}
-                    <button onClick={() => setSelectedGender('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                {priceRange !== 'all' && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    {priceRanges.find(r => r.id === priceRange)?.name}
-                    <button onClick={() => setPriceRange('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                {searchTerm && (
-                  <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                    Search: {searchTerm}
-                    <button onClick={() => setSearchTerm('')} className="text-pink-400 hover:text-pink-600">×</button>
-                  </span>
-                )}
-                <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline hover:no-underline">
-                  Clear All
-                </button>
+                {selectedCategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')}>×</button></span>}
+                {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
+                {selectedBrand !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')}>×</button></span>}
+                {selectedSize !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Size: {selectedSize} <button onClick={() => setSelectedSize('all')}>×</button></span>}
+                {selectedGender !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{genderOptions.find(g => g.id === selectedGender)?.name} <button onClick={() => setSelectedGender('all')}>×</button></span>}
+                {priceRange !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')}>×</button></span>}
+                {searchTerm && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Search: {searchTerm} <button onClick={() => setSearchTerm('')}>×</button></span>}
+                <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline">Clear All</button>
               </div>
             )}
           </div>
@@ -614,48 +529,14 @@ function ClothingPage() {
                   <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
                   <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
                 </div>
-                
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                    <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500">
-                      {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
-                    <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500">
-                      {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
-                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500">
-                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Size</label>
-                    <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500">
-                      <option value="all">All Sizes</option>
-                      {sizesList.map(size => <option key={size} value={size}>{size}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                    <select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500">
-                      {genderOptions.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500">
-                      {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                    </select>
-                  </div>
-                  <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition">
-                    Clear All Filters
-                  </button>
+                <div className="space-y-4">
+                  <div><label className="block text-sm mb-1">Category</label><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Subcategory</label><select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Size</label><select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{sizesList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Gender</label><select value={selectedGender} onChange={(e) => setSelectedGender(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{genderOptions.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+                  <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
                 </div>
               </div>
             </div>
@@ -663,10 +544,7 @@ function ClothingPage() {
 
           {/* Results Count */}
           <div className="mb-6">
-            <p className="text-sm text-gray-500">
-              Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of{' '}
-              <span className="font-semibold text-pink-600">{products.length}</span> products
-            </p>
+            <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-pink-600">{products.length}</span> products</p>
           </div>
           
           {/* Products Grid */}
@@ -675,27 +553,18 @@ function ClothingPage() {
               <div className="text-6xl mb-4">👗</div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">No clothing products found</h3>
               <p className="text-gray-500 mb-6">Try adjusting your filters or search term</p>
-              <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:shadow-lg transition">
-                Clear All Filters
-              </button>
+              <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:shadow-lg transition">Clear All Filters</button>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {filteredProducts.map(product => (
-                <ProductCard 
-                  key={product._id || product.id} 
-                  product={product} 
-                  addToCart={addToCart}
-                  isInWishlist={isInWishlist}
-                  addToWishlist={addToWishlist}
-                  removeFromWishlist={removeFromWishlist}
-                />
+                <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} />
               ))}
             </div>
           )}
         </div>
 
-        {/* Premium Footer */}
+        {/* Premium Footer - Same as Hair Page */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -706,13 +575,14 @@ function ClothingPage() {
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+                <p className="text-sm">Luxury fashion and clothing for the modern woman.</p>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Shop</h4>
                 <ul className="space-y-2 text-sm">
                   <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
                   <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair Care</Link></li>
                   <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
                   <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
                 </ul>
