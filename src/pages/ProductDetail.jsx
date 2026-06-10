@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -31,7 +32,6 @@ function ProductDetail() {
   const [deliveryStatus, setDeliveryStatus] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   
-  // State for dynamic gallery images
   const [galleryImages, setGalleryImages] = useState([]);
 
   const API_URL = 'https://api.mypinkshop.com';
@@ -65,27 +65,22 @@ function ProductDetail() {
     }
   };
 
-  // 🔥 FIXED: Function to update gallery based on selected variation - ONLY FOR CLOTHING
   const updateGalleryForVariation = (variation, productImagesList, isClothing) => {
-    // If not clothing category, always show product images
     if (!isClothing) {
       setGalleryImages([...productImagesList]);
       setSelectedImage(0);
       return;
     }
     
-    // Only for Clothing - variation images replace product images
     if (!variation || !variation.image || variation.image.length === 0) {
       setGalleryImages([...productImagesList]);
       setSelectedImage(0);
       return;
     }
     
-    // Variation has images - replace first N images with variation images
     const variationImages = Array.isArray(variation.image) ? variation.image : [variation.image];
     const productImagesListArr = Array.isArray(productImagesList) ? productImagesList : [productImagesList];
     
-    // Create new gallery: variation images first, then remaining product images
     const newGallery = [...variationImages];
     const remainingProductImages = productImagesListArr.slice(variationImages.length);
     newGallery.push(...remainingProductImages);
@@ -115,10 +110,8 @@ function ProductDetail() {
         if (data && data._id) {
           setProduct(data);
           
-          // Check if category is Clothing
           const isClothing = data.mainCategory === 'Clothing' || data.category === 'Clothing';
           
-          // Set initial gallery images from product
           const productImgs = data.images && data.images.length > 0 
             ? data.images 
             : ['https://via.placeholder.com/800x800?text=Product+Image'];
@@ -131,7 +124,6 @@ function ProductDetail() {
             const defaultVariation = data.variations[0];
             setSelectedVariation(defaultVariation);
             setSelectedVariationId(defaultVariation.id || defaultVariation._id);
-            // 🔥 Update gallery for default variation (only for Clothing)
             updateGalleryForVariation(defaultVariation, productImgs, isClothing);
           }
         } else {
@@ -250,7 +242,6 @@ function ProductDetail() {
       setSelectedVariationId(variationId);
       setQuantity(1);
       
-      // 🔥 Update gallery based on selected variation (only for Clothing)
       const isClothing = product.mainCategory === 'Clothing' || product.category === 'Clothing';
       const productImgs = product.images && product.images.length > 0 
         ? product.images 
@@ -392,6 +383,45 @@ function ProductDetail() {
     return specs;
   };
 
+  // ✅ SEO: Generate Product Schema Markup
+  const generateProductSchema = () => {
+    if (!product) return null;
+    
+    const currentPrice = getCurrentPrice();
+    const currentMrp = getCurrentMrp();
+    const discount = getDiscountPercent();
+    
+    return {
+      "@context": "https://schema.org/",
+      "@type": "Product",
+      "name": product.name,
+      "image": productImages[0],
+      "description": product.shortDescription || (product.description ? (typeof product.description === 'string' ? product.description.substring(0, 200) : '') : ''),
+      "sku": product._id,
+      "brand": {
+        "@type": "Brand",
+        "name": product.brand || "MyPinkShop"
+      },
+      "offers": {
+        "@type": "Offer",
+        "url": `https://www.mypinkshop.com/product/${product._id}`,
+        "priceCurrency": "INR",
+        "price": currentPrice,
+        "priceValidUntil": "2026-12-31",
+        "availability": getCurrentStock() > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        "seller": {
+          "@type": "Organization",
+          "name": "MyPinkShop"
+        }
+      },
+      "aggregateRating": product.rating > 0 ? {
+        "@type": "AggregateRating",
+        "ratingValue": product.rating,
+        "reviewCount": product.reviewCount || 0
+      } : undefined
+    };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -406,6 +436,10 @@ function ProductDetail() {
   if (!product) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+        <Helmet>
+          <title>Product Not Found | MyPinkShop</title>
+          <meta name="description" content="The product you're looking for does not exist or has been removed from our store." />
+        </Helmet>
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
             <div className="text-6xl mb-4">🔍</div>
@@ -433,571 +467,605 @@ function ProductDetail() {
   const isButtonDisabled = isOutOfStock || quantity < 1;
   const isClothing = product.mainCategory === 'Clothing' || product.category === 'Clothing';
 
+  const productSchema = generateProductSchema();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-      
-      {activeOffer && activeOffer.isActive !== false && (
-        <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-3 px-4 text-center">
-          <p className="text-sm font-medium">
-            {activeOffer.description || activeOffer.title}
-            {activeOffer.discountValue && (
-              <span className="ml-2 inline-block bg-white/20 px-2 py-0.5 rounded-full text-xs">
-                {activeOffer.discountType === 'percentage' ? `${activeOffer.discountValue}% OFF` : `₹${activeOffer.discountValue} OFF`}
-                {activeOffer.minOrderValue > 0 && ` on ₹${activeOffer.minOrderValue}+`}
-              </span>
-            )}
-          </p>
-        </div>
-      )}
+    <>
+      <Helmet>
+        <title>{product.name} | Buy Online at Best Price | MyPinkShop</title>
+        <meta name="description" content={product.shortDescription || `Buy ${product.name} online at best price in India. ${product.brand || 'MyPinkShop'} product with ₹{currentPrice}. Free shipping available. Shop now!`} />
+        <meta name="keywords" content={`${product.name}, buy ${product.name}, ${product.category} products, ${product.brand}, online shopping`} />
+        <link rel="canonical" href={`https://www.mypinkshop.com/product/${product._id}`} />
+        <meta property="og:title" content={`${product.name} | MyPinkShop`} />
+        <meta property="og:description" content={product.shortDescription || `Shop ${product.name} at best price. ${discountPercent}% off available.`} />
+        <meta property="og:image" content={productImages[0]} />
+        <meta property="og:url" content={`https://www.mypinkshop.com/product/${product._id}`} />
+        <meta property="og:type" content="product" />
+        <meta property="product:price:amount" content={currentPrice} />
+        <meta property="product:price:currency" content="INR" />
+        <meta property="product:availability" content={currentStock > 0 ? "in stock" : "out of stock"} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${product.name} | MyPinkShop`} />
+        <meta name="twitter:description" content={`Buy ${product.name} online. ₹{currentPrice} only.`} />
+        <meta name="twitter:image" content={productImages[0]} />
+        {productSchema && (
+          <script type="application/ld+json">
+            {JSON.stringify(productSchema)}
+          </script>
+        )}
+      </Helmet>
 
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            <Link to="/" className="flex items-center gap-2 shrink-0 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <span className="text-white font-bold text-lg sm:text-xl">M</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
-              </div>
-            </Link>
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+        
+        {activeOffer && activeOffer.isActive !== false && (
+          <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-3 px-4 text-center">
+            <p className="text-sm font-medium">
+              {activeOffer.description || activeOffer.title}
+              {activeOffer.discountValue && (
+                <span className="ml-2 inline-block bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                  {activeOffer.discountType === 'percentage' ? `${activeOffer.discountValue}% OFF` : `₹${activeOffer.discountValue} OFF`}
+                  {activeOffer.minOrderValue > 0 && ` on ₹${activeOffer.minOrderValue}+`}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
 
-            <div className="flex-1 max-w-md lg:max-w-2xl">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search for products..."
-                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
-                  onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
-              </button>
-              
-              <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+              <Link to="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
+                </div>
+                <div className="hidden sm:block">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                </div>
               </Link>
-              
-              {user ? <Avatar user={user} onLogout={logout} /> : 
-                <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </Link>
-              }
-            </div>
-          </div>
-        </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm flex-wrap">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-          <span className="text-gray-400">/</span>
-          <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition">Shop</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium truncate max-w-[200px] sm:max-w-md">{product.name}</span>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          
-          {/* Left Column - Dynamic Gallery Images */}
-          <div>
-            <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex items-center justify-center">
-              <img 
-                src={galleryImages[selectedImage] || productImages[0]} 
-                alt={product.name} 
-                className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
-              />
-              <button 
-                onClick={handleWishlistToggle} 
-                className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition z-10"
-              >
-                <span className="text-xl">{isInWishlist(product._id) ? '❤️' : '🤍'}</span>
-              </button>
-              {product.badge && (
-                <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
-                  {product.badge}
-                </span>
-              )}
-              {product.isNew && !product.badge && (
-                <span className="absolute bottom-4 left-4 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
-                  NEW
-                </span>
-              )}
-            </div>
-            
-            {/* Thumbnails - Dynamic based on gallery */}
-            {galleryImages.length > 1 && (
-              <div className="flex gap-2 sm:gap-3 mt-4 overflow-x-auto pb-2 scrollbar-hide">
-                {galleryImages.map((img, idx) => (
-                  <button 
-                    key={idx} 
-                    onClick={() => setSelectedImage(idx)} 
-                    className={`w-14 h-14 sm:w-20 sm:h-20 border-2 rounded-lg overflow-hidden flex-shrink-0 transition ${
-                      selectedImage === idx ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'
-                    }`}
-                  >
-                    <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Product Info */}
-          <div className="space-y-4">
-            <div>
-              <span className="text-xs sm:text-sm text-pink-600 font-medium capitalize">{product.mainCategory || product.category || 'Product'}</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">{product.name}</h1>
-            
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1">
-                <div className="flex text-yellow-400 text-sm sm:text-base">
-                  {'★'.repeat(Math.floor(product.rating || 0))}
-                  {'☆'.repeat(5 - Math.floor(product.rating || 0))}
-                </div>
-                <span className="text-sm font-medium ml-1">{product.rating || 0}</span>
-              </div>
-              <span className="text-gray-300">|</span>
-              <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
-            </div>
-
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-2xl sm:text-3xl font-bold text-pink-600">₹{currentPrice}</span>
-              {currentMrp > currentPrice && (
-                <>
-                  <span className="text-sm text-gray-400 line-through">₹{currentMrp}</span>
-                  <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
-                    {discountPercent}% OFF
-                  </span>
-                </>
-              )}
-            </div>
-
-            {/* Variations - With Images */}
-            {hasVariations && product.variations && product.variations.length > 0 && (
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-sm font-medium text-gray-800 mb-3">
-                  Select Option
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {product.variations.map((variation) => {
-                    const variationId = variation.id || variation._id;
-                    const displayName = variation.secondaryName 
-                      ? `${variation.name} - ${variation.secondaryName}`
-                      : variation.name;
-                    const isSelected = selectedVariationId === variationId;
-                    const variationStock = variation.stock !== undefined ? variation.stock : 0;
-                    const isVariationOutOfStock = variationStock === 0;
-                    
-                    return (
-                      <button
-                        key={variationId}
-                        onClick={() => handleVariationChange(variationId)}
-                        disabled={isVariationOutOfStock}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
-                            : isVariationOutOfStock
-                              ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
-                              : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
-                        }`}
-                      >
-                        {variation.image && isClothing && (
-                          <img 
-                            src={variation.image} 
-                            alt={variation.name}
-                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
-                          />
-                        )}
-                        <span>{displayName}</span>
-                        {variation.price !== product.price && (
-                          <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
-                        )}
-                        {isVariationOutOfStock && (
-                          <span className="ml-1 text-xs text-red-500">(Out of Stock)</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {selectedVariation && selectedVariation.sku && (
-              <div className="text-xs text-gray-400">
-                SKU: {selectedVariation.sku}
-              </div>
-            )}
-
-            {/* Stock status */}
-            {isOutOfStock ? (
-              <div className="text-sm text-red-600 font-semibold">❌ Out of Stock</div>
-            ) : isLowStock ? (
-              <div className="text-sm text-amber-600 font-semibold">⚠️ Only {currentStock} left in stock - order soon</div>
-            ) : (
-              <div className="text-sm text-green-600">✅ In Stock ({currentStock} available)</div>
-            )}
-
-            <div className="border-t border-gray-200 pt-4">
-              <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
+              <div className="flex-1 max-w-md lg:max-w-2xl">
+                <div className="relative">
                   <input 
                     type="text" 
-                    placeholder="Enter Pincode" 
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    maxLength="6"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 text-sm"
+                    placeholder="Search for products..."
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                    onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                   />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
+                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                </button>
+                
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                </Link>
+                
+                {user ? <Avatar user={user} onLogout={logout} /> : 
+                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </Link>
+                }
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+            <span className="text-gray-400">/</span>
+            <Link to="/shop" className="text-gray-500 hover:text-pink-500 transition">Shop</Link>
+            <span className="text-gray-400">/</span>
+            <Link to={`/shop?category=${product.mainCategory || product.category}`} className="text-gray-500 hover:text-pink-500 transition">
+              {product.mainCategory || product.category}
+            </Link>
+            <span className="text-gray-400">/</span>
+            <span className="text-pink-600 font-medium truncate max-w-[200px] sm:max-w-md">{product.name}</span>
+          </div>
+        </div>
+
+        {/* Rest of your existing JSX remains the same */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            
+            {/* Left Column - Dynamic Gallery Images */}
+            <div>
+              <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm border border-pink-100 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex items-center justify-center">
+                <img 
+                  src={galleryImages[selectedImage] || productImages[0]} 
+                  alt={product.name} 
+                  className="max-w-full max-h-[400px] sm:max-h-[500px] lg:max-h-[600px] w-auto h-auto object-contain"
+                />
                 <button 
-                  onClick={checkDelivery}
-                  disabled={checkingDelivery || pincode.length !== 6}
-                  className="px-5 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg text-sm font-medium hover:shadow-lg transition disabled:opacity-50"
+                  onClick={handleWishlistToggle} 
+                  className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition z-10"
                 >
-                  {checkingDelivery ? 'Checking...' : 'Check'}
+                  <span className="text-xl">{isInWishlist(product._id) ? '❤️' : '🤍'}</span>
+                </button>
+                {product.badge && (
+                  <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+                    {product.badge}
+                  </span>
+                )}
+                {product.isNew && !product.badge && (
+                  <span className="absolute bottom-4 left-4 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+                    NEW
+                  </span>
+                )}
+              </div>
+              
+              {/* Thumbnails */}
+              {galleryImages.length > 1 && (
+                <div className="flex gap-2 sm:gap-3 mt-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {galleryImages.map((img, idx) => (
+                    <button 
+                      key={idx} 
+                      onClick={() => setSelectedImage(idx)} 
+                      className={`w-14 h-14 sm:w-20 sm:h-20 border-2 rounded-lg overflow-hidden flex-shrink-0 transition ${
+                        selectedImage === idx ? 'border-pink-500 shadow-md' : 'border-gray-200 hover:border-pink-300'
+                      }`}
+                    >
+                      <img src={img} alt={`${product.name} view ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Product Info */}
+            <div className="space-y-4">
+              <div>
+                <span className="text-xs sm:text-sm text-pink-600 font-medium capitalize">{product.mainCategory || product.category || 'Product'}</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">{product.name}</h1>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <div className="flex text-yellow-400 text-sm sm:text-base">
+                    {'★'.repeat(Math.floor(product.rating || 0))}
+                    {'☆'.repeat(5 - Math.floor(product.rating || 0))}
+                  </div>
+                  <span className="text-sm font-medium ml-1">{product.rating || 0}</span>
+                </div>
+                <span className="text-gray-300">|</span>
+                <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
+              </div>
+
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="text-2xl sm:text-3xl font-bold text-pink-600">₹{currentPrice}</span>
+                {currentMrp > currentPrice && (
+                  <>
+                    <span className="text-sm text-gray-400 line-through">₹{currentMrp}</span>
+                    <span className="bg-pink-100 text-pink-700 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
+                      {discountPercent}% OFF
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Variations */}
+              {hasVariations && product.variations && product.variations.length > 0 && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-sm font-medium text-gray-800 mb-3">
+                    Select Option
+                  </h3>
+                  <div className="flex flex-wrap gap-3">
+                    {product.variations.map((variation) => {
+                      const variationId = variation.id || variation._id;
+                      const displayName = variation.secondaryName 
+                        ? `${variation.name} - ${variation.secondaryName}`
+                        : variation.name;
+                      const isSelected = selectedVariationId === variationId;
+                      const variationStock = variation.stock !== undefined ? variation.stock : 0;
+                      const isVariationOutOfStock = variationStock === 0;
+                      
+                      return (
+                        <button
+                          key={variationId}
+                          onClick={() => handleVariationChange(variationId)}
+                          disabled={isVariationOutOfStock}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md'
+                              : isVariationOutOfStock
+                                ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                                : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:text-pink-500'
+                          }`}
+                        >
+                          {variation.image && isClothing && (
+                            <img 
+                              src={variation.image} 
+                              alt={variation.name}
+                              className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                            />
+                          )}
+                          <span>{displayName}</span>
+                          {variation.price !== product.price && (
+                            <span className="ml-1 text-xs opacity-80">₹{variation.price}</span>
+                          )}
+                          {isVariationOutOfStock && (
+                            <span className="ml-1 text-xs text-red-500">(Out of Stock)</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedVariation && selectedVariation.sku && (
+                <div className="text-xs text-gray-400">
+                  SKU: {selectedVariation.sku}
+                </div>
+              )}
+
+              {/* Stock status */}
+              {isOutOfStock ? (
+                <div className="text-sm text-red-600 font-semibold">❌ Out of Stock</div>
+              ) : isLowStock ? (
+                <div className="text-sm text-amber-600 font-semibold">⚠️ Only {currentStock} left in stock - order soon</div>
+              ) : (
+                <div className="text-sm text-green-600">✅ In Stock ({currentStock} available)</div>
+              )}
+
+              {/* Delivery Check */}
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-800 mb-3">Check Delivery Availability</h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1">
+                    <input 
+                      type="text" 
+                      placeholder="Enter Pincode" 
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      maxLength="6"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 text-sm"
+                    />
+                  </div>
+                  <button 
+                    onClick={checkDelivery}
+                    disabled={checkingDelivery || pincode.length !== 6}
+                    className="px-5 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg text-sm font-medium hover:shadow-lg transition disabled:opacity-50"
+                  >
+                    {checkingDelivery ? 'Checking...' : 'Check'}
+                  </button>
+                </div>
+                {deliveryStatus && (
+                  <div className={`mt-3 p-3 rounded-lg text-sm ${deliveryStatus.isDeliverable ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    {deliveryStatus.message}
+                    {deliveryStatus.estimatedDays && (
+                      <p className="text-xs mt-1 opacity-75">⏱️ Estimated: {deliveryStatus.estimatedDays}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Quantity and Buttons */}
+              {!isOutOfStock && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center border border-gray-300 rounded-full">
+                      <button onClick={decreaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium">-</button>
+                      <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
+                      <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= currentStock}>+</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button 
+                  onClick={handleCartButtonClick}
+                  disabled={isButtonDisabled}
+                  className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
+                    isButtonDisabled
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : addedToCart
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
+                  }`}
+                >
+                  {isOutOfStock ? 'Out of Stock' : (addedToCart ? '✓ Go to Cart' : 'Add to Cart')}
+                </button>
+                <button 
+                  onClick={handleBuyNow}
+                  disabled={isButtonDisabled}
+                  className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
+                    isButtonDisabled
+                      ? 'border-2 border-gray-300 text-gray-400 cursor-not-allowed'
+                      : 'border-2 border-pink-500 text-pink-600 hover:bg-pink-50'
+                  }`}
+                >
+                  Buy Now
                 </button>
               </div>
-              {deliveryStatus && (
-                <div className={`mt-3 p-3 rounded-lg text-sm ${deliveryStatus.isDeliverable ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                  {deliveryStatus.message}
-                  {deliveryStatus.estimatedDays && (
-                    <p className="text-xs mt-1 opacity-75">⏱️ Estimated: {deliveryStatus.estimatedDays}</p>
+
+              {/* Product Details Box */}
+              <div className="border border-pink-100 rounded-xl overflow-hidden bg-gradient-to-r from-pink-50/50 to-white shadow-sm">
+                <div className="bg-pink-100/50 px-4 py-3 border-b border-pink-100">
+                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <span className="text-pink-500">📋</span> Product Details
+                  </h3>
+                </div>
+                <div className="divide-y divide-pink-100">
+                  {selectedVariation && (
+                    <div className="flex flex-wrap justify-between px-4 py-3 gap-2">
+                      <span className="text-gray-600 text-sm">Selected Option:</span>
+                      <span className="text-gray-800 font-medium text-sm text-right">
+                        {selectedVariation.secondaryName 
+                          ? `${selectedVariation.name} - ${selectedVariation.secondaryName}`
+                          : selectedVariation.name}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {Object.entries(specifications).map(([key, value], idx) => (
+                    <div key={idx} className="flex flex-wrap justify-between px-4 py-3 gap-2 hover:bg-pink-50/30 transition">
+                      <span className="text-gray-600 text-sm">{key}:</span>
+                      <span className="text-gray-800 font-medium text-sm text-right break-words max-w-[60%]">{String(value)}</span>
+                    </div>
+                  ))}
+                  
+                  {isLowStock && !isOutOfStock && (
+                    <div className="flex flex-wrap justify-between px-4 py-3 gap-2 bg-amber-50">
+                      <span className="text-amber-700 text-sm">Stock Status:</span>
+                      <span className="text-amber-800 font-medium text-sm">⚠️ Only {currentStock} left</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs Section */}
+          <div className="mt-12">
+            <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
+              {['description', 'features', 'specifications', 'reviews'].map(tab => (
+                <button 
+                  key={tab} 
+                  onClick={() => setActiveTab(tab)} 
+                  className={`pb-2 sm:pb-3 text-sm sm:text-base font-medium capitalize whitespace-nowrap transition ${
+                    activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'
+                  }`}
+                >
+                  {tab === 'description' ? 'About this item' : tab === 'features' ? 'Product Highlights' : tab === 'specifications' ? 'Full Specifications' : 'Customer Reviews'}
+                </button>
+              ))}
+            </div>
+
+            <div className="py-6">
+              {activeTab === 'description' && (
+                <div className="space-y-4">
+                  {descriptionBullets.length > 0 ? (
+                    <ul className="space-y-3">
+                      {descriptionBullets.map((bullet, idx) => (
+                        <li key={idx} className="flex items-start gap-3 text-gray-600">
+                          <span className="text-pink-500 text-lg mt-0.5">•</span>
+                          <span className="text-sm sm:text-base">{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">No description available</p>
                   )}
                 </div>
               )}
-            </div>
 
-            {!isOutOfStock && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-800 mb-3">Quantity:</h3>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center border border-gray-300 rounded-full">
-                    <button onClick={decreaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium">-</button>
-                    <span className="w-10 sm:w-12 text-center font-medium">{quantity}</span>
-                    <button onClick={increaseQuantity} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:bg-gray-100 transition text-xl font-medium" disabled={quantity >= currentStock}>+</button>
-                  </div>
+              {activeTab === 'features' && (
+                <div className="space-y-4">
+                  {keyFeatures.length > 0 ? (
+                    <ul className="space-y-3">
+                      {keyFeatures.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-3 text-gray-600">
+                          <span className="text-green-500 text-lg">✓</span>
+                          <span className="text-sm sm:text-base">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">No product highlights listed</p>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button 
-                onClick={handleCartButtonClick}
-                disabled={isButtonDisabled}
-                className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
-                  isButtonDisabled
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : addedToCart
-                      ? 'bg-green-500 text-white hover:bg-green-600'
-                      : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
-                }`}
-              >
-                {isOutOfStock ? 'Out of Stock' : (addedToCart ? '✓ Go to Cart' : 'Add to Cart')}
-              </button>
-              <button 
-                onClick={handleBuyNow}
-                disabled={isButtonDisabled}
-                className={`flex-1 py-2.5 sm:py-3 rounded-full font-medium transition-all transform hover:-translate-y-0.5 text-sm sm:text-base ${
-                  isButtonDisabled
-                    ? 'border-2 border-gray-300 text-gray-400 cursor-not-allowed'
-                    : 'border-2 border-pink-500 text-pink-600 hover:bg-pink-50'
-                }`}
-              >
-                Buy Now
-              </button>
-            </div>
-
-            {/* Product Details Box */}
-            <div className="border border-pink-100 rounded-xl overflow-hidden bg-gradient-to-r from-pink-50/50 to-white shadow-sm">
-              <div className="bg-pink-100/50 px-4 py-3 border-b border-pink-100">
-                <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                  <span className="text-pink-500">📋</span> Product Details
-                </h3>
-              </div>
-              <div className="divide-y divide-pink-100">
-                {selectedVariation && (
-                  <div className="flex flex-wrap justify-between px-4 py-3 gap-2">
-                    <span className="text-gray-600 text-sm">Selected Option:</span>
-                    <span className="text-gray-800 font-medium text-sm text-right">
-                      {selectedVariation.secondaryName 
-                        ? `${selectedVariation.name} - ${selectedVariation.secondaryName}`
-                        : selectedVariation.name}
-                    </span>
-                  </div>
-                )}
-                
-                {Object.entries(specifications).map(([key, value], idx) => (
-                  <div key={idx} className="flex flex-wrap justify-between px-4 py-3 gap-2 hover:bg-pink-50/30 transition">
-                    <span className="text-gray-600 text-sm">{key}:</span>
-                    <span className="text-gray-800 font-medium text-sm text-right break-words max-w-[60%]">{String(value)}</span>
-                  </div>
-                ))}
-                
-                {isLowStock && !isOutOfStock && (
-                  <div className="flex flex-wrap justify-between px-4 py-3 gap-2 bg-amber-50">
-                    <span className="text-amber-700 text-sm">Stock Status:</span>
-                    <span className="text-amber-800 font-medium text-sm">⚠️ Only {currentStock} left</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs Section */}
-        <div className="mt-12">
-          <div className="flex flex-wrap gap-4 sm:gap-6 border-b border-gray-200 overflow-x-auto pb-1 scrollbar-hide">
-            {['description', 'features', 'specifications', 'reviews'].map(tab => (
-              <button 
-                key={tab} 
-                onClick={() => setActiveTab(tab)} 
-                className={`pb-2 sm:pb-3 text-sm sm:text-base font-medium capitalize whitespace-nowrap transition ${
-                  activeTab === tab ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'
-                }`}
-              >
-                {tab === 'description' ? 'About this item' : tab === 'features' ? 'Product Highlights' : tab === 'specifications' ? 'Full Specifications' : 'Customer Reviews'}
-              </button>
-            ))}
-          </div>
-
-          <div className="py-6">
-            {activeTab === 'description' && (
-              <div className="space-y-4">
-                {descriptionBullets.length > 0 ? (
-                  <ul className="space-y-3">
-                    {descriptionBullets.map((bullet, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-gray-600">
-                        <span className="text-pink-500 text-lg mt-0.5">•</span>
-                        <span className="text-sm sm:text-base">{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500 text-center py-8">No description available</p>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'features' && (
-              <div className="space-y-4">
-                {keyFeatures.length > 0 ? (
-                  <ul className="space-y-3">
-                    {keyFeatures.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-gray-600">
-                        <span className="text-green-500 text-lg">✓</span>
-                        <span className="text-sm sm:text-base">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500 text-center py-8">No product highlights listed</p>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'specifications' && (
-              <div className="bg-gradient-to-r from-pink-50 to-white rounded-xl overflow-hidden border border-pink-100 shadow-sm">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-pink-100">
-                    {Object.entries(specifications).length > 0 ? (
-                      Object.entries(specifications).map(([key, value], idx) => (
-                        <tr key={idx} className="hover:bg-pink-100/30 transition duration-150">
-                          <td className="px-4 py-3 font-medium text-pink-700 w-1/3 text-sm bg-pink-50/50">
-                            {key}
-                          </td>
-                          <td className="px-4 py-3 text-gray-700 text-sm">
-                            {String(value)}
+              {activeTab === 'specifications' && (
+                <div className="bg-gradient-to-r from-pink-50 to-white rounded-xl overflow-hidden border border-pink-100 shadow-sm">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-pink-100">
+                      {Object.entries(specifications).length > 0 ? (
+                        Object.entries(specifications).map(([key, value], idx) => (
+                          <tr key={idx} className="hover:bg-pink-100/30 transition duration-150">
+                            <td className="px-4 py-3 font-medium text-pink-700 w-1/3 text-sm bg-pink-50/50">
+                              {key}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 text-sm">
+                              {String(value)}
+                            </td>
+                           </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="2" className="px-4 py-8 text-center text-gray-400">
+                            No specifications available
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="2" className="px-4 py-8 text-center text-gray-400">
-                          No specifications available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-            {activeTab === 'reviews' && (
-              <ReviewSection productId={id} />
-            )}
-          </div>
-        </div>
-
-        {/* Related Products */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-16">
-            <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-                You May Also Like
-              </h2>
-              <Link 
-                to={`/shop?category=${product.mainCategory || product.category}`} 
-                className="text-pink-500 text-sm hover:underline flex items-center gap-1"
-              >
-                View All <span className="text-base">→</span>
-              </Link>
+              {activeTab === 'reviews' && (
+                <ReviewSection productId={id} />
+              )}
             </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {relatedProducts.map((relatedProduct) => (
+          </div>
+
+          {/* Related Products */}
+          {relatedProducts.length > 0 && (
+            <div className="mt-16">
+              <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                  You May Also Like
+                </h2>
                 <Link 
-                  key={relatedProduct._id} 
-                  to={`/product/${relatedProduct._id}`}
-                  className="group bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg hover:border-pink-200 transition-all duration-300"
+                  to={`/shop?category=${product.mainCategory || product.category}`} 
+                  className="text-pink-500 text-sm hover:underline flex items-center gap-1"
                 >
-                  <div className="relative aspect-square overflow-hidden bg-gray-50">
-                    <img 
-                      src={relatedProduct.images?.[0] || 'https://via.placeholder.com/200'} 
-                      alt={relatedProduct.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                    />
-                    {relatedProduct.badge && (
-                      <span className="absolute top-2 left-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full">
-                        {relatedProduct.badge}
-                      </span>
-                    )}
-                    {(relatedProduct.discountPercent > 0 || (relatedProduct.originalPrice > relatedProduct.price)) && (
-                      <span className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">
-                        {relatedProduct.discountPercent || Math.round(((relatedProduct.originalPrice - relatedProduct.price) / relatedProduct.originalPrice) * 100)}% OFF
-                      </span>
-                    )}
-                    {relatedProduct.isNew && !relatedProduct.badge && (
-                      <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">
-                        NEW
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="p-3">
-                    <h3 className="text-xs sm:text-sm font-medium text-gray-800 line-clamp-2 min-h-[2.5rem]">
-                      {relatedProduct.name}
-                    </h3>
-                    <p className="text-[10px] text-gray-500 mt-1 truncate">
-                      {relatedProduct.brand || 'MyPinkShop'}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-sm sm:text-base font-bold text-pink-600">
-                        ₹{relatedProduct.price}
-                      </span>
-                      {relatedProduct.originalPrice > relatedProduct.price && (
-                        <span className="text-[10px] text-gray-400 line-through">
-                          ₹{relatedProduct.originalPrice}
+                  View All <span className="text-base">→</span>
+                </Link>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                {relatedProducts.map((relatedProduct) => (
+                  <Link 
+                    key={relatedProduct._id} 
+                    to={`/product/${relatedProduct._id}`}
+                    className="group bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-lg hover:border-pink-200 transition-all duration-300"
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-gray-50">
+                      <img 
+                        src={relatedProduct.images?.[0] || 'https://via.placeholder.com/200'} 
+                        alt={relatedProduct.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                      {relatedProduct.badge && (
+                        <span className="absolute top-2 left-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          {relatedProduct.badge}
+                        </span>
+                      )}
+                      {(relatedProduct.discountPercent > 0 || (relatedProduct.originalPrice > relatedProduct.price)) && (
+                        <span className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          {relatedProduct.discountPercent || Math.round(((relatedProduct.originalPrice - relatedProduct.price) / relatedProduct.originalPrice) * 100)}% OFF
+                        </span>
+                      )}
+                      {relatedProduct.isNew && !relatedProduct.badge && (
+                        <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                          NEW
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <div className="flex text-yellow-400 text-[10px]">
-                        {'★'.repeat(Math.floor(relatedProduct.rating || 4))}
-                        {'☆'.repeat(5 - Math.floor(relatedProduct.rating || 4))}
+                    
+                    <div className="p-3">
+                      <h3 className="text-xs sm:text-sm font-medium text-gray-800 line-clamp-2 min-h-[2.5rem]">
+                        {relatedProduct.name}
+                      </h3>
+                      <p className="text-[10px] text-gray-500 mt-1 truncate">
+                        {relatedProduct.brand || 'MyPinkShop'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-sm sm:text-base font-bold text-pink-600">
+                          ₹{relatedProduct.price}
+                        </span>
+                        {relatedProduct.originalPrice > relatedProduct.price && (
+                          <span className="text-[10px] text-gray-400 line-through">
+                            ₹{relatedProduct.originalPrice}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-[10px] text-gray-400">
-                        ({relatedProduct.reviewCount || 0})
-                      </span>
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className="flex text-yellow-400 text-[10px]">
+                          {'★'.repeat(Math.floor(relatedProduct.rating || 4))}
+                          {'☆'.repeat(5 - Math.floor(relatedProduct.rating || 4))}
+                        </div>
+                        <span className="text-[10px] text-gray-400">
+                          ({relatedProduct.reviewCount || 0})
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {loadingRelated && (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin w-8 h-8 border-3 border-pink-500 border-t-transparent rounded-full"></div>
-          </div>
-        )}
-
-      </div>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">M</span>
-                </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                  </Link>
+                ))}
               </div>
-              <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
             </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-              </ul>
+          )}
+          
+          {loadingRelated && (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-3 border-pink-500 border-t-transparent rounded-full"></div>
             </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-          </div>
+          )}
         </div>
-      </footer>
 
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
-    </div>
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
+          </div>
+        </footer>
+
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+        `}</style>
+      </div>
+    </>
   );
 }
 
