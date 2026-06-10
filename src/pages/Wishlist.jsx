@@ -7,30 +7,60 @@ import Avatar from '../components/Avatar';
 
 function Wishlist() {
   const navigate = useNavigate();
-  const { wishlist, removeFromWishlist } = useWishlist();
+  const { wishlist, removeFromWishlist, fetchWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [movingProduct, setMovingProduct] = useState(null);
+  const [offer, setOffer] = useState(null);
 
+  const API_URL = 'https://api.mypinkshop.com';
+
+  // Fetch offer banner from backend
   useEffect(() => {
-    setTimeout(() => setLoading(false), 500);
+    const fetchOffer = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/offers/active-offer`);
+        const data = await response.json();
+        setOffer(data);
+      } catch (error) {
+        console.error('Failed to fetch offer:', error);
+      }
+    };
+    fetchOffer();
   }, []);
 
-  const handleMoveToCart = (product) => {
+  // Fetch wishlist from backend on load
+  useEffect(() => {
+    const loadWishlist = async () => {
+      setLoading(true);
+      if (fetchWishlist) {
+        await fetchWishlist();
+      }
+      setLoading(false);
+    };
+    loadWishlist();
+  }, [fetchWishlist]);
+
+  const handleMoveToCart = async (product) => {
     setMovingProduct(product.id);
+    
+    // Add to cart
     addToCart(product);
+    
+    // Remove from wishlist (backend + local)
+    await removeFromWishlist(product.id);
+    
     setTimeout(() => {
-      removeFromWishlist(product.id);
       setMovingProduct(null);
     }, 500);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-pink-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-500">Loading your wishlist...</p>
         </div>
       </div>
@@ -38,24 +68,32 @@ function Wishlist() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
-      {/* Top Bar */}
-      <div className="bg-gray-900 text-white py-2 text-center text-sm">
-        Free Shipping on ₹999+ | Extra 10% off on first order | Cash on Delivery Available
+      {/* Dynamic Top Bar - Offer Banner */}
+      <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
+        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
+          <span>✨</span>
+          <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Extra 10% off on first order</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Cash on Delivery Available</span>
+          <span>✨</span>
+        </div>
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+      {/* Premium Header */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            <Link to="/" className="flex items-center gap-2 shrink-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-pink-600 rounded flex items-center justify-center">
+            <Link to="/" className="flex items-center gap-2 shrink-0 group">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">MyPinkShop</h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-400">FOR THE GIRLIES</p>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
               </div>
             </Link>
 
@@ -64,40 +102,38 @@ function Wishlist() {
                 <input 
                   type="text" 
                   placeholder="Search for products..."
-                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-300 rounded focus:outline-none focus:border-pink-500 text-sm sm:text-base"
+                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                 />
-                <button className="absolute right-1 top-1/2 -translate-y-1/2 bg-pink-600 text-white px-4 sm:px-6 py-1.5 rounded text-sm font-medium hover:bg-pink-700 transition">
-                  Search
-                </button>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-pink-600 transition">
+              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                {wishlist.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                {wishlist?.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                     {wishlist.length}
                   </span>
                 )}
               </button>
               
-              <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
+              <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
                 {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                     {cartCount}
                   </span>
                 )}
               </Link>
               
               {user ? <Avatar user={user} onLogout={logout} /> : 
-                <Link to="/login" className="p-1.5 sm:p-2 text-gray-600 hover:text-pink-600 transition">
+                <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
@@ -110,23 +146,23 @@ function Wishlist() {
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Link to="/" className="hover:text-pink-600">Home</Link>
-          <span>/</span>
-          <span className="text-gray-700">Wishlist</span>
+        <div className="flex items-center gap-2 text-sm">
+          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+          <span className="text-gray-400">/</span>
+          <span className="text-pink-600 font-medium">Wishlist</span>
         </div>
       </div>
 
-      {wishlist.length === 0 ? (
+      {!wishlist || wishlist.length === 0 ? (
         // Empty Wishlist
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <div className="bg-white rounded-lg p-12 max-w-md mx-auto border border-gray-200 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
             <div className="text-6xl mb-6">🤍</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-3">Your wishlist is empty</h2>
             <p className="text-gray-500 mb-6">Save your favorite items here!</p>
             <Link 
               to="/shop" 
-              className="inline-block bg-pink-600 text-white px-8 py-3 rounded font-semibold hover:bg-pink-700 transition"
+              className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
             >
               Start Shopping →
             </Link>
@@ -137,17 +173,17 @@ function Wishlist() {
           {/* Header Section */}
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-              My Wishlist ({wishlist.length} {wishlist.length === 1 ? 'item' : 'items'})
+              My Wishlist 🤍 ({wishlist.length} {wishlist.length === 1 ? 'item' : 'items'})
             </h1>
           </div>
 
           {/* Products Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {wishlist.map((product) => (
-              <div key={product.id} className="group bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition">
+              <div key={product.id || product._id} className="group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition hover:-translate-y-1">
                 {/* Product Image */}
-                <Link to={`/product/${product.id}`}>
-                  <div className="relative h-52 overflow-hidden bg-gray-100">
+                <Link to={`/product/${product.id || product._id}`}>
+                  <div className="relative h-52 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
                     {product.images && product.images[0] ? (
                       <img 
                         src={product.images[0]} 
@@ -155,24 +191,24 @@ function Wishlist() {
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-5xl text-gray-400">
-                        No Image
+                      <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">
+                        🛍️
                       </div>
                     )}
                     {product.badge && (
-                      <span className="absolute top-3 left-3 bg-pink-600 text-white text-xs px-2 py-1 rounded shadow-md">
+                      <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
                         {product.badge}
                       </span>
                     )}
                     {product.isNew && (
-                      <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded shadow-md">
+                      <span className="absolute top-3 right-12 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
                         NEW
                       </span>
                     )}
                     
                     {/* Remove Button */}
                     <button
-                      onClick={() => removeFromWishlist(product.id)}
+                      onClick={() => removeFromWishlist(product.id || product._id)}
                       className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition"
                     >
                       <span className="text-red-500 text-lg">✕</span>
@@ -182,8 +218,8 @@ function Wishlist() {
                 
                 {/* Product Info */}
                 <div className="p-4">
-                  <Link to={`/product/${product.id}`}>
-                    <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-600 transition min-h-[48px]">
+                  <Link to={`/product/${product.id || product._id}`}>
+                    <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
                       {product.name}
                     </h3>
                   </Link>
@@ -205,14 +241,14 @@ function Wishlist() {
                   
                   <button
                     onClick={() => handleMoveToCart(product)}
-                    disabled={movingProduct === product.id}
-                    className={`w-full mt-3 py-2 rounded text-sm font-medium transition ${
-                      movingProduct === product.id
-                        ? 'bg-green-600 text-white'
-                        : 'bg-pink-600 text-white hover:bg-pink-700'
+                    disabled={movingProduct === (product.id || product._id)}
+                    className={`w-full mt-3 py-2 rounded-full text-sm font-medium transition ${
+                      movingProduct === (product.id || product._id)
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
                     }`}
                   >
-                    {movingProduct === product.id ? '✓ Added to Cart!' : 'Move to Cart'}
+                    {movingProduct === (product.id || product._id) ? '✓ Added to Cart!' : 'Move to Cart 🛒'}
                   </button>
                 </div>
               </div>
@@ -223,9 +259,9 @@ function Wishlist() {
           <div className="text-center mt-12">
             <Link 
               to="/shop" 
-              className="inline-flex items-center gap-2 text-pink-600 hover:text-pink-700 font-medium transition"
+              className="inline-flex items-center gap-2 text-pink-500 hover:text-pink-600 font-medium transition group"
             >
-              ← Continue Shopping
+              <span className="group-hover:-translate-x-1 transition">←</span> Continue Shopping
             </Link>
           </div>
         </div>
@@ -237,7 +273,7 @@ function Wishlist() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-pink-600 rounded flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">M</span>
                 </div>
                 <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
@@ -274,6 +310,7 @@ function Wishlist() {
           </div>
           <div className="text-center pt-8 border-t border-gray-800">
             <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </div>
       </footer>
