@@ -383,17 +383,12 @@ function ClothingPage() {
         
         {/* Premium Top Bar */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-            <span>✨</span>
-            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
-            <span className="hidden sm:inline">•</span>
-            <span>EXTRA 10% OFF ON FIRST ORDER</span>
-            <span className="hidden sm:inline">•</span>
-            <span>CASH ON DELIVERY AVAILABLE</span>
-            <span>✨</span>
-          </div>
-        </div>
-
+  <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
+    <span>✨</span>
+    <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
+    <span>✨</span>
+  </div>
+</div>
         {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
