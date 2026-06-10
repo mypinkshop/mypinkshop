@@ -88,20 +88,16 @@ function App() {
         <CartProvider>
           <ReviewProvider>
             <Routes>
-              {/* ============ AUTH PAGES (No Header/Footer) ============ */}
+              {/* ============ PAGES WITHOUT HEADER/FOOTER (Only Auth Pages) ============ */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password/:token" element={<ResetPassword />} />
-              <Route path="/verify-email/:token" element={<VerifyEmail />} />
-
-              {/* ============ ADMIN & VENDOR LOGIN (No Header/Footer) ============ */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/vendor/login" element={<VendorLogin />} />
               <Route path="/vendor/register" element={<VendorRegister />} />
 
               {/* ============ PAGES WITH HEADER/FOOTER ============ */}
               <Route element={<Layout />}>
+                {/* Main Pages */}
                 <Route path="/" element={<Home />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/my-orders" element={<MyOrders />} />
@@ -118,6 +114,11 @@ function App() {
                 <Route path="/returns" element={<ReturnsPolicy />} />
                 <Route path="/faqs" element={<FAQs />} />
 
+                {/* Auth Pages WITH Header/Footer (except login/register) */}
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
+                <Route path="/verify-email/:token" element={<VerifyEmail />} />
+
                 {/* Category Pages */}
                 <Route path="/skincare" element={<SkincarePage />} />
                 <Route path="/makeup" element={<MakeupPage />} />
@@ -125,7 +126,7 @@ function App() {
                 <Route path="/accessories" element={<AccessoriesPage />} />
                 <Route path="/hair" element={<HairPage />} />
 
-                {/* Admin Dashboard (with header/footer) */}
+                {/* Admin Dashboard */}
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/vendors" element={<AdminVendors />} />
                 <Route path="/admin/brand-applications" element={<AdminBrandApplications />} />
