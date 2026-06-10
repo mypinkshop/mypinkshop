@@ -5,12 +5,12 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
-import OfferBanner from '../components/OfferBanner';
 
 // Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -40,84 +40,92 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
+    <div 
+      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <Link to={`/product/${product._id || product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
               onError={() => setImgError(true)}
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl">
-              {product.emoji || '🧴'}
+            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
+              ✨
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
-              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+              <span className="text-white text-sm px-4 py-2 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
         </div>
       </Link>
       
-      <div className="p-4">
+      <div className="p-5">
         <Link to={`/product/${product._id || product.id}`}>
-          <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
+          <h3 className="font-semibold text-gray-800 text-base mb-1 line-clamp-2 hover:text-pink-500 transition">
             {product.name}
           </h3>
         </Link>
         <p className="text-xs text-gray-400 mb-2">{product.brand || 'MyPinkShop'}</p>
         
-        <div className="flex items-center gap-1 mb-2">
-          <div className="flex text-yellow-400 text-sm">
-            {'★'.repeat(Math.floor(product.rating || 4))}
-            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-          </div>
-          <span className="text-xs text-gray-400">({product.rating || 4})</span>
-        </div>
-        
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <>
-              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-              <span className="text-xs text-green-500">
-                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
-              </span>
-            </>
-          )}
+          <div className="flex items-center gap-1">
+            <div className="flex text-amber-400 text-sm">
+              {'★'.repeat(Math.floor(product.rating || 4))}
+              {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+            </div>
+            <span className="text-xs text-gray-400">({product.rating || 4})</span>
+          </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <>
+                <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+                <span className="text-xs text-green-500 font-medium">
+                  {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-3">
           {isAdded ? (
             <button 
               onClick={handleGoToCart}
-              className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600 transform hover:-translate-y-0.5"
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
             >
-              ✓ Go to Cart
+              Go to Cart
             </button>
           ) : (
             <button 
               onClick={handleAddToCart} 
               disabled={product.stock === 0}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 product.stock > 0 
                   ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}
             >
               Add to Cart
@@ -126,7 +134,11 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           
           <button 
             onClick={handleWishlistToggle}
-            className="w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 border border-pink-200 hover:bg-pink-50"
+            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${
+              isInWishlist(product._id || product.id) 
+                ? 'border-pink-200 bg-pink-50 text-pink-500' 
+                : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'
+            }`}
           >
             {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
@@ -145,26 +157,18 @@ function SkincarePage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [offer, setOffer] = useState(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedConcern, setSelectedConcern] = useState('all');
+  const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedSkinType, setSelectedSkinType] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
-
-  // Fetch offer banner
-  useEffect(() => {
-    fetch(`${API_URL}/api/offers/active-offer`)
-      .then(res => res.json())
-      .then(data => setOffer(data))
-      .catch(err => console.error('Offer fetch error:', err));
-  }, []);
 
   // Load products from API
   useEffect(() => {
@@ -232,6 +236,10 @@ function SkincarePage() {
       });
     }
 
+    if (selectedBrand !== 'all') {
+      filtered = filtered.filter(p => p.brand === selectedBrand);
+    }
+
     if (selectedSkinType !== 'all') {
       filtered = filtered.filter(p => (p.skinType || 'all') === selectedSkinType);
     }
@@ -258,13 +266,14 @@ function SkincarePage() {
     }
     
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedCategory, selectedSubcategory, selectedConcern, selectedSkinType, sortBy, products, priceRange]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedConcern, selectedBrand, selectedSkinType, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('all');
     setSelectedSubcategory('all');
     setSelectedConcern('all');
+    setSelectedBrand('all');
     setSelectedSkinType('all');
     setPriceRange('all');
     setSortBy('default');
@@ -284,6 +293,11 @@ function SkincarePage() {
     const allConcerns = products.flatMap(p => p.skinConcerns || p.concerns || []).filter(Boolean);
     const uniqueConcerns = [...new Set(allConcerns)];
     return [{ id: 'all', name: 'All Concerns' }, ...uniqueConcerns.map(c => ({ id: c, name: c }))];
+  }, [products]);
+
+  const brands = useMemo(() => {
+    const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+    return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
   }, [products]);
 
   const skinTypes = [
@@ -350,7 +364,7 @@ function SkincarePage() {
     <>
       <Helmet>
         <title>Skincare Products - Face Wash, Serum, Moisturizer & More | MyPinkShop</title>
-        <meta name="description" content="Shop premium skincare products at MyPinkShop. Face washes, serums, moisturizers, sunscreens, and masks for glowing skin. ✓Free Shipping ✓Best Prices. Shop now!" />
+        <meta name="description" content="Shop premium skincare products at MyPinkShop. Face washes, serums, moisturizers, sunscreens, and masks for glowing skin. Free shipping available." />
         <meta name="keywords" content="skincare products, face wash, serum, moisturizer, sunscreen, face mask, buy skincare online" />
         <link rel="canonical" href="https://www.mypinkshop.com/skincare" />
         <meta property="og:title" content="Skincare Products - MyPinkShop" />
@@ -359,22 +373,22 @@ function SkincarePage() {
         <meta property="og:url" content="https://www.mypinkshop.com/skincare" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Skincare Products - MyPinkShop" />
-        <meta name="twitter:description" content="Shop premium skincare products. Best prices, free shipping." />
+        <meta name="twitter:description" content="Shop premium skincare products. Free shipping available." />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Offer Banner */}
+        {/* Premium Top Bar */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
             <span>✨</span>
-            <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
+            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
             <span className="hidden sm:inline">•</span>
-            <span>Extra 10% off on first order</span>
+            <span>EXTRA 10% OFF ON FIRST ORDER</span>
             <span className="hidden sm:inline">•</span>
-            <span>Cash on Delivery Available</span>
+            <span>CASH ON DELIVERY AVAILABLE</span>
             <span>✨</span>
           </div>
         </div>
@@ -402,7 +416,9 @@ function SkincarePage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition">
+                    🔍
+                  </button>
                 </div>
               </div>
 
@@ -454,12 +470,6 @@ function SkincarePage() {
           </div>
         </div>
 
-        {/* SEO Content - Hidden for Google only */}
-        <div className="hidden">
-          <h2>Premium Skincare Products Online in India</h2>
-          <p>Shop the best skincare products at MyPinkShop. From hydrating serums to nourishing moisturizers, find everything you need for your skincare routine. Our collection includes products for all skin types - oily, dry, combination, and sensitive. Trusted brands, affordable prices, and free shipping on orders above ₹499. Whether you're dealing with acne, aging, dullness, or just want to maintain healthy skin, we have the right products for you.</p>
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 pb-16">
           
           {/* Filter Bar */}
@@ -475,6 +485,9 @@ function SkincarePage() {
                 </select>
                 <select value={selectedConcern} onChange={(e) => setSelectedConcern(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
                   {concerns.map(concern => <option key={concern.id} value={concern.id}>{concern.name}</option>)}
+                </select>
+                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                 </select>
                 <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
                   {skinTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
@@ -493,11 +506,12 @@ function SkincarePage() {
               </select>
             </div>
 
-            {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedConcern !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
+            {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedConcern !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
               <div className="flex flex-wrap gap-2 mt-4">
                 {selectedCategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')}>×</button></span>}
                 {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
                 {selectedConcern !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedConcern} <button onClick={() => setSelectedConcern('all')}>×</button></span>}
+                {selectedBrand !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')}>×</button></span>}
                 {selectedSkinType !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{skinTypes.find(t => t.id === selectedSkinType)?.name} <button onClick={() => setSelectedSkinType('all')}>×</button></span>}
                 {priceRange !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')}>×</button></span>}
                 {searchTerm && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Search: {searchTerm} <button onClick={() => setSearchTerm('')}>×</button></span>}
@@ -518,6 +532,7 @@ function SkincarePage() {
                   <div><label className="block text-sm mb-1">Category</label><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Subcategory</label><select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Concern</label><select value={selectedConcern} onChange={(e) => setSelectedConcern(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{concerns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Skin Type</label><select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
                   <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
@@ -548,17 +563,52 @@ function SkincarePage() {
           )}
         </div>
 
-        {/* Footer - Same as Hair Page */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
-              <Link to="/terms" className="hover:text-pink-500 transition">Terms of Service</Link>
-              <Link to="/privacy" className="hover:text-pink-500 transition">Privacy Policy</Link>
-              <Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link>
-              <Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link>
+        {/* Premium Footer - Same as Hair Page */}
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and skincare for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair Care</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
             </div>
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
           </div>
         </footer>
       </div>
