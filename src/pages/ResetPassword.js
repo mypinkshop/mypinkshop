@@ -1,8 +1,6 @@
-import { useParams, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 function ResetPassword() {
-  const { token } = useParams();
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
@@ -11,10 +9,6 @@ function ResetPassword() {
         </div>
         
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Reset Password Page</h1>
-        
-        <p className="text-gray-600 mb-4">
-          Token: <span className="font-mono text-pink-600 break-all">{token || 'No token provided'}</span>
-        </p>
         
         <p className="text-green-600 mb-4">
           ✅ Page is working! Routing is correct.
