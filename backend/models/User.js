@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
+    index: true,
   },
   password: {
     type: String,
@@ -27,6 +28,26 @@ const userSchema = new mongoose.Schema({
   address: {
     type: String,
     default: '',
+  },
+  // ✅ NEW: Email Verification Fields
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  emailVerificationToken: {
+    type: String,
+    default: '',
+  },
+  emailVerificationExpires: {
+    type: Date,
+  },
+  // ✅ NEW: Forgot Password Fields
+  resetPasswordToken: {
+    type: String,
+    default: '',
+  },
+  resetPasswordExpires: {
+    type: Date,
   },
   // Vendor specific fields
   brandName: {
