@@ -5,12 +5,12 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
-import OfferBanner from '../components/OfferBanner';
 
 // Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -40,84 +40,92 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
+    <div 
+      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <Link to={`/product/${product._id || product.id}`}>
-        <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
               alt={product.name} 
-              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
               onError={() => setImgError(true)}
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl">
-              {product.emoji || '💄'}
+            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
+              💄
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
-              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">Out of Stock</span>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+              <span className="text-white text-sm px-4 py-2 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
         </div>
       </Link>
       
-      <div className="p-4">
+      <div className="p-5">
         <Link to={`/product/${product._id || product.id}`}>
-          <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
+          <h3 className="font-semibold text-gray-800 text-base mb-1 line-clamp-2 hover:text-pink-500 transition">
             {product.name}
           </h3>
         </Link>
         <p className="text-xs text-gray-400 mb-2">{product.brand || 'MyPinkShop'}</p>
         
-        <div className="flex items-center gap-1 mb-2">
-          <div className="flex text-yellow-400 text-sm">
-            {'★'.repeat(Math.floor(product.rating || 4))}
-            {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-          </div>
-          <span className="text-xs text-gray-400">({product.rating || 4})</span>
-        </div>
-        
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <>
-              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-              <span className="text-xs text-green-500">
-                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
-              </span>
-            </>
-          )}
+          <div className="flex items-center gap-1">
+            <div className="flex text-amber-400 text-sm">
+              {'★'.repeat(Math.floor(product.rating || 4))}
+              {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+            </div>
+            <span className="text-xs text-gray-400">({product.rating || 4})</span>
+          </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-bold text-pink-600">₹{product.price}</span>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <>
+                <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+                <span className="text-xs text-green-500 font-medium">
+                  {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-3">
           {isAdded ? (
             <button 
               onClick={handleGoToCart}
-              className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600 transform hover:-translate-y-0.5"
+              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
             >
-              ✓ Go to Cart
+              Go to Cart
             </button>
           ) : (
             <button 
               onClick={handleAddToCart} 
               disabled={product.stock === 0}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 product.stock > 0 
                   ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}
             >
               Add to Cart
@@ -126,7 +134,11 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           
           <button 
             onClick={handleWishlistToggle}
-            className="w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 border border-pink-200 hover:bg-pink-50"
+            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${
+              isInWishlist(product._id || product.id) 
+                ? 'border-pink-200 bg-pink-50 text-pink-500' 
+                : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'
+            }`}
           >
             {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
@@ -145,7 +157,6 @@ function MakeupPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [offer, setOffer] = useState(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -158,14 +169,6 @@ function MakeupPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
-
-  // Fetch offer banner
-  useEffect(() => {
-    fetch(`${API_URL}/api/offers/active-offer`)
-      .then(res => res.json())
-      .then(data => setOffer(data))
-      .catch(err => console.error('Offer fetch error:', err));
-  }, []);
 
   // Load products from API
   useEffect(() => {
@@ -288,8 +291,23 @@ function MakeupPage() {
     return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
   }, [products]);
 
-  const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy', 'Metallic'];
-  const coverageTypes = ['Light', 'Medium', 'Full', 'Sheer'];
+  const finishTypes = [
+    { id: 'all', name: 'All Finishes' },
+    { id: 'matte', name: 'Matte' },
+    { id: 'glossy', name: 'Glossy' },
+    { id: 'shimmer', name: 'Shimmer' },
+    { id: 'satin', name: 'Satin' },
+    { id: 'dewy', name: 'Dewy' },
+    { id: 'metallic', name: 'Metallic' },
+  ];
+
+  const coverageTypes = [
+    { id: 'all', name: 'All Coverage' },
+    { id: 'light', name: 'Light' },
+    { id: 'medium', name: 'Medium' },
+    { id: 'full', name: 'Full' },
+    { id: 'sheer', name: 'Sheer' },
+  ];
 
   const priceRanges = [
     { id: 'all', name: 'All Prices' },
@@ -313,7 +331,7 @@ function MakeupPage() {
     "@context": "https://schema.org",
     "@type": "ItemList",
     "name": "Makeup Products - MyPinkShop",
-    "description": "Shop premium makeup products including lipsticks, foundations, kajal, eyeshadows, and more.",
+    "description": "Shop premium makeup products including lipsticks, foundations, kajal, eyeshadows, and more for your perfect look.",
     "numberOfItems": filteredProducts.length,
     "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
       "@type": "ListItem",
@@ -346,46 +364,46 @@ function MakeupPage() {
     <>
       <Helmet>
         <title>Makeup Products - Lipstick, Foundation, Kajal & More | MyPinkShop</title>
-        <meta name="description" content="Shop premium makeup products at MyPinkShop. Lipsticks, foundations, kajal, eyeliners, eyeshadows, and more. ✓Free Shipping ✓Best Prices. Shop now!" />
+        <meta name="description" content="Shop premium makeup products at MyPinkShop. Lipsticks, foundations, kajal, eyeliners, eyeshadows, and more. Free shipping available. Shop now!" />
         <meta name="keywords" content="makeup products, lipstick, foundation, kajal, eyeliner, eyeshadow, mascara, buy makeup online" />
         <link rel="canonical" href="https://www.mypinkshop.com/makeup" />
         <meta property="og:title" content="Makeup Products - MyPinkShop" />
-        <meta property="og:description" content="Shop premium makeup products. Lipsticks, foundations, kajal & more. Free shipping available." />
+        <meta property="og:description" content="Shop premium makeup products for your perfect look. Free shipping available." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/makeup" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Makeup Products - MyPinkShop" />
-        <meta name="twitter:description" content="Shop premium makeup products. Best prices, free shipping." />
+        <meta name="twitter:description" content="Shop premium makeup products. Free shipping available." />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Offer Banner */}
+        {/* Premium Top Bar */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
             <span>✨</span>
-            <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
+            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
             <span className="hidden sm:inline">•</span>
-            <span>Extra 10% off on first order</span>
+            <span>EXTRA 10% OFF ON FIRST ORDER</span>
             <span className="hidden sm:inline">•</span>
-            <span>Cash on Delivery Available</span>
+            <span>CASH ON DELIVERY AVAILABLE</span>
             <span>✨</span>
           </div>
         </div>
 
-        {/* Header */}
+        {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                  <p className="text-[10px] text-gray-400">FOR THE GIRLIES ✨</p>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
                 </div>
               </Link>
 
@@ -393,41 +411,51 @@ function MakeupPage() {
                 <div className="relative">
                   <input 
                     type="text" 
-                    placeholder="Search makeup products..."
+                    placeholder="Search makeup..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-5 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition">
+                    🔍
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-4">
-                <button onClick={() => navigate('/wishlist')} className="relative p-2 text-gray-700 hover:text-pink-500">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
+                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{wishlistCount}</span>}
+                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
                 </button>
-                <Link to="/cart" className="relative p-2 text-gray-700 hover:text-pink-500">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{cartCount}</span>}
+                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
                 </Link>
-                {user ? <Avatar user={user} onLogout={logout} /> : <Link to="/login" className="p-2 text-gray-700">👤</Link>}
+                
+                {user ? <Avatar user={user} onLogout={logout} /> : 
+                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </Link>
+                }
               </div>
             </div>
           </div>
         </header>
 
-        {/* Hero Banner */}
-        <div className="relative bg-gradient-to-r from-purple-100 via-pink-100 to-rose-100 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-700 to-pink-700 bg-clip-text text-transparent mb-3">
-              Makeup 💄
+        {/* Hero Section */}
+        <div className="relative bg-gradient-to-r from-purple-100 via-pink-100 to-rose-100">
+          <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-700 to-pink-700 bg-clip-text text-transparent mb-4">
+              Makeup Collection 💄
             </h1>
-            <p className="text-purple-600 text-base sm:text-lg max-w-2xl mx-auto">
+            <p className="text-gray-600 text-base max-w-2xl mx-auto">
               Unleash your inner glam with our premium makeup collection
             </p>
           </div>
@@ -444,12 +472,6 @@ function MakeupPage() {
 
         <div className="max-w-7xl mx-auto px-4 pb-16">
           
-          {/* SEO Content - Hidden for Google only */}
-          <div className="hidden">
-            <h2>Premium Makeup Products Online in India</h2>
-            <p>Shop the best makeup products at MyPinkShop. From long-lasting lipsticks to flawless foundations, find everything you need for your perfect look. Our collection includes products from top brands for all skin tones and types. Trusted quality, affordable prices, and free shipping on orders above ₹999.</p>
-          </div>
-          
           {/* Filter Bar */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -465,12 +487,10 @@ function MakeupPage() {
                   {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                 </select>
                 <select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  <option value="all">All Finishes</option>
-                  {finishTypes.map(finish => <option key={finish} value={finish}>{finish}</option>)}
+                  {finishTypes.map(finish => <option key={finish.id} value={finish.id}>{finish.name}</option>)}
                 </select>
                 <select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  <option value="all">All Coverage</option>
-                  {coverageTypes.map(coverage => <option key={coverage} value={coverage}>{coverage}</option>)}
+                  {coverageTypes.map(coverage => <option key={coverage.id} value={coverage.id}>{coverage.name}</option>)}
                 </select>
                 <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
                   {priceRanges.map(range => <option key={range.id} value={range.id}>{range.name}</option>)}
@@ -512,8 +532,8 @@ function MakeupPage() {
                   <div><label className="block text-sm mb-1">Category</label><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Subcategory</label><select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                  <div><label className="block text-sm mb-1">Finish</label><select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg"><option value="all">All Finishes</option>{finishTypes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
-                  <div><label className="block text-sm mb-1">Coverage</label><select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg"><option value="all">All Coverage</option>{coverageTypes.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Finish</label><select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{finishTypes.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Coverage</label><select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{coverageTypes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
                   <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
                 </div>
@@ -543,11 +563,52 @@ function MakeupPage() {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Premium Footer - Same as Hair Page */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and makeup for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair Care</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
           </div>
         </footer>
       </div>
