@@ -10,7 +10,7 @@ import Wishlist from './pages/Wishlist';
 import Shop from './pages/Shop';
 import TrackOrder from './pages/TrackOrder';
 import Profile from './pages/Profile';
-// import ForgotPassword from './pages/ForgotPassword';
+import ForgotPassword from './pages/ForgotPassword';
 // import ResetPassword from './pages/ResetPassword';
 // import VerifyEmail from './pages/VerifyEmail';
 import AdminLogin from './pages/admin/AdminLogin';
