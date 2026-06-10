@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -144,21 +145,27 @@ function MakeupPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [offer, setOffer] = useState(null);
   
-  // Filter states - HairPage style
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedFinish, setSelectedFinish] = useState('all');
   const [selectedCoverage, setSelectedCoverage] = useState('all');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
-  const [priceRange, setPriceRange] = useState('all');
 
   const API_URL = 'https://api.mypinkshop.com';
+
+  // Fetch offer banner
+  useEffect(() => {
+    fetch(`${API_URL}/api/offers/active-offer`)
+      .then(res => res.json())
+      .then(data => setOffer(data))
+      .catch(err => console.error('Offer fetch error:', err));
+  }, []);
 
   // Load products from API
   useEffect(() => {
@@ -200,7 +207,6 @@ function MakeupPage() {
   useEffect(() => {
     let filtered = [...products];
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(p => 
         p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,12 +214,10 @@ function MakeupPage() {
       );
     }
 
-    // Category filter
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => p.mainCategory === selectedCategory || p.category === selectedCategory);
     }
 
-    // Subcategory filter
     if (selectedSubcategory !== 'all') {
       filtered = filtered.filter(p => {
         const productSub = (p.subCategory || p.subcategory || p.category || '').toLowerCase();
@@ -222,22 +226,18 @@ function MakeupPage() {
       });
     }
 
-    // Brand filter
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
 
-    // Finish filter
     if (selectedFinish !== 'all') {
       filtered = filtered.filter(p => p.finish?.toLowerCase() === selectedFinish.toLowerCase());
     }
 
-    // Coverage filter
     if (selectedCoverage !== 'all') {
       filtered = filtered.filter(p => p.coverage?.toLowerCase() === selectedCoverage.toLowerCase());
     }
 
-    // Price filter
     let min = 0, max = Infinity;
     if (priceRange !== 'all') {
       switch(priceRange) {
@@ -249,11 +249,8 @@ function MakeupPage() {
         default: break;
       }
     }
-    if (minPrice) min = parseFloat(minPrice);
-    if (maxPrice) max = parseFloat(maxPrice);
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
 
-    // Sorting
     switch(sortBy) {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
@@ -263,7 +260,7 @@ function MakeupPage() {
     }
     
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, selectedFinish, selectedCoverage, minPrice, maxPrice, sortBy, products, priceRange]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, selectedFinish, selectedCoverage, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -272,13 +269,10 @@ function MakeupPage() {
     setSelectedBrand('all');
     setSelectedFinish('all');
     setSelectedCoverage('all');
-    setMinPrice('');
-    setMaxPrice('');
-    setSortBy('default');
     setPriceRange('all');
+    setSortBy('default');
   };
 
-  // Get unique values for dropdowns
   const categories = useMemo(() => {
     const cats = [...new Set(products.map(p => p.mainCategory || p.category).filter(Boolean))];
     return [{ id: 'all', name: 'All Categories' }, ...cats.map(c => ({ id: c, name: c }))];
@@ -314,6 +308,29 @@ function MakeupPage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
+  // SEO Schema Functions
+  const generateCategorySchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "Makeup Products - MyPinkShop",
+    "description": "Shop premium makeup products including lipsticks, foundations, kajal, eyeshadows, and more.",
+    "numberOfItems": filteredProducts.length,
+    "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "url": `https://www.mypinkshop.com/product/${product._id}`
+    }))
+  });
+
+  const generateBreadcrumbSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mypinkshop.com" },
+      { "@type": "ListItem", "position": 2, "name": "Makeup", "item": "https://www.mypinkshop.com/makeup" }
+    ]
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -326,325 +343,215 @@ function MakeupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-      
-      {/* 🔥 OFFER BANNER */}
-      <OfferBanner />
+    <>
+      <Helmet>
+        <title>Makeup Products - Lipstick, Foundation, Kajal & More | MyPinkShop</title>
+        <meta name="description" content="Shop premium makeup products at MyPinkShop. Lipsticks, foundations, kajal, eyeliners, eyeshadows, and more. ✓Free Shipping ✓Best Prices. Shop now!" />
+        <meta name="keywords" content="makeup products, lipstick, foundation, kajal, eyeliner, eyeshadow, mascara, buy makeup online" />
+        <link rel="canonical" href="https://www.mypinkshop.com/makeup" />
+        <meta property="og:title" content="Makeup Products - MyPinkShop" />
+        <meta property="og:description" content="Shop premium makeup products. Lipsticks, foundations, kajal & more. Free shipping available." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://www.mypinkshop.com/makeup" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Makeup Products - MyPinkShop" />
+        <meta name="twitter:description" content="Shop premium makeup products. Best prices, free shipping." />
+        <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+      </Helmet>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
-            <Link to="/" className="flex items-center gap-2 shrink-0 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg sm:text-xl">M</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                <p className="text-[10px] text-gray-400">FOR THE GIRLIES ✨</p>
-              </div>
-            </Link>
-
-            <div className="flex-1 max-w-md lg:max-w-2xl">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search makeup products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-5 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button onClick={() => navigate('/wishlist')} className="relative p-2 text-gray-700 hover:text-pink-500">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{wishlistCount}</span>}
-              </button>
-              <Link to="/cart" className="relative p-2 text-gray-700 hover:text-pink-500">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{cartCount}</span>}
-              </Link>
-              {user ? <Avatar user={user} onLogout={logout} /> : <Link to="/login" className="p-2 text-gray-700">👤</Link>}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Banner */}
-      <div className="relative bg-gradient-to-r from-purple-100 via-pink-100 to-rose-100 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-700 to-pink-700 bg-clip-text text-transparent mb-3">
-            Makeup 💄
-          </h1>
-          <p className="text-purple-600 text-base sm:text-lg max-w-2xl mx-auto">
-            Unleash your inner glam with our premium makeup collection
-          </p>
-        </div>
-      </div>
-
-      {/* Breadcrumb */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium">Makeup</span>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 pb-16">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Filter Bar - HairPage Style */}
-        <div className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            
-            {/* Desktop Filters */}
-            <div className="hidden md:flex flex-wrap gap-3">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
+        {/* Offer Banner */}
+        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
+          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
+            <span>✨</span>
+            <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
+            <span className="hidden sm:inline">•</span>
+            <span>Extra 10% off on first order</span>
+            <span className="hidden sm:inline">•</span>
+            <span>Cash on Delivery Available</span>
+            <span>✨</span>
+          </div>
+        </div>
 
-              <select
-                value={selectedSubcategory}
-                onChange={(e) => setSelectedSubcategory(e.target.value)}
-                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                {subcategories.map(sub => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                ))}
-              </select>
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3 sm:gap-4">
+              <Link to="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
+                </div>
+                <div className="hidden sm:block">
+                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[10px] text-gray-400">FOR THE GIRLIES ✨</p>
+                </div>
+              </Link>
 
-              <select
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                {brands.map(brand => (
-                  <option key={brand.id} value={brand.id}>{brand.name}</option>
-                ))}
-              </select>
+              <div className="flex-1 max-w-md lg:max-w-2xl">
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="Search makeup products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-5 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                </div>
+              </div>
 
-              <select
-                value={selectedFinish}
-                onChange={(e) => setSelectedFinish(e.target.value)}
-                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                <option value="all">All Finishes</option>
-                {finishTypes.map(finish => (
-                  <option key={finish} value={finish}>{finish}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2 sm:gap-4">
+                <button onClick={() => navigate('/wishlist')} className="relative p-2 text-gray-700 hover:text-pink-500">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{wishlistCount}</span>}
+                </button>
+                <Link to="/cart" className="relative p-2 text-gray-700 hover:text-pink-500">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4">{cartCount}</span>}
+                </Link>
+                {user ? <Avatar user={user} onLogout={logout} /> : <Link to="/login" className="p-2 text-gray-700">👤</Link>}
+              </div>
+            </div>
+          </div>
+        </header>
 
-              <select
-                value={selectedCoverage}
-                onChange={(e) => setSelectedCoverage(e.target.value)}
-                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                <option value="all">All Coverage</option>
-                {coverageTypes.map(coverage => (
-                  <option key={coverage} value={coverage}>{coverage}</option>
-                ))}
-              </select>
+        {/* Hero Banner */}
+        <div className="relative bg-gradient-to-r from-purple-100 via-pink-100 to-rose-100 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 text-center">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-700 to-pink-700 bg-clip-text text-transparent mb-3">
+              Makeup 💄
+            </h1>
+            <p className="text-purple-600 text-base sm:text-lg max-w-2xl mx-auto">
+              Unleash your inner glam with our premium makeup collection
+            </p>
+          </div>
+        </div>
 
-              <select
-                value={priceRange}
-                onChange={(e) => setPriceRange(e.target.value)}
-                className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-              >
-                {priceRanges.map(range => (
-                  <option key={range.id} value={range.id}>{range.name}</option>
-                ))}
+        {/* Breadcrumb */}
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-2 text-sm">
+            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+            <span className="text-gray-400">/</span>
+            <span className="text-pink-600 font-medium">Makeup</span>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 pb-16">
+          
+          {/* SEO Content - Hidden for Google only */}
+          <div className="hidden">
+            <h2>Premium Makeup Products Online in India</h2>
+            <p>Shop the best makeup products at MyPinkShop. From long-lasting lipsticks to flawless foundations, find everything you need for your perfect look. Our collection includes products from top brands for all skin tones and types. Trusted quality, affordable prices, and free shipping on orders above ₹999.</p>
+          </div>
+          
+          {/* Filter Bar */}
+          <div className="mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              
+              <div className="hidden md:flex flex-wrap gap-3">
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                </select>
+                <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                </select>
+                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                </select>
+                <select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  <option value="all">All Finishes</option>
+                  {finishTypes.map(finish => <option key={finish} value={finish}>{finish}</option>)}
+                </select>
+                <select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  <option value="all">All Coverage</option>
+                  {coverageTypes.map(coverage => <option key={coverage} value={coverage}>{coverage}</option>)}
+                </select>
+                <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {priceRanges.map(range => <option key={range.id} value={range.id}>{range.name}</option>)}
+                </select>
+              </div>
+
+              <button onClick={() => setShowFilters(!showFilters)} className="md:hidden px-5 py-2 border border-pink-200 rounded-full text-sm flex items-center gap-2 bg-white">
+                Filters 🔽
+              </button>
+
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-5 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                {sortOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </div>
 
-            {/* Mobile Filter Button */}
-            <button 
-              onClick={() => setShowFilters(!showFilters)} 
-              className="md:hidden px-5 py-2 border border-pink-200 rounded-full text-sm flex items-center gap-2 bg-white"
-            >
-              <span>Filters</span>
-              <span>🔽</span>
-            </button>
-
-            {/* Sort Dropdown */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-5 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500 cursor-pointer"
-            >
-              {sortOptions.map(option => (
-                <option key={option.id} value={option.id}>{option.name}</option>
-              ))}
-            </select>
+            {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedFinish !== 'all' || selectedCoverage !== 'all' || priceRange !== 'all' || searchTerm) && (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {selectedCategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')}>×</button></span>}
+                {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
+                {selectedBrand !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')}>×</button></span>}
+                {selectedFinish !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Finish: {selectedFinish} <button onClick={() => setSelectedFinish('all')}>×</button></span>}
+                {selectedCoverage !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Coverage: {selectedCoverage} <button onClick={() => setSelectedCoverage('all')}>×</button></span>}
+                {priceRange !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')}>×</button></span>}
+                {searchTerm && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Search: {searchTerm} <button onClick={() => setSearchTerm('')}>×</button></span>}
+                <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline">Clear All</button>
+              </div>
+            )}
           </div>
 
-          {/* Active Filters Display */}
-          {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedFinish !== 'all' || selectedCoverage !== 'all' || priceRange !== 'all' || searchTerm) && (
-            <div className="flex flex-wrap gap-2 mt-4">
-              {selectedCategory !== 'all' && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  {selectedCategory}
-                  <button onClick={() => setSelectedCategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              {selectedSubcategory !== 'all' && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  {selectedSubcategory}
-                  <button onClick={() => setSelectedSubcategory('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              {selectedBrand !== 'all' && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  {selectedBrand}
-                  <button onClick={() => setSelectedBrand('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              {selectedFinish !== 'all' && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  Finish: {selectedFinish}
-                  <button onClick={() => setSelectedFinish('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              {selectedCoverage !== 'all' && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  Coverage: {selectedCoverage}
-                  <button onClick={() => setSelectedCoverage('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              {priceRange !== 'all' && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  {priceRanges.find(r => r.id === priceRange)?.name}
-                  <button onClick={() => setPriceRange('all')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              {searchTerm && (
-                <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full flex items-center gap-2">
-                  Search: {searchTerm}
-                  <button onClick={() => setSearchTerm('')} className="text-pink-400 hover:text-pink-600">×</button>
-                </span>
-              )}
-              <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline hover:no-underline">
-                Clear All
-              </button>
+          {/* Mobile Filters Modal */}
+          {showFilters && (
+            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+              <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
+                  <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
+                </div>
+                <div className="space-y-4">
+                  <div><label className="block text-sm mb-1">Category</label><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Subcategory</label><select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Finish</label><select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg"><option value="all">All Finishes</option>{finishTypes.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Coverage</label><select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg"><option value="all">All Coverage</option>{coverageTypes.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+                  <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Results Count */}
+          <div className="mb-6">
+            <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-pink-600">{products.length}</span> products</p>
+          </div>
+          
+          {/* Products Grid */}
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-16 text-center border border-pink-100">
+              <div className="text-6xl mb-4">💄</div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No makeup products found</h3>
+              <p className="text-gray-500 mb-6">Try adjusting your filters or search term</p>
+              <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:shadow-lg transition">Clear All Filters</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+              {filteredProducts.map(product => (
+                <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist} addToWishlist={addToWishlist} removeFromWishlist={removeFromWishlist} />
+              ))}
             </div>
           )}
         </div>
 
-        {/* Mobile Filters Modal */}
-        {showFilters && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
-            <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
-                <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
-              </div>
-              
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
-                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Subcategory</label>
-                  <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
-                    {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
-                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
-                    {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Finish</label>
-                  <select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
-                    <option value="all">All Finishes</option>
-                    {finishTypes.map(finish => <option key={finish} value={finish}>{finish}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Coverage</label>
-                  <select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
-                    <option value="all">All Coverage</option>
-                    {coverageTypes.map(coverage => <option key={coverage} value={coverage}>{coverage}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-                  <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 border border-pink-200 rounded-xl text-sm">
-                    {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </div>
-                <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition">
-                  Clear All Filters
-                </button>
-              </div>
-            </div>
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
-        )}
-
-        {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-500">
-            Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of{' '}
-            <span className="font-semibold text-pink-600">{products.length}</span> products
-          </p>
-        </div>
-        
-        {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-16 text-center border border-pink-100">
-            <div className="text-6xl mb-4">💄</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No makeup products found</h3>
-            <p className="text-gray-500 mb-6">Try adjusting your filters or search term</p>
-            <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full text-sm font-medium hover:shadow-lg transition">
-              Clear All Filters
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {filteredProducts.map(product => (
-              <ProductCard 
-                key={product._id || product.id} 
-                product={product} 
-                addToCart={addToCart}
-                isInWishlist={isInWishlist}
-                addToWishlist={addToWishlist}
-                removeFromWishlist={removeFromWishlist}
-              />
-            ))}
-          </div>
-        )}
+        </footer>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-          <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-        </div>
-      </footer>
-
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-    </div>
+    </>
   );
 }
 
