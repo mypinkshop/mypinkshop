@@ -6,7 +6,6 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import ReviewSection from '../components/ReviewSection';
 import Avatar from '../components/Avatar';
-import OfferBanner from '../components/OfferBanner';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -383,15 +382,13 @@ function ProductDetail() {
     return specs;
   };
 
-  // ✅ SEO: Generate Product Schema Markup
+  // ✅ SEO: Generate Product Schema Markup - Fixed for reviewCount validation
   const generateProductSchema = () => {
     if (!product) return null;
     
     const currentPrice = getCurrentPrice();
-    const currentMrp = getCurrentMrp();
-    const discount = getDiscountPercent();
     
-    return {
+    const schema = {
       "@context": "https://schema.org/",
       "@type": "Product",
       "name": product.name,
@@ -413,13 +410,19 @@ function ProductDetail() {
           "@type": "Organization",
           "name": "MyPinkShop"
         }
-      },
-      "aggregateRating": product.rating > 0 ? {
+      }
+    };
+    
+    // ✅ Only add aggregateRating if rating > 0 AND reviewCount > 0
+    if (product.rating > 0 && product.reviewCount > 0) {
+      schema.aggregateRating = {
         "@type": "AggregateRating",
         "ratingValue": product.rating,
-        "reviewCount": product.reviewCount || 0
-      } : undefined
-    };
+        "reviewCount": product.reviewCount
+      };
+    }
+    
+    return schema;
   };
 
   if (loading) {
@@ -895,7 +898,7 @@ function ProductDetail() {
                             <td className="px-4 py-3 text-gray-700 text-sm">
                               {String(value)}
                             </td>
-                           </tr>
+                            </tr>
                         ))
                       ) : (
                         <tr>
