@@ -6,14 +6,26 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
-// ========== EMAIL TRANSPORTER ==========
+// ========== SENDER.NET SMTP TRANSPORTER ==========
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: process.env.SMTP_SECURE === 'true' || false,
+  host: process.env.SENDER_HOST || 'smtp.sender.net',
+  port: process.env.SENDER_PORT || 587,
+  secure: process.env.SENDER_SECURE === 'true' || false,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    user: process.env.SENDER_USERNAME,
+    pass: process.env.SENDER_PASSWORD
+  },
+  tls: {
+    rejectUnauthorized: false
+  }
+});
+
+// Verify connection
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ Sender.net SMTP error in auth:', error.message);
+  } else {
+    console.log('✅ Sender.net SMTP ready for auth emails');
   }
 });
 
