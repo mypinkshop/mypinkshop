@@ -54,6 +54,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
               className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
               onError={() => setImgError(true)}
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
@@ -157,6 +158,7 @@ function HairPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [offer, setOffer] = useState(null); // ✅ ADDED for dynamic offer banner
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -171,6 +173,14 @@ function HairPage() {
   const [priceRange, setPriceRange] = useState('all');
 
   const API_URL = 'https://api.mypinkshop.com';
+
+  // ✅ ADDED: Fetch offer banner
+  useEffect(() => {
+    fetch(`${API_URL}/api/offers/active-offer`)
+      .then(res => res.json())
+      .then(data => setOffer(data))
+      .catch(err => console.error('Offer fetch error:', err));
+  }, []);
 
   // Load products from API
   useEffect(() => {
@@ -386,15 +396,11 @@ function HairPage() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Premium Top Bar */}
+        {/* ✅ Dynamic Offer Banner */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
             <span>✨</span>
-            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
-            <span className="hidden sm:inline">•</span>
-            <span>EXTRA 10% OFF ON FIRST ORDER</span>
-            <span className="hidden sm:inline">•</span>
-            <span>CASH ON DELIVERY AVAILABLE</span>
+            <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
             <span>✨</span>
           </div>
         </div>
