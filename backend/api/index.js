@@ -8,6 +8,7 @@ const cheerio = require('cheerio');
 const multer = require('multer');
 const AWS = require('aws-sdk');
 const otpRoutes = require('./otp');
+const authRoutes = require('./auth');  // ✅ NEW: Auth routes imported
 
 const app = express();
 
@@ -56,7 +57,7 @@ const upload = multer({
   }
 });
 
-// ========== MongoDB Connection - FIXED ==========
+// ========== MongoDB Connection ==========
 const connectDB = async () => {
   try {
     if (mongoose.connection.readyState === 1) {
@@ -77,7 +78,6 @@ const connectDB = async () => {
     console.log('✅ MongoDB Connected Successfully');
   } catch (error) {
     console.error('❌ MongoDB Connection Error:', error.message);
-    // Don't throw - let retry logic handle it
   }
 };
 
@@ -191,6 +191,12 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['buyer', 'vendor', 'admin'], default: 'buyer' },
   phone: { type: String, default: '' },
   address: { type: String, default: '' },
+  // ✅ New fields for email verification and password reset
+  isEmailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String, default: '' },
+  emailVerificationExpires: { type: Date },
+  resetPasswordToken: { type: String, default: '' },
+  resetPasswordExpires: { type: Date },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -1638,6 +1644,9 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
 
 // ========== OTP ROUTES ==========
 app.use('/api/otp', otpRoutes);
+
+// ========== AUTH ROUTES (Register, Forgot Password, etc.) ==========
+app.use('/api/auth', authRoutes);  // ✅ NEW: Auth routes added
 
 // ========== ERROR HANDLING ==========
 app.use((err, req, res, next) => {
