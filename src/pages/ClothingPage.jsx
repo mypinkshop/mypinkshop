@@ -470,7 +470,7 @@ function ClothingPage() {
               Discover the latest fashion trends at MyPinkShop. From casual daily wear to stunning ethnic outfits, 
               our clothing collection has something for every occasion. Browse through our wide range of dresses, 
               tops, kurtis, jeans, skirts, and traditional wear. Premium quality fabrics, affordable prices, 
-              and free shipping on orders above ₹999. Whether you're looking for office wear, party wear, 
+              and free shipping on orders above ₹499. Whether you're looking for office wear, party wear, 
               or comfortable home wear, find your perfect style at MyPinkShop.
             </p>
           </div>
