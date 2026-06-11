@@ -14,6 +14,7 @@ function Profile() {
   const { wishlistCount } = useWishlist();
   const [activeTab, setActiveTab] = useState('orders');
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userData, setUserData] = useState({
     name: '',
@@ -66,9 +67,9 @@ function Profile() {
     }
   };
 
-  // Fetch all user data on load
+  // ✅ Check if user is logged in, otherwise redirect
   useEffect(() => {
-    if (!user) {
+    if (!user || !token) {
       navigate('/login');
       return;
     }
@@ -76,16 +77,25 @@ function Profile() {
     fetchUserData();
     fetchAddresses();
     fetchOrders();
-  }, [user, navigate]);
+  }, [user, token, navigate]);
 
-  // Fetch user profile from backend
+  // ✅ Fetch user profile with better error handling
   const fetchUserData = async () => {
+    if (!token) return;
+    
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      // ✅ If unauthorized, redirect to login
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         const data = await response.json();
@@ -100,9 +110,13 @@ function Profile() {
         setNewName(data.name || '');
         setNewEmail(data.email || '');
         setNewPhone(data.phone || '');
+        setApiError(false);
+      } else {
+        setApiError(true);
       }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
+      setApiError(true);
     } finally {
       setLoading(false);
     }
@@ -110,12 +124,20 @@ function Profile() {
 
   // Fetch addresses from backend
   const fetchAddresses = async () => {
+    if (!token) return;
+    
     try {
       const response = await fetch(`${API_URL}/api/users/addresses`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         const data = await response.json();
@@ -128,12 +150,20 @@ function Profile() {
 
   // Fetch orders from backend
   const fetchOrders = async () => {
+    if (!token) return;
+    
     try {
       const response = await fetch(`${API_URL}/api/orders/my-orders`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         const data = await response.json();
@@ -172,6 +202,12 @@ function Profile() {
         body: JSON.stringify({ name: newName })
       });
       
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         setUserData(prev => ({ ...prev, name: data.name }));
@@ -201,6 +237,12 @@ function Profile() {
         body: JSON.stringify({ email: newEmail })
       });
       
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         setUserData(prev => ({ ...prev, email: data.email, emailVerified: false }));
@@ -229,6 +271,12 @@ function Profile() {
         },
         body: JSON.stringify({ phone: newPhone })
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         const data = await response.json();
@@ -266,6 +314,12 @@ function Profile() {
         })
       });
       
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      
       if (response.ok) {
         alert('Password changed successfully!');
         setShowPasswordEdit(false);
@@ -291,6 +345,12 @@ function Profile() {
         }
       });
       
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      
       if (response.ok) {
         alert(`Verification link sent to ${userData.email}`);
       } else {
@@ -315,6 +375,12 @@ function Profile() {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         alert(`OTP sent to ${userData.phone}`);
@@ -345,6 +411,12 @@ function Profile() {
         },
         body: JSON.stringify(addressForm)
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         fetchAddresses();
@@ -380,6 +452,12 @@ function Profile() {
         }
       });
       
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      
       if (response.ok) {
         fetchAddresses();
       } else {
@@ -399,6 +477,12 @@ function Profile() {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         fetchAddresses();
@@ -421,6 +505,12 @@ function Profile() {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (response.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
       
       if (response.ok) {
         fetchOrders();
@@ -466,6 +556,24 @@ function Profile() {
       { "@type": "ListItem", "position": 2, "name": "My Account", "item": "https://www.mypinkshop.com/profile" }
     ]
   });
+
+  // ✅ Show error UI if API fails
+  if (apiError && !loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <p className="text-gray-500 mb-4">Failed to load your account data.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-pink-500 text-white px-6 py-2 rounded-full"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!user || loading) {
     return (
@@ -570,7 +678,7 @@ function Profile() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Your Account</h1>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Left Sidebar */}
+            {/* Left Sidebar - same as before */}
             <div className="md:col-span-1">
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
                 <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100">
@@ -597,7 +705,7 @@ function Profile() {
               </div>
             </div>
 
-            {/* Right Content */}
+            {/* Right Content - same as before */}
             <div className="md:col-span-3">
               {/* Orders Tab */}
               {activeTab === 'orders' && (
