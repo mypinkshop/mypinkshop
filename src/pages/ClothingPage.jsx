@@ -184,7 +184,7 @@ function ClothingPage() {
     loadBanners();
   }, []);
 
-  // Load products
+  // Load products - FIXED for pagination
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -197,7 +197,10 @@ function ClothingPage() {
         
         let data = await response.json();
         
-        const clothingProducts = data.filter(p => 
+        // ✅ FIX: Handle both paginated and non-paginated response
+        const productsArray = data.products || data;
+        
+        const clothingProducts = productsArray.filter(p => 
           (p.mainCategory === 'Clothing' || p.category === 'Clothing' || p.category === 'clothing') &&
           p.status === 'active'
         ).map(p => ({
@@ -351,6 +354,14 @@ function ClothingPage() {
     ]
   });
 
+  const generateOrganizationSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MyPinkShop",
+    "url": "https://www.mypinkshop.com",
+    "logo": "https://www.mypinkshop.com/logo.png"
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -380,6 +391,7 @@ function ClothingPage() {
         <meta name="twitter:image" content="https://www.mypinkshop.com/og-clothing.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
