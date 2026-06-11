@@ -147,8 +147,6 @@ function ClothingPage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [banners, setBanners] = useState([]);
-  const [heroImage, setHeroImage] = useState(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -161,28 +159,6 @@ function ClothingPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
-
-  // Load dynamic banner for clothing page
-  useEffect(() => {
-    const loadBanners = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/banners/active`);
-        if (response.ok) {
-          const data = await response.json();
-          setBanners(data);
-          const clothingBanner = data.find(b => b.category === 'Clothing' || b.page === 'clothing');
-          if (clothingBanner) {
-            setHeroImage(clothingBanner);
-          } else if (data.length > 0) {
-            setHeroImage(data[0]);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading banners:', error);
-      }
-    };
-    loadBanners();
-  }, []);
 
   // Load products - FIXED for pagination
   useEffect(() => {
@@ -197,7 +173,7 @@ function ClothingPage() {
         
         let data = await response.json();
         
-        // ✅ FIX: Handle both paginated and non-paginated response
+        // Handle both paginated and non-paginated response
         const productsArray = data.products || data;
         
         const clothingProducts = productsArray.filter(p => 
@@ -396,21 +372,8 @@ function ClothingPage() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner */}
+        {/* Dynamic Offer Banner - Sirf Ek Baar */}
         <OfferBanner />
-
-        {/* Top Bar */}
-        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-            <span>✨</span>
-            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
-            <span className="hidden sm:inline">•</span>
-            <span>EXTRA 10% OFF ON FIRST ORDER</span>
-            <span className="hidden sm:inline">•</span>
-            <span>CASH ON DELIVERY AVAILABLE</span>
-            <span>✨</span>
-          </div>
-        </div>
 
         {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
@@ -468,51 +431,17 @@ function ClothingPage() {
           </div>
         </header>
 
-        {/* Dynamic Hero Banner - No Hardcode */}
-        {heroImage ? (
-          <div className="relative overflow-hidden">
-            <img 
-              src={heroImage.images?.[0] || heroImage.image}
-              alt={heroImage.title || "Clothing Collection"}
-              className="w-full h-[200px] sm:h-[300px] md:h-[400px] object-cover"
-              loading="eager"
-              decoding="async"
-              width="1920"
-              height="400"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex items-center">
-              <div className="max-w-7xl mx-auto px-4 w-full">
-                <div className="max-w-xl text-white">
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-                    {heroImage.title || "Clothing Collection"}
-                  </h1>
-                  {heroImage.subtitle && (
-                    <p className="text-base sm:text-lg mb-6 opacity-90">{heroImage.subtitle}</p>
-                  )}
-                  {heroImage.buttonText && (
-                    <Link 
-                      to={heroImage.link || "/clothing"}
-                      className="inline-block bg-white text-pink-600 px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105"
-                    >
-                      {heroImage.buttonText}
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
+        {/* Hero Section - Gradient Text Only (No Image Banner) */}
+        <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
+          <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
+              Clothing Collection 👗
+            </h1>
+            <p className="text-gray-600 text-base max-w-2xl mx-auto">
+              Fashion that speaks your style
+            </p>
           </div>
-        ) : (
-          <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
-            <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
-                Clothing Collection 👗
-              </h1>
-              <p className="text-gray-600 text-base max-w-2xl mx-auto">
-                Fashion that speaks your style
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 py-4">
