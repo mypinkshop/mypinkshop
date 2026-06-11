@@ -7,7 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 
-// OPTIMIZED Product Card Component
+// OPTIMIZED Product Card Component (same as before)
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -147,7 +147,6 @@ function SkincarePage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [offer, setOffer] = useState(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -160,14 +159,6 @@ function SkincarePage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
-
-  // Load offer from backend (admin/offers)
-  useEffect(() => {
-    fetch(`${API_URL}/api/offers/active-offer`)
-      .then(res => res.json())
-      .then(data => setOffer(data))
-      .catch(err => console.error('Offer fetch error:', err));
-  }, []);
 
   // Load products from API
   useEffect(() => {
@@ -390,21 +381,8 @@ function SkincarePage() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner - From Admin Panel */}
+        {/* Dynamic Offer Banner - From Admin Panel (Sirf Ek Baar) */}
         <OfferBanner />
-
-        {/* Premium Top Bar - Dynamic from backend /api/offers */}
-        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-            <span>✨</span>
-            <span>{offer?.description || 'FREE SHIPPING ON ORDERS ABOVE ₹499'}</span>
-            <span className="hidden sm:inline">•</span>
-            <span>EXTRA 10% OFF ON FIRST ORDER</span>
-            <span className="hidden sm:inline">•</span>
-            <span>CASH ON DELIVERY AVAILABLE</span>
-            <span>✨</span>
-          </div>
-        </div>
 
         {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
@@ -462,7 +440,7 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* Hero Section - "Skincare Collection ✨" wala gradient box (RAKHA HAI, nahi hata) */}
+        {/* Hero Section - "Skincare Collection ✨" */}
         <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
           <div className="max-w-7xl mx-auto px-4 py-16 text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
