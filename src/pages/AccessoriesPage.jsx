@@ -5,12 +5,14 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
-// Product Card Component
+// OPTIMIZED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -47,31 +49,39 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     >
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
+          {/* Loading Skeleton */}
+          {!imageLoaded && !imgError && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+          )}
+          
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
-              alt={product.name} 
-              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+              alt={product.name || 'Accessory product'}
+              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
+              onLoad={() => setImageLoaded(true)}
               loading="lazy"
+              decoding="async"
+              width="400"
+              height="400"
+              style={{ aspectRatio: '1/1' }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
-              💍
-            </div>
+            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">💍</div>
           )}
           {product.badge && (
-            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
               <span className="text-white text-sm px-4 py-2 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
@@ -283,7 +293,7 @@ function AccessoriesPage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
-  // SEO Schema Functions
+  // Hidden SEO Schema
   const generateCategorySchema = () => ({
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -306,6 +316,14 @@ function AccessoriesPage() {
     ]
   });
 
+  const generateOrganizationSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MyPinkShop",
+    "url": "https://www.mypinkshop.com",
+    "logo": "https://www.mypinkshop.com/logo.png"
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -320,31 +338,29 @@ function AccessoriesPage() {
   return (
     <>
       <Helmet>
-        <title>Accessories - Jewelry, Bags, Sunglasses & More | MyPinkShop</title>
-        <meta name="description" content="Shop stunning accessories at MyPinkShop. Jewelry, bags, sunglasses, watches, and more to complete your look. Free shipping available. Shop now!" />
-        <meta name="keywords" content="accessories, jewelry, bags, sunglasses, watches, hair accessories, scarves, belts, hats" />
+        <title>Buy Accessories Online - Jewelry, Bags, Sunglasses & More | MyPinkShop</title>
+        <meta name="description" content="Shop stunning accessories at MyPinkShop. Jewelry, bags, sunglasses, watches, hair accessories, scarves, belts, and hats. ✓ Free shipping ✓ COD ✓ Best prices." />
+        <meta name="keywords" content="accessories, jewelry, bags, sunglasses, watches, hair accessories, scarves, belts, hats, buy accessories online" />
         <link rel="canonical" href="https://www.mypinkshop.com/accessories" />
-        <meta property="og:title" content="Accessories - MyPinkShop" />
-        <meta property="og:description" content="Shop stunning accessories to complete your look. Free shipping available." />
+        <meta property="og:title" content="Buy Accessories Online - Jewelry, Bags & More | MyPinkShop" />
+        <meta property="og:description" content="Shop stunning accessories to complete your look. Free shipping on orders above ₹499." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/accessories" />
+        <meta property="og:image" content="https://www.mypinkshop.com/og-accessories.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-       <meta name="twitter:title" content="Accessories - MyPinkShop" />
+        <meta name="twitter:title" content="Buy Accessories Online - MyPinkShop" />
         <meta name="twitter:description" content="Shop stunning accessories. Free shipping available." />
+        <meta name="twitter:image" content="https://www.mypinkshop.com/og-accessories.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Premium Top Bar */}
-        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-  <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-    <span>✨</span>
-    <span>{offer?.description || 'FREE SHIPPING ON ALL ORDERS'}</span>
-    <span>✨</span>
-  </div>
-</div>
+        {/* Dynamic Offer Banner - From Admin Panel */}
+        <OfferBanner />
+
         {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
@@ -401,7 +417,7 @@ function AccessoriesPage() {
           </div>
         </header>
 
-        {/* Hero Section */}
+        {/* Hero Section - Accessories Collection */}
         <div className="relative bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100">
           <div className="max-w-7xl mx-auto px-4 py-16 text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-700 to-orange-700 bg-clip-text text-transparent mb-4">
@@ -518,7 +534,7 @@ function AccessoriesPage() {
           )}
         </div>
 
-        {/* Premium Footer - Same as Hair Page */}
+        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
