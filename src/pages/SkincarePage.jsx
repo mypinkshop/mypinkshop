@@ -5,12 +5,14 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner'; // ✅ ADDED - Dynamic offer banner
 
-// Product Card Component
+// OPTIMIZED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -47,13 +49,22 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     >
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
+          {!imageLoaded && !imgError && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+          )}
+          
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
-              alt={product.name} 
-              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+              alt={product.name || 'Skincare product'}
+              className={`w-full h-full object-contain p-4 transition-all duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
+              onLoad={() => setImageLoaded(true)}
               loading="lazy"
+              decoding="async"
+              width="400"
+              height="400"
+              style={{ aspectRatio: '1/1' }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
@@ -61,17 +72,17 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             </div>
           )}
           {product.badge && (
-            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
               <span className="text-white text-sm px-4 py-2 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
@@ -139,6 +150,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
                 ? 'border-pink-200 bg-pink-50 text-pink-500' 
                 : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'
             }`}
+            aria-label={isInWishlist(product._id || product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
           >
             {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
@@ -157,6 +169,8 @@ function SkincarePage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [banners, setBanners] = useState([]); // ✅ ADDED - Dynamic banners
+  const [heroImage, setHeroImage] = useState(null); // ✅ ADDED - Dynamic hero image
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -204,6 +218,29 @@ function SkincarePage() {
     };
     
     loadProducts();
+  }, []);
+
+  // ✅ ADDED - Load banners for category page
+  useEffect(() => {
+    const loadBanners = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/banners/active`);
+        if (response.ok) {
+          const data = await response.json();
+          setBanners(data);
+          // Find skincare-specific banner or use first banner
+          const skincareBanner = data.find(b => b.category === 'Skincare' || b.page === 'skincare');
+          if (skincareBanner) {
+            setHeroImage(skincareBanner);
+          } else if (data.length > 0) {
+            setHeroImage(data[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading banners:', error);
+      }
+    };
+    loadBanners();
   }, []);
 
   // Filter and sort products
@@ -326,12 +363,12 @@ function SkincarePage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
-  // SEO Schema Functions
+  // ✅ IMPROVED SEO - Complete schema markup
   const generateCategorySchema = () => ({
     "@context": "https://schema.org",
     "@type": "ItemList",
     "name": "Skincare Products - MyPinkShop",
-    "description": "Shop premium skincare products including face wash, serums, moisturizers, sunscreens, and masks for glowing skin.",
+    "description": "Shop premium skincare products including face wash, serums, moisturizers, sunscreens, and masks for glowing skin. Free shipping on orders above ₹499.",
     "numberOfItems": filteredProducts.length,
     "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
       "@type": "ListItem",
@@ -349,6 +386,51 @@ function SkincarePage() {
     ]
   });
 
+  // ✅ ADDED - FAQ Schema for better SEO
+  const generateFaqSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What are the best skincare products for oily skin?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "For oily skin, look for oil-free, non-comedogenic products. Our collection includes face washes with salicylic acid, lightweight gel moisturizers, and clay masks that help control excess oil."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How to build a basic skincare routine?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "A basic skincare routine includes: 1) Face wash/cleanser, 2) Toner, 3) Serum (vitamin C or hyaluronic acid), 4) Moisturizer, and 5) Sunscreen during the day."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do you offer free shipping on skincare products?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, we offer free shipping on all orders above ₹499. Cash on delivery is also available across India."
+        }
+      }
+    ]
+  });
+
+  // ✅ ADDED - Organization Schema
+  const generateOrganizationSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MyPinkShop",
+    "url": "https://www.mypinkshop.com",
+    "logo": "https://www.mypinkshop.com/logo.png",
+    "sameAs": [
+      "https://www.instagram.com/mypinkshop",
+      "https://www.facebook.com/mypinkshop"
+    ]
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -363,23 +445,36 @@ function SkincarePage() {
   return (
     <>
       <Helmet>
-        <title>Skincare Products - Face Wash, Serum, Moisturizer & More | MyPinkShop</title>
-        <meta name="description" content="Shop premium skincare products at MyPinkShop. Face washes, serums, moisturizers, sunscreens, and masks for glowing skin. Free shipping available." />
-        <meta name="keywords" content="skincare products, face wash, serum, moisturizer, sunscreen, face mask, buy skincare online" />
+        <title>Buy Skincare Products Online - Face Wash, Serum, Moisturizer | MyPinkShop</title>
+        <meta name="description" content="Shop best skincare products at MyPinkShop. Wide range of face washes, serums, moisturizers, sunscreens & masks. ✓ Free shipping ✓ COD ✓ Best prices." />
+        <meta name="keywords" content="skincare, face wash, serum, moisturizer, sunscreen, face mask, buy skincare online India, best skincare products" />
         <link rel="canonical" href="https://www.mypinkshop.com/skincare" />
-        <meta property="og:title" content="Skincare Products - MyPinkShop" />
-        <meta property="og:description" content="Shop premium skincare products for glowing skin. Free shipping available." />
+        
+        {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/skincare" />
+        <meta property="og:title" content="Buy Skincare Products Online - MyPinkShop" />
+        <meta property="og:description" content="Shop premium skincare products for glowing skin. Free shipping on orders above ₹499." />
+        <meta property="og:image" content="https://www.mypinkshop.com/og-skincare.jpg" />
+        
+        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Skincare Products - MyPinkShop" />
-        <meta name="twitter:description" content="Shop premium skincare products. Free shipping available." />
+        <meta name="twitter:title" content="Buy Skincare Products Online - MyPinkShop" />
+        <meta name="twitter:description" content="Shop premium skincare products for glowing skin. Free shipping available." />
+        <meta name="twitter:image" content="https://www.mypinkshop.com/og-skincare.jpg" />
+        
+        {/* JSON-LD Schemas */}
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateFaqSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
+        {/* ✅ DYNAMIC OFFER BANNER - From Admin Panel */}
+        <OfferBanner />
+
         {/* Premium Top Bar */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
@@ -415,22 +510,23 @@ function SkincarePage() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                    aria-label="Search skincare products"
                   />
-                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition">
+                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-pink-500 transition" aria-label="Search">
                     🔍
                   </button>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition" aria-label="Wishlist">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                   {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
                 </button>
                 
-                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition" aria-label="Cart">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
@@ -438,7 +534,7 @@ function SkincarePage() {
                 </Link>
                 
                 {user ? <Avatar user={user} onLogout={logout} /> : 
-                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition" aria-label="Login">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -449,17 +545,52 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* Hero Section */}
-        <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
-          <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
-              Skincare Collection ✨
-            </h1>
-            <p className="text-gray-600 text-base max-w-2xl mx-auto">
-              Glow up with our curated skincare collection
-            </p>
+        {/* ✅ DYNAMIC HERO SECTION - From Admin Panel (No Hardcoding!) */}
+        {heroImage ? (
+          <div className="relative overflow-hidden">
+            <img 
+              src={heroImage.images?.[0] || heroImage.image}
+              alt={heroImage.title || "Skincare Collection"}
+              className="w-full h-[200px] sm:h-[300px] md:h-[400px] object-cover"
+              loading="eager"
+              decoding="async"
+              width="1920"
+              height="400"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent flex items-center">
+              <div className="max-w-7xl mx-auto px-4 w-full">
+                <div className="max-w-xl text-white">
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+                    {heroImage.title || "Skincare Collection"}
+                  </h1>
+                  {heroImage.subtitle && (
+                    <p className="text-base sm:text-lg mb-6 opacity-90">{heroImage.subtitle}</p>
+                  )}
+                  {heroImage.buttonText && (
+                    <Link 
+                      to={heroImage.link || "/skincare"}
+                      className="inline-block bg-white text-pink-600 px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105"
+                    >
+                      {heroImage.buttonText}
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          // Fallback only if no banner from admin
+          <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
+            <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
+                Skincare Collection ✨
+              </h1>
+              <p className="text-gray-600 text-base max-w-2xl mx-auto">
+                Glow up with our curated skincare collection
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -506,15 +637,16 @@ function SkincarePage() {
               </select>
             </div>
 
+            {/* Active Filters Tags */}
             {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedConcern !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
               <div className="flex flex-wrap gap-2 mt-4">
-                {selectedCategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')}>×</button></span>}
-                {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
-                {selectedConcern !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedConcern} <button onClick={() => setSelectedConcern('all')}>×</button></span>}
-                {selectedBrand !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')}>×</button></span>}
-                {selectedSkinType !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{skinTypes.find(t => t.id === selectedSkinType)?.name} <button onClick={() => setSelectedSkinType('all')}>×</button></span>}
-                {priceRange !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')}>×</button></span>}
-                {searchTerm && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Search: {searchTerm} <button onClick={() => setSearchTerm('')}>×</button></span>}
+                {selectedCategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')} aria-label="Remove filter">×</button></span>}
+                {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')} aria-label="Remove filter">×</button></span>}
+                {selectedConcern !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedConcern} <button onClick={() => setSelectedConcern('all')} aria-label="Remove filter">×</button></span>}
+                {selectedBrand !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')} aria-label="Remove filter">×</button></span>}
+                {selectedSkinType !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{skinTypes.find(t => t.id === selectedSkinType)?.name} <button onClick={() => setSelectedSkinType('all')} aria-label="Remove filter">×</button></span>}
+                {priceRange !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')} aria-label="Remove filter">×</button></span>}
+                {searchTerm && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">Search: {searchTerm} <button onClick={() => setSearchTerm('')} aria-label="Clear search">×</button></span>}
                 <button onClick={clearFilters} className="text-xs px-3 py-1 text-pink-500 underline">Clear All</button>
               </div>
             )}
@@ -526,7 +658,7 @@ function SkincarePage() {
               <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="font-semibold text-gray-800 text-lg">Filters</h3>
-                  <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
+                  <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl" aria-label="Close filters">✕</button>
                 </div>
                 <div className="space-y-4">
                   <div><label className="block text-sm mb-1">Category</label><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
@@ -563,8 +695,35 @@ function SkincarePage() {
           )}
         </div>
 
-        {/* Premium Footer - Same as Hair Page */}
-        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+        {/* ✅ ADDED - FAQ Section for SEO */}
+        <section className="py-16 bg-white">
+          <div className="max-w-4xl mx-auto px-4">
+            <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-12">
+              Frequently Asked Questions
+            </h2>
+            <div className="space-y-6">
+              <div className="border-b border-pink-100 pb-4">
+                <h3 className="font-semibold text-gray-800 mb-2">What are the best skincare products for oily skin?</h3>
+                <p className="text-gray-600 text-sm">For oily skin, look for oil-free, non-comedogenic products. Our collection includes face washes with salicylic acid, lightweight gel moisturizers, and clay masks that help control excess oil.</p>
+              </div>
+              <div className="border-b border-pink-100 pb-4">
+                <h3 className="font-semibold text-gray-800 mb-2">How to build a basic skincare routine?</h3>
+                <p className="text-gray-600 text-sm">A basic skincare routine includes: 1) Face wash/cleanser, 2) Toner, 3) Serum (vitamin C or hyaluronic acid), 4) Moisturizer, and 5) Sunscreen during the day.</p>
+              </div>
+              <div className="border-b border-pink-100 pb-4">
+                <h3 className="font-semibold text-gray-800 mb-2">Do you offer free shipping on skincare products?</h3>
+                <p className="text-gray-600 text-sm">Yes, we offer free shipping on all orders above ₹499. Cash on delivery is also available across India.</p>
+              </div>
+              <div className="border-b border-pink-100 pb-4">
+                <h3 className="font-semibold text-gray-800 mb-2">Are your skincare products genuine?</h3>
+                <p className="text-gray-600 text-sm">Absolutely! We source all products directly from authorized brands and distributors. Every product is 100% authentic with complete manufacturer warranty.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Premium Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
