@@ -5,12 +5,14 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
-// Product Card Component
+// OPTIMIZED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -47,31 +49,38 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     >
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
+          {!imageLoaded && !imgError && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+          )}
+          
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
-              alt={product.name} 
-              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+              alt={product.name || 'Makeup product'}
+              className={`w-full h-full object-contain p-4 transition-all duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
+              onLoad={() => setImageLoaded(true)}
               loading="lazy"
+              decoding="async"
+              width="400"
+              height="400"
+              style={{ aspectRatio: '1/1' }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
-              💄
-            </div>
+            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">💄</div>
           )}
           {product.badge && (
-            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
               <span className="text-white text-sm px-4 py-2 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
@@ -112,33 +121,14 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         
         <div className="flex gap-3">
           {isAdded ? (
-            <button 
-              onClick={handleGoToCart}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
-            >
-              Go to Cart
-            </button>
+            <button onClick={handleGoToCart} className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600">Go to Cart</button>
           ) : (
-            <button 
-              onClick={handleAddToCart} 
-              disabled={product.stock === 0}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                product.stock > 0 
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              Add to Cart
-            </button>
+            <button onClick={handleAddToCart} disabled={product.stock === 0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${product.stock > 0 ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>Add to Cart</button>
           )}
-          
           <button 
-            onClick={handleWishlistToggle}
-            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${
-              isInWishlist(product._id || product.id) 
-                ? 'border-pink-200 bg-pink-50 text-pink-500' 
-                : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'
-            }`}
+            onClick={handleWishlistToggle} 
+            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${isInWishlist(product._id || product.id) ? 'border-pink-200 bg-pink-50 text-pink-500' : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'}`}
+            aria-label={isInWishlist(product._id || product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
           >
             {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
@@ -170,7 +160,7 @@ function MakeupPage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load products from API
+  // Load products from API - FIXED for pagination
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -183,7 +173,10 @@ function MakeupPage() {
         
         let data = await response.json();
         
-        const makeupProducts = data.filter(p => 
+        // ✅ FIX: Handle both paginated and non-paginated response
+        const productsArray = data.products || data;
+        
+        const makeupProducts = productsArray.filter(p => 
           (p.mainCategory === 'Makeup' || p.category === 'Makeup' || p.category === 'makeup') &&
           p.status === 'active'
         ).map(p => ({
@@ -326,7 +319,7 @@ function MakeupPage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
-  // SEO Schema Functions
+  // SEO Schema - Full Hidden JSON-LD
   const generateCategorySchema = () => ({
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -349,6 +342,14 @@ function MakeupPage() {
     ]
   });
 
+  const generateOrganizationSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MyPinkShop",
+    "url": "https://www.mypinkshop.com",
+    "logo": "https://www.mypinkshop.com/logo.png"
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -363,37 +364,30 @@ function MakeupPage() {
   return (
     <>
       <Helmet>
-        <title>Makeup Products - Lipstick, Foundation, Kajal & More | MyPinkShop</title>
-        <meta name="description" content="Shop premium makeup products at MyPinkShop. Lipsticks, foundations, kajal, eyeliners, eyeshadows, and more. Free shipping available. Shop now!" />
-        <meta name="keywords" content="makeup products, lipstick, foundation, kajal, eyeliner, eyeshadow, mascara, buy makeup online" />
+        <title>Buy Makeup Products Online - Lipstick, Foundation, Kajal & More | MyPinkShop</title>
+        <meta name="description" content="Shop premium makeup products at MyPinkShop. Lipsticks, foundations, kajal, eyeliners, eyeshadows, mascara, and more. ✓ Free shipping ✓ COD ✓ Best prices." />
+        <meta name="keywords" content="makeup products, lipstick, foundation, kajal, eyeliner, eyeshadow, mascara, concealer, compact, buy makeup online" />
         <link rel="canonical" href="https://www.mypinkshop.com/makeup" />
-        <meta property="og:title" content="Makeup Products - MyPinkShop" />
-        <meta property="og:description" content="Shop premium makeup products for your perfect look. Free shipping available." />
+        <meta property="og:title" content="Buy Makeup Products Online - MyPinkShop" />
+        <meta property="og:description" content="Shop premium makeup products for your perfect look. Free shipping on orders above ₹499." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/makeup" />
+        <meta property="og:image" content="https://www.mypinkshop.com/og-makeup.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Makeup Products - MyPinkShop" />
+        <meta name="twitter:title" content="Buy Makeup Products Online - MyPinkShop" />
         <meta name="twitter:description" content="Shop premium makeup products. Free shipping available." />
+        <meta name="twitter:image" content="https://www.mypinkshop.com/og-makeup.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Premium Top Bar */}
-        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-            <span>✨</span>
-            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
-            <span className="hidden sm:inline">•</span>
-            <span>EXTRA 10% OFF ON FIRST ORDER</span>
-            <span className="hidden sm:inline">•</span>
-            <span>CASH ON DELIVERY AVAILABLE</span>
-            <span>✨</span>
-          </div>
-        </div>
+        {/* Dynamic Offer Banner - Sirf Ek Baar */}
+        <OfferBanner />
 
-        {/* Premium Header */}
+        {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -449,7 +443,7 @@ function MakeupPage() {
           </div>
         </header>
 
-        {/* Hero Section */}
+        {/* Hero Section - Gradient Text Only */}
         <div className="relative bg-gradient-to-r from-purple-100 via-pink-100 to-rose-100">
           <div className="max-w-7xl mx-auto px-4 py-16 text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-700 to-pink-700 bg-clip-text text-transparent mb-4">
@@ -563,7 +557,7 @@ function MakeupPage() {
           )}
         </div>
 
-        {/* Premium Footer - Same as Hair Page */}
+        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
