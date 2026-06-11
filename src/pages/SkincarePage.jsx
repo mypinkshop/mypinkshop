@@ -7,7 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 
-// OPTIMIZED Product Card Component (same as before)
+// OPTIMIZED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -49,7 +49,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     >
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
-          {/* Loading Skeleton */}
           {!imageLoaded && !imgError && (
             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
           )}
@@ -58,7 +57,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             <img 
               src={product.images[0]} 
               alt={product.name || 'Skincare product'}
-              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-full object-contain p-4 transition-all duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
               onLoad={() => setImageLoaded(true)}
               loading="lazy"
@@ -160,7 +159,7 @@ function SkincarePage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load products from API
+  // Load products from API - FIXED for pagination
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -173,7 +172,10 @@ function SkincarePage() {
         
         let data = await response.json();
         
-        const skincareProducts = data.filter(p => 
+        // ✅ FIX: Handle both paginated and non-paginated response
+        const productsArray = data.products || data;
+        
+        const skincareProducts = productsArray.filter(p => 
           (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') &&
           p.status === 'active'
         ).map(p => ({
@@ -381,7 +383,7 @@ function SkincarePage() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner - From Admin Panel (Sirf Ek Baar) */}
+        {/* Dynamic Offer Banner - From Admin Panel */}
         <OfferBanner />
 
         {/* Premium Header */}
