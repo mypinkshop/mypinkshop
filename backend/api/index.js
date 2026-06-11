@@ -8,7 +8,7 @@ const cheerio = require('cheerio');
 const multer = require('multer');
 const AWS = require('aws-sdk');
 const otpRoutes = require('./otp');
-const authRoutes = require('./auth');  // ✅ NEW: Auth routes imported
+const authRoutes = require('./auth');
 
 const app = express();
 
@@ -81,10 +81,8 @@ const connectDB = async () => {
   }
 };
 
-// Connect immediately
 connectDB();
 
-// Connection event handlers
 mongoose.connection.on('connected', () => {
   console.log('✅ Mongoose connected to MongoDB Atlas');
 });
@@ -98,13 +96,11 @@ mongoose.connection.on('disconnected', () => {
   setTimeout(connectDB, 5000);
 });
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
   process.exit(0);
 });
 
-// Helper middleware to ensure DB connection for each request
 const ensureDB = async (req, res, next) => {
   try {
     if (mongoose.connection.readyState !== 1) {
@@ -116,7 +112,6 @@ const ensureDB = async (req, res, next) => {
   }
 };
 
-// Apply DB check to all API routes
 app.use('/api', ensureDB);
 
 // ========== Shiprocket Service ==========
@@ -191,7 +186,6 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['buyer', 'vendor', 'admin'], default: 'buyer' },
   phone: { type: String, default: '' },
   address: { type: String, default: '' },
-  // ✅ New fields for email verification and password reset
   isEmailVerified: { type: Boolean, default: false },
   emailVerificationToken: { type: String, default: '' },
   emailVerificationExpires: { type: Date },
@@ -298,7 +292,6 @@ const couponSchema = new mongoose.Schema({
 
 const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
 
-// ========== REVIEW SCHEMA ==========
 const reviewSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -330,7 +323,6 @@ reviewSchema.statics.getAverageRating = async function(productId) {
 
 const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
 
-// ========== ORDER SCHEMA ==========
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   name: String,
@@ -354,7 +346,6 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
-// ========== WISHLIST SCHEMA ==========
 const wishlistItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   addedAt: { type: Date, default: Date.now }
@@ -513,7 +504,6 @@ app.delete('/api/upload', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-// ========== REVIEW UPLOAD ROUTE ==========
 app.post('/api/reviews/upload', authMiddleware, upload.array('media', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -581,13 +571,34 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ========== PRODUCT ROUTES ==========
+// ========== PRODUCT ROUTES WITH PAGINATION (FASTER LOADING) ==========
 app.get('/api/products', async (req, res) => {
   try {
     await connectDB();
+    const { page = 1, limit = 20 } = req.query;
+    
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
     const products = await Product.find({ status: 'active', adminApproved: true })
-      .sort({ createdAt: -1 });
-    res.json(products);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+    
+    const total = await Product.countDocuments({ status: 'active', adminApproved: true });
+    
+    res.json({
+      products: products,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalProducts: total,
+        limit: limitNum,
+        hasNext: pageNum * limitNum < total,
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -696,8 +707,6 @@ app.delete('/api/products/:id', authMiddleware, adminMiddleware, async (req, res
 });
 
 // ========== REVIEW ROUTES ==========
-
-// Check if user can review
 app.get('/api/reviews/can-review/:productId', authMiddleware, async (req, res) => {
   try {
     const { productId } = req.params;
@@ -721,7 +730,6 @@ app.get('/api/reviews/can-review/:productId', authMiddleware, async (req, res) =
   }
 });
 
-// Create review
 app.post('/api/reviews', authMiddleware, async (req, res) => {
   try {
     const { productId, orderId, rating, title, comment, images, videos } = req.body;
@@ -763,7 +771,6 @@ app.post('/api/reviews', authMiddleware, async (req, res) => {
   }
 });
 
-// Get approved reviews for product
 app.get('/api/reviews/product/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
@@ -791,7 +798,6 @@ app.get('/api/reviews/product/:productId', async (req, res) => {
   }
 });
 
-// Mark review as helpful
 app.patch('/api/reviews/:reviewId/helpful', authMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -813,7 +819,6 @@ app.patch('/api/reviews/:reviewId/helpful', authMiddleware, async (req, res) => 
   }
 });
 
-// Admin: Get pending reviews
 app.get('/api/reviews/admin/pending', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const reviews = await Review.find({ status: 'pending' })
@@ -826,7 +831,6 @@ app.get('/api/reviews/admin/pending', authMiddleware, adminMiddleware, async (re
   }
 });
 
-// Admin: Get all reviews
 app.get('/api/reviews/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
@@ -847,7 +851,6 @@ app.get('/api/reviews/admin/all', authMiddleware, adminMiddleware, async (req, r
   }
 });
 
-// Admin: Approve review
 app.patch('/api/reviews/admin/:reviewId/approve', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -870,7 +873,6 @@ app.patch('/api/reviews/admin/:reviewId/approve', authMiddleware, adminMiddlewar
   }
 });
 
-// Admin: Reject review
 app.patch('/api/reviews/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -888,7 +890,6 @@ app.patch('/api/reviews/admin/:reviewId/reject', authMiddleware, adminMiddleware
   }
 });
 
-// Admin: Delete review
 app.delete('/api/reviews/admin/:reviewId', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await Review.findByIdAndDelete(req.params.reviewId);
@@ -898,7 +899,6 @@ app.delete('/api/reviews/admin/:reviewId', authMiddleware, adminMiddleware, asyn
   }
 });
 
-// User: Delete own review
 app.delete('/api/reviews/:reviewId', authMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -915,8 +915,6 @@ app.delete('/api/reviews/:reviewId', authMiddleware, async (req, res) => {
 });
 
 // ========== WISHLIST ROUTES ==========
-
-// Get user wishlist
 app.get('/api/wishlist', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -946,7 +944,6 @@ app.get('/api/wishlist', authMiddleware, async (req, res) => {
   }
 });
 
-// Add to wishlist
 app.post('/api/wishlist', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -982,7 +979,6 @@ app.post('/api/wishlist', authMiddleware, async (req, res) => {
   }
 });
 
-// Remove from wishlist
 app.delete('/api/wishlist/:productId', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1004,7 +1000,6 @@ app.delete('/api/wishlist/:productId', authMiddleware, async (req, res) => {
   }
 });
 
-// Clear wishlist
 app.delete('/api/wishlist/clear/all', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1160,12 +1155,11 @@ app.delete('/api/offers/delete/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// ========== SHIPPING ROUTES - ALWAYS FREE ==========
+// ========== SHIPPING ROUTES ==========
 app.post('/api/shipping/check-delivery', async (req, res) => {
   try {
     const { pincode, cartTotal, weight = 0.5 } = req.body;
     
-    // ALWAYS FREE SHIPPING - No charges
     const estimatedDate = new Date();
     estimatedDate.setDate(estimatedDate.getDate() + 5);
     const minDate = new Date();
@@ -1645,8 +1639,8 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
 // ========== OTP ROUTES ==========
 app.use('/api/otp', otpRoutes);
 
-// ========== AUTH ROUTES (Register, Forgot Password, etc.) ==========
-app.use('/api/auth', authRoutes);  // ✅ NEW: Auth routes added
+// ========== AUTH ROUTES ==========
+app.use('/api/auth', authRoutes);
 
 // ========== ERROR HANDLING ==========
 app.use((err, req, res, next) => {
