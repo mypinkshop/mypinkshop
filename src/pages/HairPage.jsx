@@ -195,7 +195,7 @@ function HairPage() {
         
         let data = await response.json();
         
-        // ✅ FIX: Handle both paginated and non-paginated response
+        // Handle both paginated and non-paginated response
         const productsArray = data.products || data;
         
         const hairProducts = productsArray.filter(p => 
@@ -345,7 +345,7 @@ function HairPage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
-  // SEO Schema Functions - Complete
+  // SEO Schema Functions
   const generateCategorySchema = () => ({
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -410,21 +410,8 @@ function HairPage() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner */}
+        {/* Dynamic Offer Banner - Sirf Ek Baar */}
         <OfferBanner />
-
-        {/* Top Bar */}
-        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
-          <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
-            <span>✨</span>
-            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
-            <span className="hidden sm:inline">•</span>
-            <span>EXTRA 10% OFF ON FIRST ORDER</span>
-            <span className="hidden sm:inline">•</span>
-            <span>CASH ON DELIVERY AVAILABLE</span>
-            <span>✨</span>
-          </div>
-        </div>
 
         {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
