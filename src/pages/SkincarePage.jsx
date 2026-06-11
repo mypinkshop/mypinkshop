@@ -5,12 +5,14 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
-// Product Card Component
+// OPTIMIZED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
@@ -47,31 +49,39 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     >
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-56 sm:h-64 md:h-72 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
+          {/* Loading Skeleton */}
+          {!imageLoaded && !imgError && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+          )}
+          
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
-              alt={product.name} 
-              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'}`}
+              alt={product.name || 'Skincare product'}
+              className={`w-full h-full object-contain p-4 transition-transform duration-700 ${isHovered ? 'scale-110' : 'scale-100'} ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
+              onLoad={() => setImageLoaded(true)}
               loading="lazy"
+              decoding="async"
+              width="400"
+              height="400"
+              style={{ aspectRatio: '1/1' }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">
-              ✨
-            </div>
+            <div className="w-full h-full flex items-center justify-center text-5xl font-light text-pink-300">✨</div>
           )}
           {product.badge && (
-            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
+            <span className="absolute top-4 right-4 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
               <span className="text-white text-sm px-4 py-2 bg-black/50 rounded-full">Out of Stock</span>
             </div>
           )}
@@ -112,33 +122,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         
         <div className="flex gap-3">
           {isAdded ? (
-            <button 
-              onClick={handleGoToCart}
-              className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
-            >
-              Go to Cart
-            </button>
+            <button onClick={handleGoToCart} className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600">Go to Cart</button>
           ) : (
-            <button 
-              onClick={handleAddToCart} 
-              disabled={product.stock === 0}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                product.stock > 0 
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              Add to Cart
-            </button>
+            <button onClick={handleAddToCart} disabled={product.stock === 0} className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${product.stock > 0 ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>Add to Cart</button>
           )}
-          
           <button 
-            onClick={handleWishlistToggle}
-            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${
-              isInWishlist(product._id || product.id) 
-                ? 'border-pink-200 bg-pink-50 text-pink-500' 
-                : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'
-            }`}
+            onClick={handleWishlistToggle} 
+            className={`w-11 py-2.5 rounded-xl text-center transition-all border ${isInWishlist(product._id || product.id) ? 'border-pink-200 bg-pink-50 text-pink-500' : 'border-pink-100 hover:border-pink-200 hover:bg-pink-50'}`}
           >
             {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
           </button>
@@ -157,6 +147,7 @@ function SkincarePage() {
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [offer, setOffer] = useState(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -169,6 +160,14 @@ function SkincarePage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
+
+  // Load offer from backend (admin/offers)
+  useEffect(() => {
+    fetch(`${API_URL}/api/offers/active-offer`)
+      .then(res => res.json())
+      .then(data => setOffer(data))
+      .catch(err => console.error('Offer fetch error:', err));
+  }, []);
 
   // Load products from API
   useEffect(() => {
@@ -326,7 +325,7 @@ function SkincarePage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
-  // SEO Schema Functions
+  // Hidden SEO Schema
   const generateCategorySchema = () => ({
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -347,6 +346,14 @@ function SkincarePage() {
       { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mypinkshop.com" },
       { "@type": "ListItem", "position": 2, "name": "Skincare", "item": "https://www.mypinkshop.com/skincare" }
     ]
+  });
+
+  const generateOrganizationSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MyPinkShop",
+    "url": "https://www.mypinkshop.com",
+    "logo": "https://www.mypinkshop.com/logo.png"
   });
 
   if (loading) {
@@ -371,20 +378,26 @@ function SkincarePage() {
         <meta property="og:description" content="Shop premium skincare products for glowing skin. Free shipping available." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/skincare" />
+        <meta property="og:image" content="https://www.mypinkshop.com/og-skincare.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Skincare Products - MyPinkShop" />
         <meta name="twitter:description" content="Shop premium skincare products. Free shipping available." />
+        <meta name="twitter:image" content="https://www.mypinkshop.com/og-skincare.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateCategorySchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Premium Top Bar */}
+        {/* Dynamic Offer Banner - From Admin Panel */}
+        <OfferBanner />
+
+        {/* Premium Top Bar - Dynamic from backend /api/offers */}
         <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white py-2.5 text-center text-sm font-medium tracking-wide">
           <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-2 flex-wrap">
             <span>✨</span>
-            <span>FREE SHIPPING ON ORDERS ABOVE ₹499</span>
+            <span>{offer?.description || 'FREE SHIPPING ON ORDERS ABOVE ₹499'}</span>
             <span className="hidden sm:inline">•</span>
             <span>EXTRA 10% OFF ON FIRST ORDER</span>
             <span className="hidden sm:inline">•</span>
@@ -449,7 +462,7 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* Hero Section */}
+        {/* Hero Section - "Skincare Collection ✨" wala gradient box (RAKHA HAI, nahi hata) */}
         <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
           <div className="max-w-7xl mx-auto px-4 py-16 text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
@@ -563,7 +576,7 @@ function SkincarePage() {
           )}
         </div>
 
-        {/* Premium Footer - Same as Hair Page */}
+        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
