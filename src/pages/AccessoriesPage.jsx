@@ -178,7 +178,7 @@ function AccessoriesPage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load products from API
+  // Load products from API - FIXED for pagination
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -191,7 +191,10 @@ function AccessoriesPage() {
         
         let data = await response.json();
         
-        const accessoriesProducts = data.filter(p => 
+        // ✅ FIX: Handle both paginated and non-paginated response
+        const productsArray = data.products || data;
+        
+        const accessoriesProducts = productsArray.filter(p => 
           (p.mainCategory === 'Accessories' || p.category === 'Accessories' || p.category === 'accessories') &&
           p.status === 'active'
         ).map(p => ({
