@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 
-// ✅ FIXED Product Card Component
+// OPTIMIZED Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const handleAddToCart = () => {
     addToCart({
@@ -41,13 +43,22 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+          {!imageLoaded && !imgError && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+          )}
+          
           {product.images && product.images[0] && !imgError ? (
             <img 
               src={product.images[0]} 
-              alt={product.name} 
-              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+              alt={product.name || 'Product image'}
+              className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
+              onLoad={() => setImageLoaded(true)}
               loading="lazy"
+              decoding="async"
+              width="400"
+              height="400"
+              style={{ aspectRatio: '1/1' }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
@@ -155,7 +166,7 @@ function Shop() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load products
+  // Load products - FIXED for pagination
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const category = params.get('category');
@@ -186,11 +197,16 @@ function Shop() {
         
         let data = await response.json();
         
+        // ✅ FIX: Handle both paginated and non-paginated response
+        const productsArray = data.products || data;
+        
+        let allProducts = productsArray;
+        
         if (offer === 'sale') {
-          data = data.filter(p => p.badge === 'Sale');
+          allProducts = allProducts.filter(p => p.badge === 'Sale');
         }
         
-        const transformedData = data.map(p => ({
+        const transformedData = allProducts.map(p => ({
           ...p,
           id: p._id,
           category: p.mainCategory || p.category
@@ -233,18 +249,16 @@ function Shop() {
     }
   };
 
-  // 🔥 FIXED FILTERS
+  // Filters
   useEffect(() => {
     let filtered = [...products];
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(p => 
         p.name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
-    // Category filter
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => {
         const productCategory = (p.mainCategory || p.category || '').toLowerCase();
@@ -252,17 +266,14 @@ function Shop() {
       });
     }
     
-    // Price filter
     const min = minPrice ? parseFloat(minPrice) : 0;
     const max = maxPrice ? parseFloat(maxPrice) : Infinity;
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
     
-    // Rating filter - All stars working
     if (selectedRating > 0) {
       filtered = filtered.filter(p => Math.floor(p.rating || 4) >= selectedRating);
     }
     
-    // Sorting
     switch(sortBy) {
       case 'price_low': 
         filtered.sort((a, b) => a.price - b.price); 
@@ -311,6 +322,37 @@ function Shop() {
     { id: 'accessories', name: 'Accessories', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'accessories').length },
   ], [products]);
 
+  // Hidden SEO Schema
+  const generateItemListSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "All Products - MyPinkShop",
+    "description": "Shop all products including skincare, makeup, hair care, clothing, and accessories at MyPinkShop.",
+    "numberOfItems": filteredProducts.length,
+    "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "url": `https://www.mypinkshop.com/product/${product._id}`
+    }))
+  });
+
+  const generateBreadcrumbSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mypinkshop.com" },
+      { "@type": "ListItem", "position": 2, "name": "Shop", "item": "https://www.mypinkshop.com/shop" }
+    ]
+  });
+
+  const generateOrganizationSchema = () => ({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "MyPinkShop",
+    "url": "https://www.mypinkshop.com",
+    "logo": "https://www.mypinkshop.com/logo.png"
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -323,354 +365,374 @@ function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-      
-      {/* 🔥 OFFER BANNER ADDED */}
-      <OfferBanner />
+    <>
+      <Helmet>
+        <title>Shop All Products - Skincare, Makeup, Hair Care & More | MyPinkShop</title>
+        <meta name="description" content="Shop all products at MyPinkShop. Wide range of skincare, makeup, hair care, clothing, and accessories. ✓ Free shipping ✓ COD ✓ Best prices." />
+        <meta name="keywords" content="shop online, buy products, skincare, makeup, hair care, clothing, accessories, beauty products, fashion" />
+        <link rel="canonical" href="https://www.mypinkshop.com/shop" />
+        <meta property="og:title" content="Shop All Products - MyPinkShop" />
+        <meta property="og:description" content="Shop all products including skincare, makeup, hair care, clothing, and accessories. Free shipping on orders above ₹499." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://www.mypinkshop.com/shop" />
+        <meta property="og:image" content="https://www.mypinkshop.com/og-shop.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Shop All Products - MyPinkShop" />
+        <meta name="twitter:description" content="Shop all products. Free shipping available." />
+        <meta name="twitter:image" content="https://www.mypinkshop.com/og-shop.jpg" />
+        <script type="application/ld+json">{JSON.stringify(generateItemListSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
+      </Helmet>
 
-      {/* Premium Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-            <Link to="/" className="flex items-center gap-2 shrink-0 group">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <span className="text-white font-bold text-lg sm:text-xl">M</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
-              </div>
-            </Link>
-
-            {/* 🔥 SEARCH BAR WITH AUTOCOMPLETE */}
-            <div className="flex-1 max-w-md lg:max-w-2xl">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search for products..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
-                />
-                
-                {/* Autocomplete Suggestions */}
-                {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                    {searchSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSearchTerm(suggestion);
-                          setShowSuggestions(false);
-                          handleSearch();
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
-                      >
-                        🔍 {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                
-                <button 
-                  onClick={handleSearch}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
-                >
-                  <span className="hidden sm:inline">Search</span>
-                  <span className="sm:hidden">🔍</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-              <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
-              </button>
-              
-              <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
-              </Link>
-              
-              {user ? <Avatar user={user} onLogout={logout} /> : 
-                <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </Link>
-              }
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Category Chips */}
-      <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-pink-100 shadow-sm overflow-x-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
-            {categoryChips.map((chip) => (
-              <button
-                key={chip.id}
-                onClick={() => {
-                  setSelectedCategory(chip.id);
-                  navigate(`/shop?category=${chip.id === 'all' ? '' : chip.id}`);
-                }}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                  selectedCategory === chip.id
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="text-base">{chip.icon}</span>
-                <span>{chip.name}</span>
-                {chip.id !== 'all' && (
-                  <span className={`text-xs ${selectedCategory === chip.id ? 'text-white/80' : 'text-gray-400'}`}>
-                    ({categories.find(c => c.id === chip.id)?.count || 0})
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Breadcrumb */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-pink-600 font-medium">Shop</span>
-          {selectedCategory !== 'all' && (
-            <>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-600 capitalize">{selectedCategory}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        <button 
-          onClick={() => setShowFilters(!showFilters)} 
-          className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
-        >
-          <span>🔽</span> Filters & Sorting
-        </button>
+        {/* Offer Banner */}
+        <OfferBanner />
 
-        <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
-          
-          {/* Left Sidebar - Filters */}
-          <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 lg:w-96 space-y-5`}>
-            
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">✨</span> Categories
-              </h3>
-              <div className="space-y-2">
-                {categories.map(cat => (
-                  <label key={cat.id} className="flex items-center justify-between cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
-                    <div className="flex items-center gap-3">
-                      <input 
-                        type="radio" 
-                        name="category" 
-                        checked={selectedCategory === cat.id} 
-                        onChange={() => {
-                          setSelectedCategory(cat.id);
-                          navigate(`/shop?category=${cat.id === 'all' ? '' : cat.id}`);
-                        }}
-                        className="w-4 h-4 text-pink-500 focus:ring-pink-400"
-                      />
-                      <span className="text-sm text-gray-700">{cat.name}</span>
-                    </div>
-                    <span className="text-xs text-gray-400">{cat.count}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">💰</span> Price Range
-              </h3>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <input 
-                    type="number" 
-                    placeholder="Min ₹" 
-                    value={minPrice} 
-                    onChange={(e) => setMinPrice(e.target.value)} 
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                  />
+        {/* Premium Header */}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+              <Link to="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
-                <div className="flex-1">
+                <div className="hidden sm:block">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                </div>
+              </Link>
+
+              {/* Search Bar with Autocomplete */}
+              <div className="flex-1 max-w-md lg:max-w-2xl">
+                <div className="relative">
                   <input 
-                    type="number" 
-                    placeholder="Max ₹" 
-                    value={maxPrice} 
-                    onChange={(e) => setMaxPrice(e.target.value)} 
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
+                    type="text" 
+                    placeholder="Search for products..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
+                  
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                      {searchSuggestions.map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSearchTerm(suggestion);
+                            setShowSuggestions(false);
+                            handleSearch();
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
+                        >
+                          🔍 {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <button 
+                    onClick={handleSearch}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                  >
+                    <span className="hidden sm:inline">Search</span>
+                    <span className="sm:hidden">🔍</span>
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* 🔥 FIXED RATING FILTER - All Stars */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-pink-500">⭐</span> Rating
-              </h3>
-              <div className="space-y-2">
-                {[5, 4, 3, 2, 1].map(r => (
-                  <label key={r} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
-                    <input 
-                      type="radio" 
-                      name="rating" 
-                      checked={selectedRating === r} 
-                      onChange={() => setSelectedRating(selectedRating === r ? 0 : r)} 
-                      className="w-4 h-4 text-pink-500"
-                    />
-                    <div className="flex text-yellow-400 text-sm">
-                      {'★'.repeat(r)}{'☆'.repeat(5 - r)}
-                    </div>
-                    <span className="text-xs text-gray-500">& above</span>
-                  </label>
-                ))}
-                <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
-                  <input 
-                    type="radio" 
-                    name="rating" 
-                    checked={selectedRating === 0} 
-                    onChange={() => setSelectedRating(0)} 
-                    className="w-4 h-4 text-pink-500"
-                  />
-                  <span className="text-sm text-gray-600">All ratings</span>
-                </label>
+              <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
+                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                </button>
+                
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                </Link>
+                
+                {user ? <Avatar user={user} onLogout={logout} /> : 
+                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </Link>
+                }
               </div>
             </div>
-
-            <button 
-              onClick={clearFilters} 
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-            >
-              Clear All Filters ✨
-            </button>
           </div>
+        </header>
 
-          {/* Right Section - Products */}
-          <div className="flex-1">
-            
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Showing</span>
-                <span className="font-semibold text-pink-600">{filteredProducts.length}</span>
-                <span className="text-sm text-gray-500">of {products.length} products</span>
-              </div>
-              
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)} 
-                className="px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
-              >
-                <option value="default">Sort by: Default</option>
-                <option value="price_low">Price: Low to High</option>
-                <option value="price_high">Price: High to Low</option>
-                <option value="rating">Rating: High to Low</option>
-                <option value="newest">Newest First</option>
-              </select>
+        {/* Category Chips */}
+        <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-pink-100 shadow-sm overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
+              {categoryChips.map((chip) => (
+                <button
+                  key={chip.id}
+                  onClick={() => {
+                    setSelectedCategory(chip.id);
+                    navigate(`/shop?category=${chip.id === 'all' ? '' : chip.id}`);
+                  }}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                    selectedCategory === chip.id
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="text-base">{chip.icon}</span>
+                  <span>{chip.name}</span>
+                  {chip.id !== 'all' && (
+                    <span className={`text-xs ${selectedCategory === chip.id ? 'text-white/80' : 'text-gray-400'}`}>
+                      ({categories.find(c => c.id === chip.id)?.count || 0})
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
-            
-            {filteredProducts.length === 0 ? (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
-                <div className="text-7xl mb-4">🔍</div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No products found</h3>
-                <p className="text-gray-500 mb-4">Try adjusting your filters or search term</p>
-                <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">Clear Filters</button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {filteredProducts.map(product => (
-                  <ProductCard 
-                    key={product._id || product.id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                  />
-                ))}
-              </div>
+          </div>
+        </div>
+
+        {/* Breadcrumb */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-2 text-sm">
+            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+            <span className="text-gray-400">/</span>
+            <span className="text-pink-600 font-medium">Shop</span>
+            {selectedCategory !== 'all' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="text-gray-600 capitalize">{selectedCategory}</span>
+              </>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">M</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          
+          <button 
+            onClick={() => setShowFilters(!showFilters)} 
+            className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
+          >
+            <span>🔽</span> Filters & Sorting
+          </button>
+
+          <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
+            
+            {/* Left Sidebar - Filters */}
+            <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 lg:w-96 space-y-5`}>
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-pink-500">✨</span> Categories
+                </h3>
+                <div className="space-y-2">
+                  {categories.map(cat => (
+                    <label key={cat.id} className="flex items-center justify-between cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          name="category" 
+                          checked={selectedCategory === cat.id} 
+                          onChange={() => {
+                            setSelectedCategory(cat.id);
+                            navigate(`/shop?category=${cat.id === 'all' ? '' : cat.id}`);
+                          }}
+                          className="w-4 h-4 text-pink-500 focus:ring-pink-400"
+                        />
+                        <span className="text-sm text-gray-700">{cat.name}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">{cat.count}</span>
+                    </label>
+                  ))}
                 </div>
-                <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
               </div>
-              <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-pink-500">💰</span> Price Range
+                </h3>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <input 
+                      type="number" 
+                      placeholder="Min ₹" 
+                      value={minPrice} 
+                      onChange={(e) => setMinPrice(e.target.value)} 
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <input 
+                      type="number" 
+                      placeholder="Max ₹" 
+                      value={maxPrice} 
+                      onChange={(e) => setMaxPrice(e.target.value)} 
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rating Filter */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-pink-500">⭐</span> Rating
+                </h3>
+                <div className="space-y-2">
+                  {[5, 4, 3, 2, 1].map(r => (
+                    <label key={r} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
+                      <input 
+                        type="radio" 
+                        name="rating" 
+                        checked={selectedRating === r} 
+                        onChange={() => setSelectedRating(selectedRating === r ? 0 : r)} 
+                        className="w-4 h-4 text-pink-500"
+                      />
+                      <div className="flex text-yellow-400 text-sm">
+                        {'★'.repeat(r)}{'☆'.repeat(5 - r)}
+                      </div>
+                      <span className="text-xs text-gray-500">& above</span>
+                    </label>
+                  ))}
+                  <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
+                    <input 
+                      type="radio" 
+                      name="rating" 
+                      checked={selectedRating === 0} 
+                      onChange={() => setSelectedRating(0)} 
+                      className="w-4 h-4 text-pink-500"
+                    />
+                    <span className="text-sm text-gray-600">All ratings</span>
+                  </label>
+                </div>
+              </div>
+
+              <button 
+                onClick={clearFilters} 
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+              >
+                Clear All Filters ✨
+              </button>
             </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Shop</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-                <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-              </ul>
+
+            {/* Right Section - Products */}
+            <div className="flex-1">
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-3 border border-pink-100 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Showing</span>
+                  <span className="font-semibold text-pink-600">{filteredProducts.length}</span>
+                  <span className="text-sm text-gray-500">of {products.length} products</span>
+                </div>
+                
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)} 
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white"
+                >
+                  <option value="default">Sort by: Default</option>
+                  <option value="price_low">Price: Low to High</option>
+                  <option value="price_high">Price: High to Low</option>
+                  <option value="rating">Rating: High to Low</option>
+                  <option value="newest">Newest First</option>
+                </select>
+              </div>
+              
+              {filteredProducts.length === 0 ? (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
+                  <div className="text-7xl mb-4">🔍</div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No products found</h3>
+                  <p className="text-gray-500 mb-4">Try adjusting your filters or search term</p>
+                  <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">Clear Filters</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredProducts.map(product => (
+                    <ProductCard 
+                      key={product._id || product.id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="text-center pt-8 border-t border-gray-800">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </div>
-      </footer>
 
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
-    </div>
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
+          </div>
+        </footer>
+
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+        `}</style>
+      </div>
+    </>
   );
 }
 
