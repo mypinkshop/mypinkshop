@@ -169,6 +169,7 @@ function AccessoriesPage() {
   const [loading, setLoading] = useState(true);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
@@ -222,6 +223,10 @@ function AccessoriesPage() {
       );
     }
 
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.mainCategory === selectedCategory || p.category === selectedCategory);
+    }
+
     if (selectedSubcategory !== 'all') {
       filtered = filtered.filter(p => {
         const productSub = (p.subCategory || p.subcategory || p.category || '').toLowerCase();
@@ -256,19 +261,25 @@ function AccessoriesPage() {
     }
     
     setFilteredProducts(filtered);
-  }, [searchTerm, selectedSubcategory, selectedBrand, sortBy, products, priceRange]);
+  }, [searchTerm, selectedCategory, selectedSubcategory, selectedBrand, sortBy, products, priceRange]);
 
   const clearFilters = () => {
     setSearchTerm('');
+    setSelectedCategory('all');
     setSelectedSubcategory('all');
     setSelectedBrand('all');
     setPriceRange('all');
     setSortBy('default');
   };
 
+  const categories = useMemo(() => {
+    const cats = [...new Set(products.map(p => p.mainCategory || p.category).filter(Boolean))];
+    return [{ id: 'all', name: 'All Categories' }, ...cats.map(c => ({ id: c, name: c }))];
+  }, [products]);
+
   const subcategories = useMemo(() => {
     const subs = [...new Set(products.map(p => p.subCategory || p.subcategory || p.category).filter(Boolean))];
-    return [{ id: 'all', name: 'All Categories' }, ...subs.map(s => ({ id: s, name: s }))];
+    return [{ id: 'all', name: 'All Subcategories' }, ...subs.map(s => ({ id: s, name: s }))];
   }, [products]);
 
   const brands = useMemo(() => {
@@ -417,10 +428,10 @@ function AccessoriesPage() {
           </div>
         </header>
 
-        {/* Hero Section - Accessories Collection */}
-        <div className="relative bg-gradient-to-r from-amber-100 via-yellow-100 to-amber-100">
+        {/* Hero Section - Same pink gradient as Skincare */}
+        <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
           <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-700 to-orange-700 bg-clip-text text-transparent mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
               Accessories Collection 💍
             </h1>
             <p className="text-gray-600 text-base max-w-2xl mx-auto">
@@ -440,33 +451,17 @@ function AccessoriesPage() {
 
         <div className="max-w-7xl mx-auto px-4 pb-16">
           
-          {/* Category Tabs */}
-          <div className="mb-8 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-2 pb-2">
-              <button onClick={() => setSelectedSubcategory('all')} className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition ${
-                selectedSubcategory === 'all' 
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                  : 'bg-white border border-pink-200 text-gray-600 hover:border-pink-400'
-              }`}>
-                All Items
-              </button>
-              {subcategories.filter(s => s.id !== 'all').map(sub => (
-                <button key={sub.id} onClick={() => setSelectedSubcategory(sub.id)} className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition ${
-                  selectedSubcategory === sub.id 
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                    : 'bg-white border border-pink-200 text-gray-600 hover:border-pink-400'
-                }`}>
-                  {sub.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Filter Bar */}
+          {/* Filter Bar - Same as Skincare */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               
               <div className="hidden md:flex flex-wrap gap-3">
+                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                </select>
+                <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                  {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                </select>
                 <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
                   {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                 </select>
@@ -484,8 +479,9 @@ function AccessoriesPage() {
               </select>
             </div>
 
-            {(selectedBrand !== 'all' || priceRange !== 'all' || searchTerm || selectedSubcategory !== 'all') && (
+            {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedBrand !== 'all' || priceRange !== 'all' || searchTerm) && (
               <div className="flex flex-wrap gap-2 mt-4">
+                {selectedCategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')}>×</button></span>}
                 {selectedSubcategory !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
                 {selectedBrand !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')}>×</button></span>}
                 {priceRange !== 'all' && <span className="text-xs px-3 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')}>×</button></span>}
@@ -504,6 +500,8 @@ function AccessoriesPage() {
                   <button onClick={() => setShowFilters(false)} className="text-gray-400 text-2xl">✕</button>
                 </div>
                 <div className="space-y-4">
+                  <div><label className="block text-sm mb-1">Category</label><select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                  <div><label className="block text-sm mb-1">Subcategory</label><select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
                   <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border border-pink-200 rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
                   <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
