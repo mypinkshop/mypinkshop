@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate }redirect } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -11,7 +11,7 @@ function Register() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState('details'); // 'details', 'otp', 'success'
+  const [step, setStep] = useState('details');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
@@ -36,7 +36,6 @@ function Register() {
     }
   };
 
-  // Step 1: Send OTP after collecting name & email
   const handleSendOTP = async (e) => {
     e.preventDefault();
     
@@ -86,7 +85,6 @@ function Register() {
     }
   };
 
-  // Step 2: Verify OTP and complete registration
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
@@ -108,7 +106,6 @@ function Register() {
       const data = await response.json();
 
       if (data.success && data.token) {
-        // Store JWT token
         localStorage.setItem('token', data.token);
         localStorage.setItem('userRole', data.user?.role || 'buyer');
         localStorage.setItem('userEmail', data.user?.email || email);
@@ -121,7 +118,6 @@ function Register() {
         
         setStep('success');
         
-        // Redirect after 2 seconds
         setTimeout(() => {
           navigate('/');
         }, 2000);
@@ -136,7 +132,6 @@ function Register() {
     }
   };
 
-  // Resend OTP
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
     
@@ -272,7 +267,6 @@ function Register() {
         <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
           <div className="max-w-md w-full">
             {step === 'success' ? (
-              // Success Screen
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8 text-center">
                 <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <span className="text-white text-3xl">✓</span>
@@ -282,7 +276,6 @@ function Register() {
                 <p className="text-gray-400 text-sm mt-2">Redirecting to home page...</p>
               </div>
             ) : step === 'otp' ? (
-              // Step 2: OTP Verification
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -302,9 +295,7 @@ function Register() {
 
                 <form onSubmit={handleVerifyOTP} className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      OTP Code
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">OTP Code</label>
                     <input
                       type="text"
                       maxLength={6}
@@ -356,7 +347,6 @@ function Register() {
                 </form>
               </div>
             ) : (
-              // Step 1: User Details
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -374,9 +364,7 @@ function Register() {
 
                 <form onSubmit={handleSendOTP} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Your name
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your name</label>
                     <input
                       type="text"
                       value={name}
@@ -388,9 +376,7 @@ function Register() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email address
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
                     <input
                       type="email"
                       value={email}
@@ -399,15 +385,11 @@ function Register() {
                       placeholder="Enter your email"
                       required
                     />
-                    <p className="text-xs text-gray-400 mt-1">
-                      We'll send you an OTP to verify this email.
-                    </p>
+                    <p className="text-xs text-gray-400 mt-1">We'll send you an OTP to verify this email.</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Mobile number (optional)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mobile number (optional)</label>
                     <input
                       type="tel"
                       value={phone}
@@ -459,7 +441,7 @@ function Register() {
           </div>
         </main>
 
-        {/* Premium Footer */}
+        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
@@ -468,12 +450,8 @@ function Register() {
               <Link to="/contact" className="hover:text-pink-500 transition">Help</Link>
               <Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link>
             </div>
-            <p className="text-center text-xs text-gray-500">
-              © 2026 MyPinkShop. All rights reserved.
-            </p>
-            <p className="text-center text-xs text-gray-600 mt-2">
-              Made with 💖 for the girlies
-            </p>
+            <p className="text-center text-xs text-gray-500">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-center text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </footer>
       </div>
