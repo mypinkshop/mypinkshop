@@ -36,7 +36,7 @@ function Register() {
     }
   };
 
-  // ✅ FIXED: Correct API endpoint /api/otp/send
+  // Send OTP
   const handleSendOTP = async (e) => {
     e.preventDefault();
     
@@ -86,7 +86,7 @@ function Register() {
     }
   };
 
-  // ✅ FIXED: Correct API endpoint /api/otp/verify
+  // Verify OTP - NO duplicate register call
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
@@ -108,15 +108,15 @@ function Register() {
       const data = await response.json();
 
       if (data.success && data.token) {
+        // Store token in localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('userRole', data.user?.role || 'buyer');
         localStorage.setItem('userEmail', data.user?.email || email);
         localStorage.setItem('userName', data.user?.name || name);
         localStorage.setItem('userId', data.user?._id || '');
         
-        if (register) {
-          await register(name, email, 'otp_auth', 'buyer');
-        }
+        // ✅ No need to call register again - OTP verification already created account
+        // The backend already created the user during OTP verification
         
         setStep('success');
         
@@ -134,7 +134,7 @@ function Register() {
     }
   };
 
-  // ✅ FIXED: Correct API endpoint /api/otp/resend
+  // Resend OTP
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
     
@@ -270,6 +270,7 @@ function Register() {
         <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
           <div className="max-w-md w-full">
             {step === 'success' ? (
+              // Success Screen
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8 text-center">
                 <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <span className="text-white text-3xl">✓</span>
@@ -279,6 +280,7 @@ function Register() {
                 <p className="text-gray-400 text-sm mt-2">Redirecting to home page...</p>
               </div>
             ) : step === 'otp' ? (
+              // Step 2: OTP Verification
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -350,6 +352,7 @@ function Register() {
                 </form>
               </div>
             ) : (
+              // Step 1: User Details
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
