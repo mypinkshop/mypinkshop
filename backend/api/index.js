@@ -9,6 +9,8 @@ const multer = require('multer');
 const AWS = require('aws-sdk');
 const otpRoutes = require('./otp');
 const authRoutes = require('./auth');
+const userRoutes = require('./users');
+const orderRoutes = require('./orders');
 
 const app = express();
 
@@ -571,7 +573,13 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ========== PRODUCT ROUTES WITH PAGINATION (FASTER LOADING) ==========
+// ========== ROUTES REGISTRATION ==========
+app.use('/api/otp', otpRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/orders', orderRoutes);
+
+// ========== PRODUCT ROUTES WITH PAGINATION ==========
 app.get('/api/products', async (req, res) => {
   try {
     await connectDB();
@@ -1635,12 +1643,6 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// ========== OTP ROUTES ==========
-app.use('/api/otp', otpRoutes);
-
-// ========== AUTH ROUTES ==========
-app.use('/api/auth', authRoutes);
 
 // ========== ERROR HANDLING ==========
 app.use((err, req, res, next) => {
