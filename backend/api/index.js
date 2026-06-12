@@ -11,6 +11,7 @@ const otpRoutes = require('./otp');
 const authRoutes = require('./auth');
 const userRoutes = require('./users');
 const orderRoutes = require('./orders');
+const reviewRoutes = require('./reviews');  // ✅ ADDED
 
 const app = express();
 
@@ -578,6 +579,7 @@ app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/reviews', reviewRoutes);  // ✅ ADDED
 
 // ========== PRODUCT ROUTES WITH PAGINATION ==========
 app.get('/api/products', async (req, res) => {
