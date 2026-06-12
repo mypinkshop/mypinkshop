@@ -36,6 +36,7 @@ function Register() {
     }
   };
 
+  // ✅ FIXED: Correct API endpoint /api/otp/send
   const handleSendOTP = async (e) => {
     e.preventDefault();
     
@@ -53,7 +54,7 @@ function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/send-otp`, {
+      const response = await fetch(`${API_URL}/api/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, name })
@@ -85,6 +86,7 @@ function Register() {
     }
   };
 
+  // ✅ FIXED: Correct API endpoint /api/otp/verify
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
@@ -97,7 +99,7 @@ function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/verify`, {
+      const response = await fetch(`${API_URL}/api/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp })
@@ -132,12 +134,13 @@ function Register() {
     }
   };
 
+  // ✅ FIXED: Correct API endpoint /api/otp/resend
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/resend`, {
+      const response = await fetch(`${API_URL}/api/otp/resend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
