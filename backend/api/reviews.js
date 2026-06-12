@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const AWS = require('aws-sdk');
+const jwt = require('jsonwebtoken');
 const Review = require('../models/Review');
-const Order = require('../models/Order'); // Assuming you have Order model
+const Order = require('../models/Order');
 const Product = require('../models/Product');
 
 // ========== Cloudflare R2 for review images ==========
@@ -22,7 +23,7 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB for review images/videos
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
@@ -98,14 +99,12 @@ router.get('/can-review/:productId', authMiddleware, async (req, res) => {
     const { productId } = req.params;
     const userId = req.user.id;
     
-    // Check if user has purchased this product and order is delivered
     const order = await Order.findOne({
       userId,
       'items.productId': productId,
       status: 'delivered'
     });
     
-    // Check if already reviewed
     const existingReview = await Review.findOne({
       productId,
       userId,
@@ -128,7 +127,6 @@ router.post('/', authMiddleware, async (req, res) => {
     const { productId, orderId, rating, title, comment, images, videos } = req.body;
     const userId = req.user.id;
     
-    // Validate order and delivery
     const order = await Order.findOne({
       _id: orderId,
       userId,
@@ -140,7 +138,6 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'You can only review products after delivery' });
     }
     
-    // Check if already reviewed
     const existingReview = await Review.findOne({ productId, userId, orderId });
     if (existingReview) {
       return res.status(400).json({ error: 'You have already reviewed this product' });
@@ -214,7 +211,6 @@ router.patch('/:reviewId/helpful', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Review not found' });
     }
     
-    // Check if user already marked helpful
     if (review.helpfulUsers.includes(userId)) {
       return res.json({ message: 'Already marked helpful' });
     }
@@ -225,6 +221,25 @@ router.patch('/:reviewId/helpful', authMiddleware, async (req, res) => {
     
     res.json({ helpful: review.helpful });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ ========== USER: GET MY REVIEWS (NEW - FOR PROFILE PAGE) ==========
+router.get('/my-reviews', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const reviews = await Review.find({ userId })
+      .populate('productId', 'name images price rating')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      reviews: reviews
+    });
+  } catch (error) {
+    console.error('Get my reviews error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -286,7 +301,6 @@ router.patch('/admin/:reviewId/approve', authMiddleware, adminMiddleware, async 
     if (adminNote) review.adminNote = adminNote;
     await review.save();
     
-    // Update product rating
     const avgRating = await Review.getAverageRating(review.productId);
     await Product.findByIdAndUpdate(review.productId, {
       rating: avgRating.rating,
