@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyPinkShop - Shop for Girlies ✨</title>
     
+    <!-- ========== PERMANENT FIX: FORCE NO CACHE ========== -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <!-- ========== PRECONNECT FOR FASTER API CALLS ========== -->
     <link rel="preconnect" href="https://api.mypinkshop.com" />
     <link rel="dns-prefetch" href="https://api.mypinkshop.com" />
@@ -12,34 +17,58 @@
     <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     
     <!-- ========== COMPLETE FAVICON - ALL DEVICES & BROWSERS ========== -->
-    
-    <!-- ICO format - Old browsers (IE, Old Chrome/Firefox) -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    
-    <!-- PNG formats - Modern browsers -->
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    
-    <!-- Apple Touch Icon - iPhone, iPad, Mac Safari -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    
-    <!-- Android Chrome - Homescreen icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
-    
-    <!-- Web Manifest - PWA support -->
     <link rel="manifest" href="/site.webmanifest" />
-    
-    <!-- Windows 8/10/11 Tiles -->
     <meta name="msapplication-TileColor" content="#ec4899" />
     <meta name="msapplication-TileImage" content="/android-chrome-192x192.png" />
-    
-    <!-- Browser theme color -->
     <meta name="theme-color" content="#ec4899" />
     
     <!-- Font Awesome - Defer loading -->
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" /></noscript>
+    
+    <!-- ========== PERMANENT FIX: FORCE CLEAR OLD CACHE ========== -->
+    <script>
+      (function() {
+        // Force clear old service workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+              console.log('Unregistered service worker');
+            }
+          });
+        }
+        
+        // Force clear old caches
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (var i = 0; i < names.length; i++) {
+              caches.delete(names[i]);
+              console.log('Deleted cache:', names[i]);
+            }
+          });
+        }
+        
+        // Force reload if old version detected
+        var timestamp = Date.now();
+        localStorage.setItem('app_version', timestamp);
+        
+        // Check if this is first load or old version
+        var oldVersion = localStorage.getItem('old_version_cleared');
+        if (!oldVersion) {
+          localStorage.setItem('old_version_cleared', 'true');
+          setTimeout(function() {
+            window.location.reload(true);
+          }, 100);
+        }
+      })();
+    </script>
     
     <!-- Critical CSS inline -->
     <style>
@@ -57,15 +86,14 @@
       </div>
     </div>
     
-    <!-- Main script with defer -->
-    <script type="module" src="/src/main.jsx"></script>
+    <!-- Main script with version cache busting -->
+    <script type="module" src="/src/main.jsx?v=20260614"></script>
     
-    <!-- Defer non-critical operations -->
+    <!-- Remove loading screen when React mounts -->
     <script>
-      // Remove loading screen when React mounts
       window.addEventListener('load', function() {
         setTimeout(function() {
-          const loader = document.querySelector('.loading-screen');
+          var loader = document.querySelector('.loading-screen');
           if (loader) {
             loader.style.opacity = '0';
             setTimeout(function() {
@@ -85,13 +113,13 @@
       // Prefetch common routes on idle
       if ('requestIdleCallback' in window) {
         requestIdleCallback(function() {
-          const links = ['/shop', '/wishlist', '/cart'];
-          links.forEach(function(link) {
-            const prefetchLink = document.createElement('link');
-            prefetchLink.rel = 'prefetch';
-            prefetchLink.href = link;
-            document.head.appendChild(prefetchLink);
-          });
+          var links = ['/shop', '/wishlist', '/cart'];
+          for (var i = 0; i < links.length; i++) {
+            var link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.href = links[i];
+            document.head.appendChild(link);
+          }
         });
       }
     </script>
