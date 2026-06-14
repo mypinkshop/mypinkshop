@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function Wishlist() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ function Wishlist() {
   const [searchQuery, setSearchQuery] = useState('');
   const [localWishlist, setLocalWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const API_URL = 'https://api.mypinkshop.com';
 
@@ -51,7 +53,7 @@ function Wishlist() {
         if (savedWishlist) {
           try {
             const parsed = JSON.parse(savedWishlist);
-            setLocalWishlist(parsed);
+            setLocalWishlist(Array.isArray(parsed) ? parsed : []);
           } catch (e) {
             setLocalWishlist([]);
           }
@@ -64,12 +66,14 @@ function Wishlist() {
     };
     
     loadWishlist();
-  }, [user, token, fetchWishlist]);
+  }, [user, token, fetchWishlist, refreshKey]);
 
   // Save guest wishlist to localStorage
   useEffect(() => {
-    if (isGuest) {
+    if (isGuest && localWishlist.length >= 0) {
       localStorage.setItem('guestWishlist', JSON.stringify(localWishlist));
+      // Update header count
+      window.dispatchEvent(new Event('storage'));
     }
   }, [localWishlist, isGuest]);
 
@@ -87,11 +91,16 @@ function Wishlist() {
       stock: product.stock
     });
     
-    // Remove from wishlist
+    toast.success('Added to cart!');
+    
+    // Remove from wishlist after adding to cart
     if (user && token) {
       await removeFromWishlist(productId);
     } else {
-      setLocalWishlist(prev => prev.filter(p => (p.id || p._id) !== productId));
+      setLocalWishlist(prev => {
+        const newList = prev.filter(p => (p.id || p._id) !== productId);
+        return newList;
+      });
     }
     
     setTimeout(() => {
@@ -102,8 +111,13 @@ function Wishlist() {
   const handleRemoveItem = async (productId) => {
     if (user && token) {
       await removeFromWishlist(productId);
+      toast.success('Removed from wishlist');
     } else {
-      setLocalWishlist(prev => prev.filter(p => (p.id || p._id) !== productId));
+      setLocalWishlist(prev => {
+        const newList = prev.filter(p => (p.id || p._id) !== productId);
+        return newList;
+      });
+      toast.success('Removed from wishlist');
     }
   };
 
@@ -156,11 +170,9 @@ function Wishlist() {
         <meta property="og:description" content="Save your favorite items and shop them later. Free shipping on orders above ₹499." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/wishlist" />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-wishlist.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="My Wishlist - MyPinkShop" />
         <meta name="twitter:description" content="Save your favorite items and shop them later." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-wishlist.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
@@ -251,7 +263,6 @@ function Wishlist() {
         </div>
 
         {!currentWishlist || currentWishlist.length === 0 ? (
-          // Empty Wishlist - Sabko dikhega
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
               <div className="text-6xl mb-6">🤍</div>
@@ -273,7 +284,6 @@ function Wishlist() {
           </div>
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* Header Section */}
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
                 My Wishlist 🤍 ({currentWishlist.length} {currentWishlist.length === 1 ? 'item' : 'items'})
@@ -286,11 +296,9 @@ function Wishlist() {
               )}
             </div>
 
-            {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {currentWishlist.map((product) => (
                 <div key={product.id || product._id} className="group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition hover:-translate-y-1">
-                  {/* Product Image */}
                   <Link to={`/product/${product.id || product._id}`}>
                     <div className="relative h-52 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
                       {product.images && product.images[0] ? (
@@ -303,9 +311,12 @@ function Wishlist() {
                           width="400"
                           height="400"
                           style={{ aspectRatio: '1/1' }}
+                          onError={(e) => {
+                            e.target.src = 'https://placehold.co/400x400/pink/white?text=No+Image';
+                          }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">
+                        <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300 bg-pink-100">
                           🛍️
                         </div>
                       )}
@@ -320,10 +331,12 @@ function Wishlist() {
                         </span>
                       )}
                       
-                      {/* Remove Button */}
                       <button
-                        onClick={() => handleRemoveItem(product.id || product._id)}
-                        className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleRemoveItem(product.id || product._id);
+                        }}
+                        className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition z-10"
                         aria-label="Remove from wishlist"
                       >
                         <span className="text-red-500 text-lg">✕</span>
@@ -331,7 +344,6 @@ function Wishlist() {
                     </div>
                   </Link>
                   
-                  {/* Product Info */}
                   <div className="p-4">
                     <Link to={`/product/${product.id || product._id}`}>
                       <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
@@ -370,7 +382,6 @@ function Wishlist() {
               ))}
             </div>
             
-            {/* Continue Shopping Button */}
             <div className="text-center mt-12">
               <Link 
                 to="/shop" 
@@ -418,7 +429,7 @@ function Wishlist() {
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
                   <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
                 </ul>
