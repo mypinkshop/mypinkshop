@@ -24,25 +24,25 @@ function Wishlist() {
     if (user && token) {
       // Logged in user - get from context
       const data = Array.isArray(wishlist) ? wishlist : [];
-      console.log('Logged in wishlist:', data);
+      console.log('📦 Logged in wishlist from context:', data);
       return data;
     } else {
       // Guest user - get from localStorage
       try {
         const saved = localStorage.getItem('guestWishlist');
-        console.log('Raw guest wishlist from localStorage:', saved);
+        console.log('📦 Raw guest wishlist from localStorage:', saved);
         
         if (saved) {
           let parsed = JSON.parse(saved);
-          // Handle different data structures
           if (Array.isArray(parsed)) {
+            console.log('✅ Parsed as array, length:', parsed.length);
             return parsed;
           } else if (parsed.items && Array.isArray(parsed.items)) {
+            console.log('✅ Parsed as items array, length:', parsed.items.length);
             return parsed.items;
           } else if (parsed.wishlist && Array.isArray(parsed.wishlist)) {
+            console.log('✅ Parsed as wishlist array, length:', parsed.wishlist.length);
             return parsed.wishlist;
-          } else {
-            return [];
           }
         }
       } catch (e) {
@@ -54,10 +54,18 @@ function Wishlist() {
 
   // Load wishlist on mount and when dependencies change
   useEffect(() => {
-    const loadData = () => {
+    const loadData = async () => {
       setLoading(true);
+      
+      if (user && token) {
+        // Fetch fresh wishlist from API for logged in user
+        if (fetchWishlist) {
+          await fetchWishlist();
+        }
+      }
+      
       const data = getWishlistData();
-      console.log('Setting displayWishlist:', data);
+      console.log('🔄 Setting displayWishlist:', data);
       setDisplayWishlist(data);
       setIsGuest(!user || !token);
       setLoading(false);
@@ -69,33 +77,31 @@ function Wishlist() {
   // Listen for storage events (when product added from other tabs/pages)
   useEffect(() => {
     const handleStorageChange = (e) => {
-      if (e.key === 'guestWishlist' || e.key === 'wishlist') {
-        console.log('Storage changed, reloading...');
+      if (e.key === 'guestWishlist') {
+        console.log('🔄 Storage changed, reloading wishlist...');
         const data = getWishlistData();
         setDisplayWishlist(data);
       }
     };
     
     const handleCustomEvent = () => {
-      console.log('Custom wishlist event received');
+      console.log('🔄 Custom wishlist event received');
       const data = getWishlistData();
       setDisplayWishlist(data);
     };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('wishlistUpdated', handleCustomEvent);
-    window.addEventListener('forceWishlistUpdate', handleCustomEvent);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('wishlistUpdated', handleCustomEvent);
-      window.removeEventListener('forceWishlistUpdate', handleCustomEvent);
     };
   }, [user, token]);
 
   // Save to localStorage whenever guest wishlist changes
   useEffect(() => {
-    if (!user && !token && displayWishlist.length >= 0) {
+    if (!user && !token) {
       localStorage.setItem('guestWishlist', JSON.stringify(displayWishlist));
       // Broadcast update to other components
       window.dispatchEvent(new CustomEvent('wishlistUpdated', { detail: { count: displayWishlist.length } }));
@@ -131,7 +137,6 @@ function Wishlist() {
     
     if (user && token) {
       await removeFromWishlist(productId);
-      // Refresh after removal
       const updated = getWishlistData();
       setDisplayWishlist(updated);
     } else {
@@ -155,8 +160,9 @@ function Wishlist() {
 
   const wishlistCount = displayWishlist.length;
 
-  console.log('RENDER - displayWishlist:', displayWishlist);
-  console.log('RENDER - count:', wishlistCount);
+  console.log('🎯 RENDER FINAL - displayWishlist:', displayWishlist);
+  console.log('🎯 RENDER FINAL - count:', wishlistCount);
+  console.log('🎯 RENDER FINAL - isGuest:', isGuest);
 
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
@@ -293,18 +299,6 @@ function Wishlist() {
                   <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
                 </p>
               )}
-              <button
-                onClick={() => {
-                  // Emergency fix - clear and reload
-                  localStorage.removeItem('guestWishlist');
-                  setDisplayWishlist([]);
-                  window.dispatchEvent(new Event('storage'));
-                  window.location.reload();
-                }}
-                className="text-xs text-gray-400 underline mb-4 block mx-auto"
-              >
-                Reset Wishlist
-              </button>
               <Link 
                 to="/shop" 
                 className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
@@ -343,7 +337,7 @@ function Wishlist() {
                           height="400"
                           style={{ aspectRatio: '1/1' }}
                           onError={(e) => {
-                            e.target.src = 'https://placehold.co/400x400/pink/white?text=Image';
+                            e.target.src = 'https://placehold.co/400x400/pink/white?text=Product';
                           }}
                         />
                       ) : (
