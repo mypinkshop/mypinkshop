@@ -6,12 +6,57 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
-// OPTIMIZED Product Card Component
-const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist }) => {
+// OPTIMIZED Product Card Component WITH FIXED WISHLIST
+const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+
+  // Check if product is in wishlist on mount
+  useEffect(() => {
+    const checkWishlist = () => {
+      if (user) {
+        setIsWishlisted(isInWishlist(product._id || product.id));
+      } else {
+        const saved = localStorage.getItem('guestWishlist');
+        if (saved) {
+          try {
+            const wishlist = JSON.parse(saved);
+            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
+            setIsWishlisted(exists);
+          } catch(e) {}
+        }
+      }
+    };
+    checkWishlist();
+    
+    // Listen for wishlist updates
+    const handleUpdate = () => {
+      if (!user) {
+        const saved = localStorage.getItem('guestWishlist');
+        if (saved) {
+          try {
+            const wishlist = JSON.parse(saved);
+            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
+            setIsWishlisted(exists);
+          } catch(e) {}
+        }
+      } else {
+        setIsWishlisted(isInWishlist(product._id || product.id));
+      }
+    };
+    
+    window.addEventListener('wishlistUpdated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, [product, user, isInWishlist]);
 
   const handleAddToCart = () => {
     addToCart({
@@ -23,19 +68,75 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       stock: product.stock
     });
     setIsAdded(true);
+    toast.success('Added to cart!');
     setTimeout(() => setIsAdded(false), 2000);
   };
 
   const handleGoToCart = () => {
-    window.location.href = '/cart';
+    navigate('/cart');
   };
 
   const handleWishlistToggle = () => {
     const productId = product._id || product.id;
-    if (isInWishlist(productId)) {
-      removeFromWishlist(productId);
+    
+    if (user) {
+      // Logged in user - use context
+      if (isWishlisted) {
+        removeFromWishlist(productId);
+        setIsWishlisted(false);
+        toast.success('Removed from wishlist');
+      } else {
+        addToWishlist(product);
+        setIsWishlisted(true);
+        toast.success('Added to wishlist');
+      }
     } else {
-      addToWishlist(product);
+      // Guest user - DIRECT localStorage save
+      const productData = {
+        _id: productId,
+        id: productId,
+        name: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        images: product.images,
+        rating: product.rating,
+        brand: product.brand,
+        badge: product.badge,
+        isNew: product.isNew,
+        stock: product.stock,
+        emoji: product.emoji
+      };
+      
+      // Get existing wishlist
+      let wishlist = [];
+      const saved = localStorage.getItem('guestWishlist');
+      if (saved) {
+        try {
+          wishlist = JSON.parse(saved);
+          if (!Array.isArray(wishlist)) wishlist = [];
+        } catch(e) { wishlist = []; }
+      }
+      
+      // Check if exists
+      const exists = wishlist.some(item => (item._id === productId || item.id === productId));
+      
+      if (!exists) {
+        wishlist.push(productData);
+        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
+        setIsWishlisted(true);
+        toast.success('Added to wishlist! 🤍');
+        console.log('✅ Added to guest wishlist:', wishlist);
+      } else {
+        wishlist = wishlist.filter(item => (item._id !== productId && item.id !== productId));
+        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
+        setIsWishlisted(false);
+        toast.success('Removed from wishlist');
+        console.log('❌ Removed from guest wishlist:', wishlist);
+      }
+      
+      // Dispatch events to update header and wishlist page
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     }
   };
 
@@ -136,7 +237,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             onClick={handleWishlistToggle}
             className="w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 border border-pink-200 hover:bg-pink-50"
           >
-            {isInWishlist(product._id || product.id) ? '❤️' : '🤍'}
+            {isWishlisted ? '❤️' : '🤍'}
           </button>
         </div>
       </div>
@@ -665,6 +766,7 @@ function Shop() {
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
                       removeFromWishlist={removeFromWishlist}
+                      user={user}
                     />
                   ))}
                 </div>
