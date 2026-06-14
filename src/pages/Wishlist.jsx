@@ -18,9 +18,94 @@ function Wishlist() {
   const [searchQuery, setSearchQuery] = useState('');
   const [localWishlist, setLocalWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
-  const [storageKey, setStorageKey] = useState(0);
 
-  const API_URL = 'https://api.mypinkshop.com';
+  // Debug: Log current wishlist state
+  useEffect(() => {
+    console.log('=== WISHLIST DEBUG ===');
+    console.log('User:', user ? 'Logged In' : 'Guest');
+    console.log('Context wishlist:', wishlist);
+    console.log('Context wishlist length:', wishlist?.length);
+    console.log('Local wishlist:', localWishlist);
+    console.log('Local wishlist length:', localWishlist.length);
+  }, [user, wishlist, localWishlist]);
+
+  // Load wishlist
+  useEffect(() => {
+    const loadWishlist = async () => {
+      setLoading(true);
+      
+      if (user && token) {
+        setIsGuest(false);
+        if (fetchWishlist) {
+          await fetchWishlist();
+        }
+      } else {
+        setIsGuest(true);
+        const saved = localStorage.getItem('guestWishlist');
+        console.log('Raw localStorage data:', saved);
+        
+        if (saved) {
+          try {
+            let parsed = JSON.parse(saved);
+            if (!Array.isArray(parsed)) {
+              if (parsed.items && Array.isArray(parsed.items)) {
+                parsed = parsed.items;
+              } else if (parsed.wishlist && Array.isArray(parsed.wishlist)) {
+                parsed = parsed.wishlist;
+              } else {
+                parsed = [];
+              }
+            }
+            console.log('Processed local wishlist:', parsed);
+            setLocalWishlist(parsed);
+          } catch (e) {
+            console.error('Parse error:', e);
+            setLocalWishlist([]);
+          }
+        } else {
+          setLocalWishlist([]);
+        }
+      }
+      
+      setLoading(false);
+    };
+    
+    loadWishlist();
+  }, [user, token, fetchWishlist]);
+
+  // Save guest wishlist
+  useEffect(() => {
+    if (isGuest && localWishlist.length >= 0) {
+      localStorage.setItem('guestWishlist', JSON.stringify(localWishlist));
+      // Dispatch event to update header
+      window.dispatchEvent(new CustomEvent('wishlistUpdated', { detail: { count: localWishlist.length } }));
+    }
+  }, [localWishlist, isGuest]);
+
+  // Listen for wishlist updates from other components
+  useEffect(() => {
+    const handleWishlistUpdate = (event) => {
+      console.log('Received wishlist update event:', event);
+      if (!user && !token) {
+        const saved = localStorage.getItem('guestWishlist');
+        if (saved) {
+          try {
+            let parsed = JSON.parse(saved);
+            if (!Array.isArray(parsed) && parsed.items) parsed = parsed.items;
+            setLocalWishlist(parsed || []);
+          } catch (e) {}
+        }
+      }
+    };
+    
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    window.addEventListener('storage', handleWishlistUpdate);
+    
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+      window.removeEventListener('storage', handleWishlistUpdate);
+    };
+  }, [user, token]);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -34,83 +119,8 @@ function Wishlist() {
     }
   };
 
-  // Function to load guest wishlist
-  const loadGuestWishlist = () => {
-    try {
-      const saved = localStorage.getItem('guestWishlist');
-      console.log('Raw saved wishlist:', saved);
-      
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const validList = Array.isArray(parsed) ? parsed : [];
-        console.log('Loaded guest wishlist:', validList);
-        setLocalWishlist(validList);
-        return validList;
-      }
-    } catch (e) {
-      console.error('Error loading wishlist:', e);
-    }
-    setLocalWishlist([]);
-    return [];
-  };
-
-  // Listen for storage changes (when product added from other pages)
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'guestWishlist') {
-        console.log('Storage changed, reloading wishlist...');
-        loadGuestWishlist();
-        setStorageKey(prev => prev + 1);
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Custom event for same-tab updates
-    window.addEventListener('wishlistUpdated', () => {
-      console.log('Wishlist updated event received');
-      loadGuestWishlist();
-      setStorageKey(prev => prev + 1);
-    });
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('wishlistUpdated', () => {});
-    };
-  }, []);
-
-  // Load wishlist on mount and when user changes
-  useEffect(() => {
-    const loadWishlist = async () => {
-      setLoading(true);
-      console.log('Loading wishlist - user:', user ? 'logged in' : 'guest', 'token:', !!token);
-      
-      if (user && token) {
-        setIsGuest(false);
-        if (fetchWishlist) {
-          await fetchWishlist();
-        }
-      } else {
-        setIsGuest(true);
-        loadGuestWishlist();
-      }
-      
-      setLoading(false);
-    };
-    
-    loadWishlist();
-  }, [user, token, fetchWishlist, storageKey]);
-
-  // Save guest wishlist to localStorage whenever it changes
-  useEffect(() => {
-    if (isGuest) {
-      console.log('Saving guest wishlist:', localWishlist);
-      localStorage.setItem('guestWishlist', JSON.stringify(localWishlist));
-    }
-  }, [localWishlist, isGuest]);
-
   const handleMoveToCart = async (product) => {
-    const productId = product.id || product._id;
+    const productId = product._id || product.id;
     setMovingProduct(productId);
     
     addToCart({
@@ -118,7 +128,7 @@ function Wishlist() {
       name: product.name,
       price: product.price,
       quantity: 1,
-      image: product.images?.[0],
+      image: product.images?.[0] || product.image,
       stock: product.stock
     });
     
@@ -127,38 +137,34 @@ function Wishlist() {
     if (user && token) {
       await removeFromWishlist(productId);
     } else {
-      setLocalWishlist(prev => {
-        const newList = prev.filter(p => (p.id || p._id) !== productId);
-        return newList;
-      });
+      setLocalWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
     }
     
-    setTimeout(() => {
-      setMovingProduct(null);
-    }, 500);
+    setTimeout(() => setMovingProduct(null), 500);
   };
 
   const handleRemoveItem = async (productId) => {
-    console.log('Removing product:', productId);
-    
     if (user && token) {
       await removeFromWishlist(productId);
       toast.success('Removed from wishlist');
     } else {
-      setLocalWishlist(prev => {
-        const newList = prev.filter(p => (p.id || p._id) !== productId);
-        console.log('New wishlist after remove:', newList);
-        return newList;
-      });
+      setLocalWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
       toast.success('Removed from wishlist');
     }
   };
 
-  const currentWishlist = user && token ? (wishlist || []) : localWishlist;
-  const wishlistCount = currentWishlist?.length || 0;
+  // Get current wishlist - FIXED: Ensure it's always an array
+  let currentWishlist = [];
+  if (user && token) {
+    currentWishlist = Array.isArray(wishlist) ? wishlist : [];
+  } else {
+    currentWishlist = Array.isArray(localWishlist) ? localWishlist : [];
+  }
+  
+  const wishlistCount = currentWishlist.length;
 
-  console.log('Rendering - currentWishlist:', currentWishlist);
-  console.log('Wishlist count:', wishlistCount);
+  console.log('Final currentWishlist:', currentWishlist);
+  console.log('Final wishlistCount:', wishlistCount);
 
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
@@ -180,9 +186,7 @@ function Wishlist() {
   if (loading) {
     return (
       <>
-        <Helmet>
-          <title>My Wishlist - MyPinkShop</title>
-        </Helmet>
+        <Helmet><title>My Wishlist - MyPinkShop</title></Helmet>
         <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -197,16 +201,10 @@ function Wishlist() {
     <>
       <Helmet>
         <title>My Wishlist - MyPinkShop | Save Your Favorite Items</title>
-        <meta name="description" content="View and manage your wishlist at MyPinkShop. Save your favorite skincare, makeup, clothing, and accessories for later. Free shipping on orders above ₹499." />
-        <meta name="keywords" content="wishlist, saved items, favorite products, mypinkshop wishlist, shopping wishlist" />
+        <meta name="description" content="View and manage your wishlist at MyPinkShop. Save your favorite skincare, makeup, clothing, and accessories for later." />
         <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
         <meta property="og:title" content="My Wishlist - MyPinkShop" />
-        <meta property="og:description" content="Save your favorite items and shop them later. Free shipping on orders above ₹499." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com/wishlist" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="My Wishlist - MyPinkShop" />
-        <meta name="twitter:description" content="Save your favorite items and shop them later." />
+        <meta property="og:description" content="Save your favorite items and shop them later." />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
@@ -293,43 +291,21 @@ function Wishlist() {
           </div>
         </div>
 
-        {!currentWishlist || currentWishlist.length === 0 ? (
+        {currentWishlist.length === 0 ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
               <div className="text-6xl mb-6">🤍</div>
               <h2 className="text-2xl font-bold text-gray-800 mb-3">Your wishlist is empty</h2>
               <p className="text-gray-500 mb-6">Save your favorite items here!</p>
               {isGuest && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-500">
-                    💡 Your wishlist is saved locally. 
-                    <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
-                  </p>
-                  <button
-                    onClick={() => {
-                      const testProduct = {
-                        _id: "test123",
-                        id: "test123",
-                        name: "Test Product - Click Heart to Add Real Products",
-                        brand: "Test",
-                        price: 499,
-                        originalPrice: 799,
-                        images: ["https://m.media-amazon.com/images/I/31Rl0Y1BVtL._SL1500_.jpg"],
-                        rating: 4.5,
-                        badge: "TEST"
-                      };
-                      setLocalWishlist(prev => [...prev, testProduct]);
-                      toast.success('Test product added! Now remove it and add real ones.');
-                    }}
-                    className="text-sm bg-pink-100 text-pink-600 px-4 py-2 rounded-full hover:bg-pink-200 transition"
-                  >
-                    🧪 Add Test Product
-                  </button>
-                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  💡 Your wishlist is saved locally. 
+                  <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
+                </p>
               )}
               <Link 
                 to="/shop" 
-                className="inline-block mt-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
               >
                 Start Shopping →
               </Link>
@@ -351,13 +327,13 @@ function Wishlist() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {currentWishlist.map((product) => (
-                <div key={product.id || product._id} className="group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition hover:-translate-y-1">
-                  <Link to={`/product/${product.id || product._id}`}>
+                <div key={product._id || product.id} className="group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition hover:-translate-y-1">
+                  <Link to={`/product/${product._id || product.id}`}>
                     <div className="relative h-52 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
-                      {product.images && product.images[0] ? (
+                      {(product.images?.[0] || product.image) ? (
                         <img 
-                          src={product.images[0]} 
-                          alt={product.name || 'Product image'} 
+                          src={product.images?.[0] || product.image} 
+                          alt={product.name} 
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           loading="lazy"
                           decoding="async"
@@ -373,21 +349,11 @@ function Wishlist() {
                           🛍️
                         </div>
                       )}
-                      {product.badge && (
-                        <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
-                          {product.badge}
-                        </span>
-                      )}
-                      {product.isNew && (
-                        <span className="absolute top-3 right-12 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md">
-                          NEW
-                        </span>
-                      )}
                       
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          handleRemoveItem(product.id || product._id);
+                          handleRemoveItem(product._id || product.id);
                         }}
                         className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition z-10"
                         aria-label="Remove from wishlist"
@@ -398,7 +364,7 @@ function Wishlist() {
                   </Link>
                   
                   <div className="p-4">
-                    <Link to={`/product/${product.id || product._id}`}>
+                    <Link to={`/product/${product._id || product.id}`}>
                       <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
                         {product.name}
                       </h3>
@@ -421,14 +387,14 @@ function Wishlist() {
                     
                     <button
                       onClick={() => handleMoveToCart(product)}
-                      disabled={movingProduct === (product.id || product._id)}
+                      disabled={movingProduct === (product._id || product.id)}
                       className={`w-full mt-3 py-2 rounded-full text-sm font-medium transition ${
-                        movingProduct === (product.id || product._id)
+                        movingProduct === (product._id || product.id)
                           ? 'bg-green-500 text-white'
                           : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
                       }`}
                     >
-                      {movingProduct === (product.id || product._id) ? '✓ Added to Cart!' : 'Move to Cart 🛒'}
+                      {movingProduct === (product._id || product.id) ? '✓ Added to Cart!' : 'Move to Cart 🛒'}
                     </button>
                   </div>
                 </div>
