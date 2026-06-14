@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -231,6 +231,70 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
+// Lazy load heavy components
+const NewsletterSection = () => (
+  <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
+    <div className="max-w-2xl mx-auto text-center px-4">
+      <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
+      <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
+      <form onSubmit={(e) => { e.preventDefault(); const email = e.target.email.value; if (email) { toast.success('Thanks for subscribing!'); e.target.reset(); } }} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+        <input type="email" name="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" required />
+        <button type="submit" className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105">Subscribe</button>
+      </form>
+    </div>
+  </section>
+);
+
+const FooterSection = () => (
+  <footer className="bg-gray-900 text-gray-400 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">M</span>
+            </div>
+            <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+          </div>
+          <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+        </div>
+        <div>
+          <h4 className="font-semibold text-white mb-4">Shop</h4>
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+            <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+            <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+            <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+            <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-semibold text-white mb-4">Support</h4>
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+            <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+            <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+            <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+          <ul className="space-y-2 text-sm">
+            <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+            <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
+            <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+            <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+          </ul>
+        </div>
+      </div>
+      <div className="text-center pt-8 border-t border-gray-800">
+        <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+        <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+      </div>
+    </div>
+  </footer>
+);
+
 function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
@@ -241,6 +305,23 @@ function Home() {
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Intersection Observer for lazy loading sections
+  const [visibleSections, setVisibleSections] = useState({
+    skincare: false,
+    makeup: false,
+    hair: false,
+    clothing: false,
+    accessories: false
+  });
+  
+  const sectionRefs = {
+    skincare: useRef(null),
+    makeup: useRef(null),
+    hair: useRef(null),
+    clothing: useRef(null),
+    accessories: useRef(null)
+  };
 
   const API_URL = 'https://api.mypinkshop.com';
 
@@ -250,7 +331,6 @@ function Home() {
       try {
         setLoading(true);
         
-        // Check cache first
         const cached = sessionStorage.getItem('products_cache');
         const cacheTime = sessionStorage.getItem('products_cache_time');
         
@@ -268,7 +348,6 @@ function Home() {
         let data = await response.json();
         const productsArray = data.products || data;
         
-        // Save to cache
         sessionStorage.setItem('products_cache', JSON.stringify(data));
         sessionStorage.setItem('products_cache_time', Date.now().toString());
         
@@ -310,6 +389,17 @@ function Home() {
     loadBanners();
   }, []);
 
+  // Preload first banner image
+  useEffect(() => {
+    if (banners.length > 0 && banners[0].images?.[0]) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = banners[0].images[0];
+      document.head.appendChild(link);
+    }
+  }, [banners]);
+
   // Auto slide for carousel
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -318,6 +408,27 @@ function Home() {
     }, 5000);
     return () => clearInterval(interval);
   }, [banners.length]);
+
+  // Intersection Observer setup
+  useEffect(() => {
+    const observers = [];
+    Object.keys(sectionRefs).forEach((key) => {
+      if (sectionRefs[key].current) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) {
+              setVisibleSections(prev => ({ ...prev, [key]: true }));
+              observer.disconnect();
+            }
+          },
+          { threshold: 0.1, rootMargin: '100px' }
+        );
+        observer.observe(sectionRefs[key].current);
+        observers.push(observer);
+      }
+    });
+    return () => observers.forEach(obs => obs.disconnect());
+  }, [products.length]);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -660,9 +771,9 @@ function Home() {
           </section>
         )}
 
-        {/* Skincare Section */}
+        {/* Skincare Section - Lazy Load */}
         {skincareProducts.length > 0 && (
-          <section className="py-12 bg-gray-50">
+          <section ref={sectionRefs.skincare} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
@@ -671,26 +782,34 @@ function Home() {
                 </div>
                 <Link to="/skincare" className="text-pink-500 text-sm hover:underline">View All →</Link>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {skincareProducts.map(product => (
-                  <ProductCard 
-                    key={product._id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                  />
-                ))}
-              </div>
+              {visibleSections.skincare ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {skincareProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
 
-        {/* Makeup Section */}
+        {/* Makeup Section - Lazy Load */}
         {makeupProducts.length > 0 && (
-          <section className="py-12 bg-white">
+          <section ref={sectionRefs.makeup} className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
@@ -699,26 +818,34 @@ function Home() {
                 </div>
                 <Link to="/makeup" className="text-pink-500 text-sm hover:underline">View All →</Link>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {makeupProducts.map(product => (
-                  <ProductCard 
-                    key={product._id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                  />
-                ))}
-              </div>
+              {visibleSections.makeup ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {makeupProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-gray-100 rounded-2xl h-64 animate-pulse"></div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
 
-        {/* Hair Section */}
+        {/* Hair Section - Lazy Load */}
         {hairProducts.length > 0 && (
-          <section className="py-12 bg-gray-50">
+          <section ref={sectionRefs.hair} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
@@ -727,83 +854,40 @@ function Home() {
                 </div>
                 <Link to="/hair" className="text-pink-500 text-sm hover:underline">View All →</Link>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {hairProducts.map(product => (
-                  <ProductCard 
-                    key={product._id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                  />
-                ))}
-              </div>
+              {visibleSections.hair ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {hairProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
 
-        {/* Newsletter */}
-        <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
-          <div className="max-w-2xl mx-auto text-center px-4">
-            <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
-            <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
-            <form onSubmit={(e) => { e.preventDefault(); const email = e.target.email.value; if (email) { toast.success('Thanks for subscribing!'); e.target.reset(); } }} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <input type="email" name="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" required />
-              <button type="submit" className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105">Subscribe</button>
-            </form>
-          </div>
-        </section>
+        {/* Newsletter - Lazy Load */}
+        <Suspense fallback={<div className="h-64 bg-pink-600" />}>
+          <NewsletterSection />
+        </Suspense>
 
-        {/* Footer */}
-        <footer className="bg-gray-900 text-gray-400 py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">M</span>
-                  </div>
-                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-                </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-4">Shop</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-4">Support</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-                </ul>
-              </div>
-            </div>
-            <div className="text-center pt-8 border-t border-gray-800">
-              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-            </div>
-          </div>
-        </footer>
+        {/* Footer - Lazy Load */}
+        <Suspense fallback={<div className="h-80 bg-gray-900" />}>
+          <FooterSection />
+        </Suspense>
 
         <style>{`
           .scrollbar-hide::-webkit-scrollbar { display: none; }
