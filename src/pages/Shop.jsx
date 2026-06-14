@@ -8,15 +8,23 @@ import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
-// OPTIMIZED Product Card Component WITH FIXED WISHLIST
+// Optimized Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
-  const navigate = useNavigate(); // ✅ FIXED - Added missing navigate
+  const navigate = useNavigate();
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  // Check if product is in wishlist on mount
+  // Optimize image URL - smaller size for faster loading
+  const getOptimizedImage = (url) => {
+    if (!url) return null;
+    if (url.includes('amazon') || url.includes('media-amazon')) {
+      return url.replace('_SL1500_.jpg', '_SL500_.jpg').replace('_SL1500_', '_SL500_');
+    }
+    return url;
+  };
+
   useEffect(() => {
     const checkWishlist = () => {
       if (user) {
@@ -34,7 +42,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     };
     checkWishlist();
     
-    // Listen for wishlist updates
     const handleUpdate = () => {
       if (!user) {
         const saved = localStorage.getItem('guestWishlist');
@@ -81,7 +88,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     const productId = product._id || product.id;
     
     if (user) {
-      // Logged in user - use context
       if (isWishlisted) {
         removeFromWishlist(productId);
         setIsWishlisted(false);
@@ -92,7 +98,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         toast.success('Added to wishlist');
       }
     } else {
-      // Guest user - DIRECT localStorage save
       const productData = {
         _id: productId,
         id: productId,
@@ -108,7 +113,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         emoji: product.emoji
       };
       
-      // Get existing wishlist
       let wishlist = [];
       const saved = localStorage.getItem('guestWishlist');
       if (saved) {
@@ -118,7 +122,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         } catch(e) { wishlist = []; }
       }
       
-      // Check if exists
       const exists = wishlist.some(item => (item._id === productId || item.id === productId));
       
       if (!exists) {
@@ -126,23 +129,20 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
         setIsWishlisted(true);
         toast.success('Added to wishlist! 🤍');
-        console.log('✅ Added to guest wishlist:', wishlist);
       } else {
         wishlist = wishlist.filter(item => (item._id !== productId && item.id !== productId));
         localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
         setIsWishlisted(false);
         toast.success('Removed from wishlist');
-        console.log('❌ Removed from guest wishlist:', wishlist);
       }
       
-      // Dispatch events to update header and wishlist page
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     }
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
+    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-pink-100">
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-48 sm:h-52 md:h-56 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {!imageLoaded && !imgError && (
@@ -151,19 +151,18 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           
           {product.images && product.images[0] && !imgError ? (
             <img 
-              src={product.images[0]} 
+              src={getOptimizedImage(product.images[0])} 
               alt={product.name || 'Product image'}
-              className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
               onLoad={() => setImageLoaded(true)}
               loading="lazy"
               decoding="async"
-              width="400"
-              height="400"
-              style={{ aspectRatio: '1/1' }}
+              width="300"
+              height="300"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
+            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl">
               {product.emoji || '✨'}
             </div>
           )}
@@ -216,7 +215,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           {isAdded ? (
             <button 
               onClick={handleGoToCart}
-              className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600 transform hover:-translate-y-0.5"
+              className="flex-1 py-2 rounded-xl text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
             >
               ✓ Go to Cart
             </button>
@@ -224,7 +223,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             <button 
               onClick={handleAddToCart} 
               disabled={product.stock === 0}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
                 product.stock > 0 
                   ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg' 
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -236,7 +235,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           
           <button 
             onClick={handleWishlistToggle}
-            className="w-10 py-2 rounded-xl text-center transition transform hover:-translate-y-0.5 border border-pink-200 hover:bg-pink-50"
+            className="w-10 py-2 rounded-xl text-center transition border border-pink-200 hover:bg-pink-50"
           >
             {isWishlisted ? '❤️' : '🤍'}
           </button>
@@ -254,7 +253,6 @@ function Shop() {
   const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   
   const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
@@ -268,53 +266,35 @@ function Shop() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load products - FIXED for pagination
+  // Load products with caching
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const category = params.get('category');
-    const search = params.get('search');
-    const offer = params.get('offer');
-    const sort = params.get('sort');
-    
-    if (search) {
-      setSearchTerm(search);
-    }
-    if (category && category !== 'all') {
-      setSelectedCategory(category);
-    }
-    if (sort === 'newest') {
-      setSortBy('newest');
-    } else if (sort === 'bestseller') {
-      setSortBy('rating');
-    }
-    
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/api/products`);
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        // Check cache first
+        const cached = sessionStorage.getItem('products_cache');
+        const cacheTime = sessionStorage.getItem('products_cache_time');
+        
+        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
+          const data = JSON.parse(cached);
+          const productsArray = data.products || data;
+          setProducts(productsArray.map(p => ({ ...p, id: p._id })));
+          setLoading(false);
+          return;
         }
+        
+        const response = await fetch(`${API_URL}/api/products`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         let data = await response.json();
-        
-        // ✅ FIX: Handle both paginated and non-paginated response
         const productsArray = data.products || data;
         
-        let allProducts = productsArray;
+        // Save to cache
+        sessionStorage.setItem('products_cache', JSON.stringify(data));
+        sessionStorage.setItem('products_cache_time', Date.now().toString());
         
-        if (offer === 'sale') {
-          allProducts = allProducts.filter(p => p.badge === 'Sale');
-        }
-        
-        const transformedData = allProducts.map(p => ({
-          ...p,
-          id: p._id,
-          category: p.mainCategory || p.category
-        }));
-        
-        setProducts(transformedData);
+        setProducts(productsArray.map(p => ({ ...p, id: p._id })));
       } catch (error) {
         console.error("Error loading products:", error);
         setProducts([]);
@@ -324,35 +304,10 @@ function Shop() {
     };
     
     loadProducts();
-  }, [location]);
+  }, []);
 
-  // Handle search with autocomplete
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    
-    if (value.length > 1) {
-      const suggestions = products
-        .filter(p => p.name?.toLowerCase().includes(value.toLowerCase()))
-        .slice(0, 5)
-        .map(p => p.name);
-      setSearchSuggestions(suggestions);
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
-  const handleSearch = () => {
-    if (searchTerm) {
-      navigate(`/shop?search=${encodeURIComponent(searchTerm)}`);
-    } else {
-      navigate('/shop');
-    }
-  };
-
-  // Filters
-  useEffect(() => {
+  // Optimized filtered products with useMemo
+  const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
     if (searchTerm) {
@@ -393,8 +348,8 @@ function Shop() {
         break;
     }
     
-    setFilteredProducts(filtered);
-  }, [searchTerm, selectedCategory, minPrice, maxPrice, selectedRating, sortBy, products]);
+    return filtered;
+  }, [products, searchTerm, selectedCategory, minPrice, maxPrice, selectedRating, sortBy]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -404,6 +359,12 @@ function Shop() {
     setSelectedRating(0);
     setSortBy('default');
     navigate('/shop');
+  };
+
+  const handleSearch = () => {
+    if (searchTerm.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchTerm.trim())}`);
+    }
   };
 
   const categoryChips = [
@@ -424,37 +385,6 @@ function Shop() {
     { id: 'accessories', name: 'Accessories', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'accessories').length },
   ], [products]);
 
-  // Hidden SEO Schema
-  const generateItemListSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    "name": "All Products - MyPinkShop",
-    "description": "Shop all products including skincare, makeup, hair care, clothing, and accessories at MyPinkShop.",
-    "numberOfItems": filteredProducts.length,
-    "itemListElement": filteredProducts.slice(0, 10).map((product, index) => ({
-      "@type": "ListItem",
-      "position": index + 1,
-      "url": `https://www.mypinkshop.com/product/${product._id}`
-    }))
-  });
-
-  const generateBreadcrumbSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mypinkshop.com" },
-      { "@type": "ListItem", "position": 2, "name": "Shop", "item": "https://www.mypinkshop.com/shop" }
-    ]
-  });
-
-  const generateOrganizationSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "MyPinkShop",
-    "url": "https://www.mypinkshop.com",
-    "logo": "https://www.mypinkshop.com/logo.png"
-  });
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -471,28 +401,13 @@ function Shop() {
       <Helmet>
         <title>Shop All Products - Skincare, Makeup, Hair Care & More | MyPinkShop</title>
         <meta name="description" content="Shop all products at MyPinkShop. Wide range of skincare, makeup, hair care, clothing, and accessories. ✓ Free shipping ✓ COD ✓ Best prices." />
-        <meta name="keywords" content="shop online, buy products, skincare, makeup, hair care, clothing, accessories, beauty products, fashion" />
         <link rel="canonical" href="https://www.mypinkshop.com/shop" />
-        <meta property="og:title" content="Shop All Products - MyPinkShop" />
-        <meta property="og:description" content="Shop all products including skincare, makeup, hair care, clothing, and accessories. Free shipping on orders above ₹499." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com/shop" />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-shop.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Shop All Products - MyPinkShop" />
-        <meta name="twitter:description" content="Shop all products. Free shipping available." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-shop.jpg" />
-        <script type="application/ld+json">{JSON.stringify(generateItemListSchema())}</script>
-        <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
-        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Offer Banner */}
         <OfferBanner />
 
-        {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -506,37 +421,15 @@ function Shop() {
                 </div>
               </Link>
 
-              {/* Search Bar with Autocomplete */}
               <div className="flex-1 max-w-md lg:max-w-2xl">
                 <div className="relative">
                   <input 
                     type="text" 
                     placeholder="Search for products..."
                     value={searchTerm}
-                    onChange={handleSearchChange}
-                    onFocus={() => searchTerm.length > 1 && setShowSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
-                  
-                  {showSuggestions && searchSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                      {searchSuggestions.map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setSearchTerm(suggestion);
-                            setShowSuggestions(false);
-                            handleSearch();
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-pink-50 text-sm transition first:rounded-t-xl last:rounded-b-xl"
-                        >
-                          🔍 {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  
                   <button 
                     onClick={handleSearch}
                     className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
@@ -574,64 +467,20 @@ function Shop() {
           </div>
         </header>
 
-        {/* Category Chips */}
-        <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-pink-100 shadow-sm overflow-x-auto">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
-              {categoryChips.map((chip) => (
-                <button
-                  key={chip.id}
-                  onClick={() => {
-                    setSelectedCategory(chip.id);
-                    navigate(`/shop?category=${chip.id === 'all' ? '' : chip.id}`);
-                  }}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                    selectedCategory === chip.id
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="text-base">{chip.icon}</span>
-                  <span>{chip.name}</span>
-                  {chip.id !== 'all' && (
-                    <span className={`text-xs ${selectedCategory === chip.id ? 'text-white/80' : 'text-gray-400'}`}>
-                      ({categories.find(c => c.id === chip.id)?.count || 0})
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
             <span className="text-gray-400">/</span>
             <span className="text-pink-600 font-medium">Shop</span>
-            {selectedCategory !== 'all' && (
-              <>
-                <span className="text-gray-400">/</span>
-                <span className="text-gray-600 capitalize">{selectedCategory}</span>
-              </>
-            )}
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           
-          <button 
-            onClick={() => setShowFilters(!showFilters)} 
-            className="md:hidden w-full bg-white/80 backdrop-blur-sm border border-pink-100 rounded-2xl py-3 mb-4 flex items-center justify-center gap-2 text-gray-700 font-medium shadow-sm"
-          >
-            <span>🔽</span> Filters & Sorting
-          </button>
-
           <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
             
             {/* Left Sidebar - Filters */}
-            <div className={`${showFilters ? 'block' : 'hidden'} md:block md:w-80 lg:w-96 space-y-5`}>
+            <div className="md:block md:w-80 lg:w-96 space-y-5">
               
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -645,10 +494,7 @@ function Shop() {
                           type="radio" 
                           name="category" 
                           checked={selectedCategory === cat.id} 
-                          onChange={() => {
-                            setSelectedCategory(cat.id);
-                            navigate(`/shop?category=${cat.id === 'all' ? '' : cat.id}`);
-                          }}
+                          onChange={() => setSelectedCategory(cat.id)}
                           className="w-4 h-4 text-pink-500 focus:ring-pink-400"
                         />
                         <span className="text-sm text-gray-700">{cat.name}</span>
@@ -685,7 +531,6 @@ function Shop() {
                 </div>
               </div>
 
-              {/* Rating Filter */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-pink-100 shadow-sm">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <span className="text-pink-500">⭐</span> Rating
@@ -706,22 +551,12 @@ function Shop() {
                       <span className="text-xs text-gray-500">& above</span>
                     </label>
                   ))}
-                  <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-pink-50 transition">
-                    <input 
-                      type="radio" 
-                      name="rating" 
-                      checked={selectedRating === 0} 
-                      onChange={() => setSelectedRating(0)} 
-                      className="w-4 h-4 text-pink-500"
-                    />
-                    <span className="text-sm text-gray-600">All ratings</span>
-                  </label>
                 </div>
               </div>
 
               <button 
                 onClick={clearFilters} 
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-medium hover:shadow-lg transition-all"
               >
                 Clear All Filters ✨
               </button>
@@ -776,7 +611,6 @@ function Shop() {
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -804,15 +638,15 @@ function Shop() {
                 <ul className="space-y-2 text-sm">
                   <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
                   <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
                   <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
                 </ul>
@@ -824,16 +658,6 @@ function Shop() {
             </div>
           </div>
         </footer>
-
-        <style>{`
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-        `}</style>
       </div>
     </>
   );
