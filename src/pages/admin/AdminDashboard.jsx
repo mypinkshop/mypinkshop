@@ -58,7 +58,10 @@ function AdminDashboard() {
       const productsRes = await fetch(`${API_URL}/api/products`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const allProducts = await productsRes.json();
+      let data = await productsRes.json();
+      
+      // ✅ FIX: Handle both paginated and non-paginated response
+      const allProducts = data.products || data;
       
       const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
       const pendingProducts = allProducts.filter(p => p.adminApproved !== true);
