@@ -28,4 +28,4 @@ Disallow: /my-orders
 Disallow: /wishlist
 
 # Sitemap location
-Sitemap: https://www.mypinkshop.com/sitemap.xml
+Sitemap: https://www.mypinkshop.com/api/sitemap.xml
