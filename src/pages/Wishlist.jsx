@@ -9,7 +9,7 @@ import OfferBanner from '../components/OfferBanner';
 
 function Wishlist() {
   const navigate = useNavigate();
-  const { wishlist, removeFromWishlist, fetchWishlist, addToWishlist } = useWishlist();
+  const { wishlist, removeFromWishlist, fetchWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
   const { user, logout, token } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -33,17 +33,19 @@ function Wishlist() {
     }
   };
 
-  // Load wishlist - supports both logged-in and guest users
+  // Load wishlist - Supports both logged-in and guest users
   useEffect(() => {
     const loadWishlist = async () => {
       setLoading(true);
       
       if (user && token) {
+        // Logged in user
         setIsGuest(false);
         if (fetchWishlist) {
           await fetchWishlist();
         }
       } else {
+        // Guest user - load from localStorage
         setIsGuest(true);
         const savedWishlist = localStorage.getItem('guestWishlist');
         if (savedWishlist) {
@@ -66,16 +68,18 @@ function Wishlist() {
 
   // Save guest wishlist to localStorage
   useEffect(() => {
-    if (isGuest && localWishlist.length >= 0) {
+    if (isGuest) {
       localStorage.setItem('guestWishlist', JSON.stringify(localWishlist));
     }
   }, [localWishlist, isGuest]);
 
   const handleMoveToCart = async (product) => {
-    setMovingProduct(product.id || product._id);
+    const productId = product.id || product._id;
+    setMovingProduct(productId);
     
+    // Add to cart
     addToCart({
-      id: product.id || product._id,
+      id: productId,
       name: product.name,
       price: product.price,
       quantity: 1,
@@ -83,10 +87,11 @@ function Wishlist() {
       stock: product.stock
     });
     
+    // Remove from wishlist
     if (user && token) {
-      await removeFromWishlist(product.id || product._id);
+      await removeFromWishlist(productId);
     } else {
-      setLocalWishlist(prev => prev.filter(p => (p.id || p._id) !== (product.id || product._id)));
+      setLocalWishlist(prev => prev.filter(p => (p.id || p._id) !== productId));
     }
     
     setTimeout(() => {
@@ -102,6 +107,7 @@ function Wishlist() {
     }
   };
 
+  // Get current wishlist based on user type
   const currentWishlist = user && token ? wishlist : localWishlist;
   const wishlistCount = currentWishlist?.length || 0;
 
@@ -125,12 +131,17 @@ function Wishlist() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading your wishlist...</p>
+      <>
+        <Helmet>
+          <title>My Wishlist - MyPinkShop</title>
+        </Helmet>
+        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading your wishlist...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -156,7 +167,7 @@ function Wishlist() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner - Sirf Ek Baar */}
+        {/* Dynamic Offer Banner */}
         <OfferBanner />
 
         {/* Premium Header */}
@@ -194,7 +205,7 @@ function Wishlist() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-pink-500 transition">
+                <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
@@ -203,7 +214,7 @@ function Wishlist() {
                       {wishlistCount}
                     </span>
                   )}
-                </button>
+                </Link>
                 
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,13 +227,15 @@ function Wishlist() {
                   )}
                 </Link>
                 
-                {user ? <Avatar user={user} onLogout={logout} /> : 
+                {user ? (
+                  <Avatar user={user} onLogout={logout} />
+                ) : (
                   <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a7 7 0 11-14 0 7 7 0 0114 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
-                }
+                )}
               </div>
             </div>
           </div>
@@ -238,7 +251,7 @@ function Wishlist() {
         </div>
 
         {!currentWishlist || currentWishlist.length === 0 ? (
-          // Empty Wishlist
+          // Empty Wishlist - Sabko dikhega
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
               <div className="text-6xl mb-6">🤍</div>
@@ -397,8 +410,8 @@ function Wishlist() {
                 <ul className="space-y-2 text-sm">
                   <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
                   <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
                 </ul>
               </div>
               <div>
