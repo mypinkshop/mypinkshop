@@ -11,7 +11,7 @@ const otpRoutes = require('./otp');
 const authRoutes = require('./auth');
 const userRoutes = require('./users');
 const orderRoutes = require('./orders');
-const reviewRoutes = require('./reviews');  // ✅ ADDED
+const reviewRoutes = require('./reviews');
 
 const app = express();
 
@@ -579,7 +579,7 @@ app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/reviews', reviewRoutes);  // ✅ ADDED
+app.use('/api/reviews', reviewRoutes);
 
 // ========== PRODUCT ROUTES WITH PAGINATION ==========
 app.get('/api/products', async (req, res) => {
@@ -627,55 +627,121 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
+// ========== FIXED PRODUCT CREATE ROUTE (AMAZON IMPORT COMPATIBLE) ==========
 app.post('/api/products', authMiddleware, async (req, res) => {
   try {
     await connectDB();
     
-    let descriptionValue = req.body.description;
+    const productData = req.body;
+    
+    // Safe data extraction with fallbacks for Amazon import
+    const name = productData.name || productData.title || 'Unnamed Product';
+    const price = Number(productData.price) || Number(productData.currentPrice) || 0;
+    const originalPrice = Number(productData.originalPrice) || Number(productData.mrp) || price * 1.2;
+    
+    // Validate price
+    if (price === 0 || isNaN(price)) {
+      return res.status(400).json({ 
+        error: 'Valid price is required',
+        receivedData: { name, price: productData.price, originalPrice: productData.originalPrice }
+      });
+    }
+    
+    // Handle description (array or string)
+    let descriptionValue = productData.description;
     if (Array.isArray(descriptionValue)) {
-      descriptionValue = descriptionValue;
+      descriptionValue = descriptionValue.join(' ');
     } else if (typeof descriptionValue === 'string') {
       descriptionValue = descriptionValue;
     } else {
       descriptionValue = '';
     }
     
+    // Handle keyFeatures
+    let keyFeaturesValue = productData.keyFeatures;
+    if (typeof keyFeaturesValue === 'string') {
+      keyFeaturesValue = [keyFeaturesValue];
+    } else if (!Array.isArray(keyFeaturesValue)) {
+      keyFeaturesValue = [];
+    }
+    
+    // Handle images
+    let imagesValue = productData.images;
+    if (typeof imagesValue === 'string') {
+      imagesValue = [imagesValue];
+    } else if (!Array.isArray(imagesValue)) {
+      imagesValue = [];
+    }
+    
+    // Handle variations
+    let variationsValue = productData.variations;
+    if (!Array.isArray(variationsValue)) {
+      variationsValue = [];
+    }
+    
+    // Categories with fallback
+    const category = productData.category || productData.detectedCategory || productData.mainCategory || 'Uncategorized';
+    const mainCategory = productData.mainCategory || productData.detectedCategory || 'Other';
+    
     const product = new Product({
-      name: req.body.name,
-      brand: req.body.brand || '',
-      category: req.body.category,
-      mainCategory: req.body.mainCategory || '',
-      price: req.body.price,
-      originalPrice: req.body.originalPrice || req.body.price * 1.2,
-      stock: req.body.stock || 0,
-      images: req.body.images || [],
+      name: name,
+      brand: productData.brand || '',
+      category: category,
+      mainCategory: mainCategory,
+      price: price,
+      originalPrice: originalPrice,
+      stock: Number(productData.stock) || 10,
+      images: imagesValue,
       description: descriptionValue,
-      shortDescription: req.body.shortDescription || '',
-      keyFeatures: req.body.keyFeatures || [],
-      sizes: req.body.sizes || [],
-      colors: req.body.colors || [],
-      variants: req.body.variants || [],
-      variations: req.body.variations || [],
-      fabric: req.body.fabric || '',
-      material: req.body.material || '',
-      gender: req.body.gender || 'unisex',
-      weight: req.body.weight || '',
-      dimensions: req.body.dimensions || '',
-      ingredients: req.body.ingredients || '',
-      metaTitle: req.body.metaTitle || '',
-      metaDescription: req.body.metaDescription || '',
-      metaKeywords: req.body.metaKeywords || '',
-      slug: req.body.slug || '',
+      shortDescription: productData.shortDescription || '',
+      keyFeatures: keyFeaturesValue,
+      sizes: productData.sizes || [],
+      colors: productData.colors || [],
+      variants: productData.variants || [],
+      variations: variationsValue,
+      fabric: productData.fabric || '',
+      material: productData.material || '',
+      gender: productData.gender || 'unisex',
+      weight: productData.weight || '',
+      dimensions: productData.dimensions || '',
+      ingredients: productData.ingredients || '',
+      metaTitle: productData.metaTitle || name.substring(0, 60),
+      metaDescription: productData.metaDescription || descriptionValue.substring(0, 160),
+      metaKeywords: productData.metaKeywords || '',
+      slug: productData.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 100),
       isNew: true,
       status: 'active',
-      adminApproved: req.user?.role === 'admin'
+      adminApproved: req.user?.role === 'admin',
+      rating: productData.rating || 4.0,
+      reviewCount: productData.reviewCount || 0
     });
     
     await product.save();
     res.status(201).json({ success: true, product });
+    
   } catch (error) {
     console.error('Add product error:', error);
-    res.status(500).json({ error: error.message });
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: errors,
+        fields: Object.keys(error.errors)
+      });
+    }
+    
+    if (error.code === 11000) {
+      return res.status(409).json({ 
+        error: 'Product already exists', 
+        field: Object.keys(error.keyPattern)[0] 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -1634,9 +1700,18 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
     
     const scrapedData = await scrapeAmazonProduct(url);
     
+    // Ensure prices are numbers
+    const finalData = {
+      ...scrapedData,
+      price: Number(scrapedData.price) || 0,
+      originalPrice: Number(scrapedData.originalPrice) || Number(scrapedData.price) * 1.2 || 0,
+      stock: 10,
+      status: 'active'
+    };
+    
     res.json({
       success: true,
-      scraped: scrapedData,
+      scraped: finalData,
       message: 'Product details fetched successfully!'
     });
     
