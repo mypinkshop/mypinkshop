@@ -1,0 +1,101 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Install Capacitor
+      run: |
+        npm install @capacitor/core @capacitor/cli
+        npm install @capacitor/android
+        npm install @capacitor/splash-screen
+
+    - name: Build React app
+      run: npm run build
+
+    - name: Create capacitor.config.ts
+      run: |
+        cat > capacitor.config.ts << 'EOF'
+        import { CapacitorConfig } from '@capacitor/cli';
+        
+        const config: CapacitorConfig = {
+          appId: 'com.mypinkshop.app',
+          appName: 'MyPinkShop',
+          webDir: 'dist',
+          server: {
+            androidScheme: 'https'
+          },
+          plugins: {
+            SplashScreen: {
+              launchShowDuration: 2000,
+              launchAutoHide: true,
+              backgroundColor: "#ffffff",
+              androidSplashResourceName: "splash",
+              androidScaleType: "CENTER_CROP",
+              showSpinner: false,
+              splashFullScreen: true,
+              splashImmersive: true,
+            }
+          }
+        };
+        
+        export default config;
+        EOF
+
+    - name: Add Android platform
+      run: npx cap add android
+
+    - name: Sync Capacitor
+      run: npx cap sync
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Give permission to gradlew
+      run: chmod +x android/gradlew
+
+    - name: Build Debug APK
+      run: |
+        cd android
+        ./gradlew assembleDebug
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: MyPinkShop-Debug-APK
+        path: android/app/build/outputs/apk/debug/*.apk
+
+    - name: Build Release APK
+      run: |
+        cd android
+        ./gradlew assembleRelease
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: MyPinkShop-Release-APK
+        path: android/app/build/outputs/apk/release/*.apk
