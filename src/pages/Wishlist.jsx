@@ -18,11 +18,10 @@ function Wishlist() {
   const [searchQuery, setSearchQuery] = useState('');
   const [localWishlist, setLocalWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [storageKey, setStorageKey] = useState(0);
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Handle search
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -35,45 +34,78 @@ function Wishlist() {
     }
   };
 
-  // Load wishlist - Supports both logged-in and guest users
+  // Function to load guest wishlist
+  const loadGuestWishlist = () => {
+    try {
+      const saved = localStorage.getItem('guestWishlist');
+      console.log('Raw saved wishlist:', saved);
+      
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const validList = Array.isArray(parsed) ? parsed : [];
+        console.log('Loaded guest wishlist:', validList);
+        setLocalWishlist(validList);
+        return validList;
+      }
+    } catch (e) {
+      console.error('Error loading wishlist:', e);
+    }
+    setLocalWishlist([]);
+    return [];
+  };
+
+  // Listen for storage changes (when product added from other pages)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'guestWishlist') {
+        console.log('Storage changed, reloading wishlist...');
+        loadGuestWishlist();
+        setStorageKey(prev => prev + 1);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Custom event for same-tab updates
+    window.addEventListener('wishlistUpdated', () => {
+      console.log('Wishlist updated event received');
+      loadGuestWishlist();
+      setStorageKey(prev => prev + 1);
+    });
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('wishlistUpdated', () => {});
+    };
+  }, []);
+
+  // Load wishlist on mount and when user changes
   useEffect(() => {
     const loadWishlist = async () => {
       setLoading(true);
+      console.log('Loading wishlist - user:', user ? 'logged in' : 'guest', 'token:', !!token);
       
       if (user && token) {
-        // Logged in user
         setIsGuest(false);
         if (fetchWishlist) {
           await fetchWishlist();
         }
       } else {
-        // Guest user - load from localStorage
         setIsGuest(true);
-        const savedWishlist = localStorage.getItem('guestWishlist');
-        if (savedWishlist) {
-          try {
-            const parsed = JSON.parse(savedWishlist);
-            setLocalWishlist(Array.isArray(parsed) ? parsed : []);
-          } catch (e) {
-            setLocalWishlist([]);
-          }
-        } else {
-          setLocalWishlist([]);
-        }
+        loadGuestWishlist();
       }
       
       setLoading(false);
     };
     
     loadWishlist();
-  }, [user, token, fetchWishlist, refreshKey]);
+  }, [user, token, fetchWishlist, storageKey]);
 
-  // Save guest wishlist to localStorage
+  // Save guest wishlist to localStorage whenever it changes
   useEffect(() => {
-    if (isGuest && localWishlist.length >= 0) {
+    if (isGuest) {
+      console.log('Saving guest wishlist:', localWishlist);
       localStorage.setItem('guestWishlist', JSON.stringify(localWishlist));
-      // Update header count
-      window.dispatchEvent(new Event('storage'));
     }
   }, [localWishlist, isGuest]);
 
@@ -81,7 +113,6 @@ function Wishlist() {
     const productId = product.id || product._id;
     setMovingProduct(productId);
     
-    // Add to cart
     addToCart({
       id: productId,
       name: product.name,
@@ -93,7 +124,6 @@ function Wishlist() {
     
     toast.success('Added to cart!');
     
-    // Remove from wishlist after adding to cart
     if (user && token) {
       await removeFromWishlist(productId);
     } else {
@@ -109,23 +139,27 @@ function Wishlist() {
   };
 
   const handleRemoveItem = async (productId) => {
+    console.log('Removing product:', productId);
+    
     if (user && token) {
       await removeFromWishlist(productId);
       toast.success('Removed from wishlist');
     } else {
       setLocalWishlist(prev => {
         const newList = prev.filter(p => (p.id || p._id) !== productId);
+        console.log('New wishlist after remove:', newList);
         return newList;
       });
       toast.success('Removed from wishlist');
     }
   };
 
-  // Get current wishlist based on user type
-  const currentWishlist = user && token ? wishlist : localWishlist;
+  const currentWishlist = user && token ? (wishlist || []) : localWishlist;
   const wishlistCount = currentWishlist?.length || 0;
 
-  // SEO Schema
+  console.log('Rendering - currentWishlist:', currentWishlist);
+  console.log('Wishlist count:', wishlistCount);
+
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -179,10 +213,8 @@ function Wishlist() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner */}
         <OfferBanner />
 
-        {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -253,7 +285,6 @@ function Wishlist() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -269,14 +300,36 @@ function Wishlist() {
               <h2 className="text-2xl font-bold text-gray-800 mb-3">Your wishlist is empty</h2>
               <p className="text-gray-500 mb-6">Save your favorite items here!</p>
               {isGuest && (
-                <p className="text-sm text-gray-500 mb-4">
-                  💡 Your wishlist is saved locally. 
-                  <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
-                </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">
+                    💡 Your wishlist is saved locally. 
+                    <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
+                  </p>
+                  <button
+                    onClick={() => {
+                      const testProduct = {
+                        _id: "test123",
+                        id: "test123",
+                        name: "Test Product - Click Heart to Add Real Products",
+                        brand: "Test",
+                        price: 499,
+                        originalPrice: 799,
+                        images: ["https://m.media-amazon.com/images/I/31Rl0Y1BVtL._SL1500_.jpg"],
+                        rating: 4.5,
+                        badge: "TEST"
+                      };
+                      setLocalWishlist(prev => [...prev, testProduct]);
+                      toast.success('Test product added! Now remove it and add real ones.');
+                    }}
+                    className="text-sm bg-pink-100 text-pink-600 px-4 py-2 rounded-full hover:bg-pink-200 transition"
+                  >
+                    🧪 Add Test Product
+                  </button>
+                </div>
               )}
               <Link 
                 to="/shop" 
-                className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                className="inline-block mt-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
               >
                 Start Shopping →
               </Link>
@@ -393,7 +446,6 @@ function Wishlist() {
           </div>
         )}
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
