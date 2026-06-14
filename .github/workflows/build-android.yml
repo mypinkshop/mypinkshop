@@ -1,10 +1,9 @@
-name: Build Android APK
+name: Build React Native Android APK
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -28,65 +27,92 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Install Capacitor
+    - name: Install React Native dependencies
       run: |
-        npm install @capacitor/core @capacitor/cli
-        npm install @capacitor/android
-        npm install @capacitor/splash-screen
+        npm install react-native
+        npm install @react-navigation/native @react-navigation/bottom-tabs
+        npm install react-native-screens react-native-safe-area-context
+        npm install react-native-vector-icons
+        npm install axios
+        npm install @react-native-async-storage/async-storage
 
-    - name: Build React app
-      run: npm run build
-
-    - name: Create capacitor.config.ts
+    - name: Create React Native entry file
       run: |
-        cat > capacitor.config.ts << 'EOF'
-        import { CapacitorConfig } from '@capacitor/cli';
-        
-        const config: CapacitorConfig = {
-          appId: 'com.mypinkshop.app',
-          appName: 'MyPinkShop',
-          webDir: 'dist',
-          server: {
-            androidScheme: 'https'
-          },
-          plugins: {
-            SplashScreen: {
-              launchShowDuration: 2000,
-              launchAutoHide: true,
-              backgroundColor: "#ffffff",
-              androidSplashResourceName: "splash",
-              androidScaleType: "CENTER_CROP",
-              showSpinner: false,
-              splashFullScreen: true,
-              splashImmersive: true,
-            }
-          }
-        };
-        
-        export default config;
+        cat > index.js << 'EOF'
+        import { AppRegistry } from 'react-native';
+        import App from './App';
+        import { name as appName } from './app.json';
+
+        AppRegistry.registerComponent(appName, () => App);
         EOF
 
-    - name: Add Android platform
-      run: npx cap add android
+    - name: Create App.js
+      run: |
+        cat > App.js << 'EOF'
+        import React from 'react';
+        import { View, Text, StyleSheet } from 'react-native';
 
-    - name: Sync Capacitor
-      run: npx cap sync
+        const App = () => {
+          return (
+            <View style={styles.container}>
+              <Text style={styles.title}>MyPinkShop</Text>
+              <Text style={styles.subtitle}>Coming Soon!</Text>
+            </View>
+          );
+        };
+
+        const styles = StyleSheet.create({
+          container: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#fdf2f8',
+          },
+          title: {
+            fontSize: 24,
+            fontWeight: 'bold',
+            color: '#ec4899',
+          },
+          subtitle: {
+            fontSize: 16,
+            color: '#666',
+            marginTop: 10,
+          },
+        });
+
+        export default App;
+        EOF
+
+    - name: Create app.json
+      run: |
+        cat > app.json << 'EOF'
+        {
+          "name": "MyPinkShop",
+          "displayName": "MyPinkShop"
+        }
+        EOF
+
+    - name: Create metro.config.js
+      run: |
+        cat > metro.config.js << 'EOF'
+        const { getDefaultConfig } = require('@react-native/metro-config');
+        const defaultConfig = getDefaultConfig(__dirname);
+        module.exports = defaultConfig;
+        EOF
 
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Give permission to gradlew
-      run: chmod +x android/gradlew
-
     - name: Build Debug APK
       run: |
         cd android
+        chmod +x gradlew
         ./gradlew assembleDebug
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: MyPinkShop-Debug-APK
+        name: MyPinkShop-Debug
         path: android/app/build/outputs/apk/debug/*.apk
 
     - name: Build Release APK
@@ -97,5 +123,5 @@ jobs:
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
-        name: MyPinkShop-Release-APK
+        name: MyPinkShop-Release
         path: android/app/build/outputs/apk/release/*.apk
