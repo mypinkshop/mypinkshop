@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import ReviewSection from '../components/ReviewSection';
 import Avatar from '../components/Avatar';
+import OfferBanner from '../components/OfferBanner';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -20,9 +21,9 @@ function ProductDetail() {
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
   const [addedToCart, setAddedToCart] = useState(false);
-  const [activeOffer, setActiveOffer] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [loadingRelated, setLoadingRelated] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedVariation, setSelectedVariation] = useState(null);
   const [selectedVariationId, setSelectedVariationId] = useState('');
@@ -35,18 +36,18 @@ function ProductDetail() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  useEffect(() => {
-    const loadActiveOffer = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/offers/active-offer`);
-        const data = await response.json();
-        setActiveOffer(data);
-      } catch (error) {
-        console.error('Error loading offer:', error);
-      }
-    };
-    loadActiveOffer();
-  }, []);
+  // Handle search
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   const fetchRelatedProducts = async (category) => {
     if (!category) return;
@@ -382,7 +383,7 @@ function ProductDetail() {
     return specs;
   };
 
-  // ✅ SEO: Generate Product Schema Markup - Fixed for reviewCount validation
+  // SEO: Generate Product Schema Markup
   const generateProductSchema = () => {
     if (!product) return null;
     
@@ -413,7 +414,6 @@ function ProductDetail() {
       }
     };
     
-    // ✅ Only add aggregateRating if rating > 0 AND reviewCount > 0
     if (product.rating > 0 && product.reviewCount > 0) {
       schema.aggregateRating = {
         "@type": "AggregateRating",
@@ -443,6 +443,7 @@ function ProductDetail() {
           <title>Product Not Found | MyPinkShop</title>
           <meta name="description" content="The product you're looking for does not exist or has been removed from our store." />
         </Helmet>
+        <OfferBanner />
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
             <div className="text-6xl mb-4">🔍</div>
@@ -500,19 +501,8 @@ function ProductDetail() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {activeOffer && activeOffer.isActive !== false && (
-          <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-3 px-4 text-center">
-            <p className="text-sm font-medium">
-              {activeOffer.description || activeOffer.title}
-              {activeOffer.discountValue && (
-                <span className="ml-2 inline-block bg-white/20 px-2 py-0.5 rounded-full text-xs">
-                  {activeOffer.discountType === 'percentage' ? `${activeOffer.discountValue}% OFF` : `₹${activeOffer.discountValue} OFF`}
-                  {activeOffer.minOrderValue > 0 && ` on ₹${activeOffer.minOrderValue}+`}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
+        {/* Dynamic Offer Banner - From Admin Panel */}
+        <OfferBanner />
 
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
@@ -532,10 +522,18 @@ function ProductDetail() {
                   <input 
                     type="text" 
                     placeholder="Search for products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
-                    onKeyPress={(e) => e.key === 'Enter' && navigate(`/shop?search=${e.target.value}`)}
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+                  <button 
+                    onClick={handleSearch}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                  >
+                    <span className="hidden sm:inline">Search</span>
+                    <span className="sm:hidden">🔍</span>
+                  </button>
                 </div>
               </div>
 
