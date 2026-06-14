@@ -1,15 +1,14 @@
 const mongoose = require('mongoose');
 
 const productSchema = new mongoose.Schema({
-  // ============ VENDOR INFO ============
+  // ============ VENDOR INFO (FIXED: Optional for Amazon Import) ============
   vendorId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
+    type: String,
+    default: 'admin',
   },
   vendorName: {
     type: String,
-    required: true,
+    default: 'MyPinkShop',
   },
 
   // ============ BASIC PRODUCT INFO ============
@@ -20,15 +19,14 @@ const productSchema = new mongoose.Schema({
   },
   brand: {
     type: String,
-    required: true,
+    default: '',
     trim: true,
   },
   
-  // ============ CATEGORIES (SEO Friendly) ============
+  // ============ CATEGORIES (FIXED: Not Required) ============
   mainCategory: {
     type: String,
-    enum: ['Skincare', 'Makeup', 'Hair', 'Clothing', 'Accessories'],
-    required: true,
+    default: 'Other',
   },
   subCategory: {
     type: String,
@@ -46,7 +44,7 @@ const productSchema = new mongoose.Schema({
   },
   originalPrice: {
     type: Number,
-    required: true,
+    default: 0,
   },
   discountPercent: {
     type: Number,
@@ -80,12 +78,11 @@ const productSchema = new mongoose.Schema({
   aboutThisItem: [{
     type: String,
     trim: true,
-  }], // Bullet points - max 8 items
-  
+  }],
   productHighlights: [{
     type: String,
     trim: true,
-  }], // Key features with checkmarks - max 10 items
+  }],
   
   // ============ SPECIFICATIONS TABLE ============
   productDetails: {
@@ -106,11 +103,11 @@ const productSchema = new mongoose.Schema({
     type: String,
   }],
 
-  // ============ VARIATIONS (Size, Color, Shade, Fragrance) ============
+  // ============ VARIATIONS ============
   variations: [{
     name: {
       type: String,
-      required: true,
+      default: '',
     },
     secondaryName: {
       type: String,
@@ -118,7 +115,7 @@ const productSchema = new mongoose.Schema({
     },
     price: {
       type: Number,
-      required: true,
+      default: 0,
     },
     stock: {
       type: Number,
@@ -137,11 +134,9 @@ const productSchema = new mongoose.Schema({
     default: false,
   },
 
-  // ============ PRODUCT SPECIFICATIONS (Category Specific) ============
-  // Skincare
+  // ============ SKINCARE (FIXED: No Enum) ============
   skinType: {
     type: String,
-    enum: ['all', 'oily', 'dry', 'combination', 'sensitive'],
     default: 'all',
   },
   concerns: [{
@@ -152,15 +147,13 @@ const productSchema = new mongoose.Schema({
     default: '',
   },
   
-  // Makeup
+  // ============ MAKEUP (FIXED: No Enum) ============
   finish: {
     type: String,
-    enum: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'],
     default: '',
   },
   coverage: {
     type: String,
-    enum: ['Light', 'Medium', 'Full', 'Sheer'],
     default: '',
   },
   shade: {
@@ -168,17 +161,16 @@ const productSchema = new mongoose.Schema({
     default: '',
   },
   
-  // Hair
+  // ============ HAIR (FIXED: No Enum) ============
   hairType: {
     type: String,
-    enum: ['all', 'oily', 'dry', 'normal', 'curly', 'wavy', 'straight'],
     default: 'all',
   },
   hairConcerns: [{
     type: String,
   }],
   
-  // Clothing & Accessories
+  // ============ CLOTHING (FIXED: No Enum) ============
   fabric: {
     type: String,
     default: '',
@@ -189,7 +181,6 @@ const productSchema = new mongoose.Schema({
   },
   gender: {
     type: String,
-    enum: ['unisex', 'men', 'women', 'kids'],
     default: 'unisex',
   },
 
@@ -218,7 +209,7 @@ const productSchema = new mongoose.Schema({
   // ============ RATINGS & REVIEWS ============
   rating: {
     type: Number,
-    default: 4.5,
+    default: 4.0,
     min: 0,
     max: 5,
   },
@@ -256,7 +247,6 @@ const productSchema = new mongoose.Schema({
   // ============ STATUS & VISIBILITY ============
   status: {
     type: String,
-    enum: ['active', 'inactive', 'draft', 'pending'],
     default: 'active',
   },
   featured: {
@@ -265,7 +255,7 @@ const productSchema = new mongoose.Schema({
   },
   adminApproved: {
     type: Boolean,
-    default: false,
+    default: true,
   },
 
   // ============ ANALYTICS ============
@@ -292,11 +282,12 @@ const productSchema = new mongoose.Schema({
 // ============ PRE-SAVE MIDDLEWARE ============
 productSchema.pre('save', function(next) {
   // Generate slug from name
-  if (this.name) {
+  if (this.name && !this.slug) {
     this.slug = this.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 100);
   }
   
   // Calculate discount percentage
@@ -315,8 +306,8 @@ productSchema.pre('save', function(next) {
   }
   
   // Generate meta title if not provided
-  if (!this.metaTitle && this.name && this.brand) {
-    this.metaTitle = `${this.name} - ${this.brand} | MyPinkShop`;
+  if (!this.metaTitle && this.name) {
+    this.metaTitle = `${this.name}${this.brand ? ` - ${this.brand}` : ''} | MyPinkShop`;
   }
   
   // Generate meta description if not provided
@@ -333,7 +324,7 @@ productSchema.pre('save', function(next) {
     "description": this.aboutThisItem && this.aboutThisItem.length > 0 ? this.aboutThisItem[0] : "",
     "brand": {
       "@type": "Brand",
-      "name": this.brand
+      "name": this.brand || "MyPinkShop"
     },
     "offers": {
       "@type": "Offer",
@@ -378,7 +369,7 @@ productSchema.index({ price: 1 });
 productSchema.index({ rating: -1 });
 productSchema.index({ createdAt: -1 });
 productSchema.index({ brand: 1 });
-productSchema.index({ name: 'text', brand: 'text', description: 'text' });
+productSchema.index({ name: 'text', brand: 'text' });
 
 // ============ STATIC METHODS ============
 productSchema.statics.findByCategory = function(category, limit = 20) {
