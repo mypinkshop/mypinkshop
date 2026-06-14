@@ -1,0 +1,31 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /skincare
+Allow: /makeup
+Allow: /hair
+Allow: /clothing
+Allow: /accessories
+Allow: /product/
+Allow: /contact
+Allow: /faqs
+Allow: /shipping-info
+Allow: /returns-policy
+Allow: /privacy
+Allow: /terms
+
+# Disallow admin and private pages
+Disallow: /admin/
+Disallow: /vendor/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /cart
+Disallow: /checkout
+Disallow: /profile
+Disallow: /my-orders
+Disallow: /wishlist
+
+# Sitemap location
+Sitemap: https://www.mypinkshop.com/sitemap.xml
