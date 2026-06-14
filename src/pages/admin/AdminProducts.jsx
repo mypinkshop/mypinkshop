@@ -30,7 +30,7 @@ function AdminProducts() {
     loadProducts();
   }, [navigate]);
 
-  // Load products from backend API
+  // Load products from backend API - FIXED for pagination
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -51,10 +51,13 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Failed to load products');
       
-      const data = await response.json();
+      let data = await response.json();
       
-      const approved = data.filter(p => p.adminApproved === true && p.status === 'active');
-      const pending = data.filter(p => p.adminApproved !== true);
+      // ✅ FIX: Handle both paginated and non-paginated response
+      const allProducts = data.products || data;
+      
+      const approved = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
+      const pending = allProducts.filter(p => p.adminApproved !== true);
       
       setProducts(approved);
       setPendingProducts(pending);
@@ -405,18 +408,15 @@ function AdminProducts() {
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 mb-6 overflow-hidden">
               <div className="p-4 border-b border-pink-100 flex flex-wrap justify-between items-center gap-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Search by name */}
                   <div className="relative">
                     <input type="text" placeholder="Search by name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-56 pl-9 pr-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white" />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
                   </div>
                   
-                  {/* Category filter */}
                   <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white">
                     {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
                   </select>
                   
-                  {/* Brand Filter */}
                   <div className="relative" style={{ zIndex: 60 }}>
                     <div className="flex items-center border border-pink-200 rounded-xl bg-white overflow-hidden">
                       <input
@@ -470,7 +470,6 @@ function AdminProducts() {
                     )}
                   </div>
                   
-                  {/* Stock status filter */}
                   <select value={filterStockStatus} onChange={(e) => setFilterStockStatus(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white">
                     <option value="all">All Stock</option>
                     <option value="instock">In Stock (&gt;10)</option>
@@ -478,7 +477,6 @@ function AdminProducts() {
                     <option value="outofstock">Out of Stock (0)</option>
                   </select>
                   
-                  {/* Clear all button */}
                   {(filterBrand !== 'all' || searchTerm || filterCategory !== 'all' || filterStockStatus !== 'all') && (
                     <button onClick={() => { setSearchTerm(''); setFilterCategory('all'); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className="px-3 py-2 text-sm text-pink-600 hover:bg-pink-50 rounded-xl transition">
                       Clear All ✕
@@ -531,7 +529,7 @@ function AdminProducts() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {product.images && product.images[0] ? (
-                              <img src={product.images[0]} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-pink-100 shadow-sm" />
+                              <img src={product.images[0]} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-pink-100 shadow-sm" loading="lazy" />
                             ) : (
                               <div className="w-10 h-10 bg-gradient-to-br from-pink-100 to-rose-100 rounded-xl flex items-center justify-center text-lg">✨</div>
                             )}
@@ -550,12 +548,12 @@ function AdminProducts() {
                         <td className="px-4 py-3 text-right font-bold text-pink-600">₹{product.price}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => updateStock(product._id, product.stock - 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">-</button>
+                            <button onClick={() => updateStock(product._id, (product.stock || 0) - 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">-</button>
                             <div className="flex flex-col items-center">
-                              {getStockBadge(product.stock)}
-                              <span className="text-xs text-gray-500 mt-1">{product.stock} units</span>
+                              {getStockBadge(product.stock || 0)}
+                              <span className="text-xs text-gray-500 mt-1">{product.stock || 0} units</span>
                             </div>
-                            <button onClick={() => updateStock(product._id, product.stock + 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">+</button>
+                            <button onClick={() => updateStock(product._id, (product.stock || 0) + 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">+</button>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
@@ -602,7 +600,7 @@ function AdminProducts() {
             <div className="p-5">
               <div className="flex items-center gap-3 mb-4">
                 {productToDelete.images && productToDelete.images[0] ? (
-                  <img src={productToDelete.images[0]} alt={productToDelete.name} className="w-12 h-12 rounded-xl object-cover border border-pink-100" />
+                  <img src={productToDelete.images[0]} alt={productToDelete.name} className="w-12 h-12 rounded-xl object-cover border border-pink-100" loading="lazy" />
                 ) : (
                   <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-rose-100 rounded-xl flex items-center justify-center text-xl">✨</div>
                 )}
