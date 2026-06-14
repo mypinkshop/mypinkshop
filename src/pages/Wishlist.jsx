@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useWishlist } from '../context/WishlistContext';
@@ -18,32 +18,22 @@ function Wishlist() {
   const [searchQuery, setSearchQuery] = useState('');
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
+  
+  // Use ref to prevent infinite loop
+  const isInitialMount = useRef(true);
 
-  // Main function to get wishlist data
+  // Function to get wishlist data
   const getWishlistData = () => {
     if (user && token) {
-      // Logged in user - get from context
-      const data = Array.isArray(wishlist) ? wishlist : [];
-      console.log('📦 Logged in wishlist from context:', data);
-      return data;
+      return Array.isArray(wishlist) ? wishlist : [];
     } else {
-      // Guest user - get from localStorage
       try {
         const saved = localStorage.getItem('guestWishlist');
-        console.log('📦 Raw guest wishlist from localStorage:', saved);
-        
         if (saved) {
-          let parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            console.log('✅ Parsed as array, length:', parsed.length);
-            return parsed;
-          } else if (parsed.items && Array.isArray(parsed.items)) {
-            console.log('✅ Parsed as items array, length:', parsed.items.length);
-            return parsed.items;
-          } else if (parsed.wishlist && Array.isArray(parsed.wishlist)) {
-            console.log('✅ Parsed as wishlist array, length:', parsed.wishlist.length);
-            return parsed.wishlist;
-          }
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+          if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
+          if (parsed.wishlist && Array.isArray(parsed.wishlist)) return parsed.wishlist;
         }
       } catch (e) {
         console.error('Error parsing wishlist:', e);
@@ -52,40 +42,43 @@ function Wishlist() {
     }
   };
 
-  // Load wishlist on mount and when dependencies change
+  // Load wishlist on mount only
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       
-      if (user && token) {
-        // Fetch fresh wishlist from API for logged in user
-        if (fetchWishlist) {
-          await fetchWishlist();
-        }
+      if (user && token && fetchWishlist) {
+        await fetchWishlist();
       }
       
       const data = getWishlistData();
-      console.log('🔄 Setting displayWishlist:', data);
       setDisplayWishlist(data);
       setIsGuest(!user || !token);
       setLoading(false);
     };
     
     loadData();
-  }, [user, token, wishlist]);
+  }, []); // Empty dependency array - runs only once on mount
 
-  // Listen for storage events (when product added from other tabs/pages)
+  // Update display when wishlist context changes (for logged in users)
+  useEffect(() => {
+    if (user && token && !isInitialMount.current) {
+      const data = getWishlistData();
+      setDisplayWishlist(data);
+    }
+    isInitialMount.current = false;
+  }, [wishlist, user, token]);
+
+  // Listen for storage events (for guest users)
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'guestWishlist') {
-        console.log('🔄 Storage changed, reloading wishlist...');
         const data = getWishlistData();
         setDisplayWishlist(data);
       }
     };
     
     const handleCustomEvent = () => {
-      console.log('🔄 Custom wishlist event received');
       const data = getWishlistData();
       setDisplayWishlist(data);
     };
@@ -97,14 +90,12 @@ function Wishlist() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('wishlistUpdated', handleCustomEvent);
     };
-  }, [user, token]);
+  }, []);
 
-  // Save to localStorage whenever guest wishlist changes
+  // Save to localStorage when guest wishlist changes
   useEffect(() => {
-    if (!user && !token) {
+    if (!user && !token && displayWishlist.length >= 0) {
       localStorage.setItem('guestWishlist', JSON.stringify(displayWishlist));
-      // Broadcast update to other components
-      window.dispatchEvent(new CustomEvent('wishlistUpdated', { detail: { count: displayWishlist.length } }));
     }
   }, [displayWishlist, user, token]);
 
@@ -160,9 +151,20 @@ function Wishlist() {
 
   const wishlistCount = displayWishlist.length;
 
-  console.log('🎯 RENDER FINAL - displayWishlist:', displayWishlist);
-  console.log('🎯 RENDER FINAL - count:', wishlistCount);
-  console.log('🎯 RENDER FINAL - isGuest:', isGuest);
+  // Force check localStorage on mount for debugging
+  useEffect(() => {
+    const saved = localStorage.getItem('guestWishlist');
+    console.log('🔍 Initial localStorage check:', saved);
+    if (saved && (!user || !token)) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log('✅ Found products in localStorage:', parsed.length);
+          setDisplayWishlist(parsed);
+        }
+      } catch(e) {}
+    }
+  }, []);
 
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
@@ -199,7 +201,7 @@ function Wishlist() {
     <>
       <Helmet>
         <title>My Wishlist - MyPinkShop | Save Your Favorite Items</title>
-        <meta name="description" content="View and manage your wishlist at MyPinkShop. Save your favorite skincare, makeup, clothing, and accessories for later." />
+        <meta name="description" content="View and manage your wishlist at MyPinkShop." />
         <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
