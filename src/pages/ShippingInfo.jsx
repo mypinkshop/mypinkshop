@@ -16,7 +16,6 @@ function ShippingInfo() {
   const [searchQuery, setSearchQuery] = useState('');
   const [notifyEmail, setNotifyEmail] = useState('');
 
-  // Handle search
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -54,7 +53,6 @@ function ShippingInfo() {
     { country: 'Australia', days: '8-12 days', charge: '₹1700', available: false },
   ];
 
-  // SEO Schema
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -75,18 +73,18 @@ function ShippingInfo() {
   return (
     <>
       <Helmet>
-        <title>Shipping Information - MyPinkShop | Free Shipping on ₹999+</title>
-        <meta name="description" content="Learn about MyPinkShop shipping policy, delivery times, shipping zones, and charges. Free shipping on orders above ₹999. Express delivery available. Track your order easily." />
+        <title>Shipping Information - MyPinkShop | Free Shipping on ₹499+</title>
+        <meta name="description" content="Learn about MyPinkShop shipping policy, delivery times, shipping zones, and charges. Free shipping on orders above ₹499. Express delivery available. Track your order easily." />
         <meta name="keywords" content="shipping information, delivery policy, shipping charges, free shipping, express delivery, order tracking, mypinkshop shipping" />
         <link rel="canonical" href="https://www.mypinkshop.com/shipping" />
         <meta property="og:title" content="Shipping Information - MyPinkShop" />
-        <meta property="og:description" content="Fast and reliable delivery across India. Free shipping on orders above ₹999. Track your order in real-time." />
+        <meta property="og:description" content="Fast and reliable delivery across India. Free shipping on orders above ₹499. Track your order in real-time." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/shipping" />
         <meta property="og:image" content="https://www.mypinkshop.com/og-shipping.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Shipping Information - MyPinkShop" />
-        <meta name="twitter:description" content="Fast delivery, free shipping on ₹999+. Track your order easily." />
+        <meta name="twitter:description" content="Fast delivery, free shipping on ₹499+. Track your order easily." />
         <meta name="twitter:image" content="https://www.mypinkshop.com/og-shipping.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
@@ -94,10 +92,8 @@ function ShippingInfo() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner */}
         <OfferBanner />
 
-        {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -158,7 +154,6 @@ function ShippingInfo() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -167,29 +162,23 @@ function ShippingInfo() {
           </div>
         </div>
 
-        {/* Hero Section */}
         <div className="bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100 py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <div className="text-6xl mb-4">🚚</div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">
-              Shipping Information
-            </h1>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-              Fast, reliable delivery across India with real-time tracking
-            </p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">Shipping Information</h1>
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto">Fast, reliable delivery across India with real-time tracking</p>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           
-          {/* Delivery Options Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center border border-pink-100 shadow-sm hover:shadow-md transition">
               <div className="text-4xl mb-3">🚚</div>
               <h3 className="text-lg font-bold text-gray-800 mb-2">Standard Delivery</h3>
               <p className="text-2xl font-bold text-pink-600 mb-1">₹40</p>
               <p className="text-sm text-gray-500">3-5 business days</p>
-              <p className="text-xs text-gray-400 mt-3">Free on orders above ₹999</p>
+              <p className="text-xs text-gray-400 mt-3">Free on orders above ₹499</p>
             </div>
             
             <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-6 text-center text-white shadow-lg transform scale-105">
@@ -204,12 +193,11 @@ function ShippingInfo() {
               <div className="text-4xl mb-3">🎁</div>
               <h3 className="text-lg font-bold text-gray-800 mb-2">Free Shipping</h3>
               <p className="text-2xl font-bold text-green-600 mb-1">₹0</p>
-              <p className="text-sm text-gray-500">On orders ₹999+</p>
+              <p className="text-sm text-gray-500">On orders ₹499+</p>
               <p className="text-xs text-gray-400 mt-3">Standard delivery only</p>
             </div>
           </div>
 
-          {/* Domestic/International Tabs */}
           <div className="mb-8">
             <div className="flex flex-wrap justify-center gap-2 sm:gap-4 border-b border-pink-200">
               <button
@@ -235,10 +223,8 @@ function ShippingInfo() {
             </div>
           </div>
 
-          {/* Domestic Shipping Content */}
           {activeTab === 'domestic' && (
             <>
-              {/* Shipping Zones Table */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden mb-8">
                 <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 sm:px-6 py-4 border-b border-pink-100">
                   <h2 className="text-lg font-semibold text-gray-800">Shipping Zones & Delivery Times</h2>
@@ -268,7 +254,6 @@ function ShippingInfo() {
                 </div>
               </div>
 
-              {/* Order Processing Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-pink-100">
                   <div className="flex items-center gap-3 mb-3">
@@ -297,7 +282,6 @@ function ShippingInfo() {
                 </div>
               </div>
 
-              {/* Shipping FAQs */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-pink-100">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <span>❓</span> Frequently Asked Questions
@@ -305,7 +289,7 @@ function ShippingInfo() {
                 <div className="space-y-4">
                   <div>
                     <h4 className="font-medium text-gray-800 mb-1">Do you offer free shipping?</h4>
-                    <p className="text-sm text-gray-600">Yes! Free standard shipping on all orders above ₹999. No coupon code needed.</p>
+                    <p className="text-sm text-gray-600">Yes! Free standard shipping on all orders above ₹499. No coupon code needed.</p>
                   </div>
                   <div>
                     <h4 className="font-medium text-gray-800 mb-1">Can I track my order?</h4>
@@ -324,7 +308,6 @@ function ShippingInfo() {
             </>
           )}
 
-          {/* International Shipping Content */}
           {activeTab === 'international' && (
             <>
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-8">
@@ -332,30 +315,15 @@ function ShippingInfo() {
                   <span className="text-2xl">🌍</span>
                   <div className="flex-1">
                     <h3 className="font-semibold text-amber-800 mb-1">Coming Soon!</h3>
-                    <p className="text-sm text-amber-700">
-                      We're working hard to bring MyPinkShop to international customers. International shipping will be available soon. 
-                      Subscribe to our newsletter to get notified when we launch internationally!
-                    </p>
+                    <p className="text-sm text-amber-700">We're working hard to bring MyPinkShop to international customers. International shipping will be available soon. Subscribe to our newsletter to get notified when we launch internationally!</p>
                     <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                      <input 
-                        type="email" 
-                        placeholder="Enter your email" 
-                        value={notifyEmail}
-                        onChange={(e) => setNotifyEmail(e.target.value)}
-                        className="px-4 py-2 border border-amber-300 rounded-lg bg-white text-sm flex-1"
-                      />
-                      <button 
-                        onClick={handleNotify}
-                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition"
-                      >
-                        Notify Me
-                      </button>
+                      <input type="email" placeholder="Enter your email" value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)} className="px-4 py-2 border border-amber-300 rounded-lg bg-white text-sm flex-1" />
+                      <button onClick={handleNotify} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition">Notify Me</button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* International Shipping Table Preview */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden">
                 <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 sm:px-6 py-4 border-b border-pink-100">
                   <h2 className="text-lg font-semibold text-gray-800">International Destinations (Coming Soon)</h2>
@@ -378,11 +346,9 @@ function ShippingInfo() {
                           <td className="px-4 sm:px-6 py-3 text-gray-600">{country.days}</td>
                           <td className="px-4 sm:px-6 py-3 text-gray-600">{country.charge}</td>
                           <td className="px-4 sm:px-6 py-3">
-                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">
-                              Coming Soon
-                            </span>
+                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Coming Soon</span>
                           </td>
-                        </table>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -391,7 +357,6 @@ function ShippingInfo() {
             </>
           )}
 
-          {/* Need Help Section */}
           <div className="mt-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-6 text-center text-white">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
@@ -399,24 +364,13 @@ function ShippingInfo() {
                 <p className="text-white/80 text-sm">Our support team is here to assist you</p>
               </div>
               <div className="flex gap-3">
-                <Link
-                  to="/contact"
-                  className="px-5 py-2 bg-white text-pink-600 rounded-xl font-medium hover:shadow-lg transition"
-                >
-                  Contact Support
-                </Link>
-                <Link
-                  to="/faqs"
-                  className="px-5 py-2 bg-white/20 border border-white/30 rounded-xl font-medium hover:bg-white/30 transition"
-                >
-                  View FAQs
-                </Link>
+                <Link to="/contact" className="px-5 py-2 bg-white text-pink-600 rounded-xl font-medium hover:shadow-lg transition">Contact Support</Link>
+                <Link to="/faqs" className="px-5 py-2 bg-white/20 border border-white/30 rounded-xl font-medium hover:bg-white/30 transition">View FAQs</Link>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -434,6 +388,7 @@ function ShippingInfo() {
                 <ul className="space-y-2 text-sm">
                   <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
                   <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
                   <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
                   <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
                 </ul>
