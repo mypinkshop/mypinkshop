@@ -627,19 +627,17 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// ========== FIXED PRODUCT CREATE ROUTE (AMAZON IMPORT COMPATIBLE) ==========
+// ========== FIXED PRODUCT CREATE ROUTE ==========
 app.post('/api/products', authMiddleware, async (req, res) => {
   try {
     await connectDB();
     
     const productData = req.body;
     
-    // Safe data extraction with fallbacks for Amazon import
     const name = productData.name || productData.title || 'Unnamed Product';
     const price = Number(productData.price) || Number(productData.currentPrice) || 0;
     const originalPrice = Number(productData.originalPrice) || Number(productData.mrp) || price * 1.2;
     
-    // Validate price
     if (price === 0 || isNaN(price)) {
       return res.status(400).json({ 
         error: 'Valid price is required',
@@ -647,7 +645,6 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       });
     }
     
-    // Handle description (array or string)
     let descriptionValue = productData.description;
     if (Array.isArray(descriptionValue)) {
       descriptionValue = descriptionValue.join(' ');
@@ -657,7 +654,6 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       descriptionValue = '';
     }
     
-    // Handle keyFeatures
     let keyFeaturesValue = productData.keyFeatures;
     if (typeof keyFeaturesValue === 'string') {
       keyFeaturesValue = [keyFeaturesValue];
@@ -665,7 +661,6 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       keyFeaturesValue = [];
     }
     
-    // Handle images
     let imagesValue = productData.images;
     if (typeof imagesValue === 'string') {
       imagesValue = [imagesValue];
@@ -673,13 +668,11 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       imagesValue = [];
     }
     
-    // Handle variations
     let variationsValue = productData.variations;
     if (!Array.isArray(variationsValue)) {
       variationsValue = [];
     }
     
-    // Categories with fallback
     const category = productData.category || productData.detectedCategory || productData.mainCategory || 'Uncategorized';
     const mainCategory = productData.mainCategory || productData.detectedCategory || 'Other';
     
@@ -1700,7 +1693,6 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
     
     const scrapedData = await scrapeAmazonProduct(url);
     
-    // Ensure prices are numbers
     const finalData = {
       ...scrapedData,
       price: Number(scrapedData.price) || 0,
@@ -1721,10 +1713,9 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== SEO: XML SITEMAP (FIXED - Using /api/sitemap.xml) ==========
+// ========== SEO: XML SITEMAP ==========
 const { generateSitemap } = require('./sitemap');
 
-// ✅ FIXED: Changed from /sitemap.xml to /api/sitemap.xml
 app.get('/api/sitemap.xml', async (req, res) => {
   try {
     const sitemap = await generateSitemap();
