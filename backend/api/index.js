@@ -1721,10 +1721,11 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== SEO: XML SITEMAP ==========
+// ========== SEO: XML SITEMAP (FIXED - Using /api/sitemap.xml) ==========
 const { generateSitemap } = require('./sitemap');
 
-app.get('/sitemap.xml', async (req, res) => {
+// ✅ FIXED: Changed from /sitemap.xml to /api/sitemap.xml
+app.get('/api/sitemap.xml', async (req, res) => {
   try {
     const sitemap = await generateSitemap();
     res.header('Content-Type', 'application/xml');
