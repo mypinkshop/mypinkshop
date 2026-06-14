@@ -1721,6 +1721,20 @@ app.post('/api/import/amazon', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== SEO: XML SITEMAP ==========
+const { generateSitemap } = require('./sitemap');
+
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    const sitemap = await generateSitemap();
+    res.header('Content-Type', 'application/xml');
+    res.send(sitemap);
+  } catch (error) {
+    console.error('Sitemap error:', error);
+    res.status(500).send('Error generating sitemap');
+  }
+});
+
 // ========== ERROR HANDLING ==========
 app.use((err, req, res, next) => {
   console.error(err.stack);
