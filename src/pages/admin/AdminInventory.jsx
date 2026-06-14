@@ -37,9 +37,12 @@ function AdminInventory() {
         throw new Error('Failed to load products');
       }
       
-      const data = await response.json();
+      let data = await response.json();
       
-      const productsWithStatus = data.map(product => {
+      // ✅ FIX: Handle both paginated and non-paginated response
+      const allProducts = data.products || data;
+      
+      const productsWithStatus = allProducts.map(product => {
         let status = 'active';
         const stock = product.stock || 0;
         if (stock === 0) status = 'outofstock';
@@ -366,6 +369,7 @@ function AdminInventory() {
                                 src={product.images[0]} 
                                 alt={product.name} 
                                 className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl object-cover border border-pink-100 shadow-sm"
+                                loading="lazy"
                               />
                             ) : (
                               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-pink-100 to-rose-100 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-lg">
@@ -454,7 +458,7 @@ function AdminInventory() {
             <div className="p-4 sm:p-5">
               <div className="flex items-center gap-3 mb-4">
                 {productToDelete.images && productToDelete.images[0] ? (
-                  <img src={productToDelete.images[0]} alt={productToDelete.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl object-cover border border-pink-100" />
+                  <img src={productToDelete.images[0]} alt={productToDelete.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl object-cover border border-pink-100" loading="lazy" />
                 ) : (
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-pink-100 to-rose-100 rounded-lg sm:rounded-xl flex items-center justify-center text-lg sm:text-xl">✨</div>
                 )}
