@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -6,50 +6,183 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
-// Product Card Component
-const ProductCard = ({ product, addToCart, isInWishlist }) => {
-  const [imgError, setImgError] = useState(false);
-  const [addedToCart, setAddedToCart] = useState(false);
+// Optimized Product Card Component
+const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
   const navigate = useNavigate();
+  const [isAdded, setIsAdded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const handleButtonClick = () => {
-    if (addedToCart) {
-      navigate('/cart');
+  // Optimize image URL - smaller size for faster loading
+  const getOptimizedImage = (url) => {
+    if (!url) return null;
+    if (url.includes('amazon') || url.includes('media-amazon')) {
+      return url.replace('_SL1500_.jpg', '_SL500_.jpg').replace('_SL1500_', '_SL500_');
+    }
+    return url;
+  };
+
+  useEffect(() => {
+    const checkWishlist = () => {
+      if (user) {
+        setIsWishlisted(isInWishlist(product._id || product.id));
+      } else {
+        const saved = localStorage.getItem('guestWishlist');
+        if (saved) {
+          try {
+            const wishlist = JSON.parse(saved);
+            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
+            setIsWishlisted(exists);
+          } catch(e) {}
+        }
+      }
+    };
+    checkWishlist();
+    
+    const handleUpdate = () => {
+      if (!user) {
+        const saved = localStorage.getItem('guestWishlist');
+        if (saved) {
+          try {
+            const wishlist = JSON.parse(saved);
+            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
+            setIsWishlisted(exists);
+          } catch(e) {}
+        }
+      } else {
+        setIsWishlisted(isInWishlist(product._id || product.id));
+      }
+    };
+    
+    window.addEventListener('wishlistUpdated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, [product, user, isInWishlist]);
+
+  const handleAddToCart = () => {
+    addToCart({
+      id: product._id || product.id,
+      name: product.name,
+      price: product.price,
+      quantity: 1,
+      image: product.images?.[0],
+      stock: product.stock
+    });
+    setIsAdded(true);
+    toast.success('Added to cart!');
+    setTimeout(() => setIsAdded(false), 2000);
+  };
+
+  const handleGoToCart = () => {
+    navigate('/cart');
+  };
+
+  const handleWishlistToggle = () => {
+    const productId = product._id || product.id;
+    
+    if (user) {
+      if (isWishlisted) {
+        removeFromWishlist(productId);
+        setIsWishlisted(false);
+        toast.success('Removed from wishlist');
+      } else {
+        addToWishlist(product);
+        setIsWishlisted(true);
+        toast.success('Added to wishlist');
+      }
     } else {
-      addToCart(product);
-      setAddedToCart(true);
+      const productData = {
+        _id: productId,
+        id: productId,
+        name: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        images: product.images,
+        rating: product.rating,
+        brand: product.brand,
+        badge: product.badge,
+        isNew: product.isNew,
+        stock: product.stock,
+        emoji: product.emoji
+      };
+      
+      let wishlist = [];
+      const saved = localStorage.getItem('guestWishlist');
+      if (saved) {
+        try {
+          wishlist = JSON.parse(saved);
+          if (!Array.isArray(wishlist)) wishlist = [];
+        } catch(e) { wishlist = []; }
+      }
+      
+      const exists = wishlist.some(item => (item._id === productId || item.id === productId));
+      
+      if (!exists) {
+        wishlist.push(productData);
+        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
+        setIsWishlisted(true);
+        toast.success('Added to wishlist! 🤍');
+      } else {
+        wishlist = wishlist.filter(item => (item._id !== productId && item.id !== productId));
+        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
+        setIsWishlisted(false);
+        toast.success('Removed from wishlist');
+      }
+      
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     }
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-pink-100">
-      <Link to={`/product/${product._id}`}>
+    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-pink-100">
+      <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+          {!imageLoaded && !imgError && (
+            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+          )}
+          
           {product.images && product.images[0] && !imgError ? (
             <img 
-              src={product.images[0]} 
+              src={getOptimizedImage(product.images[0])} 
               alt={product.name} 
-              className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+              className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
+              onLoad={() => setImageLoaded(true)}
               loading="lazy"
               decoding="async"
-              width="400"
-              height="400"
-              style={{ aspectRatio: '1/1' }}
+              width="300"
+              height="300"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-500">
+            <div className="w-full h-full flex items-center justify-center text-5xl sm:text-6xl">
               {product.emoji || '✨'}
             </div>
           )}
-          {product.badge && <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">{product.badge}</span>}
-          {product.isNew && <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">NEW</span>}
+          {product.badge && (
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+              {product.badge}
+            </span>
+          )}
+          {product.isNew && (
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
+              NEW
+            </span>
+          )}
         </div>
       </Link>
       <div className="p-4">
-        <Link to={`/product/${product._id}`}>
-          <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-pink-500 transition">{product.name}</h3>
+        <Link to={`/product/${product._id || product.id}`}>
+          <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-1 hover:text-pink-500 transition">
+            {product.name}
+          </h3>
         </Link>
         <div className="flex items-center gap-1 mb-2">
           <div className="flex text-yellow-400 text-sm">
@@ -61,19 +194,38 @@ const ProductCard = ({ product, addToCart, isInWishlist }) => {
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
           {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+            <>
+              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+              <span className="text-xs text-green-500">
+                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
+              </span>
+            </>
           )}
         </div>
-        <button 
-          onClick={handleButtonClick}
-          className={`w-full py-2 rounded-full text-sm font-medium transition-all transform hover:-translate-y-0.5 ${
-            addedToCart 
-              ? 'bg-green-500 text-white hover:bg-green-600' 
-              : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
-          }`}
-        >
-          {addedToCart ? '✓ Go to Cart' : 'Add to Cart'}
-        </button>
+        <div className="flex gap-2">
+          {isAdded ? (
+            <button 
+              onClick={handleGoToCart}
+              className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
+            >
+              ✓ Go to Cart
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddToCart}
+              className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg"
+            >
+              Add to Cart
+            </button>
+          )}
+          
+          <button 
+            onClick={handleWishlistToggle}
+            className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50"
+          >
+            {isWishlisted ? '❤️' : '🤍'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -83,77 +235,43 @@ function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { wishlistCount, isInWishlist } = useWishlist();
+  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fixed target end time
-  const getTargetEndTime = () => {
-    const endTime = localStorage.getItem('dealEndTime');
-    const now = new Date();
-    
-    if (endTime) {
-      const parsedEndTime = new Date(parseInt(endTime));
-      if (parsedEndTime > now) {
-        return parsedEndTime;
-      }
-    }
-    
-    const newEndTime = new Date();
-    newEndTime.setHours(23, 59, 59, 999);
-    localStorage.setItem('dealEndTime', newEndTime.getTime());
-    return newEndTime;
-  };
+  const API_URL = 'https://api.mypinkshop.com';
 
-  const [targetEndTime] = useState(getTargetEndTime());
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
-
-  useEffect(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      const difference = targetEndTime - now;
-      
-      if (difference <= 0) {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(23, 59, 59, 999);
-        localStorage.setItem('dealEndTime', tomorrow.getTime());
-        window.location.reload();
-        return { hours: 0, minutes: 0, seconds: 0 };
-      }
-      
-      return {
-        hours: Math.floor(difference / (1000 * 60 * 60)),
-        minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-        seconds: Math.floor((difference % (1000 * 60)) / 1000)
-      };
-    };
-    
-    setTimeLeft(calculateTimeLeft());
-    
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [targetEndTime]);
-
-  // Load products from backend API
+  // Load products with caching
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const API_URL = 'https://api.mypinkshop.com';
-        const response = await fetch(`${API_URL}/api/products`);
+        setLoading(true);
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        // Check cache first
+        const cached = sessionStorage.getItem('products_cache');
+        const cacheTime = sessionStorage.getItem('products_cache_time');
+        
+        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
+          const data = JSON.parse(cached);
+          const productsArray = data.products || data;
+          setProducts(productsArray);
+          setLoading(false);
+          return;
         }
         
-        const data = await response.json();
+        const response = await fetch(`${API_URL}/api/products`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        let data = await response.json();
         const productsArray = data.products || data;
+        
+        // Save to cache
+        sessionStorage.setItem('products_cache', JSON.stringify(data));
+        sessionStorage.setItem('products_cache_time', Date.now().toString());
+        
         setProducts(productsArray);
       } catch (error) {
         console.error("Error loading products:", error);
@@ -165,19 +283,25 @@ function Home() {
     loadProducts();
   }, []);
 
-  // Load banners from backend API
+  // Load banners with caching
   useEffect(() => {
     const loadBanners = async () => {
       try {
-        const API_URL = 'https://api.mypinkshop.com';
-        const response = await fetch(`${API_URL}/api/banners/active`);
+        const cached = sessionStorage.getItem('banners_cache');
+        const cacheTime = sessionStorage.getItem('banners_cache_time');
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 120000) {
+          setBanners(JSON.parse(cached));
+          return;
         }
+        
+        const response = await fetch(`${API_URL}/api/banners/active`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
         setBanners(data);
+        sessionStorage.setItem('banners_cache', JSON.stringify(data));
+        sessionStorage.setItem('banners_cache_time', Date.now().toString());
       } catch (error) {
         console.error("Error loading banners:", error);
         setBanners([]);
@@ -207,33 +331,48 @@ function Home() {
     }
   };
 
-  const dealsOfDay = products.filter(p => p.originalPrice && p.originalPrice > p.price).slice(0, 4);
-  const bestsellers = [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4);
-  const newArrivals = products.filter(p => p.isNew).length > 0 
-    ? products.filter(p => p.isNew).slice(0, 4)
-    : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4);
+  // Optimized data slices using useMemo
+  const dealsOfDay = useMemo(() => 
+    products.filter(p => p.originalPrice && p.originalPrice > p.price).slice(0, 4), 
+    [products]
+  );
   
-  const skincareProducts = products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4);
-  const makeupProducts = products.filter(p => p.mainCategory === 'Makeup' || p.category === 'Makeup').slice(0, 4);
-  const hairProducts = products.filter(p => p.mainCategory === 'Hair' || p.category === 'Hair').slice(0, 4);
-  const clothingProducts = products.filter(p => p.mainCategory === 'Clothing' || p.category === 'Clothing').slice(0, 4);
-  const accessoriesProducts = products.filter(p => p.mainCategory === 'Accessories' || p.category === 'Accessories').slice(0, 4);
-
-  const categorySections = [
-    { name: 'Skincare', products: skincareProducts, viewAllLink: '/skincare', icon: '🧴' },
-    { name: 'Makeup', products: makeupProducts, viewAllLink: '/makeup', icon: '💄' },
-    { name: 'Hair Care', products: hairProducts, viewAllLink: '/hair', icon: '💇‍♀️' },
-    { name: 'Clothing', products: clothingProducts, viewAllLink: '/clothing', icon: '👗' },
-    { name: 'Accessories', products: accessoriesProducts, viewAllLink: '/accessories', icon: '👜' },
-  ];
-
-  const categories = [
-    { name: 'Skincare', image: '🧴', link: '/skincare' },
-    { name: 'Makeup', image: '💄', link: '/makeup' },
-    { name: 'Hair', image: '💇‍♀️', link: '/hair' },
-    { name: 'Clothing', image: '👗', link: '/clothing' },
-    { name: 'Accessories', image: '👜', link: '/accessories' },
-  ];
+  const bestsellers = useMemo(() => 
+    [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4), 
+    [products]
+  );
+  
+  const newArrivals = useMemo(() => 
+    products.filter(p => p.isNew).length > 0 
+      ? products.filter(p => p.isNew).slice(0, 4)
+      : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4), 
+    [products]
+  );
+  
+  const skincareProducts = useMemo(() => 
+    products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4), 
+    [products]
+  );
+  
+  const makeupProducts = useMemo(() => 
+    products.filter(p => p.mainCategory === 'Makeup' || p.category === 'Makeup').slice(0, 4), 
+    [products]
+  );
+  
+  const hairProducts = useMemo(() => 
+    products.filter(p => p.mainCategory === 'Hair' || p.category === 'Hair').slice(0, 4), 
+    [products]
+  );
+  
+  const clothingProducts = useMemo(() => 
+    products.filter(p => p.mainCategory === 'Clothing' || p.category === 'Clothing').slice(0, 4), 
+    [products]
+  );
+  
+  const accessoriesProducts = useMemo(() => 
+    products.filter(p => p.mainCategory === 'Accessories' || p.category === 'Accessories').slice(0, 4), 
+    [products]
+  );
 
   const navLinks = [
     { name: 'All', link: '/shop' },
@@ -245,6 +384,14 @@ function Home() {
     { name: 'Sale 🔥', link: '/shop?offer=sale' },
     { name: 'New Arrivals', link: '/shop?sort=newest' },
     { name: 'Bestsellers', link: '/shop?sort=bestseller' },
+  ];
+
+  const categories = [
+    { name: 'Skincare', image: '🧴', link: '/skincare' },
+    { name: 'Makeup', image: '💄', link: '/makeup' },
+    { name: 'Hair', image: '💇‍♀️', link: '/hair' },
+    { name: 'Clothing', image: '👗', link: '/clothing' },
+    { name: 'Accessories', image: '👜', link: '/accessories' },
   ];
 
   if (loading) {
@@ -262,40 +409,8 @@ function Home() {
     <>
       <Helmet>
         <title>MyPinkShop - Best Online Shopping for Skincare, Makeup & Fashion</title>
-        <meta name="description" content="Shop the latest skincare, makeup, hair care, clothing, and accessories at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available. Join the Pink Club!" />
-        <meta name="keywords" content="online shopping, skincare, makeup, hair care, clothing, accessories, beauty products, fashion, MyPinkShop" />
+        <meta name="description" content="Shop the latest skincare, makeup, hair care, clothing, and accessories at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available." />
         <link rel="canonical" href="https://www.mypinkshop.com" />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com" />
-        <meta property="og:title" content="MyPinkShop - Best Online Shopping for Skincare, Makeup & Fashion" />
-        <meta property="og:description" content="Shop the latest skincare, makeup, hair care, clothing, and accessories. Best prices, free shipping, COD available." />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-image.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="MyPinkShop - Best Online Shopping" />
-        <meta name="twitter:description" content="Shop skincare, makeup, clothing & accessories. Free shipping on orders above ₹499." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-image.jpg" />
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "WebSite",
-            "name": "MyPinkShop",
-            "url": "https://www.mypinkshop.com",
-            "potentialAction": {
-              "@type": "SearchAction",
-              "target": "https://www.mypinkshop.com/shop?search={search_term_string}",
-              "query-input": "required name=search_term_string"
-            }
-          })}
-        </script>
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            "name": "MyPinkShop",
-            "url": "https://www.mypinkshop.com",
-            "logo": "https://www.mypinkshop.com/logo.png"
-          })}
-        </script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -320,7 +435,7 @@ function Home() {
                 <div className="relative">
                   <input 
                     type="text" 
-                    placeholder="Search for products, brands and more..."
+                    placeholder="Search for products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
@@ -379,7 +494,7 @@ function Home() {
         {/* Hero Carousel */}
         {banners.length > 0 ? (
           <div className="relative overflow-hidden group">
-            <div className="flex transition-transform duration-700 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
+            <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
               {banners.map((banner, idx) => (
                 <Link key={banner.id} to={banner.link} className="w-full flex-shrink-0">
                   <div className="relative">
@@ -389,23 +504,23 @@ function Home() {
                         alt={banner.title}
                         loading={idx === 0 ? "eager" : "lazy"}
                         decoding="async"
-                        className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] object-cover"
+                        className="w-full h-[250px] sm:h-[350px] md:h-[450px] object-cover"
                       />
                     ) : (
-                      <div className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] bg-gradient-to-r from-pink-400 to-rose-400 flex items-center justify-center">
+                      <div className="w-full h-[250px] sm:h-[350px] md:h-[450px] bg-gradient-to-r from-pink-400 to-rose-400 flex items-center justify-center">
                         <div className="text-center text-white">
                           <span className="text-6xl mb-4 block">🌸</span>
-                          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold">{banner.title}</h2>
+                          <h2 className="text-3xl sm:text-4xl font-bold">{banner.title}</h2>
                         </div>
                       </div>
                     )}
                     {banner.showTextOverlay !== false && (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
-                        <div className="text-center text-white px-4 animate-fade-in-up">
-                          {banner.title && <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-2 drop-shadow-lg">{banner.title}</h2>}
-                          {banner.subtitle && <p className="text-base sm:text-lg md:text-xl mb-4 drop-shadow">{banner.subtitle}</p>}
+                        <div className="text-center text-white px-4">
+                          {banner.title && <h2 className="text-2xl sm:text-4xl font-bold mb-2 drop-shadow-lg">{banner.title}</h2>}
+                          {banner.subtitle && <p className="text-sm sm:text-lg mb-4 drop-shadow">{banner.subtitle}</p>}
                           {banner.buttonText && (
-                            <button className="bg-white text-pink-600 px-6 sm:px-8 py-2 sm:py-3 rounded-full font-semibold hover:scale-105 transition-all shadow-lg">
+                            <button className="bg-white text-pink-600 px-6 py-2 rounded-full font-semibold hover:scale-105 transition-all shadow-lg">
                               {banner.buttonText}
                             </button>
                           )}
@@ -420,10 +535,10 @@ function Home() {
             {banners.length > 1 && (
               <>
                 <button onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)} className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <button onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)} className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
               </>
             )}
@@ -437,37 +552,32 @@ function Home() {
             )}
           </div>
         ) : (
-          <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
-            <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="text-center lg:text-left">
-                  <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
-                  <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection. Up to 40% off + free gift with purchase.</p>
-                  <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 sm:px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all transform hover:-translate-y-1">Shop Now →</Link>
-                </div>
-                <div className="hidden lg:block text-center">
-                  <div className="text-8xl animate-bounce">🛍️</div>
-                </div>
+          <div className="bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200">
+            <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16">
+              <div className="text-center">
+                <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
+                <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
+                <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection.</p>
+                <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all">Shop Now →</Link>
               </div>
             </div>
           </div>
         )}
 
         {/* Categories Section */}
-        <section className="py-12 sm:py-16 lg:py-20">
+        <section className="py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-8 sm:mb-12">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Shop by Category</h2>
-              <p className="text-gray-500 text-sm sm:text-base">Discover your favorite products</p>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Shop by Category</h2>
+              <p className="text-gray-500">Discover your favorite products</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
               {categories.map((cat, idx) => (
-                <Link key={idx} to={cat.link} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-100 to-rose-100 p-6 text-center hover:shadow-xl transition-all hover:-translate-y-2">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition shadow-md">
+                <Link key={idx} to={cat.link} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-100 to-rose-100 p-6 text-center hover:shadow-xl transition-all hover:-translate-y-1">
+                  <div className="w-16 h-16 mx-auto bg-white/80 rounded-full flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition shadow-md">
                     {cat.image}
                   </div>
-                  <h3 className="font-semibold text-gray-800 text-sm sm:text-base">{cat.name}</h3>
+                  <h3 className="font-semibold text-gray-800 text-sm">{cat.name}</h3>
                   <p className="text-xs text-gray-500 mt-1">Shop Now →</p>
                 </Link>
               ))}
@@ -477,33 +587,23 @@ function Home() {
 
         {/* Deals of the Day */}
         {dealsOfDay.length > 0 && (
-          <section className="py-12 sm:py-16 bg-white">
+          <section className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">⏰ Deals of the Day</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 text-sm">Ends in:</span>
-                  <div className="flex gap-1">
-                    <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
-                      <span className="text-lg sm:text-xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
-                      <span className="text-xs block">Hours</span>
-                    </div>
-                    <span className="text-gray-800 text-xl">:</span>
-                    <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
-                      <span className="text-lg sm:text-xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                      <span className="text-xs block">Mins</span>
-                    </div>
-                    <span className="text-gray-800 text-xl">:</span>
-                    <div className="bg-gray-900 text-white px-2 sm:px-3 py-1 rounded-lg text-center">
-                      <span className="text-lg sm:text-xl font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                      <span className="text-xs block">Secs</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">⏰ Deals of the Day</h2>
+                <Link to="/shop?offer=sale" className="text-pink-500 text-sm hover:underline">View All →</Link>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {dealsOfDay.map(product => (
-                  <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
                 ))}
               </div>
             </div>
@@ -520,7 +620,15 @@ function Home() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {bestsellers.map(product => (
-                  <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
                 ))}
               </div>
             </div>
@@ -537,41 +645,111 @@ function Home() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {newArrivals.map(product => (
-                  <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
                 ))}
               </div>
             </div>
           </section>
         )}
 
-        {/* Category Wise Products */}
-        {categorySections.map((section, idx) => (
-          section.products.length > 0 && (
-            <section key={idx} className={`py-12 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center mb-6">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{section.icon}</span>
-                    <h2 className="text-2xl font-bold text-gray-800">{section.name}</h2>
-                  </div>
-                  <Link to={section.viewAllLink} className="text-pink-500 text-sm hover:underline">View All →</Link>
+        {/* Skincare Section */}
+        {skincareProducts.length > 0 && (
+          <section className="py-12 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🧴</span>
+                  <h2 className="text-2xl font-bold text-gray-800">Skincare</h2>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {section.products.map(product => (
-                    <ProductCard key={product._id} product={product} addToCart={addToCart} isInWishlist={isInWishlist(product._id)} />
-                  ))}
-                </div>
+                <Link to="/skincare" className="text-pink-500 text-sm hover:underline">View All →</Link>
               </div>
-            </section>
-          )
-        ))}
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {skincareProducts.map(product => (
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Makeup Section */}
+        {makeupProducts.length > 0 && (
+          <section className="py-12 bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">💄</span>
+                  <h2 className="text-2xl font-bold text-gray-800">Makeup</h2>
+                </div>
+                <Link to="/makeup" className="text-pink-500 text-sm hover:underline">View All →</Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {makeupProducts.map(product => (
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Hair Section */}
+        {hairProducts.length > 0 && (
+          <section className="py-12 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">💇‍♀️</span>
+                  <h2 className="text-2xl font-bold text-gray-800">Hair Care</h2>
+                </div>
+                <Link to="/hair" className="text-pink-500 text-sm hover:underline">View All →</Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {hairProducts.map(product => (
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Newsletter */}
         <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
           <div className="max-w-2xl mx-auto text-center px-4">
             <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
             <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
-            <form onSubmit={(e) => { e.preventDefault(); const email = e.target.email.value; if (email) { alert('Thanks for subscribing!'); e.target.reset(); } }} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+            <form onSubmit={(e) => { e.preventDefault(); const email = e.target.email.value; if (email) { toast.success('Thanks for subscribing!'); e.target.reset(); } }} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
               <input type="email" name="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" required />
               <button type="submit" className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105">Subscribe</button>
             </form>
@@ -606,15 +784,15 @@ function Home() {
                 <ul className="space-y-2 text-sm">
                   <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
                   <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
                   <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
                 </ul>
@@ -622,13 +800,12 @@ function Home() {
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
               <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
             </div>
           </div>
         </footer>
 
         <style>{`
-          @keyframes fade-in-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-          .animate-fade-in-up { animation: fade-in-up 0.6s ease-out; }
           .scrollbar-hide::-webkit-scrollbar { display: none; }
           .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
