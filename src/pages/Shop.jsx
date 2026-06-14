@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 
 // OPTIMIZED Product Card Component WITH FIXED WISHLIST
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
+  const navigate = useNavigate(); // ✅ FIXED - Added missing navigate
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
