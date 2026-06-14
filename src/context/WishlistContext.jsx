@@ -1,4 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
 const WishlistContext = createContext();
 
@@ -15,22 +16,25 @@ export const WishlistProvider = ({ children }) => {
     return localStorage.getItem('adminToken') || localStorage.getItem('token');
   };
 
+  const getUser = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
+  };
+
   // Load wishlist from localStorage and backend
   useEffect(() => {
     const loadWishlist = async () => {
       setLoading(true);
       
-      // First load from localStorage (for guest users)
-      const savedWishlist = localStorage.getItem('pinkWishlist');
-      if (savedWishlist) {
-        const parsed = JSON.parse(savedWishlist);
-        setWishlist(parsed);
-        setWishlistCount(parsed.length);
-      }
-      
-      // If user is logged in, sync with backend
       const token = getToken();
-      if (token) {
+      const user = getUser();
+      
+      if (token && user) {
+        // Logged in user - fetch from backend
         try {
           const response = await fetch(`${API_URL}/api/wishlist`, {
             headers: { 
@@ -41,26 +45,58 @@ export const WishlistProvider = ({ children }) => {
           
           if (response.ok) {
             const backendWishlist = await response.json();
-            if (backendWishlist.length > 0) {
-              setWishlist(backendWishlist);
-              setWishlistCount(backendWishlist.length);
-              localStorage.setItem('pinkWishlist', JSON.stringify(backendWishlist));
-            }
+            const wishlistData = Array.isArray(backendWishlist) ? backendWishlist : [];
+            setWishlist(wishlistData);
+            setWishlistCount(wishlistData.length);
+            // Also save to localStorage for consistency
+            localStorage.setItem('guestWishlist', JSON.stringify(wishlistData));
           } else if (response.status === 401) {
-            // Token expired or invalid, clear localStorage
-            localStorage.removeItem('pinkWishlist');
             localStorage.removeItem('adminToken');
             localStorage.removeItem('token');
+            // Load from localStorage as guest
+            loadGuestWishlist();
           }
         } catch (error) {
-          console.error('Error fetching wishlist from backend:', error);
+          console.error('Error fetching wishlist:', error);
+          loadGuestWishlist();
         }
+      } else {
+        // Guest user - load from localStorage
+        loadGuestWishlist();
       }
       
       setLoading(false);
     };
     
+    const loadGuestWishlist = () => {
+      const saved = localStorage.getItem('guestWishlist');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const wishlistData = Array.isArray(parsed) ? parsed : [];
+          setWishlist(wishlistData);
+          setWishlistCount(wishlistData.length);
+        } catch (e) {
+          setWishlist([]);
+          setWishlistCount(0);
+        }
+      } else {
+        setWishlist([]);
+        setWishlistCount(0);
+      }
+    };
+    
     loadWishlist();
+    
+    // Listen for storage changes (for sync across tabs)
+    const handleStorageChange = (e) => {
+      if (e.key === 'guestWishlist') {
+        loadGuestWishlist();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const addToWishlist = async (product) => {
@@ -68,7 +104,7 @@ export const WishlistProvider = ({ children }) => {
     
     // Check if already in wishlist
     if (wishlist.some(item => (item._id === productId || item.id === productId))) {
-      alert(`${product.name} is already in your wishlist ❤️`);
+      toast.error(`${product.name} is already in your wishlist ❤️`);
       return;
     }
     
@@ -76,18 +112,26 @@ export const WishlistProvider = ({ children }) => {
       _id: productId,
       id: productId,
       name: product.name,
-      price: product.price || product.sellingPrice,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      images: product.images,
       image: product.images?.[0] || product.image,
       brand: product.brand,
-      category: product.category,
-      originalPrice: product.originalPrice
+      rating: product.rating || 4,
+      stock: product.stock
     };
     
     // Update local state
     const newWishlist = [...wishlist, wishlistItem];
     setWishlist(newWishlist);
     setWishlistCount(newWishlist.length);
-    localStorage.setItem('pinkWishlist', JSON.stringify(newWishlist));
+    
+    // Save to localStorage (for guest and backup)
+    localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
+    
+    // Dispatch event for other components
+    window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+    window.dispatchEvent(new Event('storage'));
     
     // If user is logged in, save to backend
     const token = getToken();
@@ -110,14 +154,20 @@ export const WishlistProvider = ({ children }) => {
       }
     }
     
-    alert(`${product.name} added to wishlist ❤️`);
+    toast.success(`${product.name} added to wishlist ❤️`);
   };
 
   const removeFromWishlist = async (id) => {
     const newWishlist = wishlist.filter(item => (item._id !== id && item.id !== id));
     setWishlist(newWishlist);
     setWishlistCount(newWishlist.length);
-    localStorage.setItem('pinkWishlist', JSON.stringify(newWishlist));
+    
+    // Save to localStorage
+    localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
+    
+    // Dispatch event for other components
+    window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+    window.dispatchEvent(new Event('storage'));
     
     // If user is logged in, remove from backend
     const token = getToken();
@@ -136,18 +186,22 @@ export const WishlistProvider = ({ children }) => {
       }
     }
     
-    alert('Removed from wishlist');
+    toast.success('Removed from wishlist');
   };
 
   const isInWishlist = (id) => {
     return wishlist.some(item => (item._id === id || item.id === id));
   };
 
-  // 🔥 FIXED: Clear wishlist with correct URL
   const clearWishlist = async () => {
     setWishlist([]);
     setWishlistCount(0);
+    localStorage.removeItem('guestWishlist');
     localStorage.removeItem('pinkWishlist');
+    
+    // Dispatch event
+    window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+    window.dispatchEvent(new Event('storage'));
     
     const token = getToken();
     if (token) {
@@ -160,6 +214,8 @@ export const WishlistProvider = ({ children }) => {
         console.error('Error clearing wishlist:', error);
       }
     }
+    
+    toast.success('Wishlist cleared');
   };
 
   return (
