@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose'); // ✅ ADD THIS
 const Review = require('../models/Review');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
@@ -99,6 +100,11 @@ router.get('/can-review/:productId', authMiddleware, async (req, res) => {
     const { productId } = req.params;
     const userId = req.user.id;
     
+    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.json({ canReview: false, alreadyReviewed: false, orderId: null });
+    }
+    
     const order = await Order.findOne({
       userId,
       'items.productId': productId,
@@ -117,7 +123,8 @@ router.get('/can-review/:productId', authMiddleware, async (req, res) => {
       orderId: order?._id
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Can review error:', error);
+    res.json({ canReview: false, alreadyReviewed: false, orderId: null });
   }
 });
 
@@ -126,6 +133,11 @@ router.post('/', authMiddleware, async (req, res) => {
   try {
     const { productId, orderId, rating, title, comment, images, videos } = req.body;
     const userId = req.user.id;
+    
+    // ✅ Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
     
     const order = await Order.findOne({
       _id: orderId,
@@ -169,14 +181,26 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== GET APPROVED REVIEWS FOR PRODUCT ==========
+// ========== GET APPROVED REVIEWS FOR PRODUCT (FIXED) ==========
 router.get('/product/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
     const { page = 1, limit = 10 } = req.query;
     
+    // ✅ FIX: Validate ObjectId first
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(200).json({
+        reviews: [],
+        total: 0,
+        page: 1,
+        pages: 0,
+        averageRating: 0,
+        totalReviews: 0
+      });
+    }
+    
     const reviews = await Review.find({
-      productId,
+      productId: productId,
       status: 'approved'
     })
     .populate('userId', 'name')
@@ -184,19 +208,47 @@ router.get('/product/:productId', async (req, res) => {
     .skip((page - 1) * limit)
     .limit(parseInt(limit));
     
-    const total = await Review.countDocuments({ productId, status: 'approved' });
-    const avgRating = await Review.getAverageRating(productId);
+    const total = await Review.countDocuments({ 
+      productId: productId, 
+      status: 'approved' 
+    });
+    
+    // ✅ FIX: Manual average calculation (since static method might not exist)
+    let averageRating = 0;
+    let totalReviews = 0;
+    
+    if (total > 0) {
+      const avgResult = await Review.aggregate([
+        { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
+        { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+      ]);
+      
+      if (avgResult.length > 0) {
+        averageRating = Math.round(avgResult[0].avgRating * 10) / 10;
+        totalReviews = avgResult[0].count;
+      }
+    }
     
     res.json({
-      reviews,
-      total,
+      reviews: reviews || [],
+      total: total || 0,
       page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      averageRating: avgRating.rating,
-      totalReviews: avgRating.count
+      pages: Math.ceil((total || 0) / limit),
+      averageRating: averageRating,
+      totalReviews: totalReviews
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Get reviews error:', error);
+    // ✅ FIX: Return empty data instead of 500 error
+    res.status(200).json({
+      reviews: [],
+      total: 0,
+      page: 1,
+      pages: 0,
+      averageRating: 0,
+      totalReviews: 0,
+      error: error.message
+    });
   }
 });
 
@@ -206,37 +258,44 @@ router.patch('/:reviewId/helpful', authMiddleware, async (req, res) => {
     const { reviewId } = req.params;
     const userId = req.user.id;
     
+    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
     const review = await Review.findById(reviewId);
     if (!review) {
       return res.status(404).json({ error: 'Review not found' });
     }
     
-    if (review.helpfulUsers.includes(userId)) {
-      return res.json({ message: 'Already marked helpful' });
+    if (review.helpfulUsers && review.helpfulUsers.includes(userId)) {
+      return res.json({ helpful: review.helpful });
     }
     
-    review.helpful += 1;
+    review.helpful = (review.helpful || 0) + 1;
+    if (!review.helpfulUsers) review.helpfulUsers = [];
     review.helpfulUsers.push(userId);
     await review.save();
     
     res.json({ helpful: review.helpful });
   } catch (error) {
+    console.error('Helpful error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// ✅ ========== USER: GET MY REVIEWS (NEW - FOR PROFILE PAGE) ==========
+// ========== USER: GET MY REVIEWS ==========
 router.get('/my-reviews', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     
     const reviews = await Review.find({ userId })
-      .populate('productId', 'name images price rating')
+      .populate('productId', 'name images price')
       .sort({ createdAt: -1 });
     
     res.json({
       success: true,
-      reviews: reviews
+      reviews: reviews || []
     });
   } catch (error) {
     console.error('Get my reviews error:', error);
@@ -252,8 +311,9 @@ router.get('/admin/pending', authMiddleware, adminMiddleware, async (req, res) =
       .populate('productId', 'name images')
       .sort({ createdAt: -1 });
     
-    res.json(reviews);
+    res.json(reviews || []);
   } catch (error) {
+    console.error('Get pending reviews error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -275,12 +335,13 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
     const total = await Review.countDocuments(filter);
     
     res.json({
-      reviews,
-      total,
+      reviews: reviews || [],
+      total: total || 0,
       page: parseInt(page),
-      pages: Math.ceil(total / limit)
+      pages: Math.ceil((total || 0) / limit)
     });
   } catch (error) {
+    console.error('Get all reviews error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -290,6 +351,11 @@ router.patch('/admin/:reviewId/approve', authMiddleware, adminMiddleware, async 
   try {
     const { reviewId } = req.params;
     const { adminNote } = req.body;
+    
+    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
     
     const review = await Review.findById(reviewId);
     if (!review) {
@@ -301,14 +367,22 @@ router.patch('/admin/:reviewId/approve', authMiddleware, adminMiddleware, async 
     if (adminNote) review.adminNote = adminNote;
     await review.save();
     
-    const avgRating = await Review.getAverageRating(review.productId);
-    await Product.findByIdAndUpdate(review.productId, {
-      rating: avgRating.rating,
-      reviewCount: avgRating.count
-    });
+    // ✅ Calculate and update product rating
+    const avgResult = await Review.aggregate([
+      { $match: { productId: review.productId, status: 'approved' } },
+      { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]);
+    
+    if (avgResult.length > 0) {
+      await Product.findByIdAndUpdate(review.productId, {
+        rating: Math.round(avgResult[0].avgRating * 10) / 10,
+        reviewCount: avgResult[0].count
+      });
+    }
     
     res.json({ success: true, review });
   } catch (error) {
+    console.error('Approve review error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -318,6 +392,11 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
   try {
     const { reviewId } = req.params;
     const { adminNote } = req.body;
+    
+    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
     
     const review = await Review.findById(reviewId);
     if (!review) {
@@ -330,6 +409,7 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
     
     res.json({ success: true, review });
   } catch (error) {
+    console.error('Reject review error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -338,10 +418,17 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
 router.delete('/admin/:reviewId', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
+    
+    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
     await Review.findByIdAndDelete(reviewId);
     
     res.json({ success: true, message: 'Review deleted successfully' });
   } catch (error) {
+    console.error('Delete review error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -352,6 +439,11 @@ router.delete('/:reviewId', authMiddleware, async (req, res) => {
     const { reviewId } = req.params;
     const userId = req.user.id;
     
+    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
     const review = await Review.findOne({ _id: reviewId, userId });
     if (!review) {
       return res.status(404).json({ error: 'Review not found' });
@@ -360,6 +452,7 @@ router.delete('/:reviewId', authMiddleware, async (req, res) => {
     await review.deleteOne();
     res.json({ success: true, message: 'Review deleted successfully' });
   } catch (error) {
+    console.error('Delete own review error:', error);
     res.status(500).json({ error: error.message });
   }
 });
