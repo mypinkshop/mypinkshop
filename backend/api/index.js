@@ -607,6 +607,7 @@ app.get('/api/addresses', authMiddleware, async (req, res) => {
     const addresses = await Address.find({ userId: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
     res.json(addresses);
   } catch (error) {
+    console.error('GET addresses error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -614,7 +615,21 @@ app.get('/api/addresses', authMiddleware, async (req, res) => {
 // POST add address
 app.post('/api/addresses', authMiddleware, async (req, res) => {
   try {
+    console.log('Received address data:', req.body);
+    
     const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
+    
+    if (!name || !phone || !address || !city || !state || !pincode) {
+      return res.status(400).json({ error: 'All required fields must be filled' });
+    }
+    
+    if (phone.length < 10) {
+      return res.status(400).json({ error: 'Phone number must be at least 10 digits' });
+    }
+    
+    if (pincode.length < 6) {
+      return res.status(400).json({ error: 'Pincode must be at least 6 digits' });
+    }
     
     if (isDefault) {
       await Address.updateMany({ userId: req.user.id }, { isDefault: false });
@@ -625,7 +640,7 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
       name,
       phone,
       address,
-      landmark,
+      landmark: landmark || '',
       city,
       state,
       pincode,
@@ -635,8 +650,10 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
     });
     
     await newAddress.save();
+    console.log('Address saved:', newAddress);
     res.status(201).json(newAddress);
   } catch (error) {
+    console.error('POST address error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -645,12 +662,14 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
 app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
+    console.log('Updating address:', id, req.body);
     
     const addressDoc = await Address.findOne({ _id: id, userId: req.user.id });
     if (!addressDoc) {
       return res.status(404).json({ error: 'Address not found' });
     }
+    
+    const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
     
     if (isDefault) {
       await Address.updateMany({ userId: req.user.id }, { isDefault: false });
@@ -668,8 +687,10 @@ app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
     addressDoc.isDefault = isDefault || false;
     
     await addressDoc.save();
+    console.log('Address updated:', addressDoc);
     res.json(addressDoc);
   } catch (error) {
+    console.error('PUT address error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -678,12 +699,15 @@ app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
 app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Deleting address:', id);
+    
     const addressDoc = await Address.findOneAndDelete({ _id: id, userId: req.user.id });
     if (!addressDoc) {
       return res.status(404).json({ error: 'Address not found' });
     }
     res.json({ success: true, message: 'Address deleted' });
   } catch (error) {
+    console.error('DELETE address error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -692,6 +716,7 @@ app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
 app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Setting default address:', id);
     
     await Address.updateMany({ userId: req.user.id }, { isDefault: false });
     const addressDoc = await Address.findOneAndUpdate(
@@ -706,6 +731,7 @@ app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
     
     res.json(addressDoc);
   } catch (error) {
+    console.error('PATCH default error:', error);
     res.status(500).json({ error: error.message });
   }
 });
