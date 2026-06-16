@@ -210,6 +210,24 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
+// ========== ADDRESS SCHEMA ==========
+const addressSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  name: { type: String, required: true },
+  phone: { type: String, required: true },
+  address: { type: String, required: true },
+  landmark: { type: String, default: '' },
+  city: { type: String, required: true },
+  state: { type: String, required: true },
+  pincode: { type: String, required: true },
+  country: { type: String, default: 'India' },
+  type: { type: String, enum: ['Home', 'Work', 'Other'], default: 'Home' },
+  isDefault: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
+
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
@@ -580,6 +598,117 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
+
+// ========== ADDRESS ROUTES ==========
+
+// GET all addresses
+app.get('/api/addresses', authMiddleware, async (req, res) => {
+  try {
+    const addresses = await Address.find({ userId: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
+    res.json(addresses);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST add address
+app.post('/api/addresses', authMiddleware, async (req, res) => {
+  try {
+    const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
+    
+    if (isDefault) {
+      await Address.updateMany({ userId: req.user.id }, { isDefault: false });
+    }
+    
+    const newAddress = new Address({
+      userId: req.user.id,
+      name,
+      phone,
+      address,
+      landmark,
+      city,
+      state,
+      pincode,
+      country: country || 'India',
+      type: type || 'Home',
+      isDefault: isDefault || false
+    });
+    
+    await newAddress.save();
+    res.status(201).json(newAddress);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT update address
+app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
+    
+    const addressDoc = await Address.findOne({ _id: id, userId: req.user.id });
+    if (!addressDoc) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+    
+    if (isDefault) {
+      await Address.updateMany({ userId: req.user.id }, { isDefault: false });
+    }
+    
+    addressDoc.name = name || addressDoc.name;
+    addressDoc.phone = phone || addressDoc.phone;
+    addressDoc.address = address || addressDoc.address;
+    addressDoc.landmark = landmark || addressDoc.landmark;
+    addressDoc.city = city || addressDoc.city;
+    addressDoc.state = state || addressDoc.state;
+    addressDoc.pincode = pincode || addressDoc.pincode;
+    addressDoc.country = country || addressDoc.country;
+    addressDoc.type = type || addressDoc.type;
+    addressDoc.isDefault = isDefault || false;
+    
+    await addressDoc.save();
+    res.json(addressDoc);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE address
+app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const addressDoc = await Address.findOneAndDelete({ _id: id, userId: req.user.id });
+    if (!addressDoc) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+    res.json({ success: true, message: 'Address deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH set default
+app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await Address.updateMany({ userId: req.user.id }, { isDefault: false });
+    const addressDoc = await Address.findOneAndUpdate(
+      { _id: id, userId: req.user.id },
+      { isDefault: true },
+      { new: true }
+    );
+    
+    if (!addressDoc) {
+      return res.status(404).json({ error: 'Address not found' });
+    }
+    
+    res.json(addressDoc);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ========== PRODUCT ROUTES WITH PAGINATION ==========
 app.get('/api/products', async (req, res) => {
