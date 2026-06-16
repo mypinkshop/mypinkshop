@@ -213,9 +213,10 @@ const User = mongoose.models.User || mongoose.model('User', userSchema);
 // ========== ADDRESS SCHEMA ==========
 const addressSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  name: { type: String, required: true },
+  fullName: { type: String, required: true },
   phone: { type: String, required: true },
-  address: { type: String, required: true },
+  addressLine1: { type: String, required: true },
+  addressLine2: { type: String, default: '' },
   landmark: { type: String, default: '' },
   city: { type: String, required: true },
   state: { type: String, required: true },
@@ -617,9 +618,9 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
   try {
     console.log('Received address data:', req.body);
     
-    const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
+    const { fullName, phone, addressLine1, addressLine2, landmark, city, state, pincode, country, type, isDefault } = req.body;
     
-    if (!name || !phone || !address || !city || !state || !pincode) {
+    if (!fullName || !phone || !addressLine1 || !city || !state || !pincode) {
       return res.status(400).json({ error: 'All required fields must be filled' });
     }
     
@@ -637,9 +638,10 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
     
     const newAddress = new Address({
       userId: req.user.id,
-      name,
+      fullName,
       phone,
-      address,
+      addressLine1,
+      addressLine2: addressLine2 || '',
       landmark: landmark || '',
       city,
       state,
@@ -669,15 +671,16 @@ app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Address not found' });
     }
     
-    const { name, phone, address, landmark, city, state, pincode, country, type, isDefault } = req.body;
+    const { fullName, phone, addressLine1, addressLine2, landmark, city, state, pincode, country, type, isDefault } = req.body;
     
     if (isDefault) {
       await Address.updateMany({ userId: req.user.id }, { isDefault: false });
     }
     
-    addressDoc.name = name || addressDoc.name;
+    addressDoc.fullName = fullName || addressDoc.fullName;
     addressDoc.phone = phone || addressDoc.phone;
-    addressDoc.address = address || addressDoc.address;
+    addressDoc.addressLine1 = addressLine1 || addressDoc.addressLine1;
+    addressDoc.addressLine2 = addressLine2 || addressDoc.addressLine2;
     addressDoc.landmark = landmark || addressDoc.landmark;
     addressDoc.city = city || addressDoc.city;
     addressDoc.state = state || addressDoc.state;
