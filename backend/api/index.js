@@ -15,11 +15,35 @@ const reviewRoutes = require('./reviews');
 
 const app = express();
 
-// ========== CORS ==========
+// ========== CORS FIX ==========
+const corsOptions = {
+  origin: [
+    'https://www.mypinkshop.com',
+    'https://mypinkshop.com',
+    'http://localhost:3000',
+    'http://localhost:8081',
+    'https://mypinkshop-backend-62p5dbqg0-mypinkshops-projects.vercel.app'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Additional CORS headers for preflight
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const allowedOrigins = [
+    'https://www.mypinkshop.com',
+    'https://mypinkshop.com',
+    'http://localhost:3000',
+    'http://localhost:8081'
+  ];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400');
   
@@ -29,7 +53,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
