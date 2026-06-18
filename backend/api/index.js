@@ -387,6 +387,21 @@ wishlistSchema.pre('save', function(next) {
 
 const Wishlist = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);
 
+// ========== CART SCHEMA ==========
+const cartItemSchema = new mongoose.Schema({
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  quantity: { type: Number, default: 1, min: 1 }
+});
+
+const cartSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  items: [cartItemSchema],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const Cart = mongoose.models.Cart || mongoose.model('Cart', cartSchema);
+
 // ========== Auth Middleware ==========
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -735,6 +750,109 @@ app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
     res.json(addressDoc);
   } catch (error) {
     console.error('PATCH default error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== CART ROUTES ==========
+
+// GET cart
+app.get('/api/cart', authMiddleware, async (req, res) => {
+  try {
+    let cart = await Cart.findOne({ userId: req.user.id }).populate('items.productId');
+    if (!cart) {
+      cart = new Cart({ userId: req.user.id, items: [] });
+      await cart.save();
+    }
+    res.json(cart);
+  } catch (error) {
+    console.error('GET cart error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST add to cart
+app.post('/api/cart', authMiddleware, async (req, res) => {
+  try {
+    const { productId, quantity = 1 } = req.body;
+    
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID required' });
+    }
+    
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    let cart = await Cart.findOne({ userId: req.user.id });
+    if (!cart) {
+      cart = new Cart({ userId: req.user.id, items: [] });
+    }
+    
+    const existingItem = cart.items.find(item => item.productId.toString() === productId);
+    if (existingItem) {
+      existingItem.quantity += quantity;
+    } else {
+      cart.items.push({ productId, quantity });
+    }
+    
+    cart.updatedAt = new Date();
+    await cart.save();
+    await cart.populate('items.productId');
+    
+    res.status(201).json(cart);
+  } catch (error) {
+    console.error('POST cart error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT update cart item
+app.put('/api/cart/:itemId', authMiddleware, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { quantity } = req.body;
+    
+    const cart = await Cart.findOne({ userId: req.user.id });
+    if (!cart) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+    
+    const item = cart.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    item.quantity = quantity;
+    cart.updatedAt = new Date();
+    await cart.save();
+    await cart.populate('items.productId');
+    
+    res.json(cart);
+  } catch (error) {
+    console.error('PUT cart error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE remove from cart
+app.delete('/api/cart/:itemId', authMiddleware, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    const cart = await Cart.findOne({ userId: req.user.id });
+    if (!cart) {
+      return res.status(404).json({ error: 'Cart not found' });
+    }
+    
+    cart.items = cart.items.filter(item => item._id.toString() !== itemId);
+    cart.updatedAt = new Date();
+    await cart.save();
+    
+    res.json({ success: true, message: 'Item removed from cart' });
+  } catch (error) {
+    console.error('DELETE cart error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1234,6 +1352,95 @@ app.delete('/api/wishlist/clear/all', authMiddleware, async (req, res) => {
     res.json({ success: true, message: 'Wishlist cleared' });
   } catch (error) {
     console.error('Clear wishlist error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ORDERS ROUTES ==========
+
+// GET all orders
+app.get('/api/orders', authMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('GET orders error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET single order
+app.get('/api/orders/:id', authMiddleware, async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json(order);
+  } catch (error) {
+    console.error('GET order error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST create order
+app.post('/api/orders', authMiddleware, async (req, res) => {
+  try {
+    const { items, total, address, paymentMethod } = req.body;
+    
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No items in order' });
+    }
+    
+    const order = new Order({
+      userId: req.user.id,
+      items: items.map(item => ({
+        productId: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image,
+        variationName: item.variationName,
+        variationSecondary: item.variationSecondary
+      })),
+      total,
+      address,
+      paymentMethod: paymentMethod || 'COD',
+      status: 'pending',
+      paymentStatus: 'pending'
+    });
+    
+    await order.save();
+    
+    // Clear cart after order
+    await Cart.findOneAndDelete({ userId: req.user.id });
+    
+    res.status(201).json(order);
+  } catch (error) {
+    console.error('POST order error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH update order status
+app.patch('/api/orders/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    order.status = status;
+    if (status === 'delivered') {
+      order.deliveredAt = new Date();
+    }
+    await order.save();
+    
+    res.json(order);
+  } catch (error) {
+    console.error('PATCH order status error:', error);
     res.status(500).json({ error: error.message });
   }
 });
