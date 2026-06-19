@@ -8,7 +8,7 @@ import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
-// Optimized Product Card Component
+// ============ OPTIMIZED PRODUCT CARD ============
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
   const navigate = useNavigate();
   const [isAdded, setIsAdded] = useState(false);
@@ -16,7 +16,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  // Optimize image URL
   const getOptimizedImage = (url) => {
     if (!url) return null;
     if (url.includes('amazon') || url.includes('media-amazon')) {
@@ -220,12 +219,14 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
+// ============ MAIN SKINCARE PAGE ============
 function SkincarePage() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
   const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   
+  // ===== STATES =====
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -237,10 +238,24 @@ function SkincarePage() {
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const sectionRefs = useRef({});
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Load products with caching
+  // ===== SUBCATEGORIES DATA =====
+  const subCategories = [
+    { id: 'all', name: 'All', icon: '✨' },
+    { id: 'cleansers', name: 'Cleansers', icon: '🧴' },
+    { id: 'toners', name: 'Toners', icon: '💧' },
+    { id: 'serums', name: 'Serums', icon: '🧪' },
+    { id: 'moisturizers', name: 'Moisturizers', icon: '✨' },
+    { id: 'nightcare', name: 'Night Care', icon: '🌙' },
+    { id: 'suncare', name: 'Sun Care', icon: '☀️' },
+    { id: 'masks', name: 'Masks', icon: '🎭' },
+  ];
+
+  // ===== LOAD PRODUCTS =====
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -287,7 +302,7 @@ function SkincarePage() {
     loadProducts();
   }, []);
 
-  // Filter and sort using useMemo
+  // ===== FILTER & SORT =====
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
@@ -349,6 +364,42 @@ function SkincarePage() {
     return filtered;
   }, [products, searchTerm, selectedCategory, selectedSubcategory, selectedConcern, selectedBrand, selectedSkinType, priceRange, sortBy]);
 
+  // ===== GROUP PRODUCTS BY SUBCATEGORY =====
+  const groupedProducts = useMemo(() => {
+    const groups = {};
+    subCategories.forEach(cat => {
+      if (cat.id === 'all') {
+        groups[cat.id] = filteredProducts;
+      } else {
+        groups[cat.id] = filteredProducts.filter(p => {
+          const productSub = (p.subCategory || p.subcategory || p.category || '').toLowerCase();
+          return productSub === cat.name.toLowerCase() || productSub.includes(cat.name.toLowerCase());
+        });
+      }
+    });
+    return groups;
+  }, [filteredProducts]);
+
+  // ===== GET BEST SELLERS =====
+  const bestSellers = useMemo(() => {
+    return [...filteredProducts]
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, 6);
+  }, [filteredProducts]);
+
+  // ===== SCROLL TO CATEGORY =====
+  const scrollToCategory = (categoryId) => {
+    setActiveTab(categoryId);
+    const element = document.getElementById(`section-${categoryId}`);
+    if (element) {
+      const headerOffset = 120;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    }
+  };
+
+  // ===== CLEAR FILTERS =====
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('all');
@@ -360,6 +411,7 @@ function SkincarePage() {
     setSortBy('default');
   };
 
+  // ===== MEMOIZED OPTIONS =====
   const categories = useMemo(() => {
     const cats = [...new Set(products.map(p => p.mainCategory || p.category).filter(Boolean))];
     return [{ id: 'all', name: 'All Categories' }, ...cats.map(c => ({ id: c, name: c }))];
@@ -407,6 +459,7 @@ function SkincarePage() {
     { id: 'newest', name: 'Newest First' },
   ];
 
+  // ===== LOADING STATE =====
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -418,6 +471,7 @@ function SkincarePage() {
     );
   }
 
+  // ===== RENDER =====
   return (
     <>
       <Helmet>
@@ -430,6 +484,7 @@ function SkincarePage() {
         
         <OfferBanner />
 
+        {/* ===== HEADER ===== */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -485,17 +540,39 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* Hero Section */}
-        <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
-          <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-2">
-              Skincare Collection ✨
-            </h1>
-            <p className="text-gray-600 text-sm">Glow up with our curated skincare collection</p>
+        {/* ===== PREMIUM HERO BANNER ===== */}
+        <div className="relative bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 overflow-hidden">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
+          <div className="relative max-w-7xl mx-auto px-4 py-12 sm:py-16 text-center">
+            <div className="animate-fade-in-up">
+              <span className="inline-block text-white/90 text-sm font-medium tracking-wider mb-2 bg-white/20 px-4 py-1 rounded-full backdrop-blur-sm">
+                ✨ GLOW UP COLLECTION
+              </span>
+              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+                Skincare ✨
+              </h1>
+              <p className="text-white/90 text-base sm:text-lg max-w-2xl mx-auto mb-6">
+                Discover our curated collection of premium skincare products for glowing, radiant skin.
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                <button 
+                  onClick={() => scrollToCategory('best-sellers')}
+                  className="bg-white text-pink-600 px-6 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg transition-all hover:scale-105"
+                >
+                  🔥 Shop Best Sellers
+                </button>
+                <button 
+                  onClick={() => scrollToCategory('cleansers')}
+                  className="bg-white/20 backdrop-blur-sm text-white px-6 py-2.5 rounded-full text-sm font-semibold border border-white/30 hover:bg-white/30 transition-all"
+                >
+                  Explore Now →
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Breadcrumb */}
+        {/* ===== BREADCRUMB ===== */}
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500">Home</Link>
@@ -504,9 +581,29 @@ function SkincarePage() {
           </div>
         </div>
 
+        {/* ===== MAIN CONTENT ===== */}
         <div className="max-w-7xl mx-auto px-4 pb-12">
           
-          {/* Filter Bar */}
+          {/* ===== CATEGORY TABS (Horizontal Scroll) ===== */}
+          <div className="mb-6">
+            <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+              {subCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => scrollToCategory(cat.id)}
+                  className={`px-4 py-2 rounded-full whitespace-nowrap text-sm transition-all duration-300 ${
+                    activeTab === cat.id 
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30' 
+                      : 'bg-white border border-pink-200 text-gray-600 hover:border-pink-400'
+                  }`}
+                >
+                  {cat.icon} {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ===== FILTER BAR ===== */}
           <div className="mb-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               
@@ -540,6 +637,7 @@ function SkincarePage() {
               </select>
             </div>
 
+            {/* Active Filters Tags */}
             {(selectedCategory !== 'all' || selectedSubcategory !== 'all' || selectedConcern !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {selectedCategory !== 'all' && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedCategory} <button onClick={() => setSelectedCategory('all')}>×</button></span>}
@@ -554,7 +652,7 @@ function SkincarePage() {
             )}
           </div>
 
-          {/* Mobile Filters Modal */}
+          {/* ===== MOBILE FILTERS MODAL ===== */}
           {showFilters && (
             <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFilters(false)}>
               <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -575,37 +673,132 @@ function SkincarePage() {
             </div>
           )}
 
-          {/* Results Count */}
+          {/* ===== RESULTS COUNT ===== */}
           <div className="mb-4">
-            <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-pink-600">{products.length}</span> products</p>
+            <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products</p>
           </div>
           
-          {/* Products Grid */}
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
-              <div className="text-6xl mb-3">🧴</div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-1">No skincare products found</h3>
-              <p className="text-gray-500 text-sm mb-4">Try adjusting your filters</p>
-              <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">Clear All Filters</button>
+          {/* ===== BEST SELLERS SECTION ===== */}
+          {bestSellers.length > 0 && (
+            <div id="section-best-sellers" className="mb-10">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">🔥 Best Sellers</h2>
+                <button className="text-sm text-pink-500 hover:text-pink-600">See All →</button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                {bestSellers.slice(0, 6).map(product => (
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                  />
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
-                <ProductCard 
-                  key={product._id} 
-                  product={product} 
-                  addToCart={addToCart}
-                  isInWishlist={isInWishlist}
-                  addToWishlist={addToWishlist}
-                  removeFromWishlist={removeFromWishlist}
-                  user={user}
-                />
-              ))}
+          )}
+
+          {/* ===== PROMO BANNER ===== */}
+          <div className="my-8 bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 rounded-2xl p-6 text-center shadow-lg shadow-pink-500/20">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <p className="text-white text-sm font-semibold tracking-wider">🎯 SPECIAL OFFER</p>
+                <p className="text-white text-2xl font-bold">Up to 50% OFF on Skincare</p>
+                <p className="text-white/80 text-sm">Use code: <span className="font-mono bg-white/20 px-3 py-1 rounded-full">GLOWUP</span></p>
+              </div>
+              <button className="bg-white text-pink-600 px-6 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg transition-all hover:scale-105">
+                Shop Now →
+              </button>
+            </div>
+          </div>
+
+          {/* ===== SUBCATEGORY SECTIONS ===== */}
+          {subCategories.map((cat) => {
+            if (cat.id === 'all' || cat.id === 'best-sellers') return null;
+            const products = groupedProducts[cat.id] || [];
+            if (products.length === 0) return null;
+            
+            return (
+              <div key={cat.id} id={`section-${cat.id}`} className="mb-10 scroll-mt-28">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-800">
+                    {cat.icon} {cat.name}
+                  </h2>
+                  <button 
+                    onClick={() => {
+                      setSelectedSubcategory(cat.id);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-sm text-pink-500 hover:text-pink-600"
+                  >
+                    See All →
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {products.slice(0, 4).map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ===== ALL PRODUCTS GRID (When All tab active or filtered) ===== */}
+          {(activeTab === 'all' || selectedSubcategory !== 'all' || selectedCategory !== 'all' || searchTerm || priceRange !== 'all' || selectedConcern !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all') && (
+            <div id="section-all" className="mb-10 scroll-mt-28">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">
+                  ✨ {selectedSubcategory !== 'all' ? selectedSubcategory : 'All Products'}
+                </h2>
+                <span className="text-sm text-gray-500">{filteredProducts.length} items</span>
+              </div>
+              {filteredProducts.length === 0 ? (
+                <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
+                  <div className="text-6xl mb-3">🧴</div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">No skincare products found</h3>
+                  <p className="text-gray-500 text-sm mb-4">Try adjusting your filters</p>
+                  <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">Clear All Filters</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {filteredProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ===== LOAD MORE BUTTON ===== */}
+          {filteredProducts.length > 12 && (
+            <div className="text-center mt-6">
+              <button className="bg-white border border-pink-200 text-gray-700 px-8 py-3 rounded-full hover:bg-pink-50 transition-all text-sm font-medium">
+                Load More Products ↓
+              </button>
             </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* ===== FOOTER ===== */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
@@ -651,6 +844,30 @@ function SkincarePage() {
           </div>
         </footer>
       </div>
+
+      {/* ===== CSS ANIMATIONS ===== */}
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.8s ease-out forwards;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </>
   );
 }
