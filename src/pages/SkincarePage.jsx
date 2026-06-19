@@ -284,24 +284,25 @@ function SkincarePage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // ===== GET SUBCATEGORY - AUTO DETECT =====
+  // ===== ✅ FIXED: GET SUBCATEGORY - AUTO DETECT =====
   const getSubcategory = (product) => {
-    // Try all possible field names
-    const sub = product.subcategory || 
-                product.subCategory || 
-                product.category || 
-                product.mainCategory || 
+    // Try all possible field names - ORDER MATTERS!
+    const sub = product.subCategory ||      // ✅ Admin panel se (capital C)
+                product.subcategory ||      // ✅ Alternative
+                product.category ||         // ✅ Fallback
+                product.mainCategory ||     // ✅ Main category
                 product.type ||
                 product.tags?.[0] ||
-                'General';
+                '';
     
-    // If sub is 'Skincare' or 'skincare', try to find more specific
-    if (sub.toLowerCase() === 'skincare') {
-      // Try to get from tags or other fields
-      const specific = product.tags?.find(t => 
-        !['skincare', 'Skincare'].includes(t.toLowerCase())
-      ) || product.subType || product.variant || 'General';
-      return specific;
+    // Agar 'Skincare' ya 'General' hai toh ignore karo
+    if (['Skincare', 'skincare', 'General', 'general', ''].includes(sub)) {
+      // Try to find from tags
+      const fromTags = product.tags?.find(t => 
+        !['skincare', 'Skincare', 'general', 'General'].includes(t)
+      );
+      if (fromTags) return fromTags;
+      return '';
     }
     
     return sub;
@@ -345,7 +346,8 @@ function SkincarePage() {
               rating: Number(p.rating) || 4,
               brand: p.brand || 'MyPinkShop',
             };
-          });
+          })
+          .filter(p => p.subcategory); // ✅ Remove products without subcategory
         
         if (skincareProducts.length === 0) {
           throw new Error('No skincare products found');
@@ -391,10 +393,14 @@ function SkincarePage() {
       return [{ id: 'all', name: 'All', icon: '✨' }];
     }
     
-    const subs = [...new Set(products.map(p => p.subcategory || 'General'))].filter(Boolean);
+    const subs = [...new Set(products.map(p => p.subcategory))].filter(Boolean);
     
     // ✅ Log subcategories for debugging
     console.log('📊 SubCategories from products:', subs);
+    
+    if (subs.length === 0) {
+      return [{ id: 'all', name: 'All', icon: '✨' }];
+    }
     
     return [
       { id: 'all', name: 'All', icon: '✨' },
