@@ -133,9 +133,9 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
           )}
           
-          {product.image || product.images?.[0] ? (
+          {product.images && product.images[0] && !imgError ? (
             <img 
-              src={product.image || product.images[0]} 
+              src={product.images[0]} 
               alt={product.name}
               className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={() => setImgError(true)}
@@ -211,37 +211,58 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
-// ============ SUBCATEGORY BANNER COMPONENT ============
-const SubcategoryBanner = ({ category, icon, count }) => {
-  const gradients = {
-    'Cleansers': 'from-pink-200 to-pink-400',
-    'Toners': 'from-blue-200 to-blue-400',
-    'Serums': 'from-purple-200 to-purple-400',
-    'Moisturizers': 'from-green-200 to-green-400',
-    'Night Care': 'from-indigo-200 to-indigo-400',
-    'Sun Care': 'from-yellow-200 to-yellow-400',
-    'Masks': 'from-red-200 to-red-400',
+// ============ SUBCATEGORY BANNER ============
+const SubcategoryBanner = ({ category, count }) => {
+  // Dynamic gradient based on category name
+  const getGradient = (name) => {
+    const gradients = {
+      'cleanser': 'from-pink-200 to-pink-400',
+      'toner': 'from-blue-200 to-blue-400',
+      'serum': 'from-purple-200 to-purple-400',
+      'moisturizer': 'from-green-200 to-green-400',
+      'night': 'from-indigo-200 to-indigo-400',
+      'sun': 'from-yellow-200 to-yellow-400',
+      'mask': 'from-red-200 to-red-400',
+      'face': 'from-rose-200 to-rose-400',
+      'eye': 'from-teal-200 to-teal-400',
+      'lip': 'from-pink-200 to-pink-400',
+    };
+    
+    const lower = name.toLowerCase();
+    for (const [key, gradient] of Object.entries(gradients)) {
+      if (lower.includes(key)) return gradient;
+    }
+    return 'from-pink-200 to-pink-400';
   };
-  
-  const icons = {
-    'Cleansers': '🧴',
-    'Toners': '💧',
-    'Serums': '🧪',
-    'Moisturizers': '✨',
-    'Night Care': '🌙',
-    'Sun Care': '☀️',
-    'Masks': '🎭',
+
+  // Dynamic icon based on category name
+  const getIcon = (name) => {
+    const icons = {
+      'cleanser': '🧴',
+      'toner': '💧',
+      'serum': '🧪',
+      'moisturizer': '✨',
+      'night': '🌙',
+      'sun': '☀️',
+      'mask': '🎭',
+      'face': '🧖',
+      'eye': '👁️',
+      'lip': '💋',
+    };
+    
+    const lower = name.toLowerCase();
+    for (const [key, icon] of Object.entries(icons)) {
+      if (lower.includes(key)) return icon;
+    }
+    return '✨';
   };
-  
-  const bgGradient = gradients[category] || 'from-pink-200 to-pink-400';
-  const catIcon = icons[category] || icon || '✨';
-  
+
   return (
-    <div className={`bg-gradient-to-r ${bgGradient} rounded-2xl p-6 mb-6 shadow-md`}>
+    <div className={`bg-gradient-to-r ${getGradient(category)} rounded-2xl p-6 mb-6 shadow-md`}>
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-3xl">{catIcon}</span>
+            <span className="text-3xl">{getIcon(category)}</span>
             <h2 className="text-2xl font-bold text-gray-800">{category}</h2>
           </div>
           <p className="text-gray-600 text-sm mt-1">{count} products available</p>
@@ -269,83 +290,59 @@ function SkincarePage() {
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [activeTab, setActiveTab] = useState('all');
+  const [error, setError] = useState(null);
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // ===== SAMPLE DATA (Fallback) =====
-  const getSampleProducts = () => {
-    return [
-      { _id: '1', name: 'Gentle Face Wash', price: 499, originalPrice: 599, image: 'https://via.placeholder.com/300/FF6B8B', rating: 4.5, category: 'Skincare', subcategory: 'Cleansers', brand: 'MyPinkShop', status: 'active' },
-      { _id: '2', name: 'Vitamin C Serum', price: 799, originalPrice: 999, image: 'https://via.placeholder.com/300/E9407A', rating: 4.8, category: 'Skincare', subcategory: 'Serums', brand: 'MyPinkShop', status: 'active' },
-      { _id: '3', name: 'Rose Water Toner', price: 349, originalPrice: 449, image: 'https://via.placeholder.com/300/FFB6C1', rating: 4.3, category: 'Skincare', subcategory: 'Toners', brand: 'MyPinkShop', status: 'active' },
-      { _id: '4', name: 'Hyaluronic Acid', price: 699, originalPrice: 899, image: 'https://via.placeholder.com/300/C21E5A', rating: 4.7, category: 'Skincare', subcategory: 'Serums', brand: 'MyPinkShop', status: 'active' },
-      { _id: '5', name: 'Day Cream SPF 30', price: 499, originalPrice: 599, image: 'https://via.placeholder.com/300/FFD6E0', rating: 4.4, category: 'Skincare', subcategory: 'Moisturizers', brand: 'MyPinkShop', status: 'active' },
-      { _id: '6', name: 'Night Cream', price: 599, originalPrice: 699, image: 'https://via.placeholder.com/300/FF9EB5', rating: 4.6, category: 'Skincare', subcategory: 'Night Care', brand: 'MyPinkShop', status: 'active' },
-      { _id: '7', name: 'Sunscreen SPF 50', price: 449, originalPrice: 549, image: 'https://via.placeholder.com/300/E8D5F5', rating: 4.6, category: 'Skincare', subcategory: 'Sun Care', brand: 'MyPinkShop', status: 'active' },
-      { _id: '8', name: 'Face Scrub', price: 399, originalPrice: 499, image: 'https://via.placeholder.com/300/D4F1F9', rating: 4.2, category: 'Skincare', subcategory: 'Cleansers', brand: 'MyPinkShop', status: 'active' },
-    ];
-  };
-
-  // ===== LOAD PRODUCTS =====
+  // ===== LOAD REAL PRODUCTS FROM API =====
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        
-        const cached = sessionStorage.getItem('products_cache');
-        const cacheTime = sessionStorage.getItem('products_cache_time');
-        
-        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
-          const data = JSON.parse(cached);
-          const productsArray = data.products || data;
-          const skincareProducts = productsArray.filter(p => 
-            (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') &&
-            p.status === 'active'
-          ).map(p => ({ 
-            ...p, 
-            id: p._id, 
-            subcategory: p.subCategory || p.subcategory || p.category,
-          }));
-          
-          if (skincareProducts.length === 0) {
-            console.warn('⚠️ No products found, using sample data');
-            setProducts(getSampleProducts());
-          } else {
-            setProducts(skincareProducts);
-          }
-          setLoading(false);
-          return;
-        }
+        setError(null);
         
         const response = await fetch(`${API_URL}/api/products`);
-        if (!response.ok) throw new Error('Failed to load products');
-        
-        let data = await response.json();
-        const productsArray = data.products || data;
-        
-        sessionStorage.setItem('products_cache', JSON.stringify(data));
-        sessionStorage.setItem('products_cache_time', Date.now().toString());
-        
-        const skincareProducts = productsArray.filter(p => 
-          (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') &&
-          p.status === 'active'
-        ).map(p => ({ 
-          ...p, 
-          id: p._id, 
-          subcategory: p.subCategory || p.subcategory || p.category,
-        }));
-        
-        if (skincareProducts.length === 0) {
-          console.warn('⚠️ No products from API, using sample data');
-          setProducts(getSampleProducts());
-        } else {
-          setProducts(skincareProducts);
+        if (!response.ok) {
+          throw new Error(`Failed to load products: ${response.status}`);
         }
         
-      } catch (error) {
-        console.error('Error loading products:', error);
-        console.warn('⚠️ Using sample data due to error');
-        setProducts(getSampleProducts());
+        const data = await response.json();
+        const productsArray = data.products || data;
+        
+        if (!Array.isArray(productsArray) || productsArray.length === 0) {
+          throw new Error('No products found');
+        }
+        
+        // Filter skincare products and normalize fields
+        const skincareProducts = productsArray
+          .filter(p => {
+            const category = (p.mainCategory || p.category || '').toLowerCase();
+            return category === 'skincare' || category.includes('skincare') || p.category === 'Skincare';
+          })
+          .filter(p => p.status === 'active' || p.status === undefined)
+          .map(p => ({
+            ...p,
+            id: p._id || p.id,
+            subcategory: p.subCategory || p.subcategory || p.category || 'General',
+            images: p.images || (p.image ? [p.image] : []),
+            price: Number(p.price) || 0,
+            originalPrice: Number(p.originalPrice) || Number(p.price) * 1.2 || 0,
+            rating: Number(p.rating) || 4,
+            brand: p.brand || 'MyPinkShop',
+          }));
+        
+        if (skincareProducts.length === 0) {
+          throw new Error('No skincare products found');
+        }
+        
+        console.log(`✅ Loaded ${skincareProducts.length} skincare products`);
+        console.log('📊 Subcategories:', [...new Set(skincareProducts.map(p => p.subcategory))]);
+        
+        setProducts(skincareProducts);
+      } catch (err) {
+        console.error('❌ Error loading products:', err);
+        setError(err.message);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -365,18 +362,19 @@ function SkincarePage() {
     if (lower.includes('night')) return '🌙';
     if (lower.includes('sun')) return '☀️';
     if (lower.includes('mask')) return '🎭';
+    if (lower.includes('face')) return '🧖';
+    if (lower.includes('eye')) return '👁️';
+    if (lower.includes('lip')) return '💋';
     return '✨';
   };
 
-  // ===== DYNAMIC SUBCATEGORIES =====
+  // ===== DYNAMIC SUBCATEGORIES (Auto-detect from products) =====
   const subCategories = useMemo(() => {
     if (!products || products.length === 0) {
       return [{ id: 'all', name: 'All', icon: '✨' }];
     }
     
-    const subs = [...new Set(products.map(p => {
-      return p.subcategory || p.subCategory || p.category || 'General';
-    }))].filter(Boolean);
+    const subs = [...new Set(products.map(p => p.subcategory || 'General'))].filter(Boolean);
     
     return [
       { id: 'all', name: 'All', icon: '✨' },
@@ -401,7 +399,7 @@ function SkincarePage() {
 
     if (selectedSubcategory !== 'all') {
       filtered = filtered.filter(p => {
-        const productSub = (p.subcategory || p.subCategory || p.category || '').toLowerCase();
+        const productSub = (p.subcategory || '').toLowerCase();
         const selected = selectedSubcategory.toLowerCase();
         return productSub === selected || productSub.includes(selected);
       });
@@ -435,13 +433,13 @@ function SkincarePage() {
     return filtered;
   }, [products, searchTerm, selectedSubcategory, selectedBrand, priceRange, sortBy]);
 
-  // ===== GROUP PRODUCTS =====
+  // ===== GROUP PRODUCTS BY SUBCATEGORY =====
   const groupedProducts = useMemo(() => {
     if (!products || products.length === 0) return {};
     
     const groups = {};
     products.forEach(product => {
-      const key = product.subcategory || product.subCategory || product.category || 'General';
+      const key = product.subcategory || 'General';
       if (!groups[key]) {
         groups[key] = [];
       }
@@ -509,6 +507,25 @@ function SkincarePage() {
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-500">Loading skincare products...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ===== ERROR =====
+  if (error || products.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">🧴</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">No Products Found</h2>
+          <p className="text-gray-500 mb-4">{error || 'No skincare products available right now.'}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm"
+          >
+            Refresh
+          </button>
         </div>
       </div>
     );
@@ -599,16 +616,19 @@ function SkincarePage() {
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <button 
-                  onClick={() => scrollToCategory('cleansers')}
+                  onClick={() => {
+                    const firstCat = subCategories.find(c => c.id !== 'all');
+                    if (firstCat) scrollToCategory(firstCat.id);
+                  }}
                   className="bg-white text-pink-600 px-6 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg transition-all hover:scale-105"
                 >
                   🔥 Shop Now
                 </button>
                 <button 
-                  onClick={() => scrollToCategory('serums')}
+                  onClick={() => window.scrollTo({ top: 600, behavior: 'smooth' })}
                   className="bg-white/20 backdrop-blur-sm text-white px-6 py-2.5 rounded-full text-sm font-semibold border border-white/30 hover:bg-white/30 transition-all"
                 >
-                  Explore Serums →
+                  Explore All →
                 </button>
               </div>
             </div>
@@ -627,7 +647,7 @@ function SkincarePage() {
         {/* ===== MAIN CONTENT ===== */}
         <div className="max-w-7xl mx-auto px-4 pb-12">
           
-          {/* ===== CATEGORY TABS ===== */}
+          {/* ===== CATEGORY TABS (Dynamic) ===== */}
           {subCategories.length > 1 && (
             <div className="mb-6">
               <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
@@ -667,9 +687,11 @@ function SkincarePage() {
                     ))}
                   </select>
                 )}
-                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-                </select>
+                {brands.length > 1 && (
+                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                    {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                  </select>
+                )}
                 <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
                   {priceRanges.map(range => <option key={range.id} value={range.id}>{range.name}</option>)}
                 </select>
@@ -724,7 +746,7 @@ function SkincarePage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                 {bestSellers.slice(0, 6).map(product => (
                   <ProductCard 
-                    key={product._id} 
+                    key={product._id || product.id} 
                     product={product} 
                     addToCart={addToCart}
                     isInWishlist={isInWishlist}
@@ -753,7 +775,7 @@ function SkincarePage() {
             </div>
           )}
 
-          {/* ===== SUBCATEGORY SECTIONS WITH BANNERS ===== */}
+          {/* ===== SUBCATEGORY SECTIONS WITH BANNERS (Dynamic) ===== */}
           {Object.keys(groupedProducts).length > 0 ? (
             Object.keys(groupedProducts).map((categoryName) => {
               const productsInCategory = groupedProducts[categoryName] || [];
@@ -773,13 +795,12 @@ function SkincarePage() {
                   <SubcategoryBanner 
                     category={categoryName} 
                     count={productsInCategory.length}
-                    icon={getCategoryIcon(categoryName)}
                   />
                   
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {productsInCategory.slice(0, 4).map(product => (
                       <ProductCard 
-                        key={product._id} 
+                        key={product._id || product.id} 
                         product={product} 
                         addToCart={addToCart}
                         isInWishlist={isInWishlist}
