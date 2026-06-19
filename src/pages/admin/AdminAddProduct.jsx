@@ -450,19 +450,16 @@ function AdminAddProduct() {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
       
-      // Meta Title - 100 chars limit
       let metaTitle = `${formData.productName}`;
       if (formData.brand) metaTitle = `${formData.productName} - ${formData.brand}`;
       metaTitle = `${metaTitle} | MyPinkShop`;
       if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
       
-      // Meta Description - 200 chars limit
       let metaDescription = `Buy ${formData.productName}`;
       if (formData.brand) metaDescription += ` by ${formData.brand}`;
       metaDescription += ` at best price. ✓ Free Shipping ✓ COD ✓ Best Quality. Shop now at MyPinkShop!`;
       if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
       
-      // Auto-generate keywords from category, brand, features
       const autoKeywords = [
         formData.brand,
         formData.category,
@@ -789,6 +786,7 @@ function AdminAddProduct() {
 
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
+  // ===== ✅ FIXED SUBMIT FUNCTION =====
   const submitProduct = async () => {
     if (!formData.productName) return alert('Enter product name');
     if (!formData.brand) return alert('Select brand');
@@ -802,11 +800,18 @@ function AdminAddProduct() {
     const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
     const finalSku = formData.sku || generateSKU();
 
+    // ✅ FIX: Added subCategory and subcategory fields
     const productData = {
       name: formData.productName, 
       brand: formData.brand, 
       category: formData.subCategory,
-      mainCategory: formData.category, 
+      mainCategory: formData.category,
+      
+      // ✅ FIX: Multiple subcategory fields for compatibility
+      subCategory: formData.subCategory,     // For admin panel
+      subcategory: formData.subCategory,     // For website
+      productSubCategory: formData.subCategory, // Extra safety
+      
       price: parseFloat(formData.sellingPrice),
       originalPrice: parseFloat(formData.mrp) || parseFloat(formData.sellingPrice) * 1.2,
       tax: parseFloat(formData.tax) || 18, 
