@@ -126,11 +126,11 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   };
 
   return (
-    <div className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-gray-100">
+    <div className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 border border-gray-100">
       <Link to={`/product/${product._id || product.id}`}>
         <div className="relative h-48 sm:h-56 overflow-hidden bg-gray-50 flex items-center justify-center">
           {!imageLoaded && !imgError && (
-            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
+            <div className="absolute inset-0 animate-pulse bg-gray-200" />
           )}
           
           {product.images && product.images[0] && !imgError ? (
@@ -149,12 +149,12 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             <div className="w-full h-full flex items-center justify-center text-5xl">✨</div>
           )}
           {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10 font-medium">
+            <span className="absolute top-3 left-3 bg-pink-600 text-white text-xs px-3 py-1 rounded-full shadow-md">
               {product.badge}
             </span>
           )}
           {product.isNew && (
-            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md z-10 font-medium">
+            <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-3 py-1 rounded-full shadow-md">
               NEW
             </span>
           )}
@@ -163,7 +163,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       
       <div className="p-4">
         <Link to={`/product/${product._id || product.id}`}>
-          <h3 className="font-medium text-gray-800 text-sm mb-1 line-clamp-1 hover:text-pink-600 transition">
+          <h3 className="font-medium text-gray-800 text-sm mb-1 hover:text-pink-600 transition">
             {product.name}
           </h3>
         </Link>
@@ -223,7 +223,6 @@ const CategorySidebar = ({
 }) => {
   const sidebarContent = (
     <div className="space-y-6">
-      {/* Categories */}
       <div>
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Categories</h3>
         <div className="space-y-1">
@@ -231,9 +230,9 @@ const CategorySidebar = ({
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                 selectedCategory === cat.id 
-                  ? 'bg-pink-600 text-white shadow-sm' 
+                  ? 'bg-pink-600 text-white' 
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -243,7 +242,6 @@ const CategorySidebar = ({
         </div>
       </div>
 
-      {/* Brands */}
       {brands.length > 0 && (
         <div>
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Brands</h3>
@@ -252,7 +250,7 @@ const CategorySidebar = ({
               <button
                 key={brand.id}
                 onClick={() => setSelectedBrand(brand.id)}
-                className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
                   selectedBrand === brand.id 
                     ? 'bg-pink-50 text-pink-600 font-medium' 
                     : 'text-gray-600 hover:bg-gray-50'
@@ -265,7 +263,6 @@ const CategorySidebar = ({
         </div>
       )}
 
-      {/* Clear Filters */}
       <button
         onClick={clearFilters}
         className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
@@ -277,7 +274,7 @@ const CategorySidebar = ({
 
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setIsMobile(false)}>
+      <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setIsMobile(false)}>
         <div className="absolute left-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           <div className="flex justify-between items-center mb-5">
             <h2 className="font-semibold text-gray-800">Filters</h2>
@@ -312,98 +309,51 @@ function SkincarePage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // ===== GET SUBCATEGORY =====
   const getSubcategory = (product) => {
-    const sub = product.subCategory || 
-                product.subcategory || 
-                product.category || 
-                product.mainCategory || 
-                '';
-    
-    if (['Skincare', 'skincare', 'General', 'general', ''].includes(sub)) {
-      return '';
-    }
+    const sub = product.subCategory || product.subcategory || product.category || '';
+    if (['Skincare', 'skincare', 'General', 'general', ''].includes(sub)) return '';
     return sub;
   };
 
-  // ===== LOAD PRODUCTS =====
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        
-        const cached = sessionStorage.getItem('products_cache');
-        const cacheTime = sessionStorage.getItem('products_cache_time');
-        
-        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
-          const data = JSON.parse(cached);
-          const productsArray = data.products || data;
-          const skincareProducts = productsArray.filter(p => 
-            (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') &&
-            p.status === 'active'
-          ).map(p => ({ 
-            ...p, 
-            id: p._id, 
-            subcategory: getSubcategory(p)
-          }));
-          setProducts(skincareProducts);
-          setLoading(false);
-          return;
-        }
-        
         const response = await fetch(`${API_URL}/api/products`);
         if (!response.ok) throw new Error('Failed to load products');
-        
-        let data = await response.json();
+        const data = await response.json();
         const productsArray = data.products || data;
-        
-        sessionStorage.setItem('products_cache', JSON.stringify(data));
-        sessionStorage.setItem('products_cache_time', Date.now().toString());
-        
-        const skincareProducts = productsArray.filter(p => 
-          (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') &&
-          p.status === 'active'
-        ).map(p => ({ 
-          ...p, 
-          id: p._id, 
-          subcategory: getSubcategory(p)
-        }));
-        
+        const skincareProducts = productsArray
+          .filter(p => (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') && p.status === 'active')
+          .map(p => ({ ...p, id: p._id, subcategory: getSubcategory(p) }));
         setProducts(skincareProducts);
       } catch (error) {
-        console.error('Error loading products:', error);
+        console.error('Error:', error);
         setProducts([]);
       } finally {
         setLoading(false);
       }
     };
-    
     loadProducts();
   }, []);
 
-  // ===== FILTER =====
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
-
     if (searchTerm) {
       filtered = filtered.filter(p => 
         p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => {
         const productSub = (p.subcategory || '').toLowerCase();
-        const selected = selectedCategory.toLowerCase();
-        return productSub === selected || productSub.includes(selected);
+        return productSub === selectedCategory.toLowerCase();
       });
     }
-
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
-    
     return filtered;
   }, [products, searchTerm, selectedCategory, selectedBrand]);
 
@@ -413,7 +363,6 @@ function SkincarePage() {
     setSelectedBrand('all');
   };
 
-  // ===== MEMOIZED OPTIONS =====
   const categories = useMemo(() => {
     const subs = [...new Set(products.map(p => p.subcategory).filter(Boolean))];
     return [{ id: 'all', name: 'All Categories' }, ...subs.map(s => ({ id: s.toLowerCase().replace(/ /g, '_'), name: s }))];
@@ -438,42 +387,36 @@ function SkincarePage() {
   return (
     <>
       <Helmet>
-        <title>Skincare Products - Face Wash, Serum, Moisturizer & More | MyPinkShop</title>
-        <meta name="description" content="Shop premium skincare products at MyPinkShop. Face washes, serums, moisturizers, sunscreens, and masks for glowing skin." />
-        <link rel="canonical" href="https://www.mypinkshop.com/skincare" />
+        <title>Skincare Products | MyPinkShop</title>
+        <meta name="description" content="Shop premium skincare products at MyPinkShop." />
       </Helmet>
 
       <div className="min-h-screen bg-white">
         
         <OfferBanner />
 
-        {/* ===== HEADER ===== */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-              <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <Link to="/" className="flex items-center gap-2 shrink-0">
+                <div className="w-9 h-9 bg-pink-600 rounded-xl flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight">MyPinkShop</h1>
+                  <h1 className="text-xl font-bold">MyPinkShop</h1>
                   <p className="text-[9px] text-gray-400">FOR THE GIRLIES ✨</p>
                 </div>
               </Link>
 
               <div className="flex-1 max-w-md">
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Search skincare..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
-                  />
-                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                    🔍
-                  </button>
-                </div>
+                <input 
+                  type="text" 
+                  placeholder="Search skincare..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50 text-sm"
+                />
               </div>
 
               <div className="flex items-center gap-2">
@@ -503,25 +446,22 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* ===== HERO BANNER ===== */}
-        <div className="relative bg-gradient-to-r from-pink-600 via-rose-500 to-pink-600">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAzMHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
-          <div className="relative max-w-7xl mx-auto px-4 py-16 sm:py-20 text-center">
-            <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+        {/* Hero Banner - NO BLUR */}
+        <div className="bg-pink-600">
+          <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+            <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3">
               Skincare
             </h1>
             <p className="text-white/90 text-base sm:text-lg max-w-2xl mx-auto mb-6">
               Discover premium skincare for glowing, radiant skin.
             </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Link to="/shop" className="bg-white text-pink-600 px-6 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg transition-all hover:scale-105">
-                Shop Now
-              </Link>
-            </div>
+            <Link to="/shop" className="inline-block bg-white text-pink-600 px-6 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg transition">
+              Shop Now
+            </Link>
           </div>
         </div>
 
-        {/* ===== BREADCRUMB ===== */}
+        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-600">Home</Link>
@@ -530,22 +470,22 @@ function SkincarePage() {
           </div>
         </div>
 
-        {/* ===== MAIN CONTENT ===== */}
+        {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 pb-12">
           
-          {/* Mobile Filter Button */}
+          {/* Mobile Filter */}
           <div className="md:hidden flex items-center justify-between mb-4">
             <button 
               onClick={() => setIsMobileFilterOpen(true)}
               className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white flex items-center gap-2"
             >
-              <span>☰</span> Filters
+              ☰ Filters
             </button>
             <span className="text-sm text-gray-500">{filteredProducts.length} products</span>
           </div>
 
           <div className="flex gap-8">
-            {/* ===== LEFT SIDEBAR (Desktop) ===== */}
+            {/* Sidebar */}
             <div className="hidden md:block">
               <CategorySidebar 
                 categories={categories}
@@ -560,7 +500,7 @@ function SkincarePage() {
               />
             </div>
 
-            {/* ===== MOBILE FILTERS ===== */}
+            {/* Mobile Filters */}
             <CategorySidebar 
               categories={categories}
               selectedCategory={selectedCategory}
@@ -573,20 +513,17 @@ function SkincarePage() {
               setIsMobile={setIsMobileFilterOpen}
             />
 
-            {/* ===== PRODUCTS ===== */}
-            <div className="flex-1 min-w-0">
-              {/* Results */}
+            {/* Products */}
+            <div className="flex-1">
               <div className="hidden md:flex justify-between items-center mb-4">
                 <p className="text-sm text-gray-500">{filteredProducts.length} products</p>
               </div>
 
-              {/* Products Grid */}
               {filteredProducts.length === 0 ? (
                 <div className="bg-gray-50 rounded-2xl p-12 text-center">
                   <div className="text-6xl mb-3">🧴</div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-1">No products found</h3>
-                  <p className="text-gray-500 text-sm mb-4">Try adjusting your filters</p>
-                  <button onClick={clearFilters} className="bg-pink-600 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-pink-700 transition">
+                  <button onClick={clearFilters} className="mt-4 bg-pink-600 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-pink-700 transition">
                     Clear Filters
                   </button>
                 </div>
@@ -609,13 +546,13 @@ function SkincarePage() {
           </div>
         </div>
 
-        {/* ===== FOOTER ===== */}
+        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                  <div className="w-7 h-7 bg-pink-600 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-xs">M</span>
                   </div>
                   <h3 className="font-bold text-white">MyPinkShop</h3>
@@ -628,8 +565,6 @@ function SkincarePage() {
                   <li><Link to="/skincare" className="hover:text-pink-500">Skincare</Link></li>
                   <li><Link to="/makeup" className="hover:text-pink-500">Makeup</Link></li>
                   <li><Link to="/hair" className="hover:text-pink-500">Hair Care</Link></li>
-                  <li><Link to="/clothing" className="hover:text-pink-500">Clothing</Link></li>
-                  <li><Link to="/accessories" className="hover:text-pink-500">Accessories</Link></li>
                 </ul>
               </div>
               <div>
@@ -637,20 +572,17 @@ function SkincarePage() {
                 <ul className="space-y-1 text-xs">
                   <li><Link to="/contact" className="hover:text-pink-500">Contact Us</Link></li>
                   <li><Link to="/faqs" className="hover:text-pink-500">FAQs</Link></li>
-                  <li><Link to="/shipping-info" className="hover:text-pink-500">Shipping</Link></li>
-                  <li><Link to="/returns-policy" className="hover:text-pink-500">Returns</Link></li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-3 text-sm">Follow Us</h4>
                 <ul className="space-y-1 text-xs">
                   <li><a href="#" className="hover:text-pink-500">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500">Pinterest</a></li>
                 </ul>
               </div>
             </div>
             <div className="text-center pt-6 border-t border-gray-800">
-              <p className="text-xs">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs">© 2026 MyPinkShop</p>
             </div>
           </div>
         </footer>
