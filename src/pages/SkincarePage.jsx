@@ -231,24 +231,17 @@ function SkincarePage() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // ===== GET SUBCATEGORY - AUTO DETECT =====
+  // ===== GET SUBCATEGORY =====
   const getSubcategory = (product) => {
     const sub = product.subCategory || 
                 product.subcategory || 
                 product.category || 
                 product.mainCategory || 
-                product.type ||
-                product.tags?.[0] ||
                 '';
     
     if (['Skincare', 'skincare', 'General', 'general', ''].includes(sub)) {
-      const fromTags = product.tags?.find(t => 
-        !['skincare', 'Skincare', 'general', 'General'].includes(t)
-      );
-      if (fromTags) return fromTags;
       return '';
     }
-    
     return sub;
   };
 
@@ -272,8 +265,7 @@ function SkincarePage() {
             id: p._id, 
             subcategory: getSubcategory(p),
             skinType: p.skinType || 'all',
-            concerns: p.concerns || [],
-            ingredients: p.ingredients || ''
+            concerns: p.concerns || []
           }));
           setProducts(skincareProducts);
           setLoading(false);
@@ -297,8 +289,7 @@ function SkincarePage() {
           id: p._id, 
           subcategory: getSubcategory(p),
           skinType: p.skinType || 'all',
-          concerns: p.concerns || [],
-          ingredients: p.ingredients || ''
+          concerns: p.concerns || []
         }));
         
         setProducts(skincareProducts);
@@ -510,7 +501,7 @@ function SkincarePage() {
               <span className="inline-block text-white/90 text-sm font-medium tracking-wider mb-2 bg-white/20 px-4 py-1 rounded-full backdrop-blur-sm">
                 ✨ GLOW UP COLLECTION
               </span>
-              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+              <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-pink-200 via-white to-pink-200 bg-clip-text text-transparent drop-shadow-lg">
                 Skincare ✨
               </h1>
               <p className="text-white/90 text-base sm:text-lg max-w-2xl mx-auto mb-6">
