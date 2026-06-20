@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -211,6 +211,216 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
+// ============ LEFT SIDEBAR SUBCATEGORY COMPONENT ============
+const SubcategorySidebar = ({ 
+  subcategories, 
+  selectedSubcategory, 
+  setSelectedSubcategory, 
+  brands, 
+  selectedBrand, 
+  setSelectedBrand,
+  skinTypes,
+  selectedSkinType,
+  setSelectedSkinType,
+  concerns,
+  selectedConcern,
+  setSelectedConcern,
+  priceRanges,
+  priceRange,
+  setPriceRange,
+  clearFilters,
+  isMobile,
+  setIsMobile
+}) => {
+  const getIcon = (name) => {
+    const icons = {
+      'cleanser': '🧴',
+      'toner': '💧',
+      'serum': '🧪',
+      'moisturizer': '✨',
+      'night': '🌙',
+      'sun': '☀️',
+      'mask': '🎭',
+      'face': '🧖',
+      'eye': '👁️',
+      'lip': '💋',
+    };
+    const lower = name.toLowerCase();
+    for (const [key, icon] of Object.entries(icons)) {
+      if (lower.includes(key)) return icon;
+    }
+    return '✨';
+  };
+
+  const sidebarContent = (
+    <div className="space-y-6">
+      {/* Subcategories */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Categories</h3>
+        <div className="space-y-1">
+          <button
+            onClick={() => setSelectedSubcategory('all')}
+            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+              selectedSubcategory === 'all' 
+                ? 'bg-pink-500 text-white shadow-md shadow-pink-500/30' 
+                : 'text-gray-600 hover:bg-pink-50'
+            }`}
+          >
+            ✨ All
+          </button>
+          {subcategories.map(sub => (
+            <button
+              key={sub.id}
+              onClick={() => setSelectedSubcategory(sub.id)}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+                selectedSubcategory === sub.id 
+                  ? 'bg-pink-500 text-white shadow-md shadow-pink-500/30' 
+                  : 'text-gray-600 hover:bg-pink-50'
+              }`}
+            >
+              {getIcon(sub.name)} {sub.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Brands */}
+      {brands.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Brands</h3>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            <button
+              onClick={() => setSelectedBrand('all')}
+              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                selectedBrand === 'all' 
+                  ? 'bg-pink-100 text-pink-600 font-medium' 
+                  : 'text-gray-600 hover:bg-pink-50'
+              }`}
+            >
+              All Brands
+            </button>
+            {brands.map(brand => (
+              <button
+                key={brand.id}
+                onClick={() => setSelectedBrand(brand.id)}
+                className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                  selectedBrand === brand.id 
+                    ? 'bg-pink-100 text-pink-600 font-medium' 
+                    : 'text-gray-600 hover:bg-pink-50'
+                }`}
+              >
+                {brand.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Skin Type */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Skin Type</h3>
+        <div className="space-y-1">
+          {skinTypes.map(type => (
+            <button
+              key={type.id}
+              onClick={() => setSelectedSkinType(type.id)}
+              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                selectedSkinType === type.id 
+                  ? 'bg-pink-100 text-pink-600 font-medium' 
+                  : 'text-gray-600 hover:bg-pink-50'
+              }`}
+            >
+              {type.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Concerns */}
+      {concerns.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Concerns</h3>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            <button
+              onClick={() => setSelectedConcern('all')}
+              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                selectedConcern === 'all' 
+                  ? 'bg-pink-100 text-pink-600 font-medium' 
+                  : 'text-gray-600 hover:bg-pink-50'
+              }`}
+            >
+              All Concerns
+            </button>
+            {concerns.map(concern => (
+              <button
+                key={concern.id}
+                onClick={() => setSelectedConcern(concern.id)}
+                className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                  selectedConcern === concern.id 
+                    ? 'bg-pink-100 text-pink-600 font-medium' 
+                    : 'text-gray-600 hover:bg-pink-50'
+                }`}
+              >
+                {concern.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Price Range */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Price</h3>
+        <div className="space-y-1">
+          {priceRanges.map(range => (
+            <button
+              key={range.id}
+              onClick={() => setPriceRange(range.id)}
+              className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                priceRange === range.id 
+                  ? 'bg-pink-100 text-pink-600 font-medium' 
+                  : 'text-gray-600 hover:bg-pink-50'
+              }`}
+            >
+              {range.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Clear Filters */}
+      <button
+        onClick={clearFilters}
+        className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+      >
+        Clear All Filters
+      </button>
+    </div>
+  );
+
+  // Mobile: Drawer
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setIsMobile(false)}>
+        <div className="absolute left-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center mb-5">
+            <h2 className="font-bold text-gray-800">Filters</h2>
+            <button onClick={() => setIsMobile(false)} className="text-gray-400 text-xl">✕</button>
+          </div>
+          {sidebarContent}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: Sidebar
+  return (
+    <div className="w-64 flex-shrink-0 sticky top-24 self-start max-h-[calc(100vh-120px)] overflow-y-auto pr-4">
+      {sidebarContent}
+    </div>
+  );
+};
+
 // ============ MAIN SKINCARE PAGE ============
 function SkincarePage() {
   const navigate = useNavigate();
@@ -227,7 +437,7 @@ function SkincarePage() {
   const [selectedConcern, setSelectedConcern] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
-  const [showFilters, setShowFilters] = useState(false);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   const API_URL = 'https://api.mypinkshop.com';
 
@@ -372,14 +582,15 @@ function SkincarePage() {
     setSortBy('default');
   };
 
+  // ===== MEMOIZED OPTIONS =====
   const subcategories = useMemo(() => {
     const subs = [...new Set(products.map(p => p.subcategory).filter(Boolean))];
-    return [{ id: 'all', name: 'All Subcategories' }, ...subs.map(s => ({ id: s, name: s }))];
+    return subs.map(s => ({ id: s.toLowerCase().replace(/ /g, '_'), name: s }));
   }, [products]);
 
   const brands = useMemo(() => {
     const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
-    return [{ id: 'all', name: 'All Brands' }, ...uniqueBrands.map(b => ({ id: b, name: b }))];
+    return uniqueBrands.map(b => ({ id: b, name: b }));
   }, [products]);
 
   const skinTypes = [
@@ -394,7 +605,7 @@ function SkincarePage() {
   const concerns = useMemo(() => {
     const allConcerns = products.flatMap(p => p.concerns || []).filter(Boolean);
     const uniqueConcerns = [...new Set(allConcerns)];
-    return [{ id: 'all', name: 'All Concerns' }, ...uniqueConcerns.map(c => ({ id: c, name: c }))];
+    return uniqueConcerns.map(c => ({ id: c.toLowerCase().replace(/ /g, '_'), name: c }));
   }, [products]);
 
   const priceRanges = [
@@ -413,6 +624,13 @@ function SkincarePage() {
     { id: 'rating', name: 'Highest Rated' },
     { id: 'newest', name: 'Newest First' },
   ];
+
+  // ===== BEST SELLERS =====
+  const bestSellers = useMemo(() => {
+    return [...filteredProducts]
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, 6);
+  }, [filteredProducts]);
 
   if (loading) {
     return (
@@ -531,100 +749,174 @@ function SkincarePage() {
           </div>
         </div>
 
+        {/* ===== MAIN CONTENT: SIDEBAR + PRODUCTS ===== */}
         <div className="max-w-7xl mx-auto px-4 pb-12">
           
-          {/* ===== FILTER BAR ===== */}
-          <div className="mb-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              
-              <div className="hidden md:flex flex-wrap gap-2">
-                <select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-                </select>
-                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-                </select>
-                <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  {skinTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
-                </select>
-                <select value={selectedConcern} onChange={(e) => setSelectedConcern(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  {concerns.map(concern => <option key={concern.id} value={concern.id}>{concern.name}</option>)}
-                </select>
-                <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                  {priceRanges.map(range => <option key={range.id} value={range.id}>{range.name}</option>)}
-                </select>
-              </div>
-
-              <button onClick={() => setShowFilters(!showFilters)} className="md:hidden px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                Filters 🔽
-              </button>
-
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                {sortOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
-              </select>
-            </div>
-
-            {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all' || selectedConcern !== 'all' || priceRange !== 'all' || searchTerm) && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {selectedSubcategory !== 'all' && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')}>×</button></span>}
-                {selectedBrand !== 'all' && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">{selectedBrand} <button onClick={() => setSelectedBrand('all')}>×</button></span>}
-                {selectedSkinType !== 'all' && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">Skin: {selectedSkinType} <button onClick={() => setSelectedSkinType('all')}>×</button></span>}
-                {selectedConcern !== 'all' && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">Concern: {selectedConcern} <button onClick={() => setSelectedConcern('all')}>×</button></span>}
-                {priceRange !== 'all' && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">{priceRanges.find(r => r.id === priceRange)?.name} <button onClick={() => setPriceRange('all')}>×</button></span>}
-                {searchTerm && <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">Search: {searchTerm} <button onClick={() => setSearchTerm('')}>×</button></span>}
-                <button onClick={clearFilters} className="text-xs text-pink-500 underline">Clear All</button>
-              </div>
-            )}
+          {/* Mobile Filter Toggle */}
+          <div className="md:hidden flex items-center justify-between mb-4">
+            <button 
+              onClick={() => setIsMobileFilterOpen(true)}
+              className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white flex items-center gap-2"
+            >
+              ☰ Filters
+              {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all' || selectedConcern !== 'all' || priceRange !== 'all') && (
+                <span className="w-2 h-2 bg-pink-500 rounded-full"></span>
+              )}
+            </button>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
+              {sortOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
+            </select>
           </div>
 
-          {/* ===== MOBILE FILTERS MODAL ===== */}
-          {showFilters && (
-            <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFilters(false)}>
-              <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-5">
-                  <h3 className="font-semibold text-gray-800">Filters</h3>
-                  <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
-                </div>
-                <div className="space-y-4">
-                  <div><label className="block text-sm mb-1">Subcategory</label><select value={selectedSubcategory} onChange={(e) => setSelectedSubcategory(e.target.value)} className="w-full p-2 border rounded-lg">{subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                  <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                  <div><label className="block text-sm mb-1">Skin Type</label><select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-2 border rounded-lg">{skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                  <div><label className="block text-sm mb-1">Concern</label><select value={selectedConcern} onChange={(e) => setSelectedConcern(e.target.value)} className="w-full p-2 border rounded-lg">{concerns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                  <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
-                  <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
-                </div>
-              </div>
+          {/* Active Filters Tags */}
+          {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedSkinType !== 'all' || selectedConcern !== 'all' || priceRange !== 'all' || searchTerm) && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {selectedSubcategory !== 'all' && (
+                <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">
+                  {subcategories.find(s => s.id === selectedSubcategory)?.name} 
+                  <button onClick={() => setSelectedSubcategory('all')} className="ml-1">×</button>
+                </span>
+              )}
+              {selectedBrand !== 'all' && (
+                <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">
+                  {selectedBrand} <button onClick={() => setSelectedBrand('all')} className="ml-1">×</button>
+                </span>
+              )}
+              {selectedSkinType !== 'all' && (
+                <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">
+                  {skinTypes.find(t => t.id === selectedSkinType)?.name} 
+                  <button onClick={() => setSelectedSkinType('all')} className="ml-1">×</button>
+                </span>
+              )}
+              {selectedConcern !== 'all' && (
+                <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">
+                  {concerns.find(c => c.id === selectedConcern)?.name} 
+                  <button onClick={() => setSelectedConcern('all')} className="ml-1">×</button>
+                </span>
+              )}
+              {priceRange !== 'all' && (
+                <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">
+                  {priceRanges.find(r => r.id === priceRange)?.name} 
+                  <button onClick={() => setPriceRange('all')} className="ml-1">×</button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="text-xs px-2 py-1 bg-pink-50 text-pink-600 rounded-full">
+                  Search: {searchTerm} <button onClick={() => setSearchTerm('')} className="ml-1">×</button>
+                </span>
+              )}
+              <button onClick={clearFilters} className="text-xs text-pink-500 underline">Clear All</button>
             </div>
           )}
 
-          {/* ===== RESULTS COUNT ===== */}
-          <div className="mb-4">
-            <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-pink-600">{products.length}</span> products</p>
+          <div className="flex gap-6">
+            {/* ===== LEFT SIDEBAR (Desktop) ===== */}
+            <div className="hidden md:block">
+              <SubcategorySidebar 
+                subcategories={subcategories}
+                selectedSubcategory={selectedSubcategory}
+                setSelectedSubcategory={setSelectedSubcategory}
+                brands={brands}
+                selectedBrand={selectedBrand}
+                setSelectedBrand={setSelectedBrand}
+                skinTypes={skinTypes}
+                selectedSkinType={selectedSkinType}
+                setSelectedSkinType={setSelectedSkinType}
+                concerns={concerns}
+                selectedConcern={selectedConcern}
+                setSelectedConcern={setSelectedConcern}
+                priceRanges={priceRanges}
+                priceRange={priceRange}
+                setPriceRange={setPriceRange}
+                clearFilters={clearFilters}
+                isMobile={false}
+                setIsMobile={() => {}}
+              />
+            </div>
+
+            {/* ===== MOBILE FILTERS ===== */}
+            <SubcategorySidebar 
+              subcategories={subcategories}
+              selectedSubcategory={selectedSubcategory}
+              setSelectedSubcategory={setSelectedSubcategory}
+              brands={brands}
+              selectedBrand={selectedBrand}
+              setSelectedBrand={setSelectedBrand}
+              skinTypes={skinTypes}
+              selectedSkinType={selectedSkinType}
+              setSelectedSkinType={setSelectedSkinType}
+              concerns={concerns}
+              selectedConcern={selectedConcern}
+              setSelectedConcern={setSelectedConcern}
+              priceRanges={priceRanges}
+              priceRange={priceRange}
+              setPriceRange={setPriceRange}
+              clearFilters={clearFilters}
+              isMobile={true}
+              setIsMobile={setIsMobileFilterOpen}
+            />
+
+            {/* ===== RIGHT CONTENT (Products) ===== */}
+            <div className="flex-1 min-w-0">
+              {/* Results Count */}
+              <div className="mb-4">
+                <p className="text-sm text-gray-500">Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products</p>
+              </div>
+
+              {/* Best Sellers */}
+              {bestSellers.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">🔥 Best Sellers</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {bestSellers.slice(0, 4).map(product => (
+                      <ProductCard 
+                        key={product._id} 
+                        product={product} 
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Products Grid */}
+              {filteredProducts.length === 0 ? (
+                <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
+                  <div className="text-6xl mb-3">🧴</div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">No skincare products found</h3>
+                  <p className="text-gray-500 text-sm mb-4">Try adjusting your filters</p>
+                  <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">Clear All Filters</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Load More */}
+              {filteredProducts.length > 12 && (
+                <div className="text-center mt-6">
+                  <button className="bg-white border border-pink-200 text-gray-700 px-8 py-3 rounded-full hover:bg-pink-50 transition-all text-sm font-medium">
+                    Load More Products ↓
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          
-          {/* ===== PRODUCTS GRID ===== */}
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
-              <div className="text-6xl mb-3">🧴</div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-1">No skincare products found</h3>
-              <p className="text-gray-500 text-sm mb-4">Try adjusting your filters</p>
-              <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">Clear All Filters</button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
-                <ProductCard 
-                  key={product._id} 
-                  product={product} 
-                  addToCart={addToCart}
-                  isInWishlist={isInWishlist}
-                  addToWishlist={addToWishlist}
-                  removeFromWishlist={removeFromWishlist}
-                  user={user}
-                />
-              ))}
-            </div>
-          )}
         </div>
 
         {/* ===== FOOTER ===== */}
