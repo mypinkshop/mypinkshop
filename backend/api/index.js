@@ -204,59 +204,19 @@ class ShiprocketService {
 
 const shiprocket = new ShiprocketService();
 
-// ========== Schemas ==========
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['buyer', 'vendor', 'admin'], default: 'buyer' },
-  phone: { type: String, default: '' },
-  address: { type: String, default: '' },
-  isEmailVerified: { type: Boolean, default: false },
-  emailVerificationToken: { type: String, default: '' },
-  emailVerificationExpires: { type: Date },
-  resetPasswordToken: { type: String, default: '' },
-  resetPasswordExpires: { type: Date },
-  createdAt: { type: Date, default: Date.now }
-});
+// ========== SCHEMAS ==========
 
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
-const User = mongoose.models.User || mongoose.model('User', userSchema);
-
-// ========== ADDRESS SCHEMA ==========
-const addressSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  fullName: { type: String, required: true },
-  phone: { type: String, required: true },
-  addressLine1: { type: String, required: true },
-  addressLine2: { type: String, default: '' },
-  landmark: { type: String, default: '' },
-  city: { type: String, required: true },
-  state: { type: String, required: true },
-  pincode: { type: String, required: true },
-  country: { type: String, default: 'India' },
-  type: { type: String, enum: ['Home', 'Work', 'Other'], default: 'Home' },
-  isDefault: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
-
+// ✅ FIXED: Product Schema with subCategory
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
   category: { type: String, required: true },
   mainCategory: { type: String, default: '' },
+  
+  // ✅ FIX: Added subCategory and subcategory fields
+  subCategory: { type: String, default: '' },
+  subcategory: { type: String, default: '' },
+  
   price: { type: Number, required: true },
   originalPrice: { type: Number, default: 0 },
   stock: { type: Number, default: 0 },
@@ -288,6 +248,54 @@ const productSchema = new mongoose.Schema({
 });
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
+
+// ========== OTHER SCHEMAS ==========
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['buyer', 'vendor', 'admin'], default: 'buyer' },
+  phone: { type: String, default: '' },
+  address: { type: String, default: '' },
+  isEmailVerified: { type: Boolean, default: false },
+  emailVerificationToken: { type: String, default: '' },
+  emailVerificationExpires: { type: Date },
+  resetPasswordToken: { type: String, default: '' },
+  resetPasswordExpires: { type: Date },
+  createdAt: { type: Date, default: Date.now }
+});
+
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+const addressSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  fullName: { type: String, required: true },
+  phone: { type: String, required: true },
+  addressLine1: { type: String, required: true },
+  addressLine2: { type: String, default: '' },
+  landmark: { type: String, default: '' },
+  city: { type: String, required: true },
+  state: { type: String, required: true },
+  pincode: { type: String, required: true },
+  country: { type: String, default: 'India' },
+  type: { type: String, enum: ['Home', 'Work', 'Other'], default: 'Home' },
+  isDefault: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
 
 const bannerSchema = new mongoose.Schema({
   title: { type: String, default: '' },
@@ -410,7 +418,6 @@ wishlistSchema.pre('save', function(next) {
 
 const Wishlist = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);
 
-// ========== CART SCHEMA ==========
 const cartItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   quantity: { type: Number, default: 1, min: 1 }
@@ -425,7 +432,7 @@ const cartSchema = new mongoose.Schema({
 
 const Cart = mongoose.models.Cart || mongoose.model('Cart', cartSchema);
 
-// ========== Auth Middleware ==========
+// ========== AUTH MIDDLEWARE ==========
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -639,8 +646,6 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 
 // ========== ADDRESS ROUTES ==========
-
-// GET all addresses
 app.get('/api/addresses', authMiddleware, async (req, res) => {
   try {
     const addresses = await Address.find({ userId: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
@@ -651,7 +656,6 @@ app.get('/api/addresses', authMiddleware, async (req, res) => {
   }
 });
 
-// POST add address
 app.post('/api/addresses', authMiddleware, async (req, res) => {
   try {
     console.log('Received address data:', req.body);
@@ -698,7 +702,6 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT update address
 app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -736,7 +739,6 @@ app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE address
 app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -753,7 +755,6 @@ app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// PATCH set default
 app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -778,8 +779,6 @@ app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
 });
 
 // ========== CART ROUTES ==========
-
-// GET cart
 app.get('/api/cart', authMiddleware, async (req, res) => {
   try {
     let cart = await Cart.findOne({ userId: req.user.id }).populate('items.productId');
@@ -794,7 +793,6 @@ app.get('/api/cart', authMiddleware, async (req, res) => {
   }
 });
 
-// POST add to cart
 app.post('/api/cart', authMiddleware, async (req, res) => {
   try {
     const { productId, quantity = 1 } = req.body;
@@ -831,7 +829,6 @@ app.post('/api/cart', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT update cart item
 app.put('/api/cart/:itemId', authMiddleware, async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -859,7 +856,6 @@ app.put('/api/cart/:itemId', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE remove from cart
 app.delete('/api/cart/:itemId', authMiddleware, async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -926,7 +922,7 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// ========== FIXED PRODUCT CREATE ROUTE ==========
+// ========== ✅ FIXED: PRODUCT CREATE ROUTE WITH SUBCATEGORY ==========
 app.post('/api/products', authMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -975,11 +971,20 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     const category = productData.category || productData.detectedCategory || productData.mainCategory || 'Uncategorized';
     const mainCategory = productData.mainCategory || productData.detectedCategory || 'Other';
     
+    // ✅ FIX: Get subCategory from request
+    const subCategory = productData.subCategory || productData.subcategory || '';
+    const subcategory = productData.subCategory || productData.subcategory || '';
+    
     const product = new Product({
       name: name,
       brand: productData.brand || '',
       category: category,
       mainCategory: mainCategory,
+      
+      // ✅ FIX: Added subCategory and subcategory
+      subCategory: subCategory,
+      subcategory: subcategory,
+      
       price: price,
       originalPrice: originalPrice,
       stock: Number(productData.stock) || 10,
@@ -1037,12 +1042,21 @@ app.post('/api/products', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== ✅ FIXED: PRODUCT UPDATE ROUTE WITH SUBCATEGORY ==========
 app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    // ✅ FIX: Update subCategory fields
+    if (req.body.subCategory !== undefined) {
+      product.subCategory = req.body.subCategory;
+    }
+    if (req.body.subcategory !== undefined) {
+      product.subcategory = req.body.subcategory;
     }
     
     if (req.body.variations !== undefined) {
@@ -1053,7 +1067,7 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       product.variants = req.body.variants;
     }
     
-    const { variations, variants, ...otherData } = req.body;
+    const { variations, variants, subCategory, subcategory, ...otherData } = req.body;
     Object.assign(product, otherData);
     
     await product.save();
@@ -1380,8 +1394,6 @@ app.delete('/api/wishlist/clear/all', authMiddleware, async (req, res) => {
 });
 
 // ========== ORDERS ROUTES ==========
-
-// GET all orders
 app.get('/api/orders', authMiddleware, async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
@@ -1392,7 +1404,6 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-// GET single order
 app.get('/api/orders/:id', authMiddleware, async (req, res) => {
   try {
     const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
@@ -1406,7 +1417,6 @@ app.get('/api/orders/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// POST create order
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
     const { items, total, address, paymentMethod } = req.body;
@@ -1445,7 +1455,6 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-// PATCH update order status
 app.patch('/api/orders/:id/status', authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
