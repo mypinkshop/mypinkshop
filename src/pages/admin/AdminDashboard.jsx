@@ -1,3 +1,5 @@
+// AdminDashboard.js - Complete file with Notification Section
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
@@ -25,8 +27,18 @@ function AdminDashboard() {
   const [salesData, setSalesData] = useState([]);
   const [categorySales, setCategorySales] = useState([]);
   const [activeOffer, setActiveOffer] = useState(null);
-  const navigate = useNavigate();
 
+  // ✅ Notification State
+  const [notificationForm, setNotificationForm] = useState({
+    title: '',
+    message: '',
+    userType: 'all',
+    userId: '',
+    type: 'system'
+  });
+  const [sendingNotification, setSendingNotification] = useState(false);
+
+  const navigate = useNavigate();
   const API_URL = 'https://api.mypinkshop.com';
 
   useEffect(() => {
@@ -60,7 +72,6 @@ function AdminDashboard() {
       });
       let data = await productsRes.json();
       
-      // ✅ FIX: Handle both paginated and non-paginated response
       const allProducts = data.products || data;
       
       const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
@@ -156,6 +167,48 @@ function AdminDashboard() {
     } catch (error) {
       console.error('Error loading dashboard:', error);
       setLoading(false);
+    }
+  };
+
+  // ✅ Send Notification Function
+  const sendNotification = async () => {
+    if (!notificationForm.title.trim() || !notificationForm.message.trim()) {
+      alert('Please fill title and message');
+      return;
+    }
+
+    try {
+      setSendingNotification(true);
+      const token = localStorage.getItem('adminToken');
+      
+      const response = await fetch(`${API_URL}/api/notifications/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: notificationForm.title,
+          message: notificationForm.message,
+          userType: notificationForm.userType,
+          userId: notificationForm.userId || null,
+          type: notificationForm.type
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`✅ Notification sent to ${data.count || 0} users!`);
+        setNotificationForm({ title: '', message: '', userType: 'all', userId: '', type: 'system' });
+      } else {
+        alert('❌ Failed: ' + (data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Send notification error:', error);
+      alert('❌ Failed to send notification');
+    } finally {
+      setSendingNotification(false);
     }
   };
 
@@ -263,6 +316,7 @@ function AdminDashboard() {
             </div>
           )}
 
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
             <div onClick={() => handleCardClick('revenue')} className="cursor-pointer group bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -304,6 +358,7 @@ function AdminDashboard() {
             </div>
           </div>
 
+          {/* More Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
             <div onClick={() => handleCardClick('products')} className="cursor-pointer bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-md transition">
               <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -357,6 +412,7 @@ function AdminDashboard() {
             </div>
           </div>
 
+          {/* Sales Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-4 sm:p-5 lg:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
@@ -408,6 +464,7 @@ function AdminDashboard() {
             </div>
           </div>
 
+          {/* Top Products & Recent Orders */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-4 sm:p-5 lg:p-6 shadow-sm">
               <h3 className="font-semibold text-gray-800 text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
@@ -501,8 +558,8 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Quick Actions */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-4">
+          {/* ✅ Quick Actions */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-4 mb-6">
             <Link to="/admin/add-product" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-4 text-center border border-pink-100 hover:shadow-lg hover:-translate-y-1 transition-all group">
               <div className="text-xl sm:text-2xl lg:text-3xl mb-1 sm:mb-2 group-hover:scale-110 transition">➕</div>
               <p className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-700">Add Product</p>
@@ -532,6 +589,86 @@ function AdminDashboard() {
               <p className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-700">Reports</p>
             </Link>
           </div>
+
+          {/* ✅ Notification Section - Send Notification */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-4 sm:p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span className="text-xl">🔔</span> Send Notification to Users
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={notificationForm.title}
+                  onChange={(e) => setNotificationForm({...notificationForm, title: e.target.value})}
+                  placeholder="Notification title..."
+                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notification Type</label>
+                <select
+                  value={notificationForm.type}
+                  onChange={(e) => setNotificationForm({...notificationForm, type: e.target.value})}
+                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                >
+                  <option value="system">⚙️ System</option>
+                  <option value="order">🛒 Order</option>
+                  <option value="promo">🏷️ Promo</option>
+                  <option value="offer">🎉 Offer</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
+                <select
+                  value={notificationForm.userType}
+                  onChange={(e) => setNotificationForm({...notificationForm, userType: e.target.value})}
+                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                >
+                  <option value="all">📢 All Users</option>
+                  <option value="specific">👤 Specific User</option>
+                </select>
+              </div>
+              {notificationForm.userType === 'specific' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">User ID *</label>
+                  <input
+                    type="text"
+                    value={notificationForm.userId}
+                    onChange={(e) => setNotificationForm({...notificationForm, userId: e.target.value})}
+                    placeholder="Enter user ID..."
+                    className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Send to specific user only</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
+              <textarea
+                value={notificationForm.message}
+                onChange={(e) => setNotificationForm({...notificationForm, message: e.target.value})}
+                placeholder="Write notification message..."
+                rows="3"
+                className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm resize-none"
+              />
+            </div>
+
+            <button
+              onClick={sendNotification}
+              disabled={sendingNotification}
+              className="mt-4 px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              {sendingNotification ? '⏳ Sending...' : '📤 Send Notification'}
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
