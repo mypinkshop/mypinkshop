@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';  // ✅ useNavigate import karo
-import AdminSidebar from '../../components/AdminSidebar';
+import AdminSidebar from './components/AdminSidebar';
 
 function AdminNotifications() {
   const navigate = useNavigate();  // ✅ navigate hook use karo
