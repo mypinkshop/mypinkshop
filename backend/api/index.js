@@ -12,6 +12,7 @@ const authRoutes = require('./auth');
 const userRoutes = require('./users');
 const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -644,6 +645,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/notifications', authMiddleware, notificationRoutes);
 
 // ========== ADDRESS ROUTES ==========
 app.get('/api/addresses', authMiddleware, async (req, res) => {
