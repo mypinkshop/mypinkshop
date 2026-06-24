@@ -645,7 +645,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ========== ADDRESS ROUTES ==========
 app.get('/api/addresses', authMiddleware, async (req, res) => {
