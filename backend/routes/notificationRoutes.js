@@ -2,8 +2,37 @@ const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
-// ========== TEST ROUTE (pehle yeh check karo) ==========
+// ========== AUTH MIDDLEWARE ==========
+const auth = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
+
+const adminAuth = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ success: false, message: 'Admin access required' });
+  }
+};
+
+// ========== TEST ROUTE ==========
 router.get('/test', (req, res) => {
   res.json({ success: true, message: '✅ Notification routes working!' });
 });
@@ -11,7 +40,7 @@ router.get('/test', (req, res) => {
 // ========== NOTIFICATION ROUTES ==========
 
 // ✅ Admin: Send notification
-router.post('/send', async (req, res) => {
+router.post('/send', auth, adminAuth, async (req, res) => {
   try {
     const { title, message, userType, userId, type } = req.body;
     
@@ -43,8 +72,8 @@ router.post('/send', async (req, res) => {
           type: type || 'system',
           isRead: false,
           data: { 
-            sentBy: req.user?.id || 'system',
-            sentByName: req.user?.name || 'Admin',
+            sentBy: req.user.id,
+            sentByName: req.user.name || 'Admin',
             userType: userType || 'all'
           }
         });
@@ -64,7 +93,7 @@ router.post('/send', async (req, res) => {
 });
 
 // ✅ Admin: Get sent notifications
-router.get('/admin/sent', async (req, res) => {
+router.get('/admin/sent', auth, adminAuth, async (req, res) => {
   try {
     const notifications = await Notification.find({})
       .populate('userId', 'name email')
@@ -97,7 +126,7 @@ router.get('/admin/sent', async (req, res) => {
 });
 
 // ✅ Admin: Delete notification
-router.delete('/admin/:id', async (req, res) => {
+router.delete('/admin/:id', auth, adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     let result;
@@ -119,7 +148,7 @@ router.delete('/admin/:id', async (req, res) => {
 });
 
 // ✅ User: Get my notifications
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const { limit = 50, page = 1 } = req.query;
     const skip = (page - 1) * limit;
@@ -153,7 +182,7 @@ router.get('/', async (req, res) => {
 });
 
 // ✅ User: Mark as read
-router.put('/:id/read', async (req, res) => {
+router.put('/:id/read', auth, async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
@@ -173,7 +202,7 @@ router.put('/:id/read', async (req, res) => {
 });
 
 // ✅ User: Mark all as read
-router.put('/read-all', async (req, res) => {
+router.put('/read-all', auth, async (req, res) => {
   try {
     const result = await Notification.updateMany(
       { userId: req.user.id, isRead: false },
@@ -192,7 +221,7 @@ router.put('/read-all', async (req, res) => {
 });
 
 // ✅ User: Delete notification
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     const notification = await Notification.findOneAndDelete({ 
       _id: req.params.id,
@@ -211,7 +240,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ✅ User: Get unread count
-router.get('/unread-count', async (req, res) => {
+router.get('/unread-count', auth, async (req, res) => {
   try {
     const count = await Notification.countDocuments({ 
       userId: req.user.id, 
