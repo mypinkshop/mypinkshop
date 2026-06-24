@@ -1,14 +1,15 @@
 // AdminNotifications.jsx - Full page for notifications management
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import AdminSidebar from './components/AdminSidebar';
+import { Link, useNavigate } from 'react-router-dom';  // ✅ useNavigate import karo
+import AdminSidebar from '../../components/AdminSidebar';
 
 function AdminNotifications() {
+  const navigate = useNavigate();  // ✅ navigate hook use karo
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('sent'); // 'sent' | 'send'
+  const [selectedTab, setSelectedTab] = useState('sent');
   const [form, setForm] = useState({
     title: '',
     message: '',
@@ -26,19 +27,28 @@ function AdminNotifications() {
       return;
     }
     fetchSentNotifications();
-  }, []);
+  }, [navigate]);
 
   const fetchSentNotifications = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_URL}/api/notifications/admin/sent`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       setNotifications(data || []);
     } catch (error) {
       console.error('Fetch notifications error:', error);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -72,12 +82,12 @@ function AdminNotifications() {
       const data = await response.json();
       
       if (response.ok) {
-        alert(`✅ Notification sent to ${data.count} users!`);
+        alert(`✅ Notification sent to ${data.count || 0} users!`);
         setForm({ title: '', message: '', userType: 'all', userId: '', type: 'system' });
         fetchSentNotifications();
         setSelectedTab('sent');
       } else {
-        alert('❌ Failed: ' + data.message);
+        alert('❌ Failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Send notification error:', error);
@@ -91,11 +101,18 @@ function AdminNotifications() {
     if (!confirm('Delete this notification?')) return;
     try {
       const token = localStorage.getItem('adminToken');
-      await fetch(`${API_URL}/api/notifications/admin/${id}`, {
+      const response = await fetch(`${API_URL}/api/notifications/admin/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-      setNotifications(notifications.filter(n => n._id !== id));
+      
+      if (response.ok) {
+        setNotifications(notifications.filter(n => n._id !== id));
+        alert('✅ Notification deleted');
+      }
     } catch (error) {
       console.error('Delete error:', error);
       alert('Failed to delete');
@@ -151,7 +168,6 @@ function AdminNotifications() {
           </div>
 
           {selectedTab === 'send' ? (
-            // Send Notification Form
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Send Notification</h3>
               
@@ -228,7 +244,6 @@ function AdminNotifications() {
               </button>
             </div>
           ) : (
-            // Sent Notifications List
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-6 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Sent Notifications</h3>
@@ -252,7 +267,11 @@ function AdminNotifications() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">{notif.type === 'order' ? '🛒' : notif.type === 'promo' ? '🏷️' : notif.type === 'offer' ? '🎉' : '⚙️'}</span>
+                            <span className="text-xl">
+                              {notif.type === 'order' ? '🛒' : 
+                               notif.type === 'promo' ? '🏷️' : 
+                               notif.type === 'offer' ? '🎉' : '⚙️'}
+                            </span>
                             <h4 className="font-semibold text-gray-800">{notif.title}</h4>
                             <span className="text-xs text-gray-400 ml-2">
                               {new Date(notif.createdAt).toLocaleDateString()}
@@ -261,10 +280,10 @@ function AdminNotifications() {
                           <p className="text-sm text-gray-600 mt-1">{notif.message}</p>
                           <div className="flex items-center gap-4 mt-2">
                             <span className="text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full">
-                              {notif.userType === 'all' ? '📢 All Users' : `👤 ${notif.userCount || 1} users`}
+                              👥 {notif.userCount || 0} users
                             </span>
                             <span className="text-xs text-gray-400">
-                              Sent by: {notif.sentBy?.name || 'Admin'}
+                              Sent by: {notif.sentBy || 'Admin'}
                             </span>
                           </div>
                         </div>
