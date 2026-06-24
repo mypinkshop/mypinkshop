@@ -24,6 +24,7 @@ const corsOptions = {
     'http://localhost:3000',
     'http://localhost:8081',
     'https://mypinkshop-backend-62p5dbqg0-mypinkshops-projects.vercel.app'
+    'https://mypinkshop.github.io'
   ],
   credentials: true,
   optionsSuccessStatus: 200
