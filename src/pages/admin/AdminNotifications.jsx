@@ -17,7 +17,7 @@ function AdminNotifications() {
     type: 'system'
   });
 
-  const API_URL = 'https://api.mypinkshop.com/api';
+  const API_URL = 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
