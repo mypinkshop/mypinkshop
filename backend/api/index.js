@@ -12,8 +12,7 @@ const authRoutes = require('./auth');
 const userRoutes = require('./users');
 const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
-const notificationRoutes = require('./routes/notificationRoutes');
-
+const notificationRoutes = require('../routes/notificationRoutes');
 const app = express();
 
 // ========== CORS FIX ==========
