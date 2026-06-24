@@ -58,6 +58,7 @@ const AdminEditProduct = lazy(() => import('./pages/admin/AdminEditProduct'));
 const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
 const AdminOffers = lazy(() => import('./pages/admin/AdminOffers'));
 const AdminBulkUpload = lazy(() => import('./pages/admin/AdminBulkUpload'));
+const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'));
 
 // ✅ VENDOR PAGES - Lazy Loaded
 const VendorLogin = lazy(() => import('./pages/vendor/VendorLogin'));
@@ -154,6 +155,7 @@ function App() {
                   <Route path="/admin/reviews" element={<AdminReviews />} />
                   <Route path="/admin/offers" element={<AdminOffers />} />
                   <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
+                  <Route path="/admin/notifications" element={<AdminNotifications />} />
 
                   {/* ============ VENDOR ROUTES ============ */}
                   <Route path="/vendor/login" element={<VendorLogin />} />
