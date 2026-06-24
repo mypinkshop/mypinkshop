@@ -12,7 +12,6 @@ const authRoutes = require('./auth');
 const userRoutes = require('./users');
 const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
-const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -23,8 +22,7 @@ const corsOptions = {
     'https://mypinkshop.com',
     'http://localhost:3000',
     'http://localhost:8081',
-    'https://mypinkshop-backend-62p5dbqg0-mypinkshops-projects.vercel.app',
-    'https://mypinkshop.github.io'
+    'https://mypinkshop-backend-62p5dbqg0-mypinkshops-projects.vercel.app'
   ],
   credentials: true,
   optionsSuccessStatus: 200
@@ -646,7 +644,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/notifications', notificationRoutes);
 
 // ========== ADDRESS ROUTES ==========
 app.get('/api/addresses', authMiddleware, async (req, res) => {
