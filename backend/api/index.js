@@ -207,7 +207,7 @@ class ShiprocketService {
 const shiprocket = new ShiprocketService();
 
 // ============================================
-// ✅ VENDOR SCHEMA - ADD THIS
+// ✅ VENDOR SCHEMA
 // ============================================
 const vendorSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -256,7 +256,6 @@ const vendorSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// Hash password before saving
 vendorSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
@@ -264,12 +263,10 @@ vendorSchema.pre('save', async function(next) {
   next();
 });
 
-// Match password method
 vendorSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Generate storeId
 vendorSchema.pre('save', function(next) {
   if (!this.storeId) {
     this.storeId = `STORE_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -282,7 +279,6 @@ const Vendor = mongoose.models.Vendor || mongoose.model('Vendor', vendorSchema);
 
 // ========== SCHEMAS ==========
 
-// Product Schema
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
@@ -323,7 +319,6 @@ const productSchema = new mongoose.Schema({
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
 
-// User Schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -352,7 +347,6 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
-// Address Schema
 const addressSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   fullName: { type: String, required: true },
@@ -371,7 +365,6 @@ const addressSchema = new mongoose.Schema({
 
 const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
 
-// Banner Schema
 const bannerSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   subtitle: { type: String, default: '' },
@@ -386,7 +379,6 @@ const bannerSchema = new mongoose.Schema({
 
 const Banner = mongoose.models.Banner || mongoose.model('Banner', bannerSchema);
 
-// Offer Schema
 const offerSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
@@ -403,7 +395,6 @@ const offerSchema = new mongoose.Schema({
 
 const Offer = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
 
-// Coupon Schema
 const couponSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true },
   description: { type: String, default: '' },
@@ -422,7 +413,6 @@ const couponSchema = new mongoose.Schema({
 
 const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
 
-// Review Schema
 const reviewSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -454,7 +444,6 @@ reviewSchema.statics.getAverageRating = async function(productId) {
 
 const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
 
-// Order Schema
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   name: String,
@@ -478,7 +467,6 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
-// Wishlist Schema
 const wishlistItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   addedAt: { type: Date, default: Date.now }
@@ -498,7 +486,6 @@ wishlistSchema.pre('save', function(next) {
 
 const Wishlist = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);
 
-// Cart Schema
 const cartItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   quantity: { type: Number, default: 1, min: 1 }
@@ -727,14 +714,13 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ============================================
-// ✅ VENDOR LOGIN API - ADD THIS
+// ✅ VENDOR LOGIN API
 // ============================================
 app.post('/api/vendor/login', async (req, res) => {
   try {
     await connectDB();
     const { email, password, rememberMe } = req.body;
 
-    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -742,7 +728,6 @@ app.post('/api/vendor/login', async (req, res) => {
       });
     }
 
-    // Find vendor by email
     const vendor = await Vendor.findOne({ email: email.toLowerCase().trim() });
 
     if (!vendor) {
@@ -752,7 +737,6 @@ app.post('/api/vendor/login', async (req, res) => {
       });
     }
 
-    // Check if account is locked (after 5 failed attempts)
     if (vendor.lockUntil && vendor.lockUntil > new Date()) {
       const minutesLeft = Math.ceil((vendor.lockUntil - new Date()) / 60000);
       return res.status(403).json({
@@ -761,16 +745,13 @@ app.post('/api/vendor/login', async (req, res) => {
       });
     }
 
-    // Check password
     const isMatch = await vendor.matchPassword(password);
     
     if (!isMatch) {
-      // Increment login attempts
       vendor.loginAttempts = (vendor.loginAttempts || 0) + 1;
       
-      // Lock account after 5 failed attempts
       if (vendor.loginAttempts >= 5) {
-        vendor.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // Lock for 30 minutes
+        vendor.lockUntil = new Date(Date.now() + 30 * 60 * 1000);
         await vendor.save();
         return res.status(403).json({
           success: false,
@@ -790,7 +771,6 @@ app.post('/api/vendor/login', async (req, res) => {
       });
     }
 
-    // Check if vendor is approved
     if (vendor.status === 'pending' || vendor.vendorStatus === 'pending') {
       return res.status(403).json({
         success: false,
@@ -815,13 +795,11 @@ app.post('/api/vendor/login', async (req, res) => {
       });
     }
 
-    // Reset login attempts on successful login
     vendor.loginAttempts = 0;
     vendor.lockUntil = null;
     vendor.lastLogin = new Date();
     await vendor.save();
 
-    // Generate JWT Token
     const token = jwt.sign(
       { 
         id: vendor._id, 
@@ -834,7 +812,6 @@ app.post('/api/vendor/login', async (req, res) => {
       { expiresIn: rememberMe ? '30d' : '7d' }
     );
 
-    // Response
     res.json({
       success: true,
       token: token,
@@ -864,14 +841,13 @@ app.post('/api/vendor/login', async (req, res) => {
 });
 
 // ============================================
-// ✅ VENDOR REGISTER API - ADD THIS
+// ✅ VENDOR REGISTER API
 // ============================================
 app.post('/api/vendor/register', async (req, res) => {
   try {
     await connectDB();
     const { name, email, password, brandName, phone, address, gstNumber, panNumber, bankDetails } = req.body;
 
-    // Validation
     if (!name || !email || !password || !brandName) {
       return res.status(400).json({
         success: false,
@@ -879,7 +855,6 @@ app.post('/api/vendor/register', async (req, res) => {
       });
     }
 
-    // Check if vendor already exists
     const existingVendor = await Vendor.findOne({ 
       $or: [
         { email: email.toLowerCase().trim() },
@@ -896,7 +871,6 @@ app.post('/api/vendor/register', async (req, res) => {
       });
     }
 
-    // Create new vendor
     const vendor = new Vendor({
       name: name.trim(),
       email: email.toLowerCase().trim(),
@@ -915,8 +889,6 @@ app.post('/api/vendor/register', async (req, res) => {
 
     await vendor.save();
 
-    // Generate token for immediate login (if auto-approve enabled)
-    // For now, keep pending approval
     res.status(201).json({
       success: true,
       message: 'Vendor registration successful! Please wait for admin approval.',
@@ -940,7 +912,7 @@ app.post('/api/vendor/register', async (req, res) => {
 });
 
 // ============================================
-// ✅ VENDOR FORGOT PASSWORD API - ADD THIS
+// ✅ VENDOR FORGOT PASSWORD API
 // ============================================
 app.post('/api/vendor/forgot-password', async (req, res) => {
   try {
@@ -963,24 +935,20 @@ app.post('/api/vendor/forgot-password', async (req, res) => {
       });
     }
 
-    // Generate reset token
     const resetToken = jwt.sign(
       { id: vendor._id, email: vendor.email },
       process.env.JWT_SECRET || 'your_jwt_secret_key_change_this',
       { expiresIn: '1h' }
     );
 
-    // Save reset token to database
     vendor.resetPasswordToken = resetToken;
-    vendor.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    vendor.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
     await vendor.save();
 
-    // Send email (you can implement email sending)
-    // For now, just return success
     res.json({
       success: true,
       message: 'Password reset link sent to your email',
-      resetToken: resetToken // Remove this in production
+      resetToken: resetToken
     });
 
   } catch (error) {
@@ -993,7 +961,7 @@ app.post('/api/vendor/forgot-password', async (req, res) => {
 });
 
 // ============================================
-// ✅ VENDOR RESET PASSWORD API - ADD THIS
+// ✅ VENDOR RESET PASSWORD API
 // ============================================
 app.post('/api/vendor/reset-password', async (req, res) => {
   try {
@@ -1007,7 +975,6 @@ app.post('/api/vendor/reset-password', async (req, res) => {
       });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key_change_this');
     
     const vendor = await Vendor.findOne({
@@ -1023,7 +990,6 @@ app.post('/api/vendor/reset-password', async (req, res) => {
       });
     }
 
-    // Update password
     vendor.password = newPassword;
     vendor.resetPasswordToken = '';
     vendor.resetPasswordExpires = null;
@@ -1044,7 +1010,7 @@ app.post('/api/vendor/reset-password', async (req, res) => {
 });
 
 // ============================================
-// ✅ VENDOR GET PROFILE API - ADD THIS
+// ✅ VENDOR GET PROFILE API
 // ============================================
 app.get('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
@@ -1074,7 +1040,7 @@ app.get('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res
 });
 
 // ============================================
-// ✅ VENDOR UPDATE PROFILE API - ADD THIS
+// ✅ VENDOR UPDATE PROFILE API
 // ============================================
 app.put('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
@@ -1088,7 +1054,6 @@ app.put('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res
       });
     }
 
-    // Allowed fields to update
     const allowedFields = ['name', 'phone', 'address', 'brandName', 'storeName', 'gstNumber', 'panNumber', 'bankDetails'];
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
@@ -1115,7 +1080,7 @@ app.put('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res
 });
 
 // ============================================
-// ✅ VENDOR GET STATS API - ADD THIS
+// ✅ VENDOR GET STATS API
 // ============================================
 app.get('/api/vendor/stats', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
@@ -1123,13 +1088,9 @@ app.get('/api/vendor/stats', authMiddleware, vendorMiddleware, async (req, res) 
     
     const vendorId = req.user.id;
     
-    // Get total products
     const totalProducts = await Product.countDocuments({ vendorId: vendorId });
-    
-    // Get total orders (you'll need to add vendorId to orders)
     const totalOrders = await Order.countDocuments({ 'items.vendorId': vendorId });
     
-    // Get total revenue
     const orders = await Order.find({ 'items.vendorId': vendorId });
     let totalRevenue = 0;
     orders.forEach(order => {
@@ -1146,7 +1107,7 @@ app.get('/api/vendor/stats', authMiddleware, vendorMiddleware, async (req, res) 
         totalProducts,
         totalOrders,
         totalRevenue: Math.round(totalRevenue),
-        pendingOrders: 0 // Add logic for pending orders
+        pendingOrders: 0
       }
     });
 
@@ -1160,7 +1121,7 @@ app.get('/api/vendor/stats', authMiddleware, vendorMiddleware, async (req, res) 
 });
 
 // ============================================
-// ✅ ADMIN: GET ALL VENDORS - ADD THIS
+// ✅ ADMIN: GET ALL VENDORS
 // ============================================
 app.get('/api/admin/vendors', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1199,7 +1160,7 @@ app.get('/api/admin/vendors', authMiddleware, adminMiddleware, async (req, res) 
 });
 
 // ============================================
-// ✅ ADMIN: APPROVE VENDOR - ADD THIS
+// ✅ ADMIN: APPROVE VENDOR
 // ============================================
 app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1234,7 +1195,7 @@ app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, asy
 });
 
 // ============================================
-// ✅ ADMIN: REJECT VENDOR - ADD THIS
+// ✅ ADMIN: REJECT VENDOR
 // ============================================
 app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1269,7 +1230,7 @@ app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, asyn
 });
 
 // ============================================
-// ✅ ADMIN: SUSPEND VENDOR - ADD THIS
+// ✅ ADMIN: SUSPEND VENDOR
 // ============================================
 app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1304,7 +1265,7 @@ app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, asy
 });
 
 // ============================================
-// ✅ VENDOR PRODUCT ROUTES - ADD THIS
+// ✅ VENDOR PRODUCT ROUTES
 // ============================================
 
 // Get vendor's own products
@@ -1342,14 +1303,12 @@ app.get('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, re
   }
 });
 
-// Add vendor product with vendorId
+// Add vendor product
 app.post('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
     
     const productData = req.body;
-    
-    // Add vendorId to product
     productData.vendorId = req.user.id;
     
     const name = productData.name || productData.title || 'Unnamed Product';
@@ -1449,6 +1408,204 @@ app.post('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, r
     res.status(500).json({ 
       error: error.message
     });
+  }
+});
+
+// ============================================
+// ✅ VENDOR PRODUCT UPDATE & DELETE (NEW)
+// ============================================
+
+// Update vendor product
+app.put('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const product = await Product.findOne({ _id: req.params.id, vendorId: req.user.id });
+    
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+    
+    const allowedFields = ['name', 'brand', 'category', 'price', 'originalPrice', 'stock', 'images', 'description', 'shortDescription', 'keyFeatures', 'sizes', 'colors', 'variants', 'variations', 'fabric', 'material', 'gender', 'weight', 'dimensions', 'ingredients', 'subCategory', 'subcategory'];
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        product[field] = req.body[field];
+      }
+    });
+    
+    product.updatedAt = new Date();
+    await product.save();
+    
+    res.json({ success: true, product });
+  } catch (error) {
+    console.error('Update product error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete vendor product
+app.delete('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const product = await Product.findOneAndDelete({ _id: req.params.id, vendorId: req.user.id });
+    
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+    
+    res.json({ success: true, message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Delete product error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR ORDERS (NEW)
+// ============================================
+
+// Get vendor orders
+app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { page = 1, limit = 20, status } = req.query;
+    
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    const filter = { 'items.vendorId': req.user.id };
+    if (status) filter.status = status;
+    
+    const orders = await Order.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('userId', 'name email');
+    
+    const total = await Order.countDocuments(filter);
+    
+    const formattedOrders = orders.map(order => {
+      let vendorTotal = 0;
+      order.items.forEach(item => {
+        if (item.vendorId && item.vendorId.toString() === req.user.id) {
+          vendorTotal += item.price * item.quantity;
+        }
+      });
+      
+      return {
+        _id: order._id,
+        customerName: order.userId?.name || 'Customer',
+        customerEmail: order.userId?.email,
+        total: vendorTotal,
+        status: order.status,
+        createdAt: order.createdAt,
+        address: order.address,
+        items: order.items.filter(item => 
+          item.vendorId && item.vendorId.toString() === req.user.id
+        )
+      };
+    });
+    
+    res.json({
+      success: true,
+      orders: formattedOrders,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalOrders: total,
+        limit: limitNum
+      }
+    });
+  } catch (error) {
+    console.error('Get vendor orders error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update order status
+app.patch('/api/vendor/orders/:id/status', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { status } = req.body;
+    const validStatuses = ['pending', 'processing', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+    
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+    
+    const order = await Order.findOne({ 
+      _id: req.params.id, 
+      'items.vendorId': req.user.id 
+    });
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    
+    order.status = status;
+    if (status === 'delivered') {
+      order.deliveredAt = new Date();
+    }
+    await order.save();
+    
+    res.json({ success: true, order });
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR EARNINGS (NEW)
+// ============================================
+
+app.get('/api/vendor/earnings', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const vendorId = req.user.id;
+    
+    const orders = await Order.find({ 
+      'items.vendorId': vendorId,
+      status: 'delivered'
+    });
+    
+    let totalEarnings = 0;
+    let history = [];
+    
+    orders.forEach(order => {
+      let vendorTotal = 0;
+      order.items.forEach(item => {
+        if (item.vendorId && item.vendorId.toString() === vendorId) {
+          vendorTotal += item.price * item.quantity;
+        }
+      });
+      
+      const earnings = vendorTotal * 0.85;
+      totalEarnings += earnings;
+      
+      history.push({
+        orderId: order._id,
+        amount: Math.round(earnings),
+        date: order.createdAt || order.deliveredAt,
+        status: order.paymentStatus || 'pending'
+      });
+    });
+    
+    const pending = totalEarnings * 0.7;
+    const paid = totalEarnings * 0.3;
+    
+    res.json({
+      success: true,
+      earnings: {
+        total: Math.round(totalEarnings),
+        pending: Math.round(pending),
+        paid: Math.round(paid),
+        history: history.slice(-10).reverse()
+      }
+    });
+  } catch (error) {
+    console.error('Get earnings error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -2244,7 +2401,6 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     
     await order.save();
     
-    // Clear cart after order
     await Cart.findOneAndDelete({ userId: req.user.id });
     
     res.status(201).json(order);
