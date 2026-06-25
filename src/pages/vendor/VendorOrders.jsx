@@ -10,6 +10,8 @@ function VendorOrders() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [vendorInfo, setVendorInfo] = useState(null);
+  const [acceptingOrder, setAcceptingOrder] = useState(null);
+  const [downloading, setDownloading] = useState(null);
   const navigate = useNavigate();
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
@@ -64,7 +66,131 @@ function VendorOrders() {
     }
   };
 
-  // ✅ Update order status
+  // ✅ ACCEPT ORDER - Shiprocket Integration
+  const acceptOrder = async (orderId) => {
+    if (!window.confirm('✅ Accept this order? Shiprocket will be notified for pickup.')) return;
+    
+    const token = localStorage.getItem('vendorToken');
+    setAcceptingOrder(orderId);
+
+    try {
+      const res = await fetch(`${API_URL}/api/vendor/orders/${orderId}/accept`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          status: 'confirmed',
+          acceptedAt: new Date().toISOString(),
+          vendorId: vendorInfo?._id || vendorInfo?.id
+        })
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        setOrders(orders.map(order => 
+          order._id === orderId ? { 
+            ...order, 
+            status: 'confirmed',
+            trackingNumber: data.trackingNumber,
+            courierName: data.courierName || 'Shiprocket',
+            shipmentId: data.shipmentId
+          } : order
+        ));
+        
+        alert(`✅ Order accepted!\nTracking: ${data.trackingNumber || 'Generating...'}\nCourier: ${data.courierName || 'Shiprocket'}`);
+        fetchOrders(token);
+      } else {
+        alert(data.message || 'Failed to accept order');
+      }
+    } catch (err) {
+      console.error('Error accepting order:', err);
+      alert('Network error. Please try again.');
+    } finally {
+      setAcceptingOrder(null);
+    }
+  };
+
+  // ✅ REJECT ORDER
+  const rejectOrder = async (orderId) => {
+    if (!window.confirm('❌ Reject this order?')) return;
+    
+    const token = localStorage.getItem('vendorToken');
+
+    try {
+      const res = await fetch(`${API_URL}/api/vendor/orders/${orderId}/reject`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'cancelled' })
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        setOrders(orders.map(order => 
+          order._id === orderId ? { ...order, status: 'cancelled' } : order
+        ));
+        alert('❌ Order rejected');
+        fetchOrders(token);
+      } else {
+        alert(data.message || 'Failed to reject order');
+      }
+    } catch (err) {
+      console.error('Error rejecting order:', err);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  // ✅ DOWNLOAD INVOICE
+  const downloadInvoice = async (orderId) => {
+    const token = localStorage.getItem('vendorToken');
+    setDownloading(orderId);
+    try {
+      const res = await fetch(`${API_URL}/api/shipping/invoice/${orderId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        alert('Invoice not available yet. Please try again later.');
+      }
+    } catch (err) {
+      console.error('Error downloading invoice:', err);
+      alert('Failed to download invoice');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  // ✅ DOWNLOAD LABEL
+  const downloadLabel = async (orderId) => {
+    const token = localStorage.getItem('vendorToken');
+    setDownloading(orderId);
+    try {
+      const res = await fetch(`${API_URL}/api/shipping/label/${orderId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        alert('Label not available yet. Please try again later.');
+      }
+    } catch (err) {
+      console.error('Error downloading label:', err);
+      alert('Failed to download label');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  // ✅ Update order status (Manual)
   const updateOrderStatus = async (orderId, newStatus) => {
     const token = localStorage.getItem('vendorToken');
     try {
@@ -118,7 +244,8 @@ function VendorOrders() {
 
   const stats = {
     total: orders.length,
-    pending: orders.filter(o => o.status === 'pending' || o.status === 'processing' || o.status === 'confirmed').length,
+    pending: orders.filter(o => o.status === 'pending' || o.status === 'processing').length,
+    confirmed: orders.filter(o => o.status === 'confirmed').length,
     shipped: orders.filter(o => o.status === 'shipped').length,
     delivered: orders.filter(o => o.status === 'delivered').length,
     cancelled: orders.filter(o => o.status === 'cancelled').length,
@@ -171,14 +298,18 @@ function VendorOrders() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition">
-              <p className="text-xs text-gray-500">Total Orders</p>
+              <p className="text-xs text-gray-500">Total</p>
               <p className="text-2xl font-bold">{stats.total}</p>
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition">
               <p className="text-xs text-gray-500">Pending</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition">
+              <p className="text-xs text-gray-500">Confirmed</p>
+              <p className="text-2xl font-bold text-indigo-600">{stats.confirmed}</p>
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition">
               <p className="text-xs text-gray-500">Shipped</p>
@@ -229,13 +360,14 @@ function VendorOrders() {
                     <th className="px-4 py-3 text-right font-semibold text-gray-600">Amount</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-600">Date</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-600">Status</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-600">Tracking</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-600">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
                         🛒 No orders found
                       </td>
                     </tr>
@@ -253,9 +385,60 @@ function VendorOrders() {
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.status)}`}>
                             {order.status || 'pending'}
                           </span>
+                          {order.trackingNumber && (
+                            <div className="text-[10px] text-gray-400 mt-1">#{order.trackingNumber}</div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {order.status !== 'delivered' && order.status !== 'cancelled' ? (
+                          {order.trackingNumber ? (
+                            <div className="flex flex-col gap-1 items-center">
+                              <a 
+                                href={`https://shiprocket.co/track/${order.trackingNumber}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:text-blue-700 text-xs"
+                              >
+                                🔗 Track
+                              </a>
+                              <div className="flex gap-1">
+                                <button 
+                                  onClick={() => downloadInvoice(order._id)}
+                                  disabled={downloading === order._id}
+                                  className="bg-blue-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-600 disabled:opacity-50"
+                                >
+                                  📄 Invoice
+                                </button>
+                                <button 
+                                  onClick={() => downloadLabel(order._id)}
+                                  disabled={downloading === order._id}
+                                  className="bg-green-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-green-600 disabled:opacity-50"
+                                >
+                                  🏷️ Label
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {order.status === 'pending' ? (
+                            <div className="flex gap-2 justify-center">
+                              <button 
+                                onClick={() => acceptOrder(order._id)} 
+                                disabled={acceptingOrder === order._id}
+                                className="bg-green-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-green-600 transition disabled:opacity-50 whitespace-nowrap"
+                              >
+                                {acceptingOrder === order._id ? '⏳' : '✅ Accept'}
+                              </button>
+                              <button 
+                                onClick={() => rejectOrder(order._id)} 
+                                className="bg-red-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-red-600 transition whitespace-nowrap"
+                              >
+                                ❌ Reject
+                              </button>
+                            </div>
+                          ) : order.status !== 'delivered' && order.status !== 'cancelled' ? (
                             <select 
                               value={order.status || 'pending'} 
                               onChange={(e) => updateOrderStatus(order._id, e.target.value)}
@@ -278,6 +461,18 @@ function VendorOrders() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Shipping Info */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <p className="text-sm text-blue-800 font-medium">🚚 Shipping Powered by Shiprocket</p>
+            <p className="text-xs text-blue-600 mt-1">
+              Click <strong>"Accept"</strong> to confirm order and automatically create Shiprocket pickup request.
+              Customer will receive tracking details via email/SMS.
+            </p>
+            <p className="text-xs text-blue-500 mt-2">
+              📄 <strong>Invoice & Label:</strong> Available after order acceptance. Click to download.
+            </p>
           </div>
         </div>
       </main>
