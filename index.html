@@ -77,17 +77,41 @@
       .loading-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#fdf2f8,#fff,#fce7f3);display:flex;align-items:center;justify-content:center;z-index:9999}
       .loading-spinner{width:50px;height:50px;border:4px solid #fbcfe8;border-top-color:#ec4899;border-radius:50%;animation:spin 1s linear infinite}
       @keyframes spin{to{transform:rotate(360deg)}}
+      
+      /* ✅ ADDED: Noscript fallback */
+      .noscript-fallback{display:none;padding:40px 20px;text-align:center;background:linear-gradient(135deg,#fdf2f8,#fff,#fce7f3);min-height:100vh}
+      .noscript-fallback h1{font-size:24px;color:#db2777;margin-bottom:12px}
+      .noscript-fallback p{color:#6b7280;font-size:14px;max-width:400px;margin:0 auto 20px;line-height:1.6}
+      .noscript-fallback .icon{font-size:48px;margin-bottom:16px}
+      .noscript-fallback .btn{display:inline-block;background:linear-gradient(135deg,#ec4899,#db2777);color:white;padding:12px 32px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:14px}
+      .no-js .noscript-fallback{display:block !important}
+      .no-js .loading-screen{display:none !important}
     </style>
+    
+    <!-- ✅ FIXED: Production build script tags -->
+    <script type="module" crossorigin src="/assets/index.D90CpO9e.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor.CKq13Wy4.js">
+    <link rel="stylesheet" crossorigin href="/assets/index.Dnyuv9oS.css">
   </head>
+  
+  <!-- ✅ ADDED: noscript class -->
   <body>
+    <noscript>
+      <div class="noscript-fallback" style="display:block !important;">
+        <div class="icon">🌸</div>
+        <h1>MyPinkShop</h1>
+        <p>Please enable JavaScript to continue shopping with us!</p>
+        <a href="https://www.google.com/search?q=how+to+enable+javascript" target="_blank" class="btn">
+          Enable JavaScript →
+        </a>
+      </div>
+    </noscript>
+    
     <div id="root">
       <div class="loading-screen">
         <div class="loading-spinner"></div>
       </div>
     </div>
-    
-    <!-- Main script with version cache busting -->
-    <script type="module" src="/src/main.jsx?v=20260614"></script>
     
     <!-- Remove loading screen when React mounts -->
     <script>
