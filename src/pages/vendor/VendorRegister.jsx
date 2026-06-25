@@ -704,8 +704,8 @@ function VendorRegister() {
           {/* Help Section */}
           <div className="bg-gray-50 rounded-lg p-4 mt-6 text-center border border-gray-100">
             <p className="text-xs text-gray-500">
-              Need help? Call us at <span className="font-medium text-gray-700">1800-123-4567</span> or email{' '}
-              <a href="mailto:seller@mypinkshop.com" className="text-[#FF6B6B] hover:underline">seller@mypinkshop.com</a>
+              Need help? Call us at <span className="font-medium text-gray-700">1800-123-456799</span> or email{' '}
+              <a href="mailto:info@mypinkshop.com" className="text-[#FF6B6B] hover:underline">info@mypinkshop.com</a>
             </p>
           </div>
         </div>
