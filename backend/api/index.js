@@ -204,19 +204,90 @@ class ShiprocketService {
 
 const shiprocket = new ShiprocketService();
 
+// ============================================
+// ✅ VENDOR SCHEMA - ADD THIS
+// ============================================
+const vendorSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  brandName: { type: String, required: true },
+  storeName: { type: String, default: '' },
+  storeId: { type: String, unique: true, sparse: true },
+  phone: { type: String, default: '' },
+  address: {
+    street: { type: String, default: '' },
+    city: { type: String, default: '' },
+    state: { type: String, default: '' },
+    pincode: { type: String, default: '' },
+    country: { type: String, default: 'India' }
+  },
+  gstNumber: { type: String, default: '' },
+  panNumber: { type: String, default: '' },
+  bankDetails: {
+    accountNumber: { type: String, default: '' },
+    ifscCode: { type: String, default: '' },
+    accountHolderName: { type: String, default: '' }
+  },
+  status: { 
+    type: String, 
+    enum: ['pending', 'approved', 'rejected', 'suspended', 'blocked'], 
+    default: 'pending' 
+  },
+  vendorStatus: { 
+    type: String, 
+    enum: ['pending', 'approved', 'rejected', 'suspended'], 
+    default: 'pending' 
+  },
+  permissions: { 
+    type: [String], 
+    default: ['manage_products', 'view_orders', 'manage_inventory', 'view_analytics'] 
+  },
+  loginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null },
+  lastLogin: { type: Date },
+  twoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret: { type: String, default: '' },
+  resetPasswordToken: { type: String, default: '' },
+  resetPasswordExpires: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+// Hash password before saving
+vendorSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Match password method
+vendorSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Generate storeId
+vendorSchema.pre('save', function(next) {
+  if (!this.storeId) {
+    this.storeId = `STORE_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  }
+  this.updatedAt = new Date();
+  next();
+});
+
+const Vendor = mongoose.models.Vendor || mongoose.model('Vendor', vendorSchema);
+
 // ========== SCHEMAS ==========
 
-// ✅ FIXED: Product Schema with subCategory
+// Product Schema
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   brand: { type: String, default: '' },
   category: { type: String, required: true },
   mainCategory: { type: String, default: '' },
-  
-  // ✅ FIX: Added subCategory and subcategory fields
   subCategory: { type: String, default: '' },
   subcategory: { type: String, default: '' },
-  
   price: { type: Number, required: true },
   originalPrice: { type: Number, default: 0 },
   stock: { type: Number, default: 0 },
@@ -244,13 +315,13 @@ const productSchema = new mongoose.Schema({
   metaDescription: { type: String, default: '' },
   metaKeywords: { type: String, default: '' },
   slug: { type: String, default: '' },
-  reviewCount: { type: Number, default: 0 }
+  reviewCount: { type: Number, default: 0 },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null }
 });
 
 const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
 
-// ========== OTHER SCHEMAS ==========
-
+// User Schema
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -279,6 +350,7 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
+// Address Schema
 const addressSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   fullName: { type: String, required: true },
@@ -297,6 +369,7 @@ const addressSchema = new mongoose.Schema({
 
 const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
 
+// Banner Schema
 const bannerSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   subtitle: { type: String, default: '' },
@@ -311,6 +384,7 @@ const bannerSchema = new mongoose.Schema({
 
 const Banner = mongoose.models.Banner || mongoose.model('Banner', bannerSchema);
 
+// Offer Schema
 const offerSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
@@ -327,6 +401,7 @@ const offerSchema = new mongoose.Schema({
 
 const Offer = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
 
+// Coupon Schema
 const couponSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true },
   description: { type: String, default: '' },
@@ -345,6 +420,7 @@ const couponSchema = new mongoose.Schema({
 
 const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
 
+// Review Schema
 const reviewSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -376,6 +452,7 @@ reviewSchema.statics.getAverageRating = async function(productId) {
 
 const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
 
+// Order Schema
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   name: String,
@@ -399,6 +476,7 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
 
+// Wishlist Schema
 const wishlistItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   addedAt: { type: Date, default: Date.now }
@@ -418,6 +496,7 @@ wishlistSchema.pre('save', function(next) {
 
 const Wishlist = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);
 
+// Cart Schema
 const cartItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   quantity: { type: Number, default: 1, min: 1 }
@@ -451,6 +530,13 @@ const authMiddleware = (req, res, next) => {
 const adminMiddleware = (req, res, next) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ message: 'Admin access required' });
+  }
+  next();
+};
+
+const vendorMiddleware = (req, res, next) => {
+  if (req.user?.role !== 'vendor' && req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'Vendor access required' });
   }
   next();
 };
@@ -635,6 +721,732 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Something went wrong.' });
+  }
+});
+
+// ============================================
+// ✅ VENDOR LOGIN API - ADD THIS
+// ============================================
+app.post('/api/vendor/login', async (req, res) => {
+  try {
+    await connectDB();
+    const { email, password, rememberMe } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password'
+      });
+    }
+
+    // Find vendor by email
+    const vendor = await Vendor.findOne({ email: email.toLowerCase().trim() });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'No vendor account found with this email'
+      });
+    }
+
+    // Check if account is locked (after 5 failed attempts)
+    if (vendor.lockUntil && vendor.lockUntil > new Date()) {
+      const minutesLeft = Math.ceil((vendor.lockUntil - new Date()) / 60000);
+      return res.status(403).json({
+        success: false,
+        message: `Account is locked. Please try again after ${minutesLeft} minutes`
+      });
+    }
+
+    // Check password
+    const isMatch = await vendor.matchPassword(password);
+    
+    if (!isMatch) {
+      // Increment login attempts
+      vendor.loginAttempts = (vendor.loginAttempts || 0) + 1;
+      
+      // Lock account after 5 failed attempts
+      if (vendor.loginAttempts >= 5) {
+        vendor.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // Lock for 30 minutes
+        await vendor.save();
+        return res.status(403).json({
+          success: false,
+          message: 'Too many failed attempts. Account locked for 30 minutes.',
+          attempts: vendor.loginAttempts,
+          locked: true
+        });
+      }
+      
+      await vendor.save();
+      
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid password',
+        attempts: vendor.loginAttempts,
+        remainingAttempts: 5 - vendor.loginAttempts
+      });
+    }
+
+    // Check if vendor is approved
+    if (vendor.status === 'pending' || vendor.vendorStatus === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is pending approval. Please wait for admin approval.',
+        status: 'pending'
+      });
+    }
+
+    if (vendor.status === 'rejected' || vendor.vendorStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your vendor application has been rejected. Please contact support.',
+        status: 'rejected'
+      });
+    }
+
+    if (vendor.status === 'suspended' || vendor.vendorStatus === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been suspended. Please contact support.',
+        status: 'suspended'
+      });
+    }
+
+    // Reset login attempts on successful login
+    vendor.loginAttempts = 0;
+    vendor.lockUntil = null;
+    vendor.lastLogin = new Date();
+    await vendor.save();
+
+    // Generate JWT Token
+    const token = jwt.sign(
+      { 
+        id: vendor._id, 
+        email: vendor.email, 
+        role: 'vendor',
+        status: vendor.status,
+        storeId: vendor.storeId
+      },
+      process.env.JWT_SECRET || 'your_jwt_secret_key_change_this',
+      { expiresIn: rememberMe ? '30d' : '7d' }
+    );
+
+    // Response
+    res.json({
+      success: true,
+      token: token,
+      vendor: {
+        id: vendor._id,
+        name: vendor.name,
+        email: vendor.email,
+        brandName: vendor.brandName,
+        storeName: vendor.storeName || vendor.brandName,
+        storeId: vendor.storeId,
+        status: vendor.status,
+        vendorStatus: vendor.vendorStatus,
+        permissions: vendor.permissions || [],
+        phone: vendor.phone || '',
+        address: vendor.address || {},
+        lastLogin: vendor.lastLogin
+      }
+    });
+
+  } catch (error) {
+    console.error('Vendor login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error. Please try again later.'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR REGISTER API - ADD THIS
+// ============================================
+app.post('/api/vendor/register', async (req, res) => {
+  try {
+    await connectDB();
+    const { name, email, password, brandName, phone, address, gstNumber, panNumber, bankDetails } = req.body;
+
+    // Validation
+    if (!name || !email || !password || !brandName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields'
+      });
+    }
+
+    // Check if vendor already exists
+    const existingVendor = await Vendor.findOne({ 
+      $or: [
+        { email: email.toLowerCase().trim() },
+        { brandName: brandName.trim() }
+      ]
+    });
+
+    if (existingVendor) {
+      return res.status(409).json({
+        success: false,
+        message: existingVendor.email === email.toLowerCase().trim() 
+          ? 'Vendor with this email already exists' 
+          : 'Vendor with this brand name already exists'
+      });
+    }
+
+    // Create new vendor
+    const vendor = new Vendor({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: password,
+      brandName: brandName.trim(),
+      storeName: brandName.trim(),
+      phone: phone || '',
+      address: address || {},
+      gstNumber: gstNumber || '',
+      panNumber: panNumber || '',
+      bankDetails: bankDetails || {},
+      status: 'pending',
+      vendorStatus: 'pending',
+      permissions: ['manage_products', 'view_orders', 'manage_inventory', 'view_analytics']
+    });
+
+    await vendor.save();
+
+    // Generate token for immediate login (if auto-approve enabled)
+    // For now, keep pending approval
+    res.status(201).json({
+      success: true,
+      message: 'Vendor registration successful! Please wait for admin approval.',
+      vendor: {
+        id: vendor._id,
+        name: vendor.name,
+        email: vendor.email,
+        brandName: vendor.brandName,
+        status: vendor.status,
+        storeId: vendor.storeId
+      }
+    });
+
+  } catch (error) {
+    console.error('Vendor registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error. Please try again later.'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR FORGOT PASSWORD API - ADD THIS
+// ============================================
+app.post('/api/vendor/forgot-password', async (req, res) => {
+  try {
+    await connectDB();
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email'
+      });
+    }
+
+    const vendor = await Vendor.findOne({ email: email.toLowerCase().trim() });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'No vendor found with this email'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = jwt.sign(
+      { id: vendor._id, email: vendor.email },
+      process.env.JWT_SECRET || 'your_jwt_secret_key_change_this',
+      { expiresIn: '1h' }
+    );
+
+    // Save reset token to database
+    vendor.resetPasswordToken = resetToken;
+    vendor.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await vendor.save();
+
+    // Send email (you can implement email sending)
+    // For now, just return success
+    res.json({
+      success: true,
+      message: 'Password reset link sent to your email',
+      resetToken: resetToken // Remove this in production
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error. Please try again later.'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR RESET PASSWORD API - ADD THIS
+// ============================================
+app.post('/api/vendor/reset-password', async (req, res) => {
+  try {
+    await connectDB();
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide token and new password'
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key_change_this');
+    
+    const vendor = await Vendor.findOne({
+      _id: decoded.id,
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    // Update password
+    vendor.password = newPassword;
+    vendor.resetPasswordToken = '';
+    vendor.resetPasswordExpires = null;
+    await vendor.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successful!'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Invalid or expired reset token'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR GET PROFILE API - ADD THIS
+// ============================================
+app.get('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendor = await Vendor.findById(req.user.id).select('-password -resetPasswordToken -resetPasswordExpires');
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      vendor: vendor
+    });
+
+  } catch (error) {
+    console.error('Get vendor profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR UPDATE PROFILE API - ADD THIS
+// ============================================
+app.put('/api/vendor/profile', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendor = await Vendor.findById(req.user.id);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Allowed fields to update
+    const allowedFields = ['name', 'phone', 'address', 'brandName', 'storeName', 'gstNumber', 'panNumber', 'bankDetails'];
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        vendor[field] = req.body[field];
+      }
+    });
+
+    vendor.updatedAt = new Date();
+    await vendor.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      vendor: vendor
+    });
+
+  } catch (error) {
+    console.error('Update vendor profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR GET STATS API - ADD THIS
+// ============================================
+app.get('/api/vendor/stats', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendorId = req.user.id;
+    
+    // Get total products
+    const totalProducts = await Product.countDocuments({ vendorId: vendorId });
+    
+    // Get total orders (you'll need to add vendorId to orders)
+    const totalOrders = await Order.countDocuments({ 'items.vendorId': vendorId });
+    
+    // Get total revenue
+    const orders = await Order.find({ 'items.vendorId': vendorId });
+    let totalRevenue = 0;
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.vendorId && item.vendorId.toString() === vendorId) {
+          totalRevenue += item.price * item.quantity;
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        totalProducts,
+        totalOrders,
+        totalRevenue: Math.round(totalRevenue),
+        pendingOrders: 0 // Add logic for pending orders
+      }
+    });
+
+  } catch (error) {
+    console.error('Get vendor stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: GET ALL VENDORS - ADD THIS
+// ============================================
+app.get('/api/admin/vendors', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const { status, page = 1, limit = 20 } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+
+    const vendors = await Vendor.find(filter)
+      .select('-password -resetPasswordToken -resetPasswordExpires -bankDetails')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    const total = await Vendor.countDocuments(filter);
+
+    res.json({
+      success: true,
+      vendors,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalVendors: total,
+        limit: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get vendors error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: APPROVE VENDOR - ADD THIS
+// ============================================
+app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    vendor.status = 'approved';
+    vendor.vendorStatus = 'approved';
+    vendor.updatedAt = new Date();
+    await vendor.save();
+
+    res.json({
+      success: true,
+      message: 'Vendor approved successfully',
+      vendor: vendor
+    });
+
+  } catch (error) {
+    console.error('Approve vendor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: REJECT VENDOR - ADD THIS
+// ============================================
+app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    vendor.status = 'rejected';
+    vendor.vendorStatus = 'rejected';
+    vendor.updatedAt = new Date();
+    await vendor.save();
+
+    res.json({
+      success: true,
+      message: 'Vendor rejected successfully',
+      vendor: vendor
+    });
+
+  } catch (error) {
+    console.error('Reject vendor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: SUSPEND VENDOR - ADD THIS
+// ============================================
+app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    vendor.status = 'suspended';
+    vendor.vendorStatus = 'suspended';
+    vendor.updatedAt = new Date();
+    await vendor.save();
+
+    res.json({
+      success: true,
+      message: 'Vendor suspended successfully',
+      vendor: vendor
+    });
+
+  } catch (error) {
+    console.error('Suspend vendor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR PRODUCT ROUTES - ADD THIS
+// ============================================
+
+// Get vendor's own products
+app.get('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { page = 1, limit = 20 } = req.query;
+    
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    const products = await Product.find({ vendorId: req.user.id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+    
+    const total = await Product.countDocuments({ vendorId: req.user.id });
+    
+    res.json({
+      success: true,
+      products,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalProducts: total,
+        limit: limitNum,
+        hasNext: pageNum * limitNum < total,
+        hasPrev: pageNum > 1
+      }
+    });
+  } catch (error) {
+    console.error('Get vendor products error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add vendor product with vendorId
+app.post('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const productData = req.body;
+    
+    // Add vendorId to product
+    productData.vendorId = req.user.id;
+    
+    const name = productData.name || productData.title || 'Unnamed Product';
+    const price = Number(productData.price) || Number(productData.currentPrice) || 0;
+    const originalPrice = Number(productData.originalPrice) || Number(productData.mrp) || price * 1.2;
+    
+    if (price === 0 || isNaN(price)) {
+      return res.status(400).json({ 
+        error: 'Valid price is required'
+      });
+    }
+    
+    let descriptionValue = productData.description;
+    if (Array.isArray(descriptionValue)) {
+      descriptionValue = descriptionValue.join(' ');
+    } else if (typeof descriptionValue === 'string') {
+      descriptionValue = descriptionValue;
+    } else {
+      descriptionValue = '';
+    }
+    
+    let keyFeaturesValue = productData.keyFeatures;
+    if (typeof keyFeaturesValue === 'string') {
+      keyFeaturesValue = [keyFeaturesValue];
+    } else if (!Array.isArray(keyFeaturesValue)) {
+      keyFeaturesValue = [];
+    }
+    
+    let imagesValue = productData.images;
+    if (typeof imagesValue === 'string') {
+      imagesValue = [imagesValue];
+    } else if (!Array.isArray(imagesValue)) {
+      imagesValue = [];
+    }
+    
+    let variationsValue = productData.variations;
+    if (!Array.isArray(variationsValue)) {
+      variationsValue = [];
+    }
+    
+    const category = productData.category || productData.detectedCategory || productData.mainCategory || 'Uncategorized';
+    const mainCategory = productData.mainCategory || productData.detectedCategory || 'Other';
+    const subCategory = productData.subCategory || productData.subcategory || '';
+    const subcategory = productData.subCategory || productData.subcategory || '';
+    
+    const product = new Product({
+      name: name,
+      brand: productData.brand || '',
+      category: category,
+      mainCategory: mainCategory,
+      subCategory: subCategory,
+      subcategory: subcategory,
+      price: price,
+      originalPrice: originalPrice,
+      stock: Number(productData.stock) || 10,
+      images: imagesValue,
+      description: descriptionValue,
+      shortDescription: productData.shortDescription || '',
+      keyFeatures: keyFeaturesValue,
+      sizes: productData.sizes || [],
+      colors: productData.colors || [],
+      variants: productData.variants || [],
+      variations: variationsValue,
+      fabric: productData.fabric || '',
+      material: productData.material || '',
+      gender: productData.gender || 'unisex',
+      weight: productData.weight || '',
+      dimensions: productData.dimensions || '',
+      ingredients: productData.ingredients || '',
+      metaTitle: productData.metaTitle || name.substring(0, 60),
+      metaDescription: productData.metaDescription || descriptionValue.substring(0, 160),
+      metaKeywords: productData.metaKeywords || '',
+      slug: productData.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 100),
+      isNew: true,
+      status: 'active',
+      adminApproved: req.user?.role === 'admin' || false,
+      rating: productData.rating || 4.0,
+      reviewCount: productData.reviewCount || 0,
+      vendorId: req.user.id
+    });
+    
+    await product.save();
+    res.status(201).json({ success: true, product });
+    
+  } catch (error) {
+    console.error('Add vendor product error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: errors,
+        fields: Object.keys(error.errors)
+      });
+    }
+    
+    res.status(500).json({ 
+      error: error.message
+    });
   }
 });
 
@@ -877,7 +1689,7 @@ app.delete('/api/cart/:itemId', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== PRODUCT ROUTES WITH PAGINATION ==========
+// ========== PRODUCT ROUTES ==========
 app.get('/api/products', async (req, res) => {
   try {
     await connectDB();
@@ -923,8 +1735,7 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// ========== ✅ FIXED: PRODUCT CREATE ROUTE WITH SUBCATEGORY ==========
-app.post('/api/products', authMiddleware, async (req, res) => {
+app.post('/api/products', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
     
@@ -936,8 +1747,7 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     
     if (price === 0 || isNaN(price)) {
       return res.status(400).json({ 
-        error: 'Valid price is required',
-        receivedData: { name, price: productData.price, originalPrice: productData.originalPrice }
+        error: 'Valid price is required'
       });
     }
     
@@ -971,8 +1781,6 @@ app.post('/api/products', authMiddleware, async (req, res) => {
     
     const category = productData.category || productData.detectedCategory || productData.mainCategory || 'Uncategorized';
     const mainCategory = productData.mainCategory || productData.detectedCategory || 'Other';
-    
-    // ✅ FIX: Get subCategory from request
     const subCategory = productData.subCategory || productData.subcategory || '';
     const subcategory = productData.subCategory || productData.subcategory || '';
     
@@ -981,11 +1789,8 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       brand: productData.brand || '',
       category: category,
       mainCategory: mainCategory,
-      
-      // ✅ FIX: Added subCategory and subcategory
       subCategory: subCategory,
       subcategory: subcategory,
-      
       price: price,
       originalPrice: originalPrice,
       stock: Number(productData.stock) || 10,
@@ -1009,9 +1814,10 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       slug: productData.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 100),
       isNew: true,
       status: 'active',
-      adminApproved: req.user?.role === 'admin',
+      adminApproved: true,
       rating: productData.rating || 4.0,
-      reviewCount: productData.reviewCount || 0
+      reviewCount: productData.reviewCount || 0,
+      vendorId: productData.vendorId || null
     });
     
     await product.save();
@@ -1024,26 +1830,16 @@ app.post('/api/products', authMiddleware, async (req, res) => {
       const errors = Object.values(error.errors).map(e => e.message);
       return res.status(400).json({ 
         error: 'Validation failed', 
-        details: errors,
-        fields: Object.keys(error.errors)
-      });
-    }
-    
-    if (error.code === 11000) {
-      return res.status(409).json({ 
-        error: 'Product already exists', 
-        field: Object.keys(error.keyPattern)[0] 
+        details: errors
       });
     }
     
     res.status(500).json({ 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 });
 
-// ========== ✅ FIXED: PRODUCT UPDATE ROUTE WITH SUBCATEGORY ==========
 app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1052,7 +1848,6 @@ app.put('/api/products/:id', authMiddleware, adminMiddleware, async (req, res) =
       return res.status(404).json({ error: 'Product not found' });
     }
     
-    // ✅ FIX: Update subCategory fields
     if (req.body.subCategory !== undefined) {
       product.subCategory = req.body.subCategory;
     }
@@ -1435,7 +2230,8 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
         quantity: item.quantity,
         image: item.image,
         variationName: item.variationName,
-        variationSecondary: item.variationSecondary
+        variationSecondary: item.variationSecondary,
+        vendorId: item.vendorId || null
       })),
       total,
       address,
