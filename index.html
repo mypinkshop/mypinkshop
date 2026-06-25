@@ -4,13 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MyPinkShop - Shop for Girlies ✨</title>
+    
+    <!-- ========== PERMANENT FIX: FORCE NO CACHE ========== -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    
+    <!-- ========== PRECONNECT FOR FASTER API CALLS ========== -->
     <link rel="preconnect" href="https://api.mypinkshop.com" />
     <link rel="dns-prefetch" href="https://api.mypinkshop.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    
+    <!-- ========== COMPLETE FAVICON - ALL DEVICES & BROWSERS ========== -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -21,27 +27,39 @@
     <meta name="msapplication-TileColor" content="#ec4899" />
     <meta name="msapplication-TileImage" content="/android-chrome-192x192.png" />
     <meta name="theme-color" content="#ec4899" />
+    
+    <!-- Font Awesome - Defer loading -->
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" /></noscript>
     
+    <!-- ========== PERMANENT FIX: FORCE CLEAR OLD CACHE ========== -->
     <script>
       (function() {
+        // Force clear old service workers
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function(registrations) {
             for (var i = 0; i < registrations.length; i++) {
               registrations[i].unregister();
+              console.log('Unregistered service worker');
             }
           });
         }
+        
+        // Force clear old caches
         if ('caches' in window) {
           caches.keys().then(function(names) {
             for (var i = 0; i < names.length; i++) {
               caches.delete(names[i]);
+              console.log('Deleted cache:', names[i]);
             }
           });
         }
+        
+        // Force reload if old version detected
         var timestamp = Date.now();
         localStorage.setItem('app_version', timestamp);
+        
+        // Check if this is first load or old version
         var oldVersion = localStorage.getItem('old_version_cleared');
         if (!oldVersion) {
           localStorage.setItem('old_version_cleared', 'true');
@@ -52,6 +70,7 @@
       })();
     </script>
     
+    <!-- Critical CSS inline -->
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
       body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif}
@@ -60,7 +79,6 @@
       @keyframes spin{to{transform:rotate(360deg)}}
     </style>
   </head>
-  
   <body>
     <div id="root">
       <div class="loading-screen">
@@ -68,6 +86,10 @@
       </div>
     </div>
     
+    <!-- ✅ YEH LINE WAPAS ADD KARO -->
+    <script type="module" src="/src/main.jsx?v=20260614"></script>
+    
+    <!-- Remove loading screen when React mounts -->
     <script>
       window.addEventListener('load', function() {
         setTimeout(function() {
@@ -80,6 +102,26 @@
           }
         }, 100);
       });
+      
+      // Defer wishlist update
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+        }, 500);
+      });
+      
+      // Prefetch common routes on idle
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(function() {
+          var links = ['/shop', '/wishlist', '/cart'];
+          for (var i = 0; i < links.length; i++) {
+            var link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.href = links[i];
+            document.head.appendChild(link);
+          }
+        });
+      }
     </script>
   </body>
 </html>
