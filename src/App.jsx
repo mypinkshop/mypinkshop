@@ -83,6 +83,7 @@ const VendorUserPermissions = lazy(() => import('./pages/vendor/VendorUserPermis
 const VendorFBA = lazy(() => import('./pages/vendor/VendorFBA'));
 const VendorStoreBuilder = lazy(() => import('./pages/vendor/VendorStoreBuilder'));
 const VendorBulkUpload = lazy(() => import('./pages/vendor/VendorBulkUpload'));
+const VendorProfile = lazy(() => import('./pages/vendor/VendorProfile'));
 
 // ✅ Amazon Importer Component - Lazy Loaded
 const AmazonImporter = lazy(() => import('./components/AmazonImporter'));
@@ -180,6 +181,7 @@ function App() {
                   <Route path="/vendor/fba" element={<VendorFBA />} />
                   <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
                   <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />
+                  <Route path="/vendor/profile" element={<VendorProfile />} />
                 </Routes>
               </Suspense>
             </ReviewProvider>
