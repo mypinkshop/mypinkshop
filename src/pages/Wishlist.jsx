@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 
 function Wishlist() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { wishlist, removeFromWishlist, fetchWishlist, clearAllWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
   const { user, logout, token } = useAuth();
@@ -23,7 +24,6 @@ function Wishlist() {
   const [isClearing, setIsClearing] = useState(false);
   
   const isInitialMount = useRef(true);
-  const isGuestRef = useRef(false);
 
   // ============ HELPER: Get wishlist data ============
   const getWishlistData = useCallback(() => {
@@ -45,32 +45,57 @@ function Wishlist() {
     }
   }, [user, token, wishlist]);
 
+  // ============ REFRESH FUNCTION ============
+  const refreshWishlist = useCallback(async () => {
+    if (user && token && fetchWishlist) {
+      await fetchWishlist();
+      const data = getWishlistData();
+      setDisplayWishlist(data);
+    } else {
+      const data = getWishlistData();
+      setDisplayWishlist(data);
+    }
+  }, [user, token, fetchWishlist, getWishlistData]);
+
   // ============ LOAD WISHLIST ON MOUNT ============
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      
-      if (user && token && fetchWishlist) {
-        await fetchWishlist();
-      }
-      
-      const data = getWishlistData();
-      setDisplayWishlist(data);
+      await refreshWishlist();
       setIsGuest(!user || !token);
-      isGuestRef.current = !user || !token;
       setLoading(false);
     };
-    
     loadData();
   }, []);
 
+  // ============ REFRESH ON ROUTE CHANGE ============
+  useEffect(() => {
+    if (!isInitialMount.current) {
+      refreshWishlist();
+    }
+    isInitialMount.current = false;
+  }, [location.pathname, refreshWishlist]);
+
+  // ============ REFRESH ON TAB VISIBILITY ============
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshWishlist();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshWishlist]);
+
   // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
   useEffect(() => {
-    if (user && token && !isInitialMount.current) {
+    if (user && token) {
       const data = getWishlistData();
       setDisplayWishlist(data);
     }
-    isInitialMount.current = false;
   }, [wishlist, user, token, getWishlistData]);
 
   // ============ STORAGE EVENT LISTENER ============
@@ -129,9 +154,6 @@ function Wishlist() {
         setDisplayWishlist(updated);
       } else {
         setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
-        localStorage.setItem('guestWishlist', JSON.stringify(
-          displayWishlist.filter(p => (p._id || p.id) !== productId)
-        ));
       }
     } catch (error) {
       console.error('Error removing from wishlist:', error);
@@ -166,7 +188,7 @@ function Wishlist() {
     setTimeout(() => setRemovingProduct(null), 300);
   };
 
-  // ============ HANDLE: Clear All ============
+  // ============ HANDLE: Clear All Wishlist ============
   const handleClearAll = async () => {
     if (displayWishlist.length === 0) {
       toast.error('Wishlist is already empty');
@@ -198,7 +220,7 @@ function Wishlist() {
     setIsClearing(false);
   };
 
-  // ============ HANDLE: Share ============
+  // ============ HANDLE: Share Wishlist ============
   const handleShare = async () => {
     try {
       if (navigator.share) {
@@ -404,7 +426,7 @@ function Wishlist() {
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
-            {/* ============ HEADER WITH ACTIONS ============ */}
+            {/* ============ HEADER WITH ACTIONS (Styled) ============ */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -419,20 +441,43 @@ function Wishlist() {
               </div>
               
               <div className="flex items-center gap-3 flex-wrap">
+                {/* ===== SHARE BUTTON ===== */}
                 <button
                   onClick={handleShare}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm font-medium text-gray-700 transition flex items-center gap-2"
+                  className="group relative px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2 overflow-hidden"
                 >
-                  <span>📤</span> Share
+                  <span className="relative z-10 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    Share
+                  </span>
+                  <span className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                 </button>
                 
+                {/* ===== CLEAR ALL BUTTON ===== */}
                 {wishlistCount > 1 && (
                   <button
                     onClick={handleClearAll}
                     disabled={isClearing}
-                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-sm font-medium transition flex items-center gap-2 disabled:opacity-50"
+                    className="group relative px-5 py-2.5 bg-white border-2 border-red-200 text-red-500 rounded-full text-sm font-medium hover:bg-red-50 hover:border-red-400 transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
-                    {isClearing ? '⏳ Clearing...' : '🗑️ Clear All'}
+                    {isClearing ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Clearing...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Clear All
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -448,7 +493,7 @@ function Wishlist() {
                 return (
                   <div 
                     key={productId || index} 
-                    className={`group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${
+                    className={`group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${
                       isRemoving ? 'opacity-50 scale-95' : ''
                     }`}
                   >
@@ -474,6 +519,7 @@ function Wishlist() {
                           </div>
                         )}
                         
+                        {/* Remove Button */}
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -481,16 +527,19 @@ function Wishlist() {
                             handleRemoveItem(productId);
                           }}
                           disabled={isRemoving || isMoving}
-                          className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition z-10 disabled:opacity-50"
+                          className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center hover:bg-red-50 hover:scale-110 transition-all duration-200 z-10 disabled:opacity-50"
                           aria-label="Remove from wishlist"
                         >
                           {isRemoving ? (
                             <span className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></span>
                           ) : (
-                            <span className="text-red-500 text-lg">✕</span>
+                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                           )}
                         </button>
                         
+                        {/* Quick Add to Cart Badge */}
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -498,11 +547,11 @@ function Wishlist() {
                             handleMoveToCart(product);
                           }}
                           disabled={isMoving || isRemoving}
-                          className="absolute bottom-3 left-1/2 -translate-x-1/2 w-11/12 bg-white/95 backdrop-blur-sm text-gray-800 py-2 rounded-full text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-pink-500 hover:text-white shadow-lg disabled:opacity-50"
+                          className="absolute bottom-3 left-1/2 -translate-x-1/2 w-11/12 bg-white/95 backdrop-blur-sm text-gray-800 py-2.5 rounded-full text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-pink-500 hover:text-white shadow-lg disabled:opacity-50 transform hover:scale-105"
                         >
                           {isMoving ? (
                             <span className="flex items-center justify-center gap-2">
-                              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                              <span className="w-3 h-3 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></span>
                               Adding...
                             </span>
                           ) : (
@@ -540,7 +589,7 @@ function Wishlist() {
                         className={`w-full mt-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
                           isMoving
                             ? 'bg-green-500 text-white'
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {isMoving ? (
@@ -558,6 +607,7 @@ function Wishlist() {
               })}
             </div>
             
+            {/* ============ CONTINUE SHOPPING ============ */}
             <div className="text-center mt-12">
               <Link 
                 to="/shop" 
@@ -569,6 +619,7 @@ function Wishlist() {
           </div>
         )}
 
+        {/* ============ FOOTER ============ */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
