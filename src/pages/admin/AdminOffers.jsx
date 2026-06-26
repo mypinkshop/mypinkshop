@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import AdminSidebar from './components/AdminSidebar';
+import toast from 'react-hot-toast';
 
 function AdminOffers() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
   const [formData, setFormData] = useState({
     title: 'Free Shipping',
     description: 'FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF ON FIRST ORDER',
@@ -18,13 +21,14 @@ function AdminOffers() {
     isActive: true
   });
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
 
   // Load offers
   const loadOffers = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await fetch(`${API_URL}/api/offers/all`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -37,6 +41,8 @@ function AdminOffers() {
       setOffers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading offers:', error);
+      setError('Failed to load offers');
+      toast.error('Failed to load offers');
       setOffers([]);
     } finally {
       setLoading(false);
@@ -53,22 +59,24 @@ function AdminOffers() {
     
     // Validation
     if (!formData.title.trim()) {
-      alert('Please enter offer title');
+      toast.error('Please enter offer title');
       return;
     }
     if (!formData.description.trim()) {
-      alert('Please enter offer description');
+      toast.error('Please enter offer description');
       return;
     }
     if (!formData.minOrderValue || formData.minOrderValue <= 0) {
-      alert('Please enter valid min order value');
+      toast.error('Please enter valid min order value');
       return;
     }
     if (!formData.discountValue || formData.discountValue <= 0) {
-      alert('Please enter valid discount value');
+      toast.error('Please enter valid discount value');
       return;
     }
     
+    setProcessingId('submitting');
+
     try {
       const url = editingOffer 
         ? `${API_URL}/api/offers/update/${editingOffer._id}`
@@ -90,17 +98,19 @@ function AdminOffers() {
       const data = await response.json();
       
       if (response.ok) {
-        alert(editingOffer ? '✅ Offer updated successfully!' : '✅ Offer created successfully!');
+        toast.success(editingOffer ? '✅ Offer updated successfully!' : '✅ Offer created successfully!');
         setShowModal(false);
         setEditingOffer(null);
         resetForm();
         loadOffers();
       } else {
-        alert(data.error || 'Failed to save offer');
+        toast.error(data.error || 'Failed to save offer');
       }
     } catch (error) {
       console.error('Error saving offer:', error);
-      alert('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -120,39 +130,47 @@ function AdminOffers() {
 
   // Toggle offer status
   const toggleStatus = async (id, currentStatus) => {
+    setProcessingId(id);
     try {
       const response = await fetch(`${API_URL}/api/offers/toggle/${id}`, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
+        toast.success(`Offer ${currentStatus ? 'deactivated' : 'activated'}!`);
         loadOffers();
       } else {
-        alert('Failed to toggle status');
+        toast.error('Failed to toggle status');
       }
     } catch (error) {
       console.error('Error toggling offer:', error);
-      alert('Network error');
+      toast.error('Network error');
+    } finally {
+      setProcessingId(null);
     }
   };
 
   // Delete offer
   const deleteOffer = async (id) => {
     if (!confirm('Are you sure you want to delete this offer?')) return;
+    
+    setProcessingId(id);
     try {
       const response = await fetch(`${API_URL}/api/offers/delete/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        alert('Offer deleted successfully');
+        toast.success('🗑️ Offer deleted successfully');
         loadOffers();
       } else {
-        alert('Failed to delete offer');
+        toast.error('Failed to delete offer');
       }
     } catch (error) {
       console.error('Error deleting offer:', error);
-      alert('Network error');
+      toast.error('Network error');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -161,7 +179,31 @@ function AdminOffers() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <AdminSidebar />
         <div className="md:ml-64 flex items-center justify-center w-full">
-          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+          <div className="text-center">
+            <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading offers...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && offers.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <AdminSidebar />
+        <div className="md:ml-64 flex items-center justify-center h-screen">
+          <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -190,11 +232,19 @@ function AdminOffers() {
         </div>
 
         {/* Active Offer Preview */}
-        <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white rounded-2xl p-4 mb-6">
-          <p className="text-center text-sm font-medium">
-            🔥 LIVE OFFER: {offers.find(o => o.isActive && o.type === 'top_banner')?.description || 'No active offer. Create one below!'}
-          </p>
-        </div>
+        {offers.some(o => o.isActive && o.type === 'top_banner') ? (
+          <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white rounded-2xl p-4 mb-6 animate-pulse">
+            <p className="text-center text-sm font-medium">
+              🔥 LIVE OFFER: {offers.find(o => o.isActive && o.type === 'top_banner')?.description}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-gray-200 text-gray-500 rounded-2xl p-4 mb-6">
+            <p className="text-center text-sm font-medium">
+              ⚠️ No active offer. Create one below!
+            </p>
+          </div>
+        )}
 
         {/* Offers List */}
         <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
@@ -229,13 +279,14 @@ function AdminOffers() {
                       <td className="px-6 py-4 text-center">
                         <button
                           onClick={() => toggleStatus(offer._id, offer.isActive)}
+                          disabled={processingId === offer._id}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                             offer.isActive 
                               ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                          }`}
+                          } disabled:opacity-50`}
                         >
-                          {offer.isActive ? 'Active ✓' : 'Inactive'}
+                          {offer.isActive ? '✅ Active' : '⛔ Inactive'}
                         </button>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -263,7 +314,8 @@ function AdminOffers() {
                           </button>
                           <button
                             onClick={() => deleteOffer(offer._id)}
-                            className="text-red-500 hover:text-red-700 p-1"
+                            disabled={processingId === offer._id}
+                            className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
                             title="Delete"
                           >
                             🗑️
@@ -389,9 +441,10 @@ function AdminOffers() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition transform hover:-translate-y-0.5"
+                  disabled={processingId === 'submitting'}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
                 >
-                  {editingOffer ? '💾 Update Offer' : '✨ Create Offer'}
+                  {processingId === 'submitting' ? '⏳ Saving...' : (editingOffer ? '💾 Update Offer' : '✨ Create Offer')}
                 </button>
               </div>
             </form>
