@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
+import toast from 'react-hot-toast';
 
 function AdminProducts() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [pendingProducts, setPendingProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('approved');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -17,8 +19,9 @@ function AdminProducts() {
   const [productToDelete, setProductToDelete] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const [processingId, setProcessingId] = useState(null);
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
 
   // Auth check
   useEffect(() => {
@@ -34,6 +37,7 @@ function AdminProducts() {
   const loadProducts = async () => {
     try {
       setLoading(true);
+      setError('');
       const token = localStorage.getItem('adminToken');
       
       const response = await fetch(`${API_URL}/api/products`, {
@@ -63,6 +67,8 @@ function AdminProducts() {
       setPendingProducts(pending);
     } catch (error) {
       console.error('Error loading products:', error);
+      setError('Failed to load products');
+      toast.error('Failed to load products');
       setProducts([]);
       setPendingProducts([]);
     } finally {
@@ -74,6 +80,7 @@ function AdminProducts() {
   const updateStock = async (productId, newStock) => {
     if (newStock < 0) return;
     
+    setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
       
@@ -94,16 +101,19 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Update failed');
       
+      toast.success(`✅ Stock updated to ${newStock}`);
       await loadProducts();
-      alert(`✓ Stock updated to ${newStock}`);
     } catch (error) {
       console.error('Error updating stock:', error);
-      alert('Failed to update stock');
+      toast.error('Failed to update stock');
+    } finally {
+      setProcessingId(null);
     }
   };
 
   // Approve product
   const approveProduct = async (productId) => {
+    setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
       
@@ -124,11 +134,13 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Approval failed');
       
+      toast.success('✅ Product approved');
       await loadProducts();
-      alert('✓ Product approved');
     } catch (error) {
       console.error('Error approving product:', error);
-      alert('Failed to approve product');
+      toast.error('Failed to approve product');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -136,6 +148,7 @@ function AdminProducts() {
   const rejectProduct = async (productId) => {
     if (!window.confirm('Reject and delete this product?')) return;
     
+    setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
       
@@ -152,16 +165,19 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Rejection failed');
       
+      toast.success('❌ Product rejected and removed');
       await loadProducts();
-      alert('✗ Product rejected and removed');
     } catch (error) {
       console.error('Error rejecting product:', error);
-      alert('Failed to reject product');
+      toast.error('Failed to reject product');
+    } finally {
+      setProcessingId(null);
     }
   };
 
   // Delete product
   const deleteProduct = async (productId) => {
+    setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
       
@@ -178,44 +194,57 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Delete failed');
       
+      toast.success('🗑 Product deleted');
       await loadProducts();
       setShowDeleteModal(false);
       setProductToDelete(null);
       setSelectedProducts([]);
-      alert('🗑 Product deleted');
     } catch (error) {
       console.error('Error deleting product:', error);
-      alert('Failed to delete product');
+      toast.error('Failed to delete product');
+    } finally {
+      setProcessingId(null);
     }
   };
 
   // Bulk delete
   const bulkDelete = async () => {
-    if (selectedProducts.length === 0) return;
+    if (selectedProducts.length === 0) {
+      toast.error('Select products to delete');
+      return;
+    }
     if (!window.confirm(`Delete ${selectedProducts.length} products?`)) return;
     
-    try {
-      const token = localStorage.getItem('adminToken');
-      
-      for (const productId of selectedProducts) {
-        await fetch(`${API_URL}/api/products/${productId}`, {
+    const token = localStorage.getItem('adminToken');
+    let deleted = 0;
+    let failed = 0;
+
+    for (const productId of selectedProducts) {
+      try {
+        const response = await fetch(`${API_URL}/api/products/${productId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (response.ok) {
+          deleted++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        failed++;
       }
-      await loadProducts();
-      setSelectedProducts([]);
-      alert(`${selectedProducts.length} products deleted`);
-    } catch (error) {
-      console.error('Error bulk deleting:', error);
-      alert('Failed to delete some products');
     }
+    
+    toast.success(`✅ ${deleted} products deleted${failed > 0 ? `, ${failed} failed` : ''}`);
+    await loadProducts();
+    setSelectedProducts([]);
   };
 
   // Toggle product status
   const toggleProductStatus = async (productId, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     
+    setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
       
@@ -236,11 +265,13 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Status update failed');
       
+      toast.success(`✅ Status updated to ${newStatus}`);
       await loadProducts();
-      alert(`Status updated to ${newStatus}`);
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update status');
+      toast.error('Failed to update status');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -271,16 +302,16 @@ function AdminProducts() {
 
   const getStatusBadge = (status) => {
     switch(status) {
-      case 'active': return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Active</span>;
-      case 'inactive': return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Inactive</span>;
-      default: return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">Inactive</span>;
+      case 'active': return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✅ Active</span>;
+      case 'inactive': return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">⛔ Inactive</span>;
+      default: return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">{status}</span>;
     }
   };
 
   const getStockBadge = (stock) => {
-    if (stock === 0) return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">Out of Stock</span>;
-    if (stock < 10) return <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium animate-pulse">Low Stock</span>;
-    return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">In Stock</span>;
+    if (stock === 0) return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">❌ Out of Stock</span>;
+    if (stock < 10) return <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium animate-pulse">⚠️ Low Stock</span>;
+    return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✅ In Stock</span>;
   };
 
   const categories = [
@@ -298,7 +329,7 @@ function AdminProducts() {
     if (filterCategory !== 'all' && p.mainCategory?.toLowerCase() !== filterCategory && p.category?.toLowerCase() !== filterCategory) return false;
     if (filterBrand !== 'all' && p.brand !== filterBrand) return false;
     if (filterStockStatus !== 'all') {
-      if (filterStockStatus === 'instock' && p.stock === 0) return false;
+      if (filterStockStatus === 'instock' && (p.stock === 0 || p.stock < 10)) return false;
       if (filterStockStatus === 'lowstock' && (p.stock >= 10 || p.stock === 0)) return false;
       if (filterStockStatus === 'outofstock' && p.stock > 0) return false;
     }
@@ -346,6 +377,24 @@ function AdminProducts() {
     );
   }
 
+  if (error && products.length === 0 && pendingProducts.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const currentProducts = activeTab === 'approved' ? filteredApproved : pendingProducts;
 
   return (
@@ -356,7 +405,7 @@ function AdminProducts() {
       <div className="bg-white/95 backdrop-blur-md border-b border-pink-100 px-4 sm:px-6 py-3 sm:py-4 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-sm">
         <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
-            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Product Management</h1>
+            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">📦 Product Management</h1>
             <p className="text-xs text-gray-400 mt-0.5">Manage your product catalog</p>
           </div>
           <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg hover:scale-105 transition-all">
@@ -396,10 +445,10 @@ function AdminProducts() {
           {/* Tabs */}
           <div className="flex flex-wrap gap-6 border-b border-pink-100 mb-6">
             <button onClick={() => { setActiveTab('approved'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              Approved ({products.length})
+              ✅ Approved ({products.length})
             </button>
             <button onClick={() => { setActiveTab('pending'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              Pending ({pendingProducts.length})
+              ⏳ Pending ({pendingProducts.length})
             </button>
           </div>
 
@@ -486,7 +535,7 @@ function AdminProducts() {
                 
                 {selectedProducts.length > 0 && (
                   <button onClick={bulkDelete} className="bg-gradient-to-r from-red-500 to-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition">
-                    Delete Selected ({selectedProducts.length})
+                    🗑️ Delete Selected ({selectedProducts.length})
                   </button>
                 )}
               </div>
@@ -548,12 +597,24 @@ function AdminProducts() {
                         <td className="px-4 py-3 text-right font-bold text-pink-600">₹{product.price}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => updateStock(product._id, (product.stock || 0) - 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">-</button>
+                            <button 
+                              onClick={() => updateStock(product._id, (product.stock || 0) - 1)} 
+                              disabled={processingId === product._id || product.stock === 0}
+                              className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600 disabled:opacity-50"
+                            >
+                              -
+                            </button>
                             <div className="flex flex-col items-center">
                               {getStockBadge(product.stock || 0)}
                               <span className="text-xs text-gray-500 mt-1">{product.stock || 0} units</span>
                             </div>
-                            <button onClick={() => updateStock(product._id, (product.stock || 0) + 1)} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600">+</button>
+                            <button 
+                              onClick={() => updateStock(product._id, (product.stock || 0) + 1)} 
+                              disabled={processingId === product._id}
+                              className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 hover:text-pink-600 disabled:opacity-50"
+                            >
+                              +
+                            </button>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
@@ -561,13 +622,13 @@ function AdminProducts() {
                           <div className="flex justify-center gap-2">
                             {activeTab === 'pending' ? (
                               <>
-                                <button onClick={() => approveProduct(product._id)} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition" title="Approve">✅</button>
-                                <button onClick={() => rejectProduct(product._id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Reject">❌</button>
+                                <button onClick={() => approveProduct(product._id)} disabled={processingId === product._id} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition disabled:opacity-50" title="Approve">✅</button>
+                                <button onClick={() => rejectProduct(product._id)} disabled={processingId === product._id} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50" title="Reject">❌</button>
                               </>
                             ) : (
                               <>
                                 <button onClick={() => editProduct(product._id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">✏️</button>
-                                <button onClick={() => toggleProductStatus(product._id, product.status)} className={`p-1.5 rounded-lg transition ${product.status === 'active' ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`} title={product.status === 'active' ? 'Disable' : 'Enable'}>
+                                <button onClick={() => toggleProductStatus(product._id, product.status)} disabled={processingId === product._id} className={`p-1.5 rounded-lg transition disabled:opacity-50 ${product.status === 'active' ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`} title={product.status === 'active' ? 'Disable' : 'Enable'}>
                                   {product.status === 'active' ? '🔒' : '🔓'}
                                 </button>
                                 <button onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
@@ -594,7 +655,7 @@ function AdminProducts() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-pink-100 p-5 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-800">Delete Product</h3>
+              <h3 className="text-lg font-semibold text-gray-800">🗑️ Delete Product</h3>
               <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
             </div>
             <div className="p-5">
@@ -612,7 +673,9 @@ function AdminProducts() {
               <p className="text-gray-500 text-sm mb-6">Are you sure you want to delete this product? This action cannot be undone.</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition">Cancel</button>
-                <button onClick={() => deleteProduct(productToDelete._id)} className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition">Delete</button>
+                <button onClick={() => deleteProduct(productToDelete._id)} disabled={processingId === productToDelete._id} className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition disabled:opacity-50">
+                  {processingId === productToDelete._id ? '⏳ Deleting...' : 'Delete'}
+                </button>
               </div>
             </div>
           </div>
