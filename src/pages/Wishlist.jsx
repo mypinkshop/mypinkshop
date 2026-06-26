@@ -271,7 +271,12 @@ function Wishlist() {
   if (loading) {
     return (
       <>
-        <Helmet><title>My Wishlist - MyPinkShop</title></Helmet>
+        // ✅ FIXED (string template)
+const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
+
+<Helmet>
+  <title>{pageTitle}</title>
+</Helmet>
         <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="mb-6">
@@ -291,13 +296,12 @@ function Wishlist() {
   return (
     <>
       <Helmet>
-        <title>My Wishlist ({wishlistCount}) - MyPinkShop</title>
-        <meta name="description" content={`View and manage your wishlist at MyPinkShop. ${wishlistCount} items saved.`} />
-        <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
-        <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
-        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
-      </Helmet>
-
+  <title>{`My Wishlist (${wishlistCount || 0}) - MyPinkShop`}</title>
+  <meta name="description" content={`View and manage your wishlist at MyPinkShop. ${wishlistCount || 0} items saved.`} />
+  <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
+  <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+  <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
+</Helmet>
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
         <OfferBanner />
