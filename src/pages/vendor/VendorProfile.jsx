@@ -405,16 +405,31 @@ function VendorProfile() {
               </div>
             </div>
 
-            {/* ✅ FIXED: Address Display - Alag-alag fields mein */}
-            {vendorInfo && (
+            {/* ✅ FIXED: Address Display - Alag-alag fields mein, koi object render nahi */}
+            {vendorInfo && vendorInfo.address && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 className="font-semibold text-gray-800 mb-3">📍 Current Address</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <p className="text-gray-600"><strong>Street:</strong> {vendorInfo.address?.street || 'N/A'}</p>
-                  <p className="text-gray-600"><strong>City:</strong> {vendorInfo.address?.city || 'N/A'}</p>
-                  <p className="text-gray-600"><strong>State:</strong> {vendorInfo.address?.state || 'N/A'}</p>
-                  <p className="text-gray-600"><strong>Pincode:</strong> {vendorInfo.address?.pincode || 'N/A'}</p>
-                  <p className="text-gray-600"><strong>Country:</strong> {vendorInfo.address?.country || 'India'}</p>
+                  <div>
+                    <span className="text-gray-500">Street:</span>
+                    <p className="text-gray-800 font-medium">{vendorInfo.address.street || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">City:</span>
+                    <p className="text-gray-800 font-medium">{vendorInfo.address.city || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">State:</span>
+                    <p className="text-gray-800 font-medium">{vendorInfo.address.state || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Pincode:</span>
+                    <p className="text-gray-800 font-medium">{vendorInfo.address.pincode || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Country:</span>
+                    <p className="text-gray-800 font-medium">{vendorInfo.address.country || 'India'}</p>
+                  </div>
                 </div>
               </div>
             )}
