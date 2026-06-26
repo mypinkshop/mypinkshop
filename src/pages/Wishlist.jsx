@@ -28,6 +28,7 @@ function Wishlist() {
   const getGuestWishlist = useCallback(() => {
     try {
       const saved = localStorage.getItem('guestWishlist');
+      console.log('🟢 getGuestWishlist - Raw:', saved);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -42,43 +43,94 @@ function Wishlist() {
 
   // ============ GUEST: Save to localStorage ============
   const saveGuestWishlist = useCallback((data) => {
+    console.log('🟢 saveGuestWishlist - Saving:', data);
     localStorage.setItem('guestWishlist', JSON.stringify(data));
+    const saved = localStorage.getItem('guestWishlist');
+    console.log('🟢 saveGuestWishlist - Verified:', saved);
   }, []);
 
   // ============ LOAD WISHLIST ============
   const loadWishlist = useCallback(async () => {
+    console.log('🟢 loadWishlist - Starting...');
     if (user && token) {
+      console.log('🟢 loadWishlist - Logged in user');
       if (fetchWishlist) {
         await fetchWishlist();
         const data = Array.isArray(wishlist) ? [...wishlist] : [];
+        console.log('🟢 loadWishlist - Fetched:', data.length, 'items');
         setDisplayWishlist(data);
       }
     } else {
+      console.log('🟢 loadWishlist - Guest user');
       const data = getGuestWishlist();
+      console.log('🟢 loadWishlist - Got:', data.length, 'items');
       setDisplayWishlist(data);
     }
     setLoading(false);
   }, [user, token, fetchWishlist, wishlist, getGuestWishlist]);
 
-  // ============ MOUNT & REFRESH ============
+  // ============ MOUNT ============
   useEffect(() => {
+    console.log('🟢 useEffect - Mount/Refresh');
     setIsGuest(!user || !token);
     loadWishlist();
-  }, [refreshKey]); // ✅ refreshKey change hone par reload
+  }, [refreshKey]);
 
   // ============ UPDATE ON CONTEXT CHANGE ============
   useEffect(() => {
     if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
+      console.log('🟢 useEffect - Context changed:', data.length, 'items');
       setDisplayWishlist(data);
     }
   }, [wishlist, user, token, loading]);
+
+  // ============ HANDLE: Remove Single Item ============
+  const handleRemoveItem = async (productId) => {
+    if (!productId) return;
+    
+    console.log('🟢 handleRemoveItem - Removing:', productId);
+    setRemovingProduct(productId);
+    
+    try {
+      if (user && token) {
+        console.log('🟢 handleRemoveItem - Logged in user');
+        await removeFromWishlist(productId);
+        await fetchWishlist();
+        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
+        console.log('🟢 handleRemoveItem - Updated:', updated.length, 'items');
+        setDisplayWishlist(updated);
+        toast.success('Removed from wishlist ❌');
+      } else {
+        console.log('🟢 handleRemoveItem - Guest user');
+        const currentList = [...displayWishlist];
+        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
+        
+        console.log('🟢 handleRemoveItem - Before:', currentList.length, 'items');
+        console.log('🟢 handleRemoveItem - After:', updatedList.length, 'items');
+        console.log('🟢 handleRemoveItem - Updated List:', updatedList);
+        
+        setDisplayWishlist(updatedList);
+        saveGuestWishlist(updatedList);
+        
+        // ✅ Force refresh
+        setRefreshKey(prev => prev + 1);
+        toast.success('Removed from wishlist ❌');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to remove from wishlist');
+    }
+    
+    setTimeout(() => setRemovingProduct(null), 300);
+  };
 
   // ============ HANDLE: Move to Cart ============
   const handleMoveToCart = async (product) => {
     const productId = product._id || product.id;
     if (!productId) return;
     
+    console.log('🟢 handleMoveToCart - Moving:', productId);
     setMovingProduct(productId);
     
     addToCart({
@@ -94,15 +146,24 @@ function Wishlist() {
     
     try {
       if (user && token) {
+        console.log('🟢 handleMoveToCart - Logged in user');
         await removeFromWishlist(productId);
         await fetchWishlist();
         const updated = Array.isArray(wishlist) ? [...wishlist] : [];
+        console.log('🟢 handleMoveToCart - Updated:', updated.length, 'items');
         setDisplayWishlist(updated);
       } else {
-        const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
+        console.log('🟢 handleMoveToCart - Guest user');
+        const currentList = [...displayWishlist];
+        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
+        
+        console.log('🟢 handleMoveToCart - Before:', currentList.length, 'items');
+        console.log('🟢 handleMoveToCart - After:', updatedList.length, 'items');
+        console.log('🟢 handleMoveToCart - Updated List:', updatedList);
+        
         setDisplayWishlist(updatedList);
         saveGuestWishlist(updatedList);
-        setRefreshKey(prev => prev + 1); // ✅ Force refresh
+        setRefreshKey(prev => prev + 1);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -110,34 +171,6 @@ function Wishlist() {
     }
     
     setTimeout(() => setMovingProduct(null), 500);
-  };
-
-  // ============ HANDLE: Remove Single Item ============
-  const handleRemoveItem = async (productId) => {
-    if (!productId) return;
-    
-    setRemovingProduct(productId);
-    
-    try {
-      if (user && token) {
-        await removeFromWishlist(productId);
-        await fetchWishlist();
-        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
-        setDisplayWishlist(updated);
-        toast.success('Removed from wishlist ❌');
-      } else {
-        const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
-        setDisplayWishlist(updatedList);
-        saveGuestWishlist(updatedList);
-        setRefreshKey(prev => prev + 1); // ✅ Force refresh
-        toast.success('Removed from wishlist ❌');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to remove from wishlist');
-    }
-    
-    setTimeout(() => setRemovingProduct(null), 300);
   };
 
   // ============ HANDLE: Clear All ============
@@ -163,7 +196,7 @@ function Wishlist() {
       } else {
         setDisplayWishlist([]);
         saveGuestWishlist([]);
-        setRefreshKey(prev => prev + 1); // ✅ Force refresh
+        setRefreshKey(prev => prev + 1);
         toast.success('Wishlist cleared 🗑️');
       }
     } catch (error) {
@@ -273,10 +306,9 @@ function Wishlist() {
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-        
         <OfferBanner />
 
-        {/* ============ HEADER ============ */}
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -347,7 +379,7 @@ function Wishlist() {
           </div>
         </header>
 
-        {/* ============ BREADCRUMB ============ */}
+        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -356,7 +388,7 @@ function Wishlist() {
           </div>
         </div>
 
-        {/* ============ EMPTY STATE ============ */}
+        {/* EMPTY STATE */}
         {wishlistCount === 0 ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
@@ -380,7 +412,7 @@ function Wishlist() {
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
-            {/* ============ HEADER ============ */}
+            {/* HEADER WITH ACTIONS */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -435,7 +467,7 @@ function Wishlist() {
               </div>
             </div>
 
-            {/* ============ PRODUCT GRID ============ */}
+            {/* PRODUCT GRID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {displayWishlist.map((product, index) => {
                 const productId = product._id || product.id;
@@ -548,6 +580,7 @@ function Wishlist() {
           </div>
         )}
 
+        {/* FOOTER */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
