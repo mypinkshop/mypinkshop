@@ -194,14 +194,12 @@ const sendNewOrder = async (vendor, order) => {
   
   if (order.items && order.items.length > 0) {
     order.items.forEach(item => {
-      // If vendorId matches or vendor is the seller
       if (item.vendorId && item.vendorId.toString() === vendor._id.toString()) {
         vendorTotal += item.price * item.quantity;
         itemCount += item.quantity;
       }
     });
   } else {
-    // Fallback: single product order
     vendorTotal = order.total || 0;
     itemCount = order.quantity || 1;
   }
@@ -403,7 +401,7 @@ const sendProductApproved = async (vendor, product) => {
         <div style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin: 20px 0;">
           <p style="margin: 5px 0;"><strong>Product:</strong> ${product.name}</p>
           <p style="margin: 5px 0;"><strong>Price:</strong> ₹${product.price}</p>
-          <p style="margin: 5px 0;"><strong>Category:</strong> ${product.mainCategory || 'N/A'}</p>
+          <p style="margin: 5px 0;"><strong>Category:</strong> ${product.mainCategory || product.category || 'N/A'}</p>
         </div>
         
         <a href="${getFrontendUrl()}/product/${product.slug || product._id}" style="display: inline-block; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 12px 35px; border-radius: 25px; text-decoration: none; font-weight: bold;">
@@ -462,6 +460,138 @@ const sendProductRejected = async (vendor, product, reason = 'Not specified') =>
   return await sendEmail(vendor.email, subject, html);
 };
 
+// ============ 11. RETURN REQUESTED ============
+const sendReturnRequested = async (vendor, order, reason) => {
+  const subject = `🔄 Return Requested for Order #${order.orderNumber || order._id}`;
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 15px; display: inline-flex; align-items: center; justify-content: center;">
+          <span style="font-size: 30px;">🔄</span>
+        </div>
+        <h1 style="color: #d97706; margin-top: 10px;">MyPinkShop</h1>
+      </div>
+      
+      <div style="background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <h2 style="color: #1f2937; margin-bottom: 20px;">Return Requested</h2>
+        <p style="color: #4b5563; font-size: 16px; margin-bottom: 10px;">
+          Dear <strong>${vendor.brandName || vendor.name}</strong>,
+        </p>
+        <p style="color: #4b5563; font-size: 16px; margin-bottom: 20px;">
+          A customer has requested a return for Order <strong>#${order.orderNumber || order._id}</strong>.
+        </p>
+        
+        <div style="background: #fffbeb; padding: 15px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+          <p style="margin: 5px 0;"><strong>Order ID:</strong> ${order.orderNumber || order._id}</p>
+          <p style="margin: 5px 0;"><strong>Customer:</strong> ${order.buyerName || order.customerName || 'Guest'}</p>
+          <p style="margin: 5px 0;"><strong>Reason:</strong> ${reason || order.returnReason || 'Not specified'}</p>
+          <p style="margin: 5px 0;"><strong>Amount:</strong> ₹${order.total || 0}</p>
+        </div>
+        
+        <a href="${getFrontendUrl()}/vendor/orders/${order._id}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 12px 35px; border-radius: 25px; text-decoration: none; font-weight: bold;">
+          📋 Review Return
+        </a>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+        <p>© 2026 MyPinkShop. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  return await sendEmail(vendor.email, subject, html);
+};
+
+// ============ 12. RETURN APPROVED ============
+const sendReturnApproved = async (vendor, order) => {
+  const subject = `✅ Return Approved for Order #${order.orderNumber || order._id}`;
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #22c55e, #16a34a); border-radius: 15px; display: inline-flex; align-items: center; justify-content: center;">
+          <span style="font-size: 30px;">✅</span>
+        </div>
+        <h1 style="color: #16a34a; margin-top: 10px;">MyPinkShop</h1>
+      </div>
+      
+      <div style="background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <h2 style="color: #1f2937; margin-bottom: 20px;">Return Approved</h2>
+        <p style="color: #4b5563; font-size: 16px; margin-bottom: 10px;">
+          Dear <strong>${vendor.brandName || vendor.name}</strong>,
+        </p>
+        <p style="color: #4b5563; font-size: 16px; margin-bottom: 20px;">
+          The return request for Order <strong>#${order.orderNumber || order._id}</strong> has been <strong style="color: #22c55e;">APPROVED</strong>.
+        </p>
+        
+        <div style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin: 20px 0;">
+          <p style="margin: 5px 0;"><strong>Order ID:</strong> ${order.orderNumber || order._id}</p>
+          <p style="margin: 5px 0;"><strong>Customer:</strong> ${order.buyerName || order.customerName || 'Guest'}</p>
+          <p style="margin: 5px 0;"><strong>Return Amount:</strong> ₹${order.total || 0}</p>
+        </div>
+        
+        <div style="background: #fef3c7; padding: 15px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+          <p style="color: #92400e; margin: 5px 0;">ℹ️ Refund will be processed within 5-7 business days.</p>
+        </div>
+        
+        <a href="${getFrontendUrl()}/vendor/orders/${order._id}" style="display: inline-block; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 12px 35px; border-radius: 25px; text-decoration: none; font-weight: bold;">
+          📋 View Order
+        </a>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+        <p>© 2026 MyPinkShop. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  return await sendEmail(vendor.email, subject, html);
+};
+
+// ============ 13. RETURN REJECTED ============
+const sendReturnRejected = async (vendor, order, reason = 'Not specified') => {
+  const subject = `❌ Return Rejected for Order #${order.orderNumber || order._id}`;
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-radius: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 15px; display: inline-flex; align-items: center; justify-content: center;">
+          <span style="font-size: 30px;">❌</span>
+        </div>
+        <h1 style="color: #dc2626; margin-top: 10px;">MyPinkShop</h1>
+      </div>
+      
+      <div style="background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <h2 style="color: #1f2937; margin-bottom: 20px;">Return Rejected</h2>
+        <p style="color: #4b5563; font-size: 16px; margin-bottom: 10px;">
+          Dear <strong>${vendor.brandName || vendor.name}</strong>,
+        </p>
+        <p style="color: #4b5563; font-size: 16px; margin-bottom: 20px;">
+          The return request for Order <strong>#${order.orderNumber || order._id}</strong> has been <strong style="color: #dc2626;">REJECTED</strong>.
+        </p>
+        
+        <div style="background: #fef2f2; padding: 15px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #dc2626;">
+          <p style="margin: 5px 0;"><strong>Order ID:</strong> ${order.orderNumber || order._id}</p>
+          <p style="margin: 5px 0;"><strong>Customer:</strong> ${order.buyerName || order.customerName || 'Guest'}</p>
+          <p style="margin: 5px 0; color: #dc2626;"><strong>Reason:</strong></p>
+          <p style="margin: 5px 0; color: #4b5563;">${reason}</p>
+        </div>
+        
+        <a href="${getFrontendUrl()}/vendor/orders/${order._id}" style="display: inline-block; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 12px 35px; border-radius: 25px; text-decoration: none; font-weight: bold;">
+          📋 View Order
+        </a>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px; color: #9ca3af; font-size: 12px;">
+        <p>© 2026 MyPinkShop. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  return await sendEmail(vendor.email, subject, html);
+};
+
 // ============ EXPORT ALL FUNCTIONS ============
 module.exports = {
   sendVendorApproved,
@@ -473,5 +603,8 @@ module.exports = {
   sendOrderDelivered,
   sendLowStockAlert,
   sendProductApproved,
-  sendProductRejected
+  sendProductRejected,
+  sendReturnRequested,
+  sendReturnApproved,
+  sendReturnRejected
 };
