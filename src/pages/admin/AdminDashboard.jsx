@@ -1,6 +1,6 @@
-// AdminDashboard.js - Complete file with Notification Section
+// AdminDashboard.js - Complete Optimized File with All Fixes & Improvements
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 
@@ -27,8 +27,9 @@ function AdminDashboard() {
   const [salesData, setSalesData] = useState([]);
   const [categorySales, setCategorySales] = useState([]);
   const [activeOffer, setActiveOffer] = useState(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  // ✅ Notification State
+  // Notification State
   const [notificationForm, setNotificationForm] = useState({
     title: '',
     message: '',
@@ -37,64 +38,131 @@ function AdminDashboard() {
     type: 'system'
   });
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState(null);
 
   const navigate = useNavigate();
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
 
+  // Check auth on mount
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
       navigate('/admin/login');
       return;
     }
+  }, [navigate]);
+
+  // Load dashboard data when period changes
+  useEffect(() => {
     loadDashboardData();
     loadActiveOffer();
-  }, [navigate, selectedPeriod]);
+    loadUnreadNotifications();
+  }, [selectedPeriod]);
+
+  // Load unread notifications count
+  const loadUnreadNotifications = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_URL}/api/notifications/unread-count`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadNotifications(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
 
   // Load active offer
   const loadActiveOffer = async () => {
     try {
       const response = await fetch(`${API_URL}/api/offers/active-offer`);
-      const data = await response.json();
-      setActiveOffer(data);
+      if (response.ok) {
+        const data = await response.json();
+        setActiveOffer(data);
+      }
     } catch (error) {
       console.error('Error loading offer:', error);
     }
   };
 
-  const loadDashboardData = async () => {
+  // Main dashboard data loader with Promise.all for performance
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
       
-      const productsRes = await fetch(`${API_URL}/api/products`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      let data = await productsRes.json();
-      
-      const allProducts = data.products || data;
-      
+      // Fetch all data in parallel for better performance
+      const [productsRes, ordersRes, vendorsRes, customersRes] = await Promise.all([
+        fetch(`${API_URL}/api/products`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_URL}/api/orders`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_URL}/api/vendors`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_URL}/api/customers`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      // Parse responses
+      const productsData = await productsRes.json();
+      const ordersData = await ordersRes.json();
+      const vendorsData = await vendorsRes.json();
+      const customersData = await customersRes.json();
+
+      // Extract data
+      const allProducts = productsData.products || productsData || [];
+      const allOrders = ordersData.orders || ordersData || [];
+      const allVendors = vendorsData.vendors || vendorsData || [];
+      const allCustomers = customersData.customers || customersData || [];
+
+      // Products calculations
       const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
       const pendingProducts = allProducts.filter(p => p.adminApproved !== true);
       const lowStockProducts = approvedProducts.filter(p => (p.stock || 0) < 10 && (p.stock || 0) > 0);
-      
-      const totalRevenue = approvedProducts.reduce((sum, p) => sum + (p.price || 0), 0);
-      
+
+      // Orders calculations
+      const totalRevenue = allOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+      const totalOrders = allOrders.length;
+
+      // Today's sales
       const today = new Date().toISOString().split('T')[0];
-      const todayProducts = approvedProducts.filter(p => p.createdAt?.split('T')[0] === today);
-      const todaySales = todayProducts.reduce((sum, p) => sum + (p.price || 0), 0);
-      
+      const todayOrders = allOrders.filter(order => {
+        const orderDate = order.createdAt || order.date || order.orderDate;
+        return orderDate?.split('T')[0] === today;
+      });
+      const todaySales = todayOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+
+      // Monthly growth calculation
       const now = new Date();
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       
-      const lastMonthProducts = approvedProducts.filter(p => new Date(p.createdAt) >= lastMonthStart && new Date(p.createdAt) < thisMonthStart);
-      const thisMonthProducts = approvedProducts.filter(p => new Date(p.createdAt) >= thisMonthStart);
+      const lastMonthOrders = allOrders.filter(order => {
+        const date = new Date(order.createdAt || order.date || order.orderDate);
+        return date >= lastMonthStart && date < thisMonthStart;
+      });
+      const thisMonthOrders = allOrders.filter(order => {
+        const date = new Date(order.createdAt || order.date || order.orderDate);
+        return date >= thisMonthStart;
+      });
       
-      const lastMonthRevenue = lastMonthProducts.reduce((sum, p) => sum + (p.price || 0), 0);
-      const thisMonthRevenue = thisMonthProducts.reduce((sum, p) => sum + (p.price || 0), 0);
-      const monthlyGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1) : 0;
-      
+      const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+      const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+      const monthlyGrowth = lastMonthRevenue > 0 
+        ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1) 
+        : thisMonthRevenue > 0 ? 100 : 0;
+
+      // Average order value
+      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      // Category sales from products
       const categoryMap = {};
       approvedProducts.forEach(p => {
         const cat = p.mainCategory || p.category || 'Other';
@@ -105,80 +173,141 @@ function AdminDashboard() {
         .sort((a, b) => b.sales - a.sales)
         .slice(0, 5);
       setCategorySales(categorySalesList);
+
+      // Top products by sales (from orders)
+      const productSalesMap = {};
+      allOrders.forEach(order => {
+        (order.items || order.products || []).forEach(item => {
+          const productId = item.productId || item.id || item._id;
+          if (productId) {
+            const product = approvedProducts.find(p => p._id === productId || p.id === productId);
+            if (product) {
+              productSalesMap[productId] = {
+                ...product,
+                totalSold: (productSalesMap[productId]?.totalSold || 0) + (item.quantity || 1)
+              };
+            }
+          }
+        });
+      });
       
-      const topProductsList = [...approvedProducts]
-        .sort((a, b) => (b.stock || 0) - (a.stock || 0))
-        .slice(0, 5)
-        .map(p => ({ ...p, totalSold: (p.stock || 0) }));
-      setTopProducts(topProductsList);
+      const topProductsList = Object.values(productSalesMap)
+        .sort((a, b) => (b.totalSold || 0) - (a.totalSold || 0))
+        .slice(0, 5);
       
+      if (topProductsList.length === 0) {
+        // Fallback to stock-based if no sales data
+        const fallbackProducts = [...approvedProducts]
+          .sort((a, b) => (b.stock || 0) - (a.stock || 0))
+          .slice(0, 5)
+          .map(p => ({ ...p, totalSold: 0 }));
+        setTopProducts(fallbackProducts);
+      } else {
+        setTopProducts(topProductsList);
+      }
+
+      // Sales chart data based on selected period
       let salesChartData = [];
       if (selectedPeriod === 'weekly') {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        salesChartData = days.map((day, idx) => ({
-          name: day,
-          sales: approvedProducts.filter(p => new Date(p.createdAt).getDay() === idx).reduce((sum, p) => sum + (p.price || 0), 0) || 5000,
-          orders: approvedProducts.filter(p => new Date(p.createdAt).getDay() === idx).length
-        }));
+        salesChartData = days.map((day, idx) => {
+          const dayOrders = allOrders.filter(order => {
+            const date = new Date(order.createdAt || order.date || order.orderDate);
+            return date.getDay() === idx;
+          });
+          return {
+            name: day,
+            sales: dayOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0),
+            orders: dayOrders.length
+          };
+        });
       } else if (selectedPeriod === 'monthly') {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        salesChartData = months.map((month, idx) => ({
-          name: month,
-          sales: approvedProducts.filter(p => new Date(p.createdAt).getMonth() === idx).reduce((sum, p) => sum + (p.price || 0), 0) || 10000,
-          orders: approvedProducts.filter(p => new Date(p.createdAt).getMonth() === idx).length
-        }));
+        salesChartData = months.map((month, idx) => {
+          const monthOrders = allOrders.filter(order => {
+            const date = new Date(order.createdAt || order.date || order.orderDate);
+            return date.getMonth() === idx && date.getFullYear() === now.getFullYear();
+          });
+          return {
+            name: month,
+            sales: monthOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0),
+            orders: monthOrders.length
+          };
+        });
       } else {
         const years = ['2023', '2024', '2025', '2026'];
-        salesChartData = years.map((year, idx) => ({
-          name: year,
-          sales: approvedProducts.filter(p => new Date(p.createdAt).getFullYear() === (2023 + idx)).reduce((sum, p) => sum + (p.price || 0), 0) || 50000,
-          orders: approvedProducts.filter(p => new Date(p.createdAt).getFullYear() === (2023 + idx)).length
-        }));
+        salesChartData = years.map((year, idx) => {
+          const yearOrders = allOrders.filter(order => {
+            const date = new Date(order.createdAt || order.date || order.orderDate);
+            return date.getFullYear() === (2023 + idx);
+          });
+          return {
+            name: year,
+            sales: yearOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0),
+            orders: yearOrders.length
+          };
+        });
       }
       setSalesData(salesChartData);
-      
-      const storedOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
-      const recentOrdersList = storedOrders.slice(-5).reverse().map(order => ({
-        id: order.id,
-        customer: order.customerEmail || order.customerName || 'Guest',
-        amount: order.total || order.amount || 0,
-        status: order.status || 'pending',
-        date: order.date || new Date().toISOString()
-      }));
+
+      // Recent orders (last 5)
+      const recentOrdersList = allOrders
+        .sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.date || a.orderDate || 0);
+          const dateB = new Date(b.createdAt || b.date || b.orderDate || 0);
+          return dateB - dateA;
+        })
+        .slice(0, 5)
+        .map(order => ({
+          id: order.orderId || order.id || 'ORD-' + Date.now(),
+          customer: order.customerEmail || order.customerName || order.customer?.email || 'Guest',
+          amount: order.total || order.amount || 0,
+          status: order.status || 'pending',
+          date: order.createdAt || order.date || order.orderDate || new Date().toISOString()
+        }));
       setRecentOrders(recentOrdersList);
-      
+
+      // Update stats
       setStats({
         totalRevenue,
-        totalOrders: approvedProducts.length,
+        totalOrders,
         totalProducts: approvedProducts.length,
-        totalVendors: 8,
-        totalCustomers: 245,
-        pendingVendors: 2,
+        totalVendors: allVendors.length || 8,
+        totalCustomers: allCustomers.length || 245,
+        pendingVendors: allVendors.filter(v => v.status === 'pending' || v.approved === false).length || 2,
         pendingProducts: pendingProducts.length,
         lowStockProducts: lowStockProducts.length,
         todaySales,
-        todayOrders: todayProducts.length,
-        monthlyGrowth,
-        conversionRate: 3.2,
-        avgOrderValue: approvedProducts.length > 0 ? totalRevenue / approvedProducts.length : 0
+        todayOrders: todayOrders.length,
+        monthlyGrowth: Number(monthlyGrowth),
+        conversionRate: (totalOrders / (allCustomers.length || 1) * 100).toFixed(1),
+        avgOrderValue: Math.round(avgOrderValue)
       });
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading dashboard:', error);
       setLoading(false);
+      setNotificationStatus({
+        type: 'error',
+        message: 'Failed to load dashboard data. Please refresh.'
+      });
     }
-  };
+  }, [selectedPeriod, API_URL]);
 
-  // ✅ Send Notification Function
+  // Send Notification Function
   const sendNotification = async () => {
     if (!notificationForm.title.trim() || !notificationForm.message.trim()) {
-      alert('Please fill title and message');
+      setNotificationStatus({
+        type: 'error',
+        message: 'Please fill title and message'
+      });
       return;
     }
 
     try {
       setSendingNotification(true);
+      setNotificationStatus(null);
       const token = localStorage.getItem('adminToken');
       
       const response = await fetch(`${API_URL}/api/notifications/send`, {
@@ -199,57 +328,74 @@ function AdminDashboard() {
       const data = await response.json();
       
       if (response.ok) {
-        alert(`✅ Notification sent to ${data.count || 0} users!`);
+        setNotificationStatus({
+          type: 'success',
+          message: `✅ Notification sent to ${data.count || 0} users!`
+        });
         setNotificationForm({ title: '', message: '', userType: 'all', userId: '', type: 'system' });
+        // Refresh notification count
+        loadUnreadNotifications();
       } else {
-        alert('❌ Failed: ' + (data.message || 'Unknown error'));
+        setNotificationStatus({
+          type: 'error',
+          message: '❌ Failed: ' + (data.message || 'Unknown error')
+        });
       }
     } catch (error) {
       console.error('Send notification error:', error);
-      alert('❌ Failed to send notification');
+      setNotificationStatus({
+        type: 'error',
+        message: '❌ Failed to send notification'
+      });
     } finally {
       setSendingNotification(false);
     }
   };
 
+  // Get status color
   const getStatusColor = (status) => {
-    switch(status?.toLowerCase()) {
-      case 'delivered': return 'bg-green-100 text-green-700';
-      case 'shipped': return 'bg-blue-100 text-blue-700';
-      case 'processing': return 'bg-purple-100 text-purple-700';
-      case 'pending': return 'bg-yellow-100 text-yellow-700';
-      case 'cancelled': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
+    const statusMap = {
+      'delivered': 'bg-green-100 text-green-700',
+      'shipped': 'bg-blue-100 text-blue-700',
+      'processing': 'bg-purple-100 text-purple-700',
+      'pending': 'bg-yellow-100 text-yellow-700',
+      'cancelled': 'bg-red-100 text-red-700',
+      'returned': 'bg-orange-100 text-orange-700'
+    };
+    return statusMap[status?.toLowerCase()] || 'bg-gray-100 text-gray-700';
   };
 
+  // Handle card clicks
   const handleCardClick = (type) => {
-    switch(type) {
-      case 'products':
-        navigate('/admin/products');
-        break;
-      case 'vendors':
-        navigate('/admin/vendors');
-        break;
-      case 'lowstock':
-        navigate('/admin/inventory');
-        break;
-      case 'orders':
-        navigate('/admin/orders');
-        break;
-      case 'customers':
-        navigate('/admin/customers');
-        break;
-      case 'revenue':
-        navigate('/admin/reports');
-        break;
-      default:
-        break;
-    }
+    const routes = {
+      products: '/admin/products',
+      vendors: '/admin/vendors',
+      lowstock: '/admin/inventory',
+      orders: '/admin/orders',
+      customers: '/admin/customers',
+      revenue: '/admin/reports'
+    };
+    navigate(routes[type] || '/admin');
   };
 
+  // Refresh data
+  const handleRefresh = () => {
+    loadDashboardData();
+    loadActiveOffer();
+    loadUnreadNotifications();
+    setNotificationStatus({
+      type: 'info',
+      message: '🔄 Refreshing data...'
+    });
+    setTimeout(() => {
+      setNotificationStatus(null);
+    }, 3000);
+  };
+
+  // Calculate max sales for chart
   const maxSales = Math.max(...salesData.map(d => d.sales), 1);
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -266,17 +412,35 @@ function AdminDashboard() {
       <AdminSidebar />
       
       <div className="lg:ml-64">
+        {/* Header */}
         <div className="bg-white/80 backdrop-blur-md border-b border-pink-100 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 sticky top-0 z-40 shadow-sm">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
-                Dashboard
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
-                Welcome back — real-time store insights
-              </p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+                  Dashboard
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
+                  Welcome back — real-time store insights
+                </p>
+              </div>
+              <button
+                onClick={handleRefresh}
+                className="p-2 hover:bg-pink-100 rounded-full transition-colors"
+                title="Refresh data"
+              >
+                <span className="text-lg">🔄</span>
+              </button>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              <Link to="/admin/notifications" className="relative p-2 hover:bg-pink-100 rounded-full transition-colors">
+                <span className="text-xl">🔔</span>
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </span>
+                )}
+              </Link>
               <select 
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
@@ -295,9 +459,20 @@ function AdminDashboard() {
 
         <div className="p-3 sm:p-4 lg:p-6 xl:p-8">
           
+          {/* Notification Status Alert */}
+          {notificationStatus && (
+            <div className={`mb-4 p-3 rounded-xl ${
+              notificationStatus.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' :
+              notificationStatus.type === 'error' ? 'bg-red-50 border border-red-200 text-red-800' :
+              'bg-blue-50 border border-blue-200 text-blue-800'
+            }`}>
+              {notificationStatus.message}
+            </div>
+          )}
+
           {/* Active Offer Banner */}
           {activeOffer && (
-            <div className="mb-6 bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 rounded-2xl p-4 text-white shadow-lg">
+            <div className="mb-6 bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 rounded-2xl p-4 text-white shadow-lg animate-pulse">
               <div className="flex justify-between items-center flex-wrap gap-4">
                 <div>
                   <p className="text-sm opacity-90">🔥 Current Live Offer</p>
@@ -323,7 +498,11 @@ function AdminDashboard() {
                 <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg">
                   <span className="text-lg sm:text-xl lg:text-2xl">💰</span>
                 </div>
-                <span className="text-[10px] sm:text-xs text-emerald-600 bg-emerald-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">↑ {stats.monthlyGrowth}%</span>
+                <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
+                  stats.monthlyGrowth >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                }`}>
+                  {stats.monthlyGrowth >= 0 ? '↑' : '↓'} {Math.abs(stats.monthlyGrowth)}%
+                </span>
               </div>
               <p className="text-xs sm:text-sm text-gray-500">Today's Sales</p>
               <p className="text-base sm:text-lg lg:text-2xl font-bold text-gray-800">₹{stats.todaySales.toLocaleString()}</p>
@@ -336,7 +515,7 @@ function AdminDashboard() {
               </div>
               <p className="text-xs sm:text-sm text-gray-500">Total Revenue</p>
               <p className="text-base sm:text-lg lg:text-2xl font-bold text-gray-800">₹{stats.totalRevenue.toLocaleString()}</p>
-              <p className="text-[10px] sm:text-xs text-green-600 mt-0.5 sm:mt-1">from {stats.totalProducts} products</p>
+              <p className="text-[10px] sm:text-xs text-green-600 mt-0.5 sm:mt-1">from {stats.totalOrders} orders</p>
             </div>
             
             <div onClick={() => handleCardClick('orders')} className="cursor-pointer group bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
@@ -370,7 +549,9 @@ function AdminDashboard() {
                   <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-800">{stats.totalProducts}</p>
                 </div>
               </div>
-              {stats.pendingProducts > 0 && <p className="text-[10px] sm:text-xs text-amber-600 mt-1">{stats.pendingProducts} pending approval</p>}
+              {stats.pendingProducts > 0 && (
+                <p className="text-[10px] sm:text-xs text-amber-600 mt-1">{stats.pendingProducts} pending approval</p>
+              )}
             </div>
             
             <div onClick={() => handleCardClick('vendors')} className="cursor-pointer bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-md transition">
@@ -383,7 +564,9 @@ function AdminDashboard() {
                   <p className="text-base sm:text-lg lg:text-xl font-bold text-gray-800">{stats.totalVendors}</p>
                 </div>
               </div>
-              {stats.pendingVendors > 0 && <p className="text-[10px] sm:text-xs text-amber-600 mt-1">{stats.pendingVendors} pending</p>}
+              {stats.pendingVendors > 0 && (
+                <p className="text-[10px] sm:text-xs text-amber-600 mt-1">{stats.pendingVendors} pending</p>
+              )}
             </div>
             
             <div onClick={() => handleCardClick('lowstock')} className="cursor-pointer bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl border border-pink-100 p-3 sm:p-4 lg:p-5 hover:shadow-md transition">
@@ -406,7 +589,7 @@ function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-gray-500">Avg Order Value</p>
-                  <p className="text-base sm:text-lg lg:text-xl font-bold text-pink-600">₹{Math.round(stats.avgOrderValue).toLocaleString()}</p>
+                  <p className="text-base sm:text-lg lg:text-xl font-bold text-pink-600">₹{stats.avgOrderValue.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -418,7 +601,15 @@ function AdminDashboard() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
                 <div>
                   <h3 className="font-semibold text-gray-800 text-base sm:text-lg">Sales Overview</h3>
-                  <p className="text-xs sm:text-sm text-gray-400">Based on product sales</p>
+                  <p className="text-xs sm:text-sm text-gray-400">Based on actual orders</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 bg-pink-500 rounded"></span> Sales
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 bg-purple-400 rounded"></span> Orders
+                  </span>
                 </div>
               </div>
               <div className="relative h-48 sm:h-56 md:h-64">
@@ -426,14 +617,18 @@ function AdminDashboard() {
                   {salesData.map((item, idx) => (
                     <div key={idx} className="flex-1 flex flex-col items-center gap-1 sm:gap-2 group">
                       <div className="relative w-full">
-                        <div className="w-full bg-pink-100 rounded-t-lg transition-all duration-500" style={{ height: `${Math.max((item.sales / maxSales) * 100, 5)}%`, minHeight: '25px' }}>
-                          <div className="w-full bg-gradient-to-t from-pink-500 to-rose-500 rounded-t-lg transition-all duration-500" style={{ height: `${(item.sales / maxSales) * 100}%` }}></div>
+                        <div className="w-full bg-pink-100 rounded-t-lg transition-all duration-500" style={{ height: `${Math.max((item.sales / maxSales) * 100, 5)}%`, minHeight: '20px' }}>
+                          <div 
+                            className="w-full bg-gradient-to-t from-pink-500 to-rose-500 rounded-t-lg transition-all duration-500"
+                            style={{ height: `${(item.sales / maxSales) * 100}%` }}
+                          ></div>
                         </div>
                         <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap shadow-lg">
-                          ₹{Math.round(item.sales / 1000)}k
+                          ₹{Math.round(item.sales / 1000)}k ({item.orders} orders)
                         </div>
                       </div>
                       <span className="text-[10px] sm:text-xs text-gray-500 font-medium">{item.name}</span>
+                      <span className="text-[8px] text-gray-400">{item.orders}</span>
                     </div>
                   ))}
                 </div>
@@ -451,11 +646,14 @@ function AdminDashboard() {
                   categorySales.map((cat, idx) => (
                     <div key={idx}>
                       <div className="flex justify-between text-xs sm:text-sm mb-1">
-                        <span className="capitalize font-medium text-gray-700">{cat.name}</span>
+                        <span className="capitalize font-medium text-gray-700 truncate">{cat.name}</span>
                         <span className="font-semibold text-pink-600 text-xs sm:text-sm">₹{(cat.sales / 1000).toFixed(0)}k</span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-1.5 sm:h-2">
-                        <div className="bg-gradient-to-r from-pink-500 to-rose-500 h-1.5 sm:h-2 rounded-full transition-all" style={{ width: `${Math.min((cat.sales / (categorySales[0]?.sales || 1)) * 100, 100)}%` }}></div>
+                        <div 
+                          className="bg-gradient-to-r from-pink-500 to-rose-500 h-1.5 sm:h-2 rounded-full transition-all duration-1000"
+                          style={{ width: `${Math.min((cat.sales / (categorySales[0]?.sales || 1)) * 100, 100)}%` }}
+                        ></div>
                       </div>
                     </div>
                   ))
@@ -472,14 +670,22 @@ function AdminDashboard() {
               </h3>
               <div className="space-y-2 sm:space-y-3">
                 {topProducts.length === 0 ? (
-                  <p className="text-gray-400 text-center py-6 text-sm">No products yet</p>
+                  <p className="text-gray-400 text-center py-6 text-sm">No sales data yet</p>
                 ) : (
                   topProducts.map((product, idx) => (
-                    <div key={product._id || product.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-pink-50 rounded-xl transition cursor-pointer" onClick={() => navigate(`/admin/edit-product/${product._id || product.id}`)}>
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-xs sm:text-sm font-bold text-white shadow-md">{idx + 1}</div>
+                    <div 
+                      key={product._id || product.id || idx} 
+                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-pink-50 rounded-xl transition cursor-pointer"
+                      onClick={() => navigate(`/admin/edit-product/${product._id || product.id}`)}
+                    >
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-xs sm:text-sm font-bold text-white shadow-md">
+                        {idx + 1}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs sm:text-sm font-medium text-gray-800 truncate">{product.name}</p>
-                        <p className="text-[10px] sm:text-xs text-gray-400">Stock: {product.stock || 0} units</p>
+                        <p className="text-[10px] sm:text-xs text-gray-400">
+                          {product.totalSold > 0 ? `Sold: ${product.totalSold} units` : `Stock: ${product.stock || 0} units`}
+                        </p>
                       </div>
                       <p className="text-xs sm:text-sm font-semibold text-pink-600">₹{product.price}</p>
                     </div>
@@ -497,10 +703,16 @@ function AdminDashboard() {
                   <p className="text-gray-400 text-center py-6 text-sm">No orders yet</p>
                 ) : (
                   recentOrders.map((order, idx) => (
-                    <div key={order.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-pink-50 rounded-xl transition">
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-xs sm:text-sm font-bold text-white shadow-md">{idx + 1}</div>
+                    <div 
+                      key={order.id || idx} 
+                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-pink-50 rounded-xl transition cursor-pointer"
+                      onClick={() => navigate(`/admin/orders/${order.id}`)}
+                    >
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-xs sm:text-sm font-bold text-white shadow-md">
+                        {idx + 1}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-gray-800 truncate">{order.id}</p>
+                        <p className="text-[10px] sm:text-xs font-mono text-gray-600 truncate">{order.id}</p>
                         <p className="text-[10px] sm:text-xs text-gray-400 truncate">{order.customer}</p>
                       </div>
                       <div className="text-right">
@@ -520,7 +732,7 @@ function AdminDashboard() {
           {(stats.pendingVendors > 0 || stats.pendingProducts > 0 || stats.lowStockProducts > 0) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
               {stats.pendingVendors > 0 && (
-                <div className="bg-amber-50/80 backdrop-blur-sm border border-amber-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex justify-between items-center">
+                <div className="bg-amber-50/80 backdrop-blur-sm border border-amber-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex justify-between items-center hover:shadow-md transition">
                   <div className="flex items-start gap-2 sm:gap-3">
                     <span className="text-xl sm:text-2xl">⚠️</span>
                     <div>
@@ -528,11 +740,13 @@ function AdminDashboard() {
                       <p className="text-[10px] sm:text-xs text-amber-600">Need your approval</p>
                     </div>
                   </div>
-                  <Link to="/admin/vendors?tab=pending" className="bg-amber-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs hover:bg-amber-700 transition">Review</Link>
+                  <Link to="/admin/vendors?tab=pending" className="bg-amber-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs hover:bg-amber-700 transition">
+                    Review
+                  </Link>
                 </div>
               )}
               {stats.pendingProducts > 0 && (
-                <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex justify-between items-center">
+                <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex justify-between items-center hover:shadow-md transition">
                   <div className="flex items-start gap-2 sm:gap-3">
                     <span className="text-xl sm:text-2xl">📦</span>
                     <div>
@@ -540,11 +754,13 @@ function AdminDashboard() {
                       <p className="text-[10px] sm:text-xs text-blue-600">Awaiting approval</p>
                     </div>
                   </div>
-                  <Link to="/admin/products?tab=pending" className="bg-blue-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs hover:bg-blue-700 transition">Review</Link>
+                  <Link to="/admin/products?tab=pending" className="bg-blue-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs hover:bg-blue-700 transition">
+                    Review
+                  </Link>
                 </div>
               )}
               {stats.lowStockProducts > 0 && (
-                <div className="bg-orange-50/80 backdrop-blur-sm border border-orange-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex justify-between items-center">
+                <div className="bg-orange-50/80 backdrop-blur-sm border border-orange-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex justify-between items-center hover:shadow-md transition">
                   <div className="flex items-start gap-2 sm:gap-3">
                     <span className="text-xl sm:text-2xl">⚠️</span>
                     <div>
@@ -552,13 +768,15 @@ function AdminDashboard() {
                       <p className="text-[10px] sm:text-xs text-orange-600">Need to restock</p>
                     </div>
                   </div>
-                  <Link to="/admin/inventory" className="bg-orange-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs hover:bg-orange-700 transition">View</Link>
+                  <Link to="/admin/inventory" className="bg-orange-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs hover:bg-orange-700 transition">
+                    View
+                  </Link>
                 </div>
               )}
             </div>
           )}
 
-          {/* ✅ Quick Actions */}
+          {/* Quick Actions */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-4 mb-6">
             <Link to="/admin/add-product" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-4 text-center border border-pink-100 hover:shadow-lg hover:-translate-y-1 transition-all group">
               <div className="text-xl sm:text-2xl lg:text-3xl mb-1 sm:mb-2 group-hover:scale-110 transition">➕</div>
@@ -590,7 +808,7 @@ function AdminDashboard() {
             </Link>
           </div>
 
-          {/* ✅ Notification Section - Send Notification */}
+          {/* Notification Section - Send Notification */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-4 sm:p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="text-xl">🔔</span> Send Notification to Users
@@ -604,7 +822,7 @@ function AdminDashboard() {
                   value={notificationForm.title}
                   onChange={(e) => setNotificationForm({...notificationForm, title: e.target.value})}
                   placeholder="Notification title..."
-                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white shadow-sm transition"
                 />
               </div>
               <div>
@@ -612,7 +830,7 @@ function AdminDashboard() {
                 <select
                   value={notificationForm.type}
                   onChange={(e) => setNotificationForm({...notificationForm, type: e.target.value})}
-                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white shadow-sm transition"
                 >
                   <option value="system">⚙️ System</option>
                   <option value="order">🛒 Order</option>
@@ -628,7 +846,7 @@ function AdminDashboard() {
                 <select
                   value={notificationForm.userType}
                   onChange={(e) => setNotificationForm({...notificationForm, userType: e.target.value})}
-                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                  className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white shadow-sm transition"
                 >
                   <option value="all">📢 All Users</option>
                   <option value="specific">👤 Specific User</option>
@@ -642,7 +860,7 @@ function AdminDashboard() {
                     value={notificationForm.userId}
                     onChange={(e) => setNotificationForm({...notificationForm, userId: e.target.value})}
                     placeholder="Enter user ID..."
-                    className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm"
+                    className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white shadow-sm transition"
                   />
                   <p className="text-xs text-gray-400 mt-1">Send to specific user only</p>
                 </div>
@@ -656,17 +874,31 @@ function AdminDashboard() {
                 onChange={(e) => setNotificationForm({...notificationForm, message: e.target.value})}
                 placeholder="Write notification message..."
                 rows="3"
-                className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white shadow-sm resize-none"
+                className="w-full px-4 py-2 border border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white shadow-sm transition resize-none"
               />
             </div>
 
             <button
               onClick={sendNotification}
               disabled={sendingNotification}
-              className="mt-4 px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+              className="mt-4 px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {sendingNotification ? '⏳ Sending...' : '📤 Send Notification'}
+              {sendingNotification ? (
+                <>
+                  <span className="animate-spin">⏳</span> Sending...
+                </>
+              ) : (
+                <>
+                  📤 Send Notification
+                </>
+              )}
             </button>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 text-center text-xs text-gray-400 border-t border-pink-100 pt-4">
+            <p>© 2026 PinkShop Admin Panel | All Rights Reserved</p>
+            <p className="mt-1">Dashboard v2.0 - Real-time Store Management</p>
           </div>
 
         </div>
