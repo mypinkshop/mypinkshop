@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 function AdminBanners() {
   const navigate = useNavigate();
@@ -22,7 +23,9 @@ function AdminBanners() {
   });
   const [imagePreviews, setImagePreviews] = useState([]);
 
-  const API_BASE = 'https://api.mypinkshop.com/api';
+  const API_BASE = process.env.REACT_APP_API_URL 
+    ? `${process.env.REACT_APP_API_URL}/api` 
+    : 'https://api.mypinkshop.com/api';
 
   // Auth check
   useEffect(() => {
@@ -63,6 +66,7 @@ function AdminBanners() {
     } catch (err) {
       console.error('Load error:', err);
       setError('Failed to load banners. Please refresh.');
+      toast.error('Failed to load banners');
       setBanners([]);
     } finally {
       setLoading(false);
@@ -149,9 +153,11 @@ function AdminBanners() {
       });
       if (response.ok) {
         await loadBanners();
+        toast.success(`Banner ${!currentStatus ? 'activated' : 'deactivated'}!`);
       }
     } catch (err) {
       console.error('Toggle error:', err);
+      toast.error('Failed to toggle banner');
     }
   };
 
@@ -161,13 +167,13 @@ function AdminBanners() {
     if (files.length === 0) return;
     
     if (files.length > 6) {
-      alert('Maximum 6 images allowed');
+      toast.error('Maximum 6 images allowed');
       return;
     }
     
     const totalSize = files.reduce((sum, f) => sum + f.size, 0);
     if (totalSize > 5 * 1024 * 1024) {
-      alert('Total images size should be less than 5MB');
+      toast.error('Total images size should be less than 5MB');
       return;
     }
     
@@ -189,7 +195,7 @@ function AdminBanners() {
     e.preventDefault();
     
     if (!formData.title && formData.images.length === 0) {
-      alert('Please enter a title or upload at least one image');
+      toast.error('Please enter a title or upload at least one image');
       return;
     }
     
@@ -199,16 +205,16 @@ function AdminBanners() {
     try {
       if (editingBanner) {
         await saveBannerToAPI(formData, true);
-        alert('✅ Banner updated successfully!');
+        toast.success('✅ Banner updated successfully!');
       } else {
         await saveBannerToAPI(formData, false);
-        alert('✅ Banner added successfully!');
+        toast.success('✅ Banner added successfully!');
       }
       await loadBanners();
       resetForm();
     } catch (err) {
       console.error('Submit error:', err);
-      alert('❌ ' + err.message);
+      toast.error('❌ ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -250,11 +256,11 @@ function AdminBanners() {
     
     try {
       await deleteBanner(id);
-      alert('✅ Banner deleted');
+      toast.success('✅ Banner deleted');
       await loadBanners();
       if (editingBanner?._id === id || editingBanner?.id === id) resetForm();
     } catch (err) {
-      alert('❌ ' + err.message);
+      toast.error('❌ ' + err.message);
     }
   };
 
