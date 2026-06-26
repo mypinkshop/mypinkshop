@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -9,21 +10,20 @@ function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // Basic validation
     if (!email || !password) {
       setError('❌ Please enter both email and password');
+      toast.error('Please enter both email and password');
       setLoading(false);
       return;
     }
 
-    // Timeout - 10 seconds max
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -40,12 +40,16 @@ function AdminLogin() {
       if (!response.ok) {
         if (response.status === 401) {
           setError('❌ Invalid email or password. Please try again.');
+          toast.error('Invalid email or password');
         } else if (response.status === 404) {
           setError('❌ Server not found. Please try again later.');
+          toast.error('Server not found');
         } else if (response.status === 500) {
           setError('❌ Server error. Please try again later.');
+          toast.error('Server error');
         } else {
           setError(`❌ Error ${response.status}. Please try again.`);
+          toast.error(`Error ${response.status}`);
         }
         setLoading(false);
         return;
@@ -54,31 +58,36 @@ function AdminLogin() {
       const data = await response.json();
 
       if (data.token && data.role === 'admin') {
-        // Store admin token
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminRole', data.role);
         localStorage.setItem('adminEmail', data.email);
         localStorage.setItem('adminName', data.name || 'Admin');
         localStorage.setItem('adminId', data._id);
         
-        // Small delay for better UX
+        toast.success('✅ Welcome Admin!');
+        
         setTimeout(() => {
           navigate('/admin/dashboard');
         }, 300);
       } else if (data.token && data.role !== 'admin') {
         setError('❌ You do not have admin access. Please login with admin credentials.');
+        toast.error('Admin access required');
       } else {
         setError(data.message || '❌ Invalid email or password.');
+        toast.error(data.message || 'Invalid credentials');
       }
     } catch (err) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
         setError('❌ Request timeout. Server is taking too long to respond. Please try again.');
+        toast.error('Request timeout');
       } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
         setError('❌ Cannot connect to server. Please check your internet connection.');
+        toast.error('Network error');
       } else {
         console.error('Login error:', err);
         setError('❌ Something went wrong. Please try again.');
+        toast.error('Something went wrong');
       }
     } finally {
       setLoading(false);
@@ -183,9 +192,8 @@ function AdminLogin() {
           </button>
         </form>
 
-        {/* Footer Note */}
         <p className="text-center text-xs text-gray-500 mt-6">
-          Secure Admin Access Only
+          🔒 Secure Admin Access Only
         </p>
       </div>
     </div>
