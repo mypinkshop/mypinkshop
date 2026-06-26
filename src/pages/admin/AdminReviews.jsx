@@ -1,17 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
-import { useReviews } from '../../context/ReviewContext';
+import toast from 'react-hot-toast';
 
 function AdminReviews() {
   const navigate = useNavigate();
-  const { 
-    fetchPendingReviews,
-    fetchAllReviews,
-    approveReview, 
-    rejectReview, 
-    deleteReview 
-  } = useReviews();
   
   const [activeTab, setActiveTab] = useState('pending');
   const [reviews, setReviews] = useState([]);
@@ -24,13 +17,20 @@ function AdminReviews() {
   const [actionType, setActionType] = useState(null);
   const [actionReviewId, setActionReviewId] = useState(null);
   
+  // ✅ Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRating, setFilterRating] = useState('all');
+  const [filterBrand, setFilterBrand] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterDateRange, setFilterDateRange] = useState('all');
+  const [filterVerified, setFilterVerified] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [selectedReviews, setSelectedReviews] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReviews, setTotalReviews] = useState(0);
-  
-  const API_URL = 'https://api.mypinkshop.com';
+
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
   const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
 
   // Auth check
@@ -72,6 +72,7 @@ function AdminReviews() {
       }
     } catch (error) {
       console.error('Error loading reviews:', error);
+      toast.error('Failed to load reviews');
       setReviews([]);
     } finally {
       setLoading(false);
@@ -82,65 +83,291 @@ function AdminReviews() {
     loadReviews();
   }, [loadReviews]);
 
-  // Filter reviews
+  // ✅ Get unique brands and categories from reviews
+  const uniqueBrands = [...new Set(reviews
+    .map(r => r.productId?.brand)
+    .filter(Boolean))].sort();
+
+  const uniqueCategories = [...new Set(reviews
+    .map(r => r.productId?.category || r.productId?.mainCategory)
+    .filter(Boolean))].sort();
+
+  // ✅ Filter reviews
   const filteredReviews = reviews.filter(review => {
+    // Search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       const userName = review.userId?.name?.toLowerCase() || '';
       const userEmail = review.userId?.email?.toLowerCase() || '';
       const productName = review.productId?.name?.toLowerCase() || '';
+      const productBrand = review.productId?.brand?.toLowerCase() || '';
+      const reviewTitle = review.title?.toLowerCase() || '';
       const comment = review.comment?.toLowerCase() || '';
       if (!userName.includes(searchLower) && !userEmail.includes(searchLower) && 
-          !productName.includes(searchLower) && !comment.includes(searchLower)) {
+          !productName.includes(searchLower) && !productBrand.includes(searchLower) &&
+          !reviewTitle.includes(searchLower) && !comment.includes(searchLower)) {
         return false;
       }
     }
+    
+    // Rating filter
     if (filterRating !== 'all' && review.rating !== parseInt(filterRating)) {
       return false;
     }
+    
+    // Brand filter
+    if (filterBrand !== 'all' && review.productId?.brand !== filterBrand) {
+      return false;
+    }
+    
+    // Category filter
+    if (filterCategory !== 'all' && 
+        review.productId?.category !== filterCategory && 
+        review.productId?.mainCategory !== filterCategory) {
+      return false;
+    }
+    
+    // Date range filter
+    if (filterDateRange !== 'all') {
+      const reviewDate = new Date(review.createdAt);
+      const now = new Date();
+      let startDate = new Date(now);
+      
+      switch(filterDateRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        default:
+          break;
+      }
+      
+      if (reviewDate < startDate) {
+        return false;
+      }
+    }
+    
+    // Verified filter
+    if (filterVerified === 'verified' && !review.isVerifiedPurchase) {
+      return false;
+    }
+    if (filterVerified === 'unverified' && review.isVerifiedPurchase) {
+      return false;
+    }
+    
     return true;
   });
 
+  // ✅ Sort reviews
+  const sortedReviews = [...filteredReviews].sort((a, b) => {
+    switch(sortBy) {
+      case 'newest':
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      case 'oldest':
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      case 'highest':
+        return b.rating - a.rating;
+      case 'lowest':
+        return a.rating - b.rating;
+      default:
+        return 0;
+    }
+  });
+
+  // ✅ Bulk actions
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedReviews(sortedReviews.map(r => r._id));
+    } else {
+      setSelectedReviews([]);
+    }
+  };
+
+  const toggleSelect = (id) => {
+    if (selectedReviews.includes(id)) {
+      setSelectedReviews(selectedReviews.filter(i => i !== id));
+    } else {
+      setSelectedReviews([...selectedReviews, id]);
+    }
+  };
+
+  const bulkApprove = async () => {
+    if (selectedReviews.length === 0) {
+      toast.error('Select reviews to approve');
+      return;
+    }
+    if (!window.confirm(`Approve ${selectedReviews.length} reviews?`)) return;
+    
+    const token = getToken();
+    let approved = 0;
+    let failed = 0;
+
+    for (const id of selectedReviews) {
+      try {
+        const res = await fetch(`${API_URL}/api/reviews/admin/${id}/approve`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (res.ok) approved++;
+        else failed++;
+      } catch (err) {
+        failed++;
+      }
+    }
+    
+    toast.success(`✅ ${approved} reviews approved${failed > 0 ? `, ${failed} failed` : ''}`);
+    setSelectedReviews([]);
+    await loadReviews();
+  };
+
+  const bulkReject = async () => {
+    if (selectedReviews.length === 0) {
+      toast.error('Select reviews to reject');
+      return;
+    }
+    if (!window.confirm(`Reject ${selectedReviews.length} reviews?`)) return;
+    
+    const token = getToken();
+    let rejected = 0;
+    let failed = 0;
+
+    for (const id of selectedReviews) {
+      try {
+        const res = await fetch(`${API_URL}/api/reviews/admin/${id}/reject`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (res.ok) rejected++;
+        else failed++;
+      } catch (err) {
+        failed++;
+      }
+    }
+    
+    toast.success(`❌ ${rejected} reviews rejected${failed > 0 ? `, ${failed} failed` : ''}`);
+    setSelectedReviews([]);
+    await loadReviews();
+  };
+
+  const bulkDelete = async () => {
+    if (selectedReviews.length === 0) {
+      toast.error('Select reviews to delete');
+      return;
+    }
+    if (!window.confirm(`Delete ${selectedReviews.length} reviews permanently?`)) return;
+    
+    const token = getToken();
+    let deleted = 0;
+    let failed = 0;
+
+    for (const id of selectedReviews) {
+      try {
+        const res = await fetch(`${API_URL}/api/reviews/admin/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) deleted++;
+        else failed++;
+      } catch (err) {
+        failed++;
+      }
+    }
+    
+    toast.success(`🗑️ ${deleted} reviews deleted${failed > 0 ? `, ${failed} failed` : ''}`);
+    setSelectedReviews([]);
+    await loadReviews();
+  };
+
   const handleApprove = async (reviewId) => {
     setActionLoading(true);
-    const success = await approveReview(reviewId, adminNote);
-    if (success) {
-      await loadReviews();
-      alert('✅ Review approved successfully!');
-    } else {
-      alert('❌ Failed to approve review');
+    const token = getToken();
+    try {
+      const res = await fetch(`${API_URL}/api/reviews/admin/${reviewId}/approve`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ adminNote })
+      });
+      
+      if (res.ok) {
+        toast.success('✅ Review approved successfully!');
+        await loadReviews();
+      } else {
+        toast.error('❌ Failed to approve review');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(false);
+      setShowNoteModal(false);
+      setAdminNote('');
     }
-    setActionLoading(false);
-    setShowNoteModal(false);
-    setAdminNote('');
   };
 
   const handleReject = async (reviewId) => {
     setActionLoading(true);
-    const success = await rejectReview(reviewId, adminNote);
-    if (success) {
-      await loadReviews();
-      alert('❌ Review rejected');
-    } else {
-      alert('❌ Failed to reject review');
+    const token = getToken();
+    try {
+      const res = await fetch(`${API_URL}/api/reviews/admin/${reviewId}/reject`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ adminNote })
+      });
+      
+      if (res.ok) {
+        toast.success('❌ Review rejected');
+        await loadReviews();
+      } else {
+        toast.error('❌ Failed to reject review');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(false);
+      setShowNoteModal(false);
+      setAdminNote('');
     }
-    setActionLoading(false);
-    setShowNoteModal(false);
-    setAdminNote('');
   };
 
-  const handleDelete = async (reviewId, productId) => {
-    if (!window.confirm('Delete this review permanently? This action cannot be undone.')) return;
+  const handleDelete = async (reviewId) => {
+    if (!window.confirm('Delete this review permanently?')) return;
     
     setActionLoading(true);
-    const success = await deleteReview(reviewId, productId);
-    if (success) {
-      await loadReviews();
-      alert('🗑 Review deleted successfully');
-    } else {
-      alert('❌ Failed to delete review');
+    const token = getToken();
+    try {
+      const res = await fetch(`${API_URL}/api/reviews/admin/${reviewId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        toast.success('🗑️ Review deleted successfully');
+        await loadReviews();
+        if (showDetails) setShowDetails(false);
+      } else {
+        toast.error('❌ Failed to delete review');
+      }
+    } catch (err) {
+      toast.error('Network error');
+    } finally {
+      setActionLoading(false);
     }
-    setActionLoading(false);
   };
 
   const openActionModal = (reviewId, type) => {
@@ -168,7 +395,13 @@ function AdminReviews() {
   const clearFilters = () => {
     setSearchTerm('');
     setFilterRating('all');
+    setFilterBrand('all');
+    setFilterCategory('all');
+    setFilterDateRange('all');
+    setFilterVerified('all');
+    setSortBy('newest');
     setCurrentPage(1);
+    setSelectedReviews([]);
   };
 
   // Stats
@@ -182,7 +415,13 @@ function AdminReviews() {
   if (loading && !reviews.length) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+        <AdminSidebar />
+        <div className="md:ml-64 flex items-center justify-center w-full">
+          <div className="text-center">
+            <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading reviews...</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -202,7 +441,7 @@ function AdminReviews() {
             <div className="relative w-full sm:w-64">
               <input 
                 type="text" 
-                placeholder="Search by customer, product..." 
+                placeholder="Search by customer, product, brand..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
@@ -233,9 +472,10 @@ function AdminReviews() {
             </div>
           </div>
 
-          {/* Filters */}
+          {/* ✅ Filters - Complete with Brand, Category, Date, Verified, Sort */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-            <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Rating Filter */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Rating:</span>
                 <select 
@@ -251,18 +491,110 @@ function AdminReviews() {
                   <option value="1">1 ★</option>
                 </select>
               </div>
-              
-              <button
-                onClick={clearFilters}
-                className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition"
-              >
-                Clear Filters
-              </button>
-              
-              {(searchTerm || filterRating !== 'all') && (
-                <span className="text-xs text-gray-400">
-                  Showing {filteredReviews.length} of {reviews.length} reviews
-                </span>
+
+              {/* Brand Filter */}
+              {uniqueBrands.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Brand:</span>
+                  <select 
+                    value={filterBrand} 
+                    onChange={(e) => setFilterBrand(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="all">All Brands</option>
+                    {uniqueBrands.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Category Filter */}
+              {uniqueCategories.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Category:</span>
+                  <select 
+                    value={filterCategory} 
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="all">All Categories</option>
+                    {uniqueCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Date Range Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Date:</span>
+                <select 
+                  value={filterDateRange} 
+                  onChange={(e) => setFilterDateRange(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                </select>
+              </div>
+
+              {/* Verified Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Verified:</span>
+                <select 
+                  value={filterVerified} 
+                  onChange={(e) => setFilterVerified(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                >
+                  <option value="all">All</option>
+                  <option value="verified">✅ Verified Only</option>
+                  <option value="unverified">❌ Unverified Only</option>
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Sort:</span>
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="highest">⭐ Highest Rating</option>
+                  <option value="lowest">⭐ Lowest Rating</option>
+                </select>
+              </div>
+
+              {/* Bulk Actions */}
+              {selectedReviews.length > 0 && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-sm text-blue-600 font-medium">{selectedReviews.length} selected</span>
+                  <button onClick={bulkApprove} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition">
+                    ✅ Approve
+                  </button>
+                  <button onClick={bulkReject} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition">
+                    ❌ Reject
+                  </button>
+                  <button onClick={bulkDelete} className="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600 transition">
+                    🗑️ Delete
+                  </button>
+                  <button onClick={() => setSelectedReviews([])} className="px-3 py-1.5 text-gray-500 text-sm hover:text-gray-700 transition">
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              {/* Clear All Filters */}
+              {(searchTerm || filterRating !== 'all' || filterBrand !== 'all' || filterCategory !== 'all' || 
+                filterDateRange !== 'all' || filterVerified !== 'all' || sortBy !== 'newest') && (
+                <button onClick={clearFilters} className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition">
+                  Clear All ✕
+                </button>
               )}
             </div>
           </div>
@@ -270,25 +602,25 @@ function AdminReviews() {
           {/* Tabs */}
           <div className="flex gap-2 border-b border-gray-200 mb-6 overflow-x-auto">
             <button
-              onClick={() => { setActiveTab('pending'); setCurrentPage(1); }}
+              onClick={() => { setActiveTab('pending'); setCurrentPage(1); setSelectedReviews([]); }}
               className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Pending ({pendingCount})
             </button>
             <button
-              onClick={() => { setActiveTab('approved'); setCurrentPage(1); }}
+              onClick={() => { setActiveTab('approved'); setCurrentPage(1); setSelectedReviews([]); }}
               className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Approved ({approvedCount})
             </button>
             <button
-              onClick={() => { setActiveTab('rejected'); setCurrentPage(1); }}
+              onClick={() => { setActiveTab('rejected'); setCurrentPage(1); setSelectedReviews([]); }}
               className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'rejected' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Rejected ({rejectedCount})
             </button>
             <button
-              onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
+              onClick={() => { setActiveTab('all'); setCurrentPage(1); setSelectedReviews([]); }}
               className={`px-4 py-2 text-sm font-medium transition whitespace-nowrap ${activeTab === 'all' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
             >
               All ({reviews.length})
@@ -301,6 +633,14 @@ function AdminReviews() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
+                    <th className="px-4 py-3 w-8">
+                      <input 
+                        type="checkbox" 
+                        onChange={handleSelectAll}
+                        checked={selectedReviews.length === sortedReviews.length && sortedReviews.length > 0}
+                        className="rounded border-gray-300 text-pink-500"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left">Product / Customer</th>
                     <th className="px-4 py-3 text-center">Rating</th>
                     <th className="px-4 py-3 text-left">Review</th>
@@ -310,23 +650,34 @@ function AdminReviews() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredReviews.length === 0 ? (
+                  {sortedReviews.length === 0 ? (
                     <tr>
-                      <td colSpan={activeTab === 'approved' ? 6 : 5} className="px-4 py-12 text-center text-gray-400">
+                      <td colSpan={activeTab === 'approved' ? 7 : 6} className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">⭐</div>
                         <p>No {activeTab} reviews found</p>
-                        {(searchTerm || filterRating !== 'all') && (
+                        {(searchTerm || filterRating !== 'all' || filterBrand !== 'all' || filterCategory !== 'all') && (
                           <button onClick={clearFilters} className="mt-2 text-pink-500 text-sm hover:underline">Clear filters</button>
                         )}
                       </td>
                     </tr>
                   ) : (
-                    filteredReviews.map((review) => (
+                    sortedReviews.map((review) => (
                       <tr key={review._id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedReviews.includes(review._id)}
+                            onChange={() => toggleSelect(review._id)}
+                            className="rounded border-gray-300 text-pink-500"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-800 text-sm">{review.productId?.name || 'Unknown Product'}</p>
                           <p className="text-xs text-gray-500 mt-0.5">by {review.userId?.name || review.userId?.email || 'Anonymous'}</p>
-                          <p className="text-[10px] text-gray-400">{review.productId?.brand || ''}</p>
+                          <p className="text-[10px] text-gray-400">{review.productId?.brand || ''} • {review.productId?.category || ''}</p>
+                          {review.isVerifiedPurchase && (
+                            <span className="text-[10px] text-green-600">✅ Verified Purchase</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getRatingBadge(review.rating)}`}>
@@ -338,9 +689,6 @@ function AdminReviews() {
                           <p className="text-gray-500 text-xs line-clamp-2 max-w-[250px] mt-0.5">{review.comment}</p>
                           {review.images?.length > 0 && (
                             <span className="text-xs text-blue-500 mt-1 inline-flex items-center gap-1">📸 {review.images.length} images</span>
-                          )}
-                          {review.isVerifiedPurchase && (
-                            <span className="text-xs text-green-600 ml-2">✓ Verified</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center text-gray-500 text-xs">
@@ -380,7 +728,7 @@ function AdminReviews() {
                             ) : (
                               <>
                                 <button 
-                                  onClick={() => handleDelete(review._id, review.productId?._id)} 
+                                  onClick={() => handleDelete(review._id)} 
                                   disabled={actionLoading}
                                   className="text-red-500 hover:text-red-700 transition disabled:opacity-50" 
                                   title="Delete"
@@ -429,7 +777,8 @@ function AdminReviews() {
 
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-400">
-              Showing {filteredReviews.length} of {reviews.length} reviews
+              Showing {sortedReviews.length} of {reviews.length} reviews
+              {selectedReviews.length > 0 && ` • ${selectedReviews.length} selected`}
             </p>
           </div>
         </div>
@@ -437,10 +786,10 @@ function AdminReviews() {
 
       {/* Admin Note Modal */}
       {showNoteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowNoteModal(false)}>
-          <div className="bg-white rounded-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowNoteModal(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b p-4">
-              <h3 className="text-lg font-semibold">{actionType === 'approve' ? 'Approve' : 'Reject'} Review</h3>
+              <h3 className="text-lg font-semibold">{actionType === 'approve' ? '✅ Approve' : '❌ Reject'} Review</h3>
             </div>
             <div className="p-5">
               <label className="block text-sm font-medium mb-2">Admin Note (Optional)</label>
@@ -468,22 +817,25 @@ function AdminReviews() {
 
       {/* Review Details Modal */}
       {showDetails && selectedReview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDetails(false)}>
-          <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetails(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Review Details</h3>
+              <h3 className="text-lg font-semibold">📋 Review Details</h3>
               <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
             <div className="p-5 space-y-4">
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-xs text-gray-500">Product</p>
                 <p className="font-medium">{selectedReview.productId?.name || 'Unknown Product'}</p>
-                <p className="text-xs text-gray-400 mt-1">{selectedReview.productId?.brand || ''}</p>
+                <p className="text-xs text-gray-400">{selectedReview.productId?.brand || ''} • {selectedReview.productId?.category || ''}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Customer</p>
                 <p className="font-medium">{selectedReview.userId?.name || 'Anonymous'}</p>
                 <p className="text-xs text-gray-400">{selectedReview.userId?.email || ''}</p>
+                {selectedReview.isVerifiedPurchase && (
+                  <span className="text-xs text-green-600">✅ Verified Purchase</span>
+                )}
               </div>
               <div>
                 <p className="text-xs text-gray-500">Rating</p>
@@ -527,21 +879,21 @@ function AdminReviews() {
                       onClick={() => { openActionModal(selectedReview._id, 'approve'); setShowDetails(false); }} 
                       className="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600"
                     >
-                      Approve
+                      ✅ Approve
                     </button>
                     <button 
                       onClick={() => { openActionModal(selectedReview._id, 'reject'); setShowDetails(false); }} 
                       className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
                     >
-                      Reject
+                      ❌ Reject
                     </button>
                   </>
                 ) : (
                   <button 
-                    onClick={() => { handleDelete(selectedReview._id, selectedReview.productId?._id); setShowDetails(false); }} 
+                    onClick={() => { handleDelete(selectedReview._id); setShowDetails(false); }} 
                     className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600"
                   >
-                    Delete Review
+                    🗑️ Delete Review
                   </button>
                 )}
                 <button onClick={() => setShowDetails(false)} className="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50">Close</button>
