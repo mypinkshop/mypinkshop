@@ -13,6 +13,18 @@ const userRoutes = require('./users');
 const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
 const notificationRoutes = require('../routes/notificationRoutes');
+
+// ✅ VENDOR EMAIL SERVICE IMPORTS
+const { 
+  sendVendorApproved, 
+  sendVendorRejected, 
+  sendVendorBlocked, 
+  sendVendorUnblocked,
+  sendNewOrder,
+  sendOrderShipped,
+  sendOrderDelivered
+} = require('./services/vendorEmailService');
+
 const app = express();
 
 // ========== CORS FIX ==========
@@ -1200,7 +1212,7 @@ app.get('/api/admin/vendors', authMiddleware, adminMiddleware, async (req, res) 
 });
 
 // ============================================
-// ✅ ADMIN: APPROVE VENDOR
+// ✅ ADMIN: APPROVE VENDOR (WITH EMAIL)
 // ============================================
 app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1219,6 +1231,14 @@ app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, asy
     vendor.updatedAt = new Date();
     await vendor.save();
 
+    // ✅ SEND EMAIL: Vendor Approved
+    try {
+      await sendVendorApproved(vendor);
+      console.log('📧 Approval email sent to:', vendor.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send approval email:', emailError.message);
+    }
+
     res.json({
       success: true,
       message: 'Vendor approved successfully',
@@ -1235,7 +1255,7 @@ app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, asy
 });
 
 // ============================================
-// ✅ ADMIN: REJECT VENDOR
+// ✅ ADMIN: REJECT VENDOR (WITH EMAIL)
 // ============================================
 app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1249,10 +1269,20 @@ app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, asyn
       });
     }
 
+    const reason = req.body.reason || 'Your application did not meet our requirements.';
+
     vendor.status = 'rejected';
     vendor.vendorStatus = 'rejected';
     vendor.updatedAt = new Date();
     await vendor.save();
+
+    // ✅ SEND EMAIL: Vendor Rejected
+    try {
+      await sendVendorRejected(vendor, reason);
+      console.log('📧 Rejection email sent to:', vendor.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send rejection email:', emailError.message);
+    }
 
     res.json({
       success: true,
@@ -1270,7 +1300,7 @@ app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, asyn
 });
 
 // ============================================
-// ✅ ADMIN: SUSPEND VENDOR
+// ✅ ADMIN: SUSPEND/BLOCK VENDOR (WITH EMAIL)
 // ============================================
 app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -1284,10 +1314,20 @@ app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, asy
       });
     }
 
+    const reason = req.body.reason || 'Violation of terms and conditions.';
+
     vendor.status = 'suspended';
     vendor.vendorStatus = 'suspended';
     vendor.updatedAt = new Date();
     await vendor.save();
+
+    // ✅ SEND EMAIL: Vendor Blocked
+    try {
+      await sendVendorBlocked(vendor, reason);
+      console.log('📧 Blocked email sent to:', vendor.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send block email:', emailError.message);
+    }
 
     res.json({
       success: true,
@@ -1297,6 +1337,49 @@ app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, asy
 
   } catch (error) {
     console.error('Suspend vendor error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: UNBLOCK VENDOR (WITH EMAIL)
+// ============================================
+app.patch('/api/admin/vendors/:id/unblock', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    vendor.status = 'approved';
+    vendor.vendorStatus = 'approved';
+    vendor.updatedAt = new Date();
+    await vendor.save();
+
+    // ✅ SEND EMAIL: Vendor Unblocked
+    try {
+      await sendVendorUnblocked(vendor);
+      console.log('📧 Unblocked email sent to:', vendor.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send unblock email:', emailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Vendor unblocked successfully',
+      vendor: vendor
+    });
+
+  } catch (error) {
+    console.error('Unblock vendor error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -1635,7 +1718,7 @@ app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res)
   }
 });
 
-// ✅ ACCEPT ORDER - Shiprocket Integration
+// ✅ ACCEPT ORDER - Shiprocket Integration (WITH EMAIL)
 app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1657,6 +1740,17 @@ app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, asy
     order.trackingNumber = `SR-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     order.courierName = 'Shiprocket';
     await order.save();
+
+    // ✅ SEND EMAIL: Order Confirmed
+    try {
+      const vendor = await Vendor.findById(req.user.id);
+      if (vendor) {
+        await sendNewOrder(vendor, order);
+        console.log('📧 Order confirmed email sent to:', vendor.email);
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send order confirmation email:', emailError.message);
+    }
 
     res.json({
       success: true,
@@ -1697,11 +1791,11 @@ app.patch('/api/vendor/orders/:id/reject', authMiddleware, vendorMiddleware, asy
   }
 });
 
-// Update order status
+// Update order status (WITH EMAIL)
 app.patch('/api/vendor/orders/:id/status', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
-    const { status } = req.body;
+    const { status, trackingNumber, courierName } = req.body;
     const validStatuses = ['pending', 'processing', 'confirmed', 'shipped', 'delivered', 'cancelled'];
     
     if (!validStatuses.includes(status)) {
@@ -1717,11 +1811,36 @@ app.patch('/api/vendor/orders/:id/status', authMiddleware, vendorMiddleware, asy
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
     
+    const previousStatus = order.status;
     order.status = status;
+    
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    if (courierName) order.courierName = courierName;
+    
     if (status === 'delivered') {
       order.deliveredAt = new Date();
     }
+    if (status === 'shipped') {
+      order.shippedAt = new Date();
+    }
+    
     await order.save();
+
+    // ✅ SEND EMAILS based on status change
+    try {
+      const vendor = await Vendor.findById(req.user.id);
+      if (vendor) {
+        if (status === 'shipped' && previousStatus !== 'shipped') {
+          await sendOrderShipped(vendor, order, { trackingNumber, courierName });
+          console.log('📧 Shipped email sent to:', vendor.email);
+        } else if (status === 'delivered' && previousStatus !== 'delivered') {
+          await sendOrderDelivered(vendor, order);
+          console.log('📧 Delivered email sent to:', vendor.email);
+        }
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send order status email:', emailError.message);
+    }
     
     res.json({ success: true, order });
   } catch (error) {
@@ -2080,8 +2199,6 @@ app.post('/api/vendor/shipping/settings', authMiddleware, vendorMiddleware, asyn
 // Get shipping zones
 app.get('/api/vendor/shipping/zones', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
-    // You can implement shipping zones logic here
-    // For now, returning default zones
     const defaultZones = [
       { id: 1, zone: 'Local (Metro Cities)', cities: 'Mumbai, Delhi, Bangalore, Chennai, Kolkata', rate: 49, days: '2-3 days' },
       { id: 2, zone: 'Zone A (Tier 2 Cities)', cities: 'Jaipur, Lucknow, Nagpur, Indore, Bhopal', rate: 79, days: '3-5 days' },
@@ -2857,6 +2974,7 @@ app.get('/api/orders/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// ✅ ORDER CREATION WITH EMAIL
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
     const { items, total, address, paymentMethod } = req.body;
@@ -2887,6 +3005,30 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     await order.save();
     
     await Cart.findOneAndDelete({ userId: req.user.id });
+
+    // ✅ SEND EMAIL: New Order to Vendor
+    try {
+      const vendorIds = [...new Set(items.map(item => item.vendorId).filter(id => id))];
+      
+      for (const vendorId of vendorIds) {
+        const vendor = await Vendor.findById(vendorId);
+        if (vendor) {
+          const vendorItems = items.filter(item => item.vendorId === vendorId);
+          const vendorTotal = vendorItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+          
+          const vendorOrder = {
+            ...order._doc,
+            items: vendorItems,
+            total: vendorTotal
+          };
+          
+          await sendNewOrder(vendor, vendorOrder);
+          console.log('📧 New order email sent to:', vendor.email);
+        }
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send new order email:', emailError.message);
+    }
     
     res.status(201).json(order);
   } catch (error) {
