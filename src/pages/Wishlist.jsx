@@ -22,7 +22,6 @@ function Wishlist() {
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // ============ GUEST: Get from localStorage ============
   const getGuestWishlist = useCallback(() => {
@@ -52,16 +51,19 @@ function Wishlist() {
   // ============ LOAD WISHLIST ============
   const loadWishlist = useCallback(async () => {
     console.log('🟢 loadWishlist - Starting...');
+    
     if (user && token) {
       console.log('🟢 loadWishlist - Logged in user');
       if (fetchWishlist) {
         await fetchWishlist();
+        // ✅ After fetch, use context wishlist
         const data = Array.isArray(wishlist) ? [...wishlist] : [];
         console.log('🟢 loadWishlist - Fetched:', data.length, 'items');
         setDisplayWishlist(data);
       }
     } else {
-      console.log('🟢 loadWishlist - Guest user');
+      console.log('🟢 loadWishlist - Guest user - Using localStorage ONLY');
+      // ✅ Guest: ALWAYS use localStorage, ignore context
       const data = getGuestWishlist();
       console.log('🟢 loadWishlist - Got:', data.length, 'items');
       setDisplayWishlist(data);
@@ -71,19 +73,42 @@ function Wishlist() {
 
   // ============ MOUNT ============
   useEffect(() => {
-    console.log('🟢 useEffect - Mount/Refresh');
+    console.log('🟢 useEffect - Mount');
     setIsGuest(!user || !token);
     loadWishlist();
-  }, [refreshKey]);
+  }, []); // ✅ Empty dependency - runs only once on mount
 
-  // ============ UPDATE ON CONTEXT CHANGE ============
+  // ============ UPDATE ON CONTEXT CHANGE (ONLY FOR LOGGED IN) ============
   useEffect(() => {
     if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      console.log('🟢 useEffect - Context changed:', data.length, 'items');
+      console.log('🟢 useEffect - Context changed for logged in user:', data.length, 'items');
       setDisplayWishlist(data);
     }
   }, [wishlist, user, token, loading]);
+
+  // ============ REFRESH ON ROUTE CHANGE ============
+  useEffect(() => {
+    if (!loading) {
+      console.log('🟢 useEffect - Route changed, reloading wishlist');
+      loadWishlist();
+    }
+  }, [location.pathname, loadWishlist, loading]);
+
+  // ============ REFRESH ON TAB VISIBILITY ============
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !loading) {
+        console.log('🟢 useEffect - Tab visible, reloading wishlist');
+        loadWishlist();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadWishlist, loading]);
 
   // ============ HANDLE: Remove Single Item ============
   const handleRemoveItem = async (productId) => {
@@ -110,11 +135,9 @@ function Wishlist() {
         console.log('🟢 handleRemoveItem - After:', updatedList.length, 'items');
         console.log('🟢 handleRemoveItem - Updated List:', updatedList);
         
+        // ✅ Update state AND localStorage
         setDisplayWishlist(updatedList);
         saveGuestWishlist(updatedList);
-        
-        // ✅ Force refresh
-        setRefreshKey(prev => prev + 1);
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
@@ -163,7 +186,6 @@ function Wishlist() {
         
         setDisplayWishlist(updatedList);
         saveGuestWishlist(updatedList);
-        setRefreshKey(prev => prev + 1);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -196,7 +218,6 @@ function Wishlist() {
       } else {
         setDisplayWishlist([]);
         saveGuestWishlist([]);
-        setRefreshKey(prev => prev + 1);
         toast.success('Wishlist cleared 🗑️');
       }
     } catch (error) {
