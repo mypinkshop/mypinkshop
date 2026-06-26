@@ -35,29 +35,34 @@ export const WishlistProvider = ({ children }) => {
         const wishlistData = Array.isArray(parsed) ? parsed : [];
         setWishlist(wishlistData);
         setWishlistCount(wishlistData.length);
+        return wishlistData;
       } catch (e) {
         setWishlist([]);
         setWishlistCount(0);
+        return [];
       }
     } else {
       setWishlist([]);
       setWishlistCount(0);
+      return [];
     }
   }, []);
 
-  // ============ FETCH WISHLIST ============
+  // ============ FETCH WISHLIST (ONLY FOR LOGGED IN USERS) ============
   const fetchWishlist = useCallback(async () => {
     const token = getToken();
     const user = getUser();
     
+    // ✅ GUEST MODE: Only load from localStorage, don't call backend
     if (!token || !user) {
-      console.log('🟢 CONTEXT - fetchWishlist: Guest mode, loading from localStorage');
-      loadGuestWishlist();
-      return;
+      console.log('🟢 CONTEXT - fetchWishlist: Guest mode, loading from localStorage ONLY');
+      const data = loadGuestWishlist();
+      return data;
     }
     
+    // ✅ LOGGED IN USER: Fetch from backend
     try {
-      console.log('🟢 CONTEXT - fetchWishlist: Fetching from backend');
+      console.log('🟢 CONTEXT - fetchWishlist: Fetching from backend for logged in user');
       const response = await fetch(`${API_URL}/api/wishlist`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -70,16 +75,20 @@ export const WishlistProvider = ({ children }) => {
         const wishlistData = Array.isArray(backendWishlist) ? backendWishlist : [];
         setWishlist(wishlistData);
         setWishlistCount(wishlistData.length);
+        // Also save to localStorage for consistency
         localStorage.setItem('guestWishlist', JSON.stringify(wishlistData));
-        console.log('🟢 CONTEXT - fetchWishlist: Fetched', wishlistData.length, 'items');
+        console.log('🟢 CONTEXT - fetchWishlist: Fetched', wishlistData.length, 'items from backend');
+        return wishlistData;
       } else if (response.status === 401) {
         localStorage.removeItem('adminToken');
         localStorage.removeItem('token');
-        loadGuestWishlist();
+        const data = loadGuestWishlist();
+        return data;
       }
     } catch (error) {
       console.error('Error fetching wishlist:', error);
-      loadGuestWishlist();
+      const data = loadGuestWishlist();
+      return data;
     }
   }, [loadGuestWishlist]);
 
@@ -109,6 +118,8 @@ export const WishlistProvider = ({ children }) => {
       const user = getUser();
       if (!token || !user) {
         loadGuestWishlist();
+      } else {
+        fetchWishlist();
       }
     };
     window.addEventListener('wishlistUpdated', handleCustomEvent);
@@ -185,7 +196,7 @@ export const WishlistProvider = ({ children }) => {
     const token = getToken();
     const user = getUser();
     
-    // Guest mode - handle locally
+    // ✅ GUEST MODE: Handle locally only
     if (!token || !user) {
       console.log('🟢 CONTEXT - Guest mode remove');
       const saved = localStorage.getItem('guestWishlist');
@@ -201,17 +212,21 @@ export const WishlistProvider = ({ children }) => {
       const newWishlist = currentList.filter(item => (item._id !== id && item.id !== id));
       console.log('🟢 CONTEXT - New guest wishlist:', newWishlist);
       
+      // ✅ Update state
       setWishlist(newWishlist);
       setWishlistCount(newWishlist.length);
+      
+      // ✅ Save to localStorage
       localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
       
-      // Dispatch event
+      // ✅ Dispatch event so Wishlist.jsx updates
       window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+      
       toast.success('Removed from wishlist');
       return;
     }
     
-    // Logged in user - remove from backend
+    // ✅ LOGGED IN USER: Remove from backend
     try {
       const response = await fetch(`${API_URL}/api/wishlist/${id}`, {
         method: 'DELETE',
@@ -280,7 +295,7 @@ export const WishlistProvider = ({ children }) => {
       removeFromWishlist, 
       isInWishlist,
       clearWishlist,
-      fetchWishlist, // ✅ ADDED
+      fetchWishlist,
     }}>
       {children}
     </WishlistContext.Provider>
