@@ -513,7 +513,7 @@ function AdminVendors() {
         </div>
       </div>
 
-      {/* Vendor Details Modal */}
+      {/* ✅ FIXED: Vendor Details Modal with proper address display */}
       {showDetails && selectedVendor && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetails(false)}>
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -540,7 +540,25 @@ function AdminVendors() {
                   <div><p className="text-gray-500 text-xs">Phone</p><p className="font-medium text-gray-800">{selectedVendor.phone || 'N/A'}</p></div>
                   <div><p className="text-gray-500 text-xs">GST Number</p><p className="font-medium text-gray-800">{selectedVendor.gstNumber || 'Not provided'}</p></div>
                   <div><p className="text-gray-500 text-xs">Store ID</p><p className="font-medium text-gray-800">{selectedVendor.storeId || 'N/A'}</p></div>
-                  <div className="col-span-2"><p className="text-gray-500 text-xs">Address</p><p className="font-medium text-gray-800">{selectedVendor.address?.street || selectedVendor.address || 'Not provided'}</p></div>
+                  
+                  {/* ✅ FIXED: Address Display - No object render */}
+                  <div className="col-span-2">
+                    <p className="text-gray-500 text-xs">Address</p>
+                    {selectedVendor.address ? (
+                      <div className="font-medium text-gray-800 text-sm space-y-0.5">
+                        <p>{selectedVendor.address.street || ''}</p>
+                        <p>
+                          {selectedVendor.address.city || ''} 
+                          {selectedVendor.address.city && selectedVendor.address.state ? ', ' : ''}
+                          {selectedVendor.address.state || ''}
+                        </p>
+                        <p>{selectedVendor.address.pincode || ''}</p>
+                        <p>{selectedVendor.address.country || 'India'}</p>
+                      </div>
+                    ) : (
+                      <p className="text-gray-400">Not provided</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
