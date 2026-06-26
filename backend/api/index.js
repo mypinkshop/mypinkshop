@@ -14,7 +14,7 @@ const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
 const notificationRoutes = require('../routes/notificationRoutes');
 
-// ✅ VENDOR EMAIL SERVICE IMPORTS
+// ✅ VENDOR EMAIL SERVICE IMPORTS (UPDATED WITH ALL FUNCTIONS)
 const { 
   sendVendorApproved, 
   sendVendorRejected, 
@@ -22,7 +22,12 @@ const {
   sendVendorUnblocked,
   sendNewOrder,
   sendOrderShipped,
-  sendOrderDelivered
+  sendOrderDelivered,
+  sendProductApproved,
+  sendProductRejected,
+  sendReturnRequested,
+  sendReturnApproved,
+  sendReturnRejected
 } = require('./services/vendorEmailService');
 
 const app = express();
@@ -1455,6 +1460,104 @@ app.patch('/api/admin/brand-applications/:id/reject', authMiddleware, adminMiddl
 });
 
 // ============================================
+// ✅ ADMIN: APPROVE PRODUCT (WITH EMAIL)
+// ============================================
+app.patch('/api/admin/products/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    product.adminApproved = true;
+    product.status = 'active';
+    product.updatedAt = new Date();
+    await product.save();
+
+    // ✅ SEND EMAIL: Product Approved
+    if (product.vendorId) {
+      try {
+        const vendor = await Vendor.findById(product.vendorId);
+        if (vendor) {
+          await sendProductApproved(vendor, product);
+          console.log('📧 Product approved email sent to:', vendor.email);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send product approval email:', emailError.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Product approved successfully',
+      product: product
+    });
+
+  } catch (error) {
+    console.error('Approve product error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: REJECT PRODUCT (WITH EMAIL)
+// ============================================
+app.patch('/api/admin/products/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    const reason = req.body.reason || 'Product does not meet our quality standards.';
+
+    product.adminApproved = false;
+    product.status = 'rejected';
+    product.updatedAt = new Date();
+    await product.save();
+
+    // ✅ SEND EMAIL: Product Rejected
+    if (product.vendorId) {
+      try {
+        const vendor = await Vendor.findById(product.vendorId);
+        if (vendor) {
+          await sendProductRejected(vendor, product, reason);
+          console.log('📧 Product rejected email sent to:', vendor.email);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send product rejection email:', emailError.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Product rejected successfully',
+      product: product
+    });
+
+  } catch (error) {
+    console.error('Reject product error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
 // ✅ VENDOR PRODUCT ROUTES
 // ============================================
 
@@ -2059,6 +2162,158 @@ app.patch('/api/vendor/returns/:id/status', authMiddleware, vendorMiddleware, as
   } catch (error) {
     console.error('Update return status error:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ CUSTOMER: REQUEST RETURN (WITH EMAIL)
+// ============================================
+app.patch('/api/orders/:id/return-request', authMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const { reason, returnType } = req.body;
+    const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ success: false, message: 'Only delivered orders can be returned' });
+    }
+    
+    if (order.returnRequested) {
+      return res.status(400).json({ success: false, message: 'Return already requested' });
+    }
+
+    order.returnRequested = true;
+    order.returnReason = reason || 'Not specified';
+    order.returnType = returnType || 'refund';
+    order.returnStatus = 'pending';
+    await order.save();
+
+    // ✅ SEND EMAIL: Return Requested to Vendor
+    try {
+      const vendorIds = [...new Set(order.items.map(item => item.vendorId).filter(id => id))];
+      
+      for (const vendorId of vendorIds) {
+        const vendor = await Vendor.findById(vendorId);
+        if (vendor) {
+          await sendReturnRequested(vendor, order, reason);
+          console.log('📧 Return request email sent to:', vendor.email);
+        }
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send return request email:', emailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Return request submitted successfully',
+      order: order
+    });
+
+  } catch (error) {
+    console.error('Return request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR: APPROVE RETURN (WITH EMAIL)
+// ============================================
+app.patch('/api/vendor/returns/:id/approve', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const order = await Order.findOne({ 
+      _id: req.params.id, 
+      'items.vendorId': req.user.id,
+      returnRequested: true 
+    });
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    order.returnStatus = 'approved';
+    await order.save();
+
+    // ✅ SEND EMAIL: Return Approved to Vendor
+    try {
+      const vendor = await Vendor.findById(req.user.id);
+      if (vendor) {
+        await sendReturnApproved(vendor, order);
+        console.log('📧 Return approved email sent to:', vendor.email);
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send return approved email:', emailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Return approved successfully',
+      order: order
+    });
+
+  } catch (error) {
+    console.error('Approve return error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// ============================================
+// ✅ VENDOR: REJECT RETURN (WITH EMAIL)
+// ============================================
+app.patch('/api/vendor/returns/:id/reject', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    
+    const { reason } = req.body;
+    const order = await Order.findOne({ 
+      _id: req.params.id, 
+      'items.vendorId': req.user.id,
+      returnRequested: true 
+    });
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Return request not found' });
+    }
+
+    order.returnStatus = 'rejected';
+    order.returnResolution = reason || 'Return request does not meet our return policy.';
+    await order.save();
+
+    // ✅ SEND EMAIL: Return Rejected to Vendor
+    try {
+      const vendor = await Vendor.findById(req.user.id);
+      if (vendor) {
+        await sendReturnRejected(vendor, order, reason || 'Return request does not meet our return policy.');
+        console.log('📧 Return rejected email sent to:', vendor.email);
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send return rejected email:', emailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Return rejected successfully',
+      order: order
+    });
+
+  } catch (error) {
+    console.error('Reject return error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
   }
 });
 
