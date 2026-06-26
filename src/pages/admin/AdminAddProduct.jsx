@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 // ============================================
 // AMAZON IMPORTER COMPONENT
@@ -9,7 +10,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   const [loading, setLoading] = useState(false);
   const [importedProducts, setImportedProducts] = useState([]);
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
 
   const garbageWords = [
