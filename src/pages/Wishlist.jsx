@@ -62,7 +62,7 @@ function Wishlist() {
     };
     
     loadData();
-  }, []); // Only on mount
+  }, []);
 
   // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
   useEffect(() => {
@@ -73,7 +73,7 @@ function Wishlist() {
     isInitialMount.current = false;
   }, [wishlist, user, token, getWishlistData]);
 
-  // ============ STORAGE EVENT LISTENER (Guest) ============
+  // ============ STORAGE EVENT LISTENER ============
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'guestWishlist') {
@@ -96,7 +96,7 @@ function Wishlist() {
     };
   }, [getWishlistData]);
 
-  // ============ SAVE GUEST WISHLIST TO LOCALSTORAGE ============
+  // ============ SAVE GUEST WISHLIST ============
   useEffect(() => {
     if (!user && !token) {
       localStorage.setItem('guestWishlist', JSON.stringify(displayWishlist));
@@ -110,7 +110,6 @@ function Wishlist() {
     
     setMovingProduct(productId);
     
-    // Add to cart
     addToCart({
       id: productId,
       name: product.name || 'Product',
@@ -122,18 +121,14 @@ function Wishlist() {
     
     toast.success('Added to cart! 🛒');
     
-    // Remove from wishlist after adding to cart
     try {
       if (user && token) {
         await removeFromWishlist(productId);
-        // Refresh wishlist from backend
         await fetchWishlist();
         const updated = getWishlistData();
         setDisplayWishlist(updated);
       } else {
-        // Guest: remove from local state
         setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
-        // Update localStorage
         localStorage.setItem('guestWishlist', JSON.stringify(
           displayWishlist.filter(p => (p._id || p.id) !== productId)
         ));
@@ -171,7 +166,7 @@ function Wishlist() {
     setTimeout(() => setRemovingProduct(null), 300);
   };
 
-  // ============ HANDLE: Clear All Wishlist ============
+  // ============ HANDLE: Clear All ============
   const handleClearAll = async () => {
     if (displayWishlist.length === 0) {
       toast.error('Wishlist is already empty');
@@ -203,20 +198,7 @@ function Wishlist() {
     setIsClearing(false);
   };
 
-  // ============ HANDLE: Search ============
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-
-  // ============ HANDLE: Share Wishlist ============
+  // ============ HANDLE: Share ============
   const handleShare = async () => {
     try {
       if (navigator.share) {
@@ -233,6 +215,19 @@ function Wishlist() {
       if (error.name !== 'AbortError') {
         console.error('Share error:', error);
       }
+    }
+  };
+
+  // ============ HANDLE: Search ============
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
     }
   };
 
@@ -266,17 +261,15 @@ function Wishlist() {
   });
 
   const wishlistCount = displayWishlist.length;
+  const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
 
   // ============ RENDER ============
   if (loading) {
     return (
       <>
-        // ✅ FIXED (string template)
-const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
-
-<Helmet>
-  <title>{pageTitle}</title>
-</Helmet>
+        <Helmet>
+          <title>Loading Wishlist - MyPinkShop</title>
+        </Helmet>
         <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="mb-6">
@@ -296,12 +289,13 @@ const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
   return (
     <>
       <Helmet>
-  <title>{`My Wishlist (${wishlistCount || 0}) - MyPinkShop`}</title>
-  <meta name="description" content={`View and manage your wishlist at MyPinkShop. ${wishlistCount || 0} items saved.`} />
-  <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
-  <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
-  <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
-</Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={`View and manage your wishlist at MyPinkShop. ${wishlistCount || 0} items saved.`} />
+        <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
+        <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
+        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
+      </Helmet>
+
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
         <OfferBanner />
@@ -408,7 +402,6 @@ const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
             </div>
           </div>
         ) : (
-          /* ============ WISHLIST WITH ITEMS ============ */
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
             {/* ============ HEADER WITH ACTIONS ============ */}
@@ -481,7 +474,6 @@ const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
                           </div>
                         )}
                         
-                        {/* Remove Button */}
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -499,7 +491,6 @@ const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
                           )}
                         </button>
                         
-                        {/* Quick Add to Cart Badge */}
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -567,7 +558,6 @@ const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
               })}
             </div>
             
-            {/* ============ CONTINUE SHOPPING ============ */}
             <div className="text-center mt-12">
               <Link 
                 to="/shop" 
@@ -579,7 +569,6 @@ const pageTitle = `My Wishlist (${wishlistCount || 0}) - MyPinkShop`;
           </div>
         )}
 
-        {/* ============ FOOTER ============ */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
