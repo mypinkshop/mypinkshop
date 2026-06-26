@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
+import toast from 'react-hot-toast';
 
 const VariationSelectWithSearch = ({ 
   label, 
@@ -165,8 +166,8 @@ function AdminEditProduct() {
   const [specValueInput, setSpecValueInput] = useState('');
   const [currentBullet, setCurrentBullet] = useState('');
 
-  const API_URL = 'https://api.mypinkshop.com';
-
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  
   const categories = {
     'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Lip Balm', 'Toner', 'Face Scrub', 'Body Lotion', 'Body Wash'],
     'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer', 'Primer', 'Setting Spray'],
