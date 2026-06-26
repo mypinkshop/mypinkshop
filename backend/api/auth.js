@@ -3,31 +3,9 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+// ❌ REMOVED: const nodemailer = require('nodemailer');
 const User = require('../models/User');
-
-// ========== SENDER.NET SMTP TRANSPORTER ==========
-const transporter = nodemailer.createTransport({
-  host: process.env.SENDER_HOST || 'smtp.sender.net',
-  port: process.env.SENDER_PORT || 587,
-  secure: process.env.SENDER_SECURE === 'true' || false,
-  auth: {
-    user: process.env.SENDER_USERNAME,
-    pass: process.env.SENDER_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-
-// Verify connection
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Sender.net SMTP error in auth:', error.message);
-  } else {
-    console.log('✅ Sender.net SMTP ready for auth emails');
-  }
-});
+const { sendEmail } = require('../services/emailService'); // ✅ NEW
 
 // ========== REGISTER ==========
 router.post('/register', async (req, res) => {
@@ -55,29 +33,36 @@ router.post('/register', async (req, res) => {
     
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
     
-    await transporter.sendMail({
-      from: `"MyPinkShop" <noreply@mypinkshop.com>`,
-      to: email,
-      subject: 'Verify Your Email Address',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
-          <div style="text-align: center;">
-            <h1 style="color: #be185d;">MyPinkShop</h1>
-            <h2>Welcome to the Pink Club! 🎀</h2>
-            <p>Click the link below to verify your email:</p>
-            <p style="margin: 20px 0;">
-              <a href="${verificationUrl}" style="color: #ec4899; word-break: break-all;">${verificationUrl}</a>
-            </p>
-            <p style="color: #6b7280; font-size: 14px;">This link expires in 24 hours.</p>
-            <p style="color: #9ca3af; font-size: 12px;">If you didn't create an account, please ignore this email.</p>
-            <hr style="border-color: #fce7f3;">
-            <p style="color: #9ca3af; font-size: 12px;">Made with 💖 for the girlies</p>
-          </div>
+    // ✅ UPDATED: Using sendEmail instead of transporter.sendMail
+    const subject = 'Verify Your Email Address';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
+        <div style="text-align: center;">
+          <h1 style="color: #be185d;">MyPinkShop</h1>
+          <h2>Welcome to the Pink Club! 🎀</h2>
+          <p>Click the link below to verify your email:</p>
+          <p style="margin: 20px 0;">
+            <a href="${verificationUrl}" style="color: #ec4899; word-break: break-all;">${verificationUrl}</a>
+          </p>
+          <p style="color: #6b7280; font-size: 14px;">This link expires in 24 hours.</p>
+          <p style="color: #9ca3af; font-size: 12px;">If you didn't create an account, please ignore this email.</p>
+          <hr style="border-color: #fce7f3;">
+          <p style="color: #9ca3af; font-size: 12px;">Made with 💖 for the girlies</p>
         </div>
-      `
-    });
+      </div>
+    `;
     
-    res.json({ success: true, message: 'Registration successful! Please check your email to verify your account.' });
+    const result = await sendEmail(email, subject, html);
+    
+    if (!result.success && !result.mock) {
+      console.error('❌ Failed to send verification email:', result.error);
+      // Still return success because user is created
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Registration successful! Please check your email to verify your account.' 
+    });
     
   } catch (error) {
     console.error('Register error:', error);
@@ -165,27 +150,30 @@ router.post('/forgot-password', async (req, res) => {
     
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
     
-    await transporter.sendMail({
-      from: `"MyPinkShop" <noreply@mypinkshop.com>`,
-      to: email,
-      subject: '🔐 Reset Your Password',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
-          <div style="text-align: center;">
-            <h1 style="color: #be185d;">MyPinkShop</h1>
-            <h2>Reset Your Password 🔐</h2>
-            <p>We received a request to reset your password. Click the link below to create a new password:</p>
-            <p style="margin: 20px 0;">
-              <a href="${resetUrl}" style="color: #ec4899; word-break: break-all;">${resetUrl}</a>
-            </p>
-            <p style="color: #6b7280; font-size: 14px;">This link expires in 1 hour.</p>
-            <p style="color: #9ca3af; font-size: 12px;">If you didn't request this, please ignore this email.</p>
-            <hr style="border-color: #fce7f3;">
-            <p style="color: #9ca3af; font-size: 12px;">Made with 💖 for the girlies</p>
-          </div>
+    // ✅ UPDATED: Using sendEmail instead of transporter.sendMail
+    const subject = '🔐 Reset Your Password';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
+        <div style="text-align: center;">
+          <h1 style="color: #be185d;">MyPinkShop</h1>
+          <h2>Reset Your Password 🔐</h2>
+          <p>We received a request to reset your password. Click the link below to create a new password:</p>
+          <p style="margin: 20px 0;">
+            <a href="${resetUrl}" style="color: #ec4899; word-break: break-all;">${resetUrl}</a>
+          </p>
+          <p style="color: #6b7280; font-size: 14px;">This link expires in 1 hour.</p>
+          <p style="color: #9ca3af; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+          <hr style="border-color: #fce7f3;">
+          <p style="color: #9ca3af; font-size: 12px;">Made with 💖 for the girlies</p>
         </div>
-      `
-    });
+      </div>
+    `;
+    
+    const result = await sendEmail(email, subject, html);
+    
+    if (!result.success && !result.mock) {
+      console.error('❌ Failed to send reset email:', result.error);
+    }
     
     res.json({ success: true, message: 'Password reset link sent to your email' });
     
