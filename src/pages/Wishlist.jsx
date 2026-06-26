@@ -22,62 +22,56 @@ function Wishlist() {
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  
-  const isInitialMount = useRef(true);
 
-  // ============ HELPER: Get wishlist data ============
-  const getWishlistData = useCallback(() => {
-    if (user && token) {
-      return Array.isArray(wishlist) ? wishlist : [];
-    } else {
-      try {
-        const saved = localStorage.getItem('guestWishlist');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-          if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
-          if (parsed.wishlist && Array.isArray(parsed.wishlist)) return parsed.wishlist;
-        }
-      } catch (e) {
-        console.error('Error parsing wishlist:', e);
+  // ============ HELPER: Get wishlist data from localStorage ============
+  const getGuestWishlist = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('guestWishlist');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
+        if (parsed.wishlist && Array.isArray(parsed.wishlist)) return parsed.wishlist;
       }
-      return [];
+    } catch (e) {
+      console.error('Error parsing wishlist:', e);
     }
-  }, [user, token, wishlist]);
+    return [];
+  }, []);
 
-  // ============ FORCE REFRESH ============
-  const forceRefresh = useCallback(async () => {
-    if (user && token && fetchWishlist) {
-      await fetchWishlist();
-      // ✅ Directly use wishlist from context after fetch
-      const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      setDisplayWishlist(data);
-    } else {
-      const data = getWishlistData();
-      setDisplayWishlist(data);
-    }
-  }, [user, token, fetchWishlist, wishlist, getWishlistData]);
+  // ============ SAVE GUEST WISHLIST ============
+  const saveGuestWishlist = useCallback((data) => {
+    localStorage.setItem('guestWishlist', JSON.stringify(data));
+  }, []);
 
-  // ============ LOAD WISHLIST ON MOUNT ============
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      if (user && token && fetchWishlist) {
+  // ============ LOAD WISHLIST ============
+  const loadWishlist = useCallback(async () => {
+    if (user && token) {
+      // Logged in user
+      if (fetchWishlist) {
         await fetchWishlist();
         const data = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(data);
-      } else {
-        const data = getWishlistData();
-        setDisplayWishlist(data);
       }
+    } else {
+      // Guest user
+      const data = getGuestWishlist();
+      setDisplayWishlist(data);
+    }
+  }, [user, token, fetchWishlist, wishlist, getGuestWishlist]);
+
+  // ============ MOUNT ============
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
       setIsGuest(!user || !token);
+      await loadWishlist();
       setLoading(false);
     };
-    loadData();
-  }, [refreshKey]);
+    init();
+  }, []);
 
-  // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
+  // ============ WISHLIST CONTEXT CHANGE ============
   useEffect(() => {
     if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
@@ -87,17 +81,16 @@ function Wishlist() {
 
   // ============ REFRESH ON ROUTE CHANGE ============
   useEffect(() => {
-    if (!isInitialMount.current) {
-      forceRefresh();
+    if (!loading) {
+      loadWishlist();
     }
-    isInitialMount.current = false;
-  }, [location.pathname, forceRefresh]);
+  }, [location.pathname, loadWishlist, loading]);
 
   // ============ REFRESH ON TAB VISIBILITY ============
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        forceRefresh();
+      if (document.visibilityState === 'visible' && !loading) {
+        loadWishlist();
       }
     };
 
@@ -105,37 +98,7 @@ function Wishlist() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [forceRefresh]);
-
-  // ============ STORAGE EVENT LISTENER ============
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'guestWishlist') {
-        const data = getWishlistData();
-        setDisplayWishlist(data);
-      }
-    };
-    
-    const handleCustomEvent = () => {
-      const data = getWishlistData();
-      setDisplayWishlist(data);
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('wishlistUpdated', handleCustomEvent);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('wishlistUpdated', handleCustomEvent);
-    };
-  }, [getWishlistData]);
-
-  // ============ SAVE GUEST WISHLIST ============
-  useEffect(() => {
-    if (!user && !token) {
-      localStorage.setItem('guestWishlist', JSON.stringify(displayWishlist));
-    }
-  }, [displayWishlist, user, token]);
+  }, [loadWishlist, loading]);
 
   // ============ HANDLE: Move to Cart ============
   const handleMoveToCart = async (product) => {
@@ -161,15 +124,14 @@ function Wishlist() {
         await fetchWishlist();
         const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
-        // ✅ Force re-render
-        setRefreshKey(prev => prev + 1);
       } else {
+        // ✅ GUEST: Remove from state + localStorage
         const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
         setDisplayWishlist(updatedList);
-        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
+        saveGuestWishlist(updatedList);
       }
     } catch (error) {
-      console.error('Error removing from wishlist:', error);
+      console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
     }
     
@@ -188,24 +150,23 @@ function Wishlist() {
         await fetchWishlist();
         const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
-        // ✅ Force re-render
-        setRefreshKey(prev => prev + 1);
         toast.success('Removed from wishlist ❌');
       } else {
+        // ✅ GUEST: Remove from state + localStorage
         const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
         setDisplayWishlist(updatedList);
-        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
+        saveGuestWishlist(updatedList);
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
-      console.error('Error removing item:', error);
+      console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
     }
     
     setTimeout(() => setRemovingProduct(null), 300);
   };
 
-  // ============ HANDLE: Clear All Wishlist ============
+  // ============ HANDLE: Clear All ============
   const handleClearAll = async () => {
     if (displayWishlist.length === 0) {
       toast.error('Wishlist is already empty');
@@ -224,22 +185,22 @@ function Wishlist() {
         await fetchWishlist();
         const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
-        setRefreshKey(prev => prev + 1);
         toast.success('Wishlist cleared 🗑️');
       } else {
+        // ✅ GUEST: Clear state + localStorage
         setDisplayWishlist([]);
-        localStorage.setItem('guestWishlist', JSON.stringify([]));
+        saveGuestWishlist([]);
         toast.success('Wishlist cleared 🗑️');
       }
     } catch (error) {
-      console.error('Error clearing wishlist:', error);
+      console.error('Error:', error);
       toast.error('Failed to clear wishlist');
     }
     
     setIsClearing(false);
   };
 
-  // ============ HANDLE: Share Wishlist ============
+  // ============ HANDLE: Share ============
   const handleShare = async () => {
     try {
       if (navigator.share) {
@@ -445,7 +406,7 @@ function Wishlist() {
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
-            {/* ============ HEADER WITH ACTIONS ============ */}
+            {/* ============ HEADER ============ */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -460,7 +421,6 @@ function Wishlist() {
               </div>
               
               <div className="flex items-center gap-3 flex-wrap">
-                {/* Share Button */}
                 <button
                   onClick={handleShare}
                   className="group relative px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2 overflow-hidden"
@@ -474,7 +434,6 @@ function Wishlist() {
                   <span className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                 </button>
                 
-                {/* Clear All Button */}
                 {wishlistCount > 1 && (
                   <button
                     onClick={handleClearAll}
@@ -537,7 +496,6 @@ function Wishlist() {
                           </div>
                         )}
                         
-                        {/* Remove Button */}
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -605,7 +563,6 @@ function Wishlist() {
               })}
             </div>
             
-            {/* ============ CONTINUE SHOPPING ============ */}
             <div className="text-center mt-12">
               <Link 
                 to="/shop" 
@@ -617,7 +574,6 @@ function Wishlist() {
           </div>
         )}
 
-        {/* ============ FOOTER ============ */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
