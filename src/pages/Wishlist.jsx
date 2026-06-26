@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
@@ -22,8 +22,9 @@ function Wishlist() {
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // ============ HELPER: Get wishlist data from localStorage ============
+  // ============ GUEST: Get from localStorage ============
   const getGuestWishlist = useCallback(() => {
     try {
       const saved = localStorage.getItem('guestWishlist');
@@ -39,7 +40,7 @@ function Wishlist() {
     return [];
   }, []);
 
-  // ============ SAVE GUEST WISHLIST ============
+  // ============ GUEST: Save to localStorage ============
   const saveGuestWishlist = useCallback((data) => {
     localStorage.setItem('guestWishlist', JSON.stringify(data));
   }, []);
@@ -47,58 +48,31 @@ function Wishlist() {
   // ============ LOAD WISHLIST ============
   const loadWishlist = useCallback(async () => {
     if (user && token) {
-      // Logged in user
       if (fetchWishlist) {
         await fetchWishlist();
         const data = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(data);
       }
     } else {
-      // Guest user
       const data = getGuestWishlist();
       setDisplayWishlist(data);
     }
+    setLoading(false);
   }, [user, token, fetchWishlist, wishlist, getGuestWishlist]);
 
-  // ============ MOUNT ============
+  // ============ MOUNT & REFRESH ============
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      setIsGuest(!user || !token);
-      await loadWishlist();
-      setLoading(false);
-    };
-    init();
-  }, []);
+    setIsGuest(!user || !token);
+    loadWishlist();
+  }, [refreshKey]); // ✅ refreshKey change hone par reload
 
-  // ============ WISHLIST CONTEXT CHANGE ============
+  // ============ UPDATE ON CONTEXT CHANGE ============
   useEffect(() => {
     if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
       setDisplayWishlist(data);
     }
   }, [wishlist, user, token, loading]);
-
-  // ============ REFRESH ON ROUTE CHANGE ============
-  useEffect(() => {
-    if (!loading) {
-      loadWishlist();
-    }
-  }, [location.pathname, loadWishlist, loading]);
-
-  // ============ REFRESH ON TAB VISIBILITY ============
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !loading) {
-        loadWishlist();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [loadWishlist, loading]);
 
   // ============ HANDLE: Move to Cart ============
   const handleMoveToCart = async (product) => {
@@ -125,10 +99,10 @@ function Wishlist() {
         const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
       } else {
-        // ✅ GUEST: Remove from state + localStorage
         const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
         setDisplayWishlist(updatedList);
         saveGuestWishlist(updatedList);
+        setRefreshKey(prev => prev + 1); // ✅ Force refresh
       }
     } catch (error) {
       console.error('Error:', error);
@@ -152,10 +126,10 @@ function Wishlist() {
         setDisplayWishlist(updated);
         toast.success('Removed from wishlist ❌');
       } else {
-        // ✅ GUEST: Remove from state + localStorage
         const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
         setDisplayWishlist(updatedList);
         saveGuestWishlist(updatedList);
+        setRefreshKey(prev => prev + 1); // ✅ Force refresh
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
@@ -187,9 +161,9 @@ function Wishlist() {
         setDisplayWishlist(updated);
         toast.success('Wishlist cleared 🗑️');
       } else {
-        // ✅ GUEST: Clear state + localStorage
         setDisplayWishlist([]);
         saveGuestWishlist([]);
+        setRefreshKey(prev => prev + 1); // ✅ Force refresh
         toast.success('Wishlist cleared 🗑️');
       }
     } catch (error) {
