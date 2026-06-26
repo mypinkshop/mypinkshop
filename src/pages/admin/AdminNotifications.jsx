@@ -1,11 +1,12 @@
 // AdminNotifications.jsx - Full page for notifications management
 
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';  // ✅ useNavigate import karo
+import { Link, useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
+import toast from 'react-hot-toast';
 
 function AdminNotifications() {
-  const navigate = useNavigate();  // ✅ navigate hook use karo
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -18,7 +19,7 @@ function AdminNotifications() {
     type: 'system'
   });
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -48,6 +49,7 @@ function AdminNotifications() {
       setNotifications(data || []);
     } catch (error) {
       console.error('Fetch notifications error:', error);
+      toast.error('Failed to load notifications');
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -56,7 +58,7 @@ function AdminNotifications() {
 
   const sendNotification = async () => {
     if (!form.title.trim() || !form.message.trim()) {
-      alert('Please fill title and message');
+      toast.error('Please fill title and message');
       return;
     }
 
@@ -82,16 +84,16 @@ function AdminNotifications() {
       const data = await response.json();
       
       if (response.ok) {
-        alert(`✅ Notification sent to ${data.count || 0} users!`);
+        toast.success(`✅ Notification sent to ${data.count || 0} users!`);
         setForm({ title: '', message: '', userType: 'all', userId: '', type: 'system' });
         fetchSentNotifications();
         setSelectedTab('sent');
       } else {
-        alert('❌ Failed: ' + (data.message || 'Unknown error'));
+        toast.error('❌ Failed: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Send notification error:', error);
-      alert('❌ Failed to send notification');
+      toast.error('❌ Failed to send notification');
     } finally {
       setSending(false);
     }
@@ -111,11 +113,11 @@ function AdminNotifications() {
       
       if (response.ok) {
         setNotifications(notifications.filter(n => n._id !== id));
-        alert('✅ Notification deleted');
+        toast.success('✅ Notification deleted');
       }
     } catch (error) {
       console.error('Delete error:', error);
-      alert('Failed to delete');
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -169,7 +171,7 @@ function AdminNotifications() {
 
           {selectedTab === 'send' ? (
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Send Notification</h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">✉️ Send Notification</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -246,7 +248,7 @@ function AdminNotifications() {
           ) : (
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-6 shadow-sm">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Sent Notifications</h3>
+                <h3 className="text-lg font-semibold text-gray-800">📋 Sent Notifications</h3>
                 <button 
                   onClick={fetchSentNotifications}
                   className="text-pink-600 hover:text-pink-700 text-sm"
