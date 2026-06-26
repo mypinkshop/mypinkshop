@@ -28,7 +28,7 @@ const {
   sendReturnRequested,
   sendReturnApproved,
   sendReturnRejected
-} = require('./services/vendorEmailService');
+} = require('../services/vendorEmailService');
 
 const app = express();
 
