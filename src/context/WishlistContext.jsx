@@ -45,45 +45,49 @@ export const WishlistProvider = ({ children }) => {
     }
   }, []);
 
+  // ============ FETCH WISHLIST ============
+  const fetchWishlist = useCallback(async () => {
+    const token = getToken();
+    const user = getUser();
+    
+    if (!token || !user) {
+      console.log('🟢 CONTEXT - fetchWishlist: Guest mode, loading from localStorage');
+      loadGuestWishlist();
+      return;
+    }
+    
+    try {
+      console.log('🟢 CONTEXT - fetchWishlist: Fetching from backend');
+      const response = await fetch(`${API_URL}/api/wishlist`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const backendWishlist = await response.json();
+        const wishlistData = Array.isArray(backendWishlist) ? backendWishlist : [];
+        setWishlist(wishlistData);
+        setWishlistCount(wishlistData.length);
+        localStorage.setItem('guestWishlist', JSON.stringify(wishlistData));
+        console.log('🟢 CONTEXT - fetchWishlist: Fetched', wishlistData.length, 'items');
+      } else if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('token');
+        loadGuestWishlist();
+      }
+    } catch (error) {
+      console.error('Error fetching wishlist:', error);
+      loadGuestWishlist();
+    }
+  }, [loadGuestWishlist]);
+
   // ============ Load wishlist on mount ============
   useEffect(() => {
     const loadWishlist = async () => {
       setLoading(true);
-      
-      const token = getToken();
-      const user = getUser();
-      
-      if (token && user) {
-        // Logged in user - fetch from backend
-        try {
-          const response = await fetch(`${API_URL}/api/wishlist`, {
-            headers: { 
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (response.ok) {
-            const backendWishlist = await response.json();
-            const wishlistData = Array.isArray(backendWishlist) ? backendWishlist : [];
-            setWishlist(wishlistData);
-            setWishlistCount(wishlistData.length);
-            // Also save to localStorage for consistency
-            localStorage.setItem('guestWishlist', JSON.stringify(wishlistData));
-          } else if (response.status === 401) {
-            localStorage.removeItem('adminToken');
-            localStorage.removeItem('token');
-            loadGuestWishlist();
-          }
-        } catch (error) {
-          console.error('Error fetching wishlist:', error);
-          loadGuestWishlist();
-        }
-      } else {
-        // Guest user - load from localStorage
-        loadGuestWishlist();
-      }
-      
+      await fetchWishlist();
       setLoading(false);
     };
     
@@ -113,7 +117,7 @@ export const WishlistProvider = ({ children }) => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('wishlistUpdated', handleCustomEvent);
     };
-  }, [loadGuestWishlist]);
+  }, [fetchWishlist, loadGuestWishlist]);
 
   // ============ ADD TO WISHLIST ============
   const addToWishlist = async (product) => {
@@ -275,7 +279,8 @@ export const WishlistProvider = ({ children }) => {
       addToWishlist, 
       removeFromWishlist, 
       isInWishlist,
-      clearWishlist
+      clearWishlist,
+      fetchWishlist, // ✅ ADDED
     }}>
       {children}
     </WishlistContext.Provider>
