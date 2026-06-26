@@ -67,8 +67,11 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   };
 
   const addUrlField = () => {
-    if (urls.length < 20) setUrls([...urls, '']);
-    else alert('Maximum 20 URLs allowed');
+    if (urls.length < 20) {
+      setUrls([...urls, '']);
+    } else {
+      toast.error('Maximum 20 URLs allowed');
+    }
   };
 
   const removeUrlField = (index) => {
@@ -84,7 +87,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   const fetchAllProducts = async () => {
     const validUrls = urls.filter(url => url.trim());
     if (validUrls.length === 0) {
-      alert('Please enter at least one Amazon URL');
+      toast.error('Please enter at least one Amazon URL');
       return;
     }
 
@@ -215,7 +218,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       setVariations(formattedVariations);
     }
     
-    alert(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''}`);
+    toast.success(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''}`);
     if (onProductImported) onProductImported();
   };
 
@@ -576,10 +579,12 @@ function AdminAddProduct() {
         setFormData({ ...formData, subCategory: newSubCategory.trim() });
         setNewSubCategory('');
         setShowAddSubCategory(false);
-        alert(`✅ Sub-category "${newSubCategory.trim()}" added!`);
-      } else alert('⚠️ Already exists!');
+        toast.success(`✅ Sub-category "${newSubCategory.trim()}" added!`);
+      } else {
+        toast.error('⚠️ Already exists!');
+      }
     } else {
-      alert('Please select a category first');
+      toast.error('Please select a category first');
     }
   };
 
@@ -600,17 +605,20 @@ function AdminAddProduct() {
 
   const deleteSelectedVariations = () => {
     if (selectedVariationIds.length === 0) {
-      alert('Please select variations to delete');
+      toast.error('Please select variations to delete');
       return;
     }
-    if (confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
+    if (window.confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
       setVariations(variations.filter(v => !selectedVariationIds.includes(v.id)));
       setSelectedVariationIds([]);
     }
   };
 
   const saveVariation = () => {
-    if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
+    if (!variationForm.name) {
+      toast.error(`Please select ${variationAttrs.type}`);
+      return;
+    }
     
     const existingIndex = variations.findIndex(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
     const newVariation = {
@@ -629,11 +637,14 @@ function AdminAddProduct() {
       const updated = [...variations];
       updated[variations.findIndex(v => v.id === editingVariation.id)] = newVariation;
       setVariations(updated);
-      alert('✅ Variation updated successfully!');
+      toast.success('✅ Variation updated successfully!');
     } else {
-      if (existingIndex !== -1) return alert(`⚠️ This ${variationAttrs.type} combination already exists!`);
+      if (existingIndex !== -1) {
+        toast.error(`⚠️ This ${variationAttrs.type} combination already exists!`);
+        return;
+      }
       setVariations([...variations, newVariation]);
-      alert(`✅ ${variationAttrs.type} added successfully!`);
+      toast.success(`✅ ${variationAttrs.type} added successfully!`);
     }
     setVariationModalOpen(false);
     setEditingVariation(null);
@@ -655,7 +666,9 @@ function AdminAddProduct() {
   };
 
   const deleteVariation = (variationId) => {
-    if (confirm('Delete this variation?')) setVariations(variations.filter(v => v.id !== variationId));
+    if (window.confirm('Delete this variation?')) {
+      setVariations(variations.filter(v => v.id !== variationId));
+    }
   };
 
   const uploadVariationImage = async (e) => {
@@ -675,10 +688,10 @@ function AdminAddProduct() {
       const data = await response.json();
       if (data.url) {
         setVariationForm({ ...variationForm, image: data.url });
-        alert('✅ Image uploaded!');
+        toast.success('✅ Image uploaded!');
       }
     } catch (error) {
-      alert('Upload failed');
+      toast.error('Upload failed');
     }
   };
 
@@ -688,7 +701,7 @@ function AdminAddProduct() {
   const [keyFeature, setKeyFeature] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
 
   const compressImage = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -730,19 +743,27 @@ function AdminAddProduct() {
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    if (formData.images.length + files.length > 5) return alert('Maximum 5 images');
+    if (formData.images.length + files.length > 5) {
+      toast.error('Maximum 5 images');
+      return;
+    }
     setUploadingImages(true);
     const uploadedUrls = [];
     for (const file of files) {
-      if (file.size > 5 * 1024 * 1024) { alert(`${file.name} > 5MB`); continue; }
+      if (file.size > 5 * 1024 * 1024) { 
+        toast.error(`${file.name} > 5MB`); 
+        continue; 
+      }
       try {
         const url = await uploadImageToBackend(file);
         uploadedUrls.push(url);
-      } catch (error) { alert(`Failed: ${file.name}`); }
+      } catch (error) { 
+        toast.error(`Failed: ${file.name}`); 
+      }
     }
     if (uploadedUrls.length) {
       setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
-      alert(`✅ ${uploadedUrls.length} image(s) uploaded successfully!`);
+      toast.success(`✅ ${uploadedUrls.length} image(s) uploaded successfully!`);
     }
     setUploadingImages(false);
   };
@@ -756,14 +777,19 @@ function AdminAddProduct() {
     if (text && !isGarbage) {
       setFormData({ ...formData, fullDescription: [...formData.fullDescription, text] });
       setCurrentBullet('');
-    } else if (isGarbage) alert('That is garbage text. Please enter valid content.');
+    } else if (isGarbage) {
+      toast.error('That is garbage text. Please enter valid content.');
+    }
   };
 
   const removeBulletPoint = (index) => setFormData({ ...formData, fullDescription: formData.fullDescription.filter((_, i) => i !== index) });
 
   const addKeyFeature = () => {
     if (keyFeature.trim()) {
-      if (formData.keyFeatures.length >= 10) return alert('Max 10 features');
+      if (formData.keyFeatures.length >= 10) {
+        toast.error('Max 10 features');
+        return;
+      }
       setFormData({ ...formData, keyFeatures: [...formData.keyFeatures, keyFeature.trim()] });
       setKeyFeature('');
     }
@@ -777,11 +803,11 @@ function AdminAddProduct() {
       setFormData({ ...formData, brand: newBrand.trim() });
       setNewBrand('');
       setShowAddBrand(false);
-      alert(`✅ Brand "${newBrand.trim()}" added!`);
+      toast.success(`✅ Brand "${newBrand.trim()}" added!`);
     } else if (brands.includes(newBrand.trim())) {
-      alert('⚠️ Brand already exists!');
+      toast.error('⚠️ Brand already exists!');
     } else {
-      alert('Please enter a valid brand name');
+      toast.error('Please enter a valid brand name');
     }
   };
 
@@ -789,14 +815,30 @@ function AdminAddProduct() {
 
   // ===== ✅ FIXED SUBMIT FUNCTION =====
   const submitProduct = async () => {
-    if (!formData.productName) return alert('Enter product name');
-    if (!formData.brand) return alert('Select brand');
-    if (!formData.category) return alert('Select category');
-    if (!formData.subCategory) return alert('Select sub category');
+    if (!formData.productName) {
+      toast.error('Enter product name');
+      return;
+    }
+    if (!formData.brand) {
+      toast.error('Select brand');
+      return;
+    }
+    if (!formData.category) {
+      toast.error('Select category');
+      return;
+    }
+    if (!formData.subCategory) {
+      toast.error('Select sub category');
+      return;
+    }
 
     setLoading(true);
     const token = localStorage.getItem('adminToken');
-    if (!token) { alert('Session expired'); setLoading(false); return; }
+    if (!token) { 
+      toast.error('Session expired'); 
+      setLoading(false); 
+      return; 
+    }
 
     const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
     const finalSku = formData.sku || generateSKU();
@@ -853,21 +895,41 @@ function AdminAddProduct() {
         body: JSON.stringify(productData)
       });
       if (!response.ok) throw new Error('Failed');
-      alert('🎉 Product added successfully!');
+      toast.success('🎉 Product added successfully!');
       navigate('/admin/inventory');
-    } catch (error) { alert(`❌ ${error.message}`); }
+    } catch (error) { 
+      toast.error(`❌ ${error.message}`); 
+    }
     finally { setLoading(false); }
   };
 
   const goToNextStep = () => {
     if (step === 1) {
-      if (!formData.productName) return alert('Enter product name');
-      if (!formData.brand) return alert('Select brand');
-      if (!formData.category) return alert('Select category');
-      if (!formData.subCategory) return alert('Select sub category');
+      if (!formData.productName) {
+        toast.error('Enter product name');
+        return;
+      }
+      if (!formData.brand) {
+        toast.error('Select brand');
+        return;
+      }
+      if (!formData.category) {
+        toast.error('Select category');
+        return;
+      }
+      if (!formData.subCategory) {
+        toast.error('Select sub category');
+        return;
+      }
     }
-    if (step === 2 && !formData.images.length) return alert('Upload at least one image');
-    if (step === 3 && !formData.sellingPrice) return alert('Enter selling price');
+    if (step === 2 && !formData.images.length) {
+      toast.error('Upload at least one image');
+      return;
+    }
+    if (step === 3 && !formData.sellingPrice) {
+      toast.error('Enter selling price');
+      return;
+    }
     setStep(step + 1);
     window.scrollTo({ top: 0 });
   };
