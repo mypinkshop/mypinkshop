@@ -231,6 +231,10 @@ const vendorSchema = new mongoose.Schema({
     ifscCode: { type: String, default: '' },
     accountHolderName: { type: String, default: '' }
   },
+  shippingRate: { type: Number, default: 49 },
+  expressRate: { type: Number, default: 99 },
+  freeShippingThreshold: { type: Number, default: 999 },
+  processingTime: { type: String, default: '1-2 days' },
   status: { 
     type: String, 
     enum: ['pending', 'approved', 'rejected', 'suspended', 'blocked'], 
@@ -276,6 +280,31 @@ vendorSchema.pre('save', function(next) {
 });
 
 const Vendor = mongoose.models.Vendor || mongoose.model('Vendor', vendorSchema);
+
+// ============================================
+// ✅ BRAND APPLICATION SCHEMA
+// ============================================
+const brandApplicationSchema = new mongoose.Schema({
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  brandName: { type: String, required: true },
+  trademarkNumber: { type: String, required: true },
+  trademarkOffice: { type: String, default: 'india' },
+  brandWebsite: { type: String, default: '' },
+  productCategories: { type: [String], default: [] },
+  manufacturingCountries: { type: [String], default: [] },
+  brandCertificate: { type: String, default: '' },
+  brandLogo: { type: String, default: '' },
+  status: { 
+    type: String, 
+    enum: ['pending', 'approved', 'rejected'], 
+    default: 'pending' 
+  },
+  adminRemarks: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const BrandApplication = mongoose.models.BrandApplication || mongoose.model('BrandApplication', brandApplicationSchema);
 
 // ========== SCHEMAS ==========
 
@@ -407,6 +436,7 @@ const couponSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   startDate: { type: Date, default: Date.now },
   endDate: { type: Date },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -461,8 +491,18 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'], default: 'pending' },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
   address: Object,
-  createdAt: { type: Date, default: Date.now },
-  deliveredAt: Date
+  trackingNumber: { type: String, default: '' },
+  courierName: { type: String, default: '' },
+  shipmentId: { type: String, default: '' },
+  returnRequested: { type: Boolean, default: false },
+  returnReason: { type: String, default: '' },
+  returnStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  returnType: { type: String, default: 'refund' },
+  returnResolution: { type: String, default: '' },
+  acceptedAt: { type: Date },
+  shippedAt: { type: Date },
+  deliveredAt: { type: Date },
+  createdAt: { type: Date, default: Date.now }
 });
 
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
@@ -1265,6 +1305,73 @@ app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, asy
 });
 
 // ============================================
+// ✅ ADMIN: GET BRAND APPLICATIONS
+// ============================================
+app.get('/api/admin/brand-applications', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const applications = await BrandApplication.find()
+      .populate('vendorId', 'name email brandName')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, applications });
+  } catch (error) {
+    console.error('Get brand applications error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: APPROVE BRAND APPLICATION
+// ============================================
+app.patch('/api/admin/brand-applications/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const application = await BrandApplication.findById(req.params.id);
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    application.status = 'approved';
+    application.updatedAt = new Date();
+    await application.save();
+
+    // Update vendor brand
+    await Vendor.findByIdAndUpdate(application.vendorId, {
+      brandName: application.brandName,
+      status: 'approved',
+      vendorStatus: 'approved'
+    });
+
+    res.json({ success: true, message: 'Brand application approved' });
+  } catch (error) {
+    console.error('Approve brand application error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ ADMIN: REJECT BRAND APPLICATION
+// ============================================
+app.patch('/api/admin/brand-applications/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const application = await BrandApplication.findById(req.params.id);
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    application.status = 'rejected';
+    application.updatedAt = new Date();
+    await application.save();
+
+    res.json({ success: true, message: 'Brand application rejected' });
+  } catch (error) {
+    console.error('Reject brand application error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
 // ✅ VENDOR PRODUCT ROUTES
 // ============================================
 
@@ -1412,7 +1519,7 @@ app.post('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, r
 });
 
 // ============================================
-// ✅ VENDOR PRODUCT UPDATE & DELETE (NEW)
+// ✅ VENDOR PRODUCT UPDATE & DELETE
 // ============================================
 
 // Update vendor product
@@ -1460,14 +1567,14 @@ app.delete('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (
 });
 
 // ============================================
-// ✅ VENDOR ORDERS (NEW)
+// ✅ VENDOR ORDERS
 // ============================================
 
 // Get vendor orders
 app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, returnRequested } = req.query;
     
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
@@ -1475,6 +1582,7 @@ app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res)
     
     const filter = { 'items.vendorId': req.user.id };
     if (status) filter.status = status;
+    if (returnRequested === 'true') filter.returnRequested = true;
     
     const orders = await Order.find(filter)
       .sort({ createdAt: -1 })
@@ -1502,7 +1610,12 @@ app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res)
         address: order.address,
         items: order.items.filter(item => 
           item.vendorId && item.vendorId.toString() === req.user.id
-        )
+        ),
+        trackingNumber: order.trackingNumber,
+        courierName: order.courierName,
+        returnRequested: order.returnRequested,
+        returnReason: order.returnReason,
+        returnStatus: order.returnStatus
       };
     });
     
@@ -1519,6 +1632,68 @@ app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res)
   } catch (error) {
     console.error('Get vendor orders error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ ACCEPT ORDER - Shiprocket Integration
+app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Check if order belongs to this vendor
+    const belongsToVendor = order.items.some(item => 
+      item.vendorId && item.vendorId.toString() === req.user.id
+    );
+    if (!belongsToVendor) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    order.status = 'confirmed';
+    order.acceptedAt = new Date();
+    order.trackingNumber = `SR-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    order.courierName = 'Shiprocket';
+    await order.save();
+
+    res.json({
+      success: true,
+      message: 'Order accepted',
+      trackingNumber: order.trackingNumber,
+      courierName: order.courierName,
+      shipmentId: order.shipmentId
+    });
+  } catch (error) {
+    console.error('Accept order error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ✅ REJECT ORDER
+app.patch('/api/vendor/orders/:id/reject', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    const belongsToVendor = order.items.some(item => 
+      item.vendorId && item.vendorId.toString() === req.user.id
+    );
+    if (!belongsToVendor) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+
+    res.json({ success: true, message: 'Order rejected' });
+  } catch (error) {
+    console.error('Reject order error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -1556,7 +1731,7 @@ app.patch('/api/vendor/orders/:id/status', authMiddleware, vendorMiddleware, asy
 });
 
 // ============================================
-// ✅ VENDOR EARNINGS (NEW)
+// ✅ VENDOR EARNINGS
 // ============================================
 
 app.get('/api/vendor/earnings', authMiddleware, vendorMiddleware, async (req, res) => {
@@ -1606,6 +1781,316 @@ app.get('/api/vendor/earnings', authMiddleware, vendorMiddleware, async (req, re
   } catch (error) {
     console.error('Get earnings error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR BUSINESS DETAILS
+// ============================================
+
+// Save business details
+app.post('/api/vendor/business-details', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const vendor = await Vendor.findById(req.user.id);
+    if (!vendor) {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    const { businessName, panNumber, gstNumber, bankDetails, address, phone, email } = req.body;
+
+    vendor.name = businessName || vendor.name;
+    vendor.panNumber = panNumber || vendor.panNumber;
+    vendor.gstNumber = gstNumber || vendor.gstNumber;
+    vendor.bankDetails = bankDetails || vendor.bankDetails;
+    vendor.address = address || vendor.address;
+    vendor.phone = phone || vendor.phone;
+    vendor.email = email || vendor.email;
+
+    await vendor.save();
+
+    res.json({ success: true, message: 'Business details saved successfully' });
+  } catch (error) {
+    console.error('Save business details error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get business details
+app.get('/api/vendor/business-details', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const vendor = await Vendor.findById(req.user.id).select('-password');
+    if (!vendor) {
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
+    }
+
+    res.json({
+      success: true,
+      details: {
+        businessName: vendor.name,
+        panNumber: vendor.panNumber,
+        gstNumber: vendor.gstNumber,
+        bankDetails: vendor.bankDetails,
+        address: vendor.address,
+        phone: vendor.phone,
+        email: vendor.email
+      }
+    });
+  } catch (error) {
+    console.error('Get business details error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR BRAND APPLICATION
+// ============================================
+
+// Submit brand application
+app.post('/api/vendor/brand-application', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { brandName, trademarkNumber, trademarkOffice, brandWebsite, productCategories, manufacturingCountries, brandCertificate, brandLogo } = req.body;
+
+    const existing = await BrandApplication.findOne({ vendorId: req.user.id, status: 'pending' });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'You already have a pending application' });
+    }
+
+    const application = new BrandApplication({
+      vendorId: req.user.id,
+      brandName,
+      trademarkNumber,
+      trademarkOffice: trademarkOffice || 'india',
+      brandWebsite: brandWebsite || '',
+      productCategories: productCategories || [],
+      manufacturingCountries: manufacturingCountries || [],
+      brandCertificate: brandCertificate || '',
+      brandLogo: brandLogo || '',
+      status: 'pending'
+    });
+
+    await application.save();
+
+    res.json({ success: true, message: 'Brand application submitted successfully' });
+  } catch (error) {
+    console.error('Brand application error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get brand application status
+app.get('/api/vendor/brand-application/status', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const application = await BrandApplication.findOne({ vendorId: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, application });
+  } catch (error) {
+    console.error('Get brand application status error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR RETURNS
+// ============================================
+
+// Get vendor returns
+app.get('/api/vendor/returns', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const orders = await Order.find({ 
+      'items.vendorId': req.user.id,
+      returnRequested: true 
+    });
+
+    const returns = orders.map(order => ({
+      id: order._id,
+      orderId: order._id,
+      customer: order.address?.fullName || 'Customer',
+      product: order.items[0]?.name || 'Product',
+      reason: order.returnReason || 'Not specified',
+      status: order.returnStatus || 'pending',
+      amount: order.total || 0,
+      requestedDate: order.createdAt
+    }));
+
+    res.json({ success: true, returns });
+  } catch (error) {
+    console.error('Get returns error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update return status
+app.patch('/api/vendor/returns/:id/status', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { status } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.returnStatus = status;
+    await order.save();
+
+    res.json({ success: true, message: `Return ${status}` });
+  } catch (error) {
+    console.error('Update return status error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR COUPONS
+// ============================================
+
+// Get vendor coupons
+app.get('/api/vendor/coupons', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const coupons = await Coupon.find({ vendorId: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, coupons });
+  } catch (error) {
+    console.error('Get coupons error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create coupon
+app.post('/api/vendor/coupons/create', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const { code, discountType, discountValue, minOrderValue, maxDiscount, usageLimit, endDate } = req.body;
+
+    const existing = await Coupon.findOne({ code: code.toUpperCase() });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Coupon code already exists' });
+    }
+
+    const coupon = new Coupon({
+      code: code.toUpperCase(),
+      discountType: discountType || 'percentage',
+      discountValue: parseFloat(discountValue),
+      minOrderValue: parseFloat(minOrderValue) || 0,
+      maxDiscount: parseFloat(maxDiscount) || 0,
+      usageLimit: parseInt(usageLimit) || 100,
+      endDate: endDate || null,
+      vendorId: req.user.id,
+      isActive: true
+    });
+
+    await coupon.save();
+    res.json({ success: true, coupon });
+  } catch (error) {
+    console.error('Create coupon error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Toggle coupon status
+app.patch('/api/vendor/coupons/:id/toggle', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const coupon = await Coupon.findOne({ _id: req.params.id, vendorId: req.user.id });
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'Coupon not found' });
+    }
+
+    coupon.isActive = !coupon.isActive;
+    await coupon.save();
+
+    res.json({ success: true, isActive: coupon.isActive });
+  } catch (error) {
+    console.error('Toggle coupon error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete coupon
+app.delete('/api/vendor/coupons/:id', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const coupon = await Coupon.findOneAndDelete({ _id: req.params.id, vendorId: req.user.id });
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: 'Coupon not found' });
+    }
+
+    res.json({ success: true, message: 'Coupon deleted' });
+  } catch (error) {
+    console.error('Delete coupon error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR SHIPPING SETTINGS
+// ============================================
+
+// Get shipping settings
+app.get('/api/vendor/shipping', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const vendor = await Vendor.findById(req.user.id);
+    res.json({
+      success: true,
+      settings: {
+        standardRate: vendor.shippingRate || 49,
+        expressRate: vendor.expressRate || 99,
+        freeShippingThreshold: vendor.freeShippingThreshold || 999,
+        processingTime: vendor.processingTime || '1-2 days',
+        pickupPincode: vendor.address?.pincode || ''
+      }
+    });
+  } catch (error) {
+    console.error('Get shipping error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Save shipping settings
+app.post('/api/vendor/shipping/settings', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    await connectDB();
+    const vendor = await Vendor.findById(req.user.id);
+    const { standardRate, expressRate, freeShippingThreshold, processingTime, pickupPincode } = req.body;
+
+    vendor.shippingRate = parseFloat(standardRate) || 49;
+    vendor.expressRate = parseFloat(expressRate) || 99;
+    vendor.freeShippingThreshold = parseFloat(freeShippingThreshold) || 999;
+    vendor.processingTime = processingTime || '1-2 days';
+    if (pickupPincode) {
+      vendor.address.pincode = pickupPincode;
+    }
+
+    await vendor.save();
+    res.json({ success: true, message: 'Shipping settings saved' });
+  } catch (error) {
+    console.error('Save shipping error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============================================
+// ✅ VENDOR SHIPPING ZONES
+// ============================================
+
+// Get shipping zones
+app.get('/api/vendor/shipping/zones', authMiddleware, vendorMiddleware, async (req, res) => {
+  try {
+    // You can implement shipping zones logic here
+    // For now, returning default zones
+    const defaultZones = [
+      { id: 1, zone: 'Local (Metro Cities)', cities: 'Mumbai, Delhi, Bangalore, Chennai, Kolkata', rate: 49, days: '2-3 days' },
+      { id: 2, zone: 'Zone A (Tier 2 Cities)', cities: 'Jaipur, Lucknow, Nagpur, Indore, Bhopal', rate: 79, days: '3-5 days' },
+      { id: 3, zone: 'Zone B (Rest of India)', cities: 'All other cities and towns', rate: 99, days: '5-7 days' }
+    ];
+    res.json({ success: true, zones: defaultZones });
+  } catch (error) {
+    console.error('Get shipping zones error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
