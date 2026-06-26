@@ -1,67 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-
-const VendorSidebar = ({ activeMenu, setActiveMenu }) => {
-  const menuItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: '📊', path: '/vendor/dashboard' },
-    { id: 'catalogue', name: 'Catalogue', icon: '📦', path: '/vendor/products' },
-    { id: 'inventory', name: 'Inventory', icon: '📋', path: '/vendor/inventory' },
-    { id: 'orders', name: 'Orders', icon: '🛒', path: '/vendor/orders' },
-    { id: 'payments', name: 'Payments', icon: '💳', path: '/vendor/earnings' },
-    { id: 'settings', name: 'Settings', icon: '⚙️', path: '/vendor/settings' },
-  ];
-
-  return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white z-40 shadow-2xl">
-      <div className="p-5 border-b border-gray-700">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center shadow-lg">
-            <span className="text-white font-bold text-sm">M</span>
-          </div>
-          <div>
-            <h1 className="font-bold text-white text-lg">MyPinkShop</h1>
-            <p className="text-[10px] text-gray-400">Seller Central</p>
-          </div>
-        </div>
-      </div>
-      <nav className="mt-6 px-3">
-        <div className="space-y-1">
-          {menuItems.map((item) => (
-            <Link
-              key={item.id}
-              to={item.path}
-              onClick={() => setActiveMenu(item.id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                activeMenu === item.id
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
-            >
-              <span className="text-xl group-hover:scale-110 transition">{item.icon}</span>
-              <span className="text-sm font-medium">{item.name}</span>
-            </Link>
-          ))}
-        </div>
-      </nav>
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <div className="border-t border-gray-700 pt-4">
-          <button 
-            onClick={() => {
-              localStorage.removeItem('vendorToken');
-              localStorage.removeItem('vendor');
-              window.location.href = '/vendor/login';
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-gray-300 hover:bg-red-600 hover:text-white transition-all"
-          >
-            <span className="text-xl">🚪</span>
-            <span className="text-sm font-medium">Logout</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-};
+// ✅ IMPORT FROM SEPARATE FILE
+import VendorSidebar from './components/VendorSidebar';
 
 function VendorDashboard() {
   const navigate = useNavigate();
@@ -175,8 +116,11 @@ function VendorDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* ✅ USING SEPARATE SIDEBAR FILE */}
       <VendorSidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
+      
       <div className="ml-64">
+        {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-30 shadow-sm">
           <div className="flex justify-between items-center">
             <div>
@@ -195,6 +139,7 @@ function VendorDashboard() {
           </div>
         </div>
         
+        {/* Main Content */}
         <div className="p-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
@@ -220,7 +165,7 @@ function VendorDashboard() {
           <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
             <h3 className="font-semibold text-gray-700 mb-4">⚡ Quick Actions</h3>
             <div className="flex flex-wrap gap-3">
-              <Link to="/vendor/products/add" className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg hover:shadow-lg transition transform hover:-translate-y-0.5 text-sm font-medium">
+              <Link to="/vendor/add-product" className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-lg hover:shadow-lg transition transform hover:-translate-y-0.5 text-sm font-medium">
                 ➕ Add Product
               </Link>
               <Link to="/vendor/orders" className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
@@ -228,6 +173,9 @@ function VendorDashboard() {
               </Link>
               <Link to="/vendor/earnings" className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
                 💳 Earnings
+              </Link>
+              <Link to="/vendor/profile" className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                👤 Profile
               </Link>
             </div>
           </div>
