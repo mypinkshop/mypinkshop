@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
+import toast from 'react-hot-toast';
 
 function AdminInventory() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [productToDelete, setProductToDelete] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [updatingStock, setUpdatingStock] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
 
   const getToken = () => {
     return localStorage.getItem('adminToken') || localStorage.getItem('token');
@@ -31,6 +34,7 @@ function AdminInventory() {
   const loadInventory = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await fetch(`${API_URL}/api/products`);
       
       if (!response.ok) {
@@ -53,7 +57,7 @@ function AdminInventory() {
         
         return {
           ...product,
-          id: product._id,
+          id: product._id || product.id,
           stock: stock,
           price: product.price || product.sellingPrice || 0,
           status: product.status === 'active' ? status : 'inactive',
@@ -64,6 +68,8 @@ function AdminInventory() {
       setProducts(productsWithStatus);
     } catch (error) {
       console.error('Error loading products:', error);
+      setError('Failed to load products. Please refresh.');
+      toast.error('Failed to load products');
       setProducts([]);
     } finally {
       setLoading(false);
@@ -75,7 +81,7 @@ function AdminInventory() {
     
     const token = getToken();
     if (!token) {
-      alert('Session expired. Please login again.');
+      toast.error('Session expired. Please login again.');
       navigate('/admin/login');
       return;
     }
@@ -95,17 +101,18 @@ function AdminInventory() {
       if (response.status === 401) {
         localStorage.removeItem('adminToken');
         localStorage.removeItem('token');
-        alert('Session expired. Please login again.');
+        toast.error('Session expired. Please login again.');
         navigate('/admin/login');
         return;
       }
       
       if (!response.ok) throw new Error('Update failed');
       
+      toast.success('✅ Stock updated successfully!');
       await loadInventory();
     } catch (error) {
       console.error('Error updating stock:', error);
-      alert('Failed to update stock');
+      toast.error('Failed to update stock');
     } finally {
       setUpdatingStock(null);
     }
@@ -114,10 +121,12 @@ function AdminInventory() {
   const deleteProduct = async (productId) => {
     const token = getToken();
     if (!token) {
-      alert('Session expired. Please login again.');
+      toast.error('Session expired. Please login again.');
       navigate('/admin/login');
       return;
     }
+
+    setProcessingId(productId);
 
     try {
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
@@ -131,7 +140,7 @@ function AdminInventory() {
       if (response.status === 401) {
         localStorage.removeItem('adminToken');
         localStorage.removeItem('token');
-        alert('Session expired. Please login again.');
+        toast.error('Session expired. Please login again.');
         navigate('/admin/login');
         return;
       }
@@ -141,13 +150,15 @@ function AdminInventory() {
         throw new Error(error || 'Delete failed');
       }
       
+      toast.success('🗑 Product deleted successfully');
       await loadInventory();
       setShowDeleteModal(false);
       setProductToDelete(null);
-      alert('🗑 Product deleted successfully');
     } catch (error) {
       console.error('Error deleting product:', error);
-      alert('Failed to delete product: ' + error.message);
+      toast.error('Failed to delete product: ' + error.message);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -204,6 +215,24 @@ function AdminInventory() {
     );
   }
 
+  if (error && products.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
+          <p className="text-gray-500 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-pink-50/30">
       <AdminSidebar />
@@ -212,7 +241,7 @@ function AdminInventory() {
       <div className="bg-white/95 backdrop-blur-md border-b border-pink-100 px-3 sm:px-6 py-3 sm:py-4 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Inventory Management</h1>
+            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">📦 Inventory Management</h1>
             <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">Track and manage your product stock levels</p>
           </div>
           
@@ -424,7 +453,8 @@ function AdminInventory() {
                             </Link>
                             <button 
                               onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} 
-                              className="p-1 sm:p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" 
+                              disabled={processingId === product.id}
+                              className="p-1 sm:p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50" 
                               title="Delete"
                             >
                               🗑️
@@ -452,7 +482,7 @@ function AdminInventory() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4" onClick={() => setShowDeleteModal(false)}>
           <div className="bg-white rounded-xl sm:rounded-2xl max-w-md w-full shadow-2xl animate-fade-in-up mx-3 sm:mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-pink-100 p-4 sm:p-5 flex justify-between items-center">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800">Delete Product</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800">🗑️ Delete Product</h3>
               <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600 text-xl sm:text-2xl">✕</button>
             </div>
             <div className="p-4 sm:p-5">
@@ -472,8 +502,12 @@ function AdminInventory() {
                 <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg sm:rounded-xl text-gray-700 hover:bg-gray-50 transition text-sm">
                   Cancel
                 </button>
-                <button onClick={() => deleteProduct(productToDelete.id)} className="flex-1 px-3 sm:px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-lg sm:rounded-xl font-medium hover:shadow-lg transition text-sm">
-                  Delete
+                <button 
+                  onClick={() => deleteProduct(productToDelete.id)} 
+                  disabled={processingId === productToDelete.id}
+                  className="flex-1 px-3 sm:px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-lg sm:rounded-xl font-medium hover:shadow-lg transition disabled:opacity-50 text-sm"
+                >
+                  {processingId === productToDelete.id ? '⏳ Deleting...' : 'Delete'}
                 </button>
               </div>
             </div>
