@@ -22,6 +22,7 @@ function Wishlist() {
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const isInitialMount = useRef(true);
 
@@ -45,12 +46,12 @@ function Wishlist() {
     }
   }, [user, token, wishlist]);
 
-  // ============ REFRESH FUNCTION (Force Update) ============
-  const refreshWishlist = useCallback(async () => {
+  // ============ FORCE REFRESH ============
+  const forceRefresh = useCallback(async () => {
     if (user && token && fetchWishlist) {
       await fetchWishlist();
-      // ✅ Force update from wishlist context after fetch
-      const data = Array.isArray(wishlist) ? wishlist : [];
+      // ✅ Directly use wishlist from context after fetch
+      const data = Array.isArray(wishlist) ? [...wishlist] : [];
       setDisplayWishlist(data);
     } else {
       const data = getWishlistData();
@@ -64,7 +65,7 @@ function Wishlist() {
       setLoading(true);
       if (user && token && fetchWishlist) {
         await fetchWishlist();
-        const data = Array.isArray(wishlist) ? wishlist : [];
+        const data = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(data);
       } else {
         const data = getWishlistData();
@@ -74,29 +75,29 @@ function Wishlist() {
       setLoading(false);
     };
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
   useEffect(() => {
-    if (user && token) {
-      const data = Array.isArray(wishlist) ? wishlist : [];
+    if (user && token && !loading) {
+      const data = Array.isArray(wishlist) ? [...wishlist] : [];
       setDisplayWishlist(data);
     }
-  }, [wishlist, user, token]);
+  }, [wishlist, user, token, loading]);
 
   // ============ REFRESH ON ROUTE CHANGE ============
   useEffect(() => {
     if (!isInitialMount.current) {
-      refreshWishlist();
+      forceRefresh();
     }
     isInitialMount.current = false;
-  }, [location.pathname, refreshWishlist]);
+  }, [location.pathname, forceRefresh]);
 
   // ============ REFRESH ON TAB VISIBILITY ============
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        refreshWishlist();
+        forceRefresh();
       }
     };
 
@@ -104,7 +105,7 @@ function Wishlist() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshWishlist]);
+  }, [forceRefresh]);
 
   // ============ STORAGE EVENT LISTENER ============
   useEffect(() => {
@@ -158,9 +159,10 @@ function Wishlist() {
       if (user && token) {
         await removeFromWishlist(productId);
         await fetchWishlist();
-        // ✅ Force update after fetch
-        const updated = Array.isArray(wishlist) ? wishlist : [];
+        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
+        // ✅ Force re-render
+        setRefreshKey(prev => prev + 1);
       } else {
         const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
         setDisplayWishlist(updatedList);
@@ -184,9 +186,10 @@ function Wishlist() {
       if (user && token) {
         await removeFromWishlist(productId);
         await fetchWishlist();
-        // ✅ Force update after fetch
-        const updated = Array.isArray(wishlist) ? wishlist : [];
+        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
+        // ✅ Force re-render
+        setRefreshKey(prev => prev + 1);
         toast.success('Removed from wishlist ❌');
       } else {
         const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
@@ -219,8 +222,9 @@ function Wishlist() {
       if (user && token && clearAllWishlist) {
         await clearAllWishlist();
         await fetchWishlist();
-        const updated = Array.isArray(wishlist) ? wishlist : [];
+        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
         setDisplayWishlist(updated);
+        setRefreshKey(prev => prev + 1);
         toast.success('Wishlist cleared 🗑️');
       } else {
         setDisplayWishlist([]);
