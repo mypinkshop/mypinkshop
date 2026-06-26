@@ -149,11 +149,12 @@ function Wishlist() {
     try {
       if (user && token) {
         await removeFromWishlist(productId);
-        await fetchWishlist();
-        const updated = getWishlistData();
-        setDisplayWishlist(updated);
+        await refreshWishlist();
       } else {
         setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
+        localStorage.setItem('guestWishlist', JSON.stringify(
+          displayWishlist.filter(p => (p._id || p.id) !== productId)
+        ));
       }
     } catch (error) {
       console.error('Error removing from wishlist:', error);
@@ -172,12 +173,13 @@ function Wishlist() {
     try {
       if (user && token) {
         await removeFromWishlist(productId);
-        await fetchWishlist();
-        const updated = getWishlistData();
-        setDisplayWishlist(updated);
+        await refreshWishlist();
         toast.success('Removed from wishlist ❌');
       } else {
         setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
+        localStorage.setItem('guestWishlist', JSON.stringify(
+          displayWishlist.filter(p => (p._id || p.id) !== productId)
+        ));
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
@@ -204,8 +206,7 @@ function Wishlist() {
     try {
       if (user && token && clearAllWishlist) {
         await clearAllWishlist();
-        await fetchWishlist();
-        setDisplayWishlist([]);
+        await refreshWishlist();
         toast.success('Wishlist cleared 🗑️');
       } else {
         setDisplayWishlist([]);
@@ -256,7 +257,7 @@ function Wishlist() {
   // ============ SKELETON LOADER ============
   const SkeletonCard = () => (
     <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 p-4 animate-pulse">
-      <div className="h-52 bg-gray-200 rounded-lg mb-4"></div>
+      <div className="aspect-square bg-gray-200 rounded-lg mb-4"></div>
       <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
       <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
       <div className="h-5 bg-gray-200 rounded w-1/3 mb-3"></div>
@@ -426,7 +427,7 @@ function Wishlist() {
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
-            {/* ============ HEADER WITH ACTIONS (Styled) ============ */}
+            {/* ============ HEADER WITH ACTIONS ============ */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -441,7 +442,7 @@ function Wishlist() {
               </div>
               
               <div className="flex items-center gap-3 flex-wrap">
-                {/* ===== SHARE BUTTON ===== */}
+                {/* Share Button */}
                 <button
                   onClick={handleShare}
                   className="group relative px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2 overflow-hidden"
@@ -455,7 +456,7 @@ function Wishlist() {
                   <span className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                 </button>
                 
-                {/* ===== CLEAR ALL BUTTON ===== */}
+                {/* Clear All Button */}
                 {wishlistCount > 1 && (
                   <button
                     onClick={handleClearAll}
@@ -498,7 +499,7 @@ function Wishlist() {
                     }`}
                   >
                     <Link to={`/product/${productId}`}>
-                      <div className="relative h-52 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
+                      <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
                         {(product.images?.[0] || product.image) ? (
                           <img 
                             src={product.images?.[0] || product.image} 
@@ -508,7 +509,6 @@ function Wishlist() {
                             decoding="async"
                             width="400"
                             height="400"
-                            style={{ aspectRatio: '1/1' }}
                             onError={(e) => {
                               e.target.src = 'https://placehold.co/400x400/pink/white?text=Product';
                             }}
@@ -536,26 +536,6 @@ function Wishlist() {
                             <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                          )}
-                        </button>
-                        
-                        {/* Quick Add to Cart Badge */}
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleMoveToCart(product);
-                          }}
-                          disabled={isMoving || isRemoving}
-                          className="absolute bottom-3 left-1/2 -translate-x-1/2 w-11/12 bg-white/95 backdrop-blur-sm text-gray-800 py-2.5 rounded-full text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-pink-500 hover:text-white shadow-lg disabled:opacity-50 transform hover:scale-105"
-                        >
-                          {isMoving ? (
-                            <span className="flex items-center justify-center gap-2">
-                              <span className="w-3 h-3 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></span>
-                              Adding...
-                            </span>
-                          ) : (
-                            '🛒 Quick Add'
                           )}
                         </button>
                       </div>
