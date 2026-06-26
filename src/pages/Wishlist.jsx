@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useWishlist } from '../context/WishlistContext';
@@ -10,20 +10,23 @@ import toast from 'react-hot-toast';
 
 function Wishlist() {
   const navigate = useNavigate();
-  const { wishlist, removeFromWishlist, fetchWishlist } = useWishlist();
+  const { wishlist, removeFromWishlist, fetchWishlist, clearAllWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
   const { user, logout, token } = useAuth();
+  
   const [loading, setLoading] = useState(true);
   const [movingProduct, setMovingProduct] = useState(null);
+  const [removingProduct, setRemovingProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   
-  // Use ref to prevent infinite loop
   const isInitialMount = useRef(true);
+  const isGuestRef = useRef(false);
 
-  // Function to get wishlist data
-  const getWishlistData = () => {
+  // ============ HELPER: Get wishlist data ============
+  const getWishlistData = useCallback(() => {
     if (user && token) {
       return Array.isArray(wishlist) ? wishlist : [];
     } else {
@@ -40,9 +43,9 @@ function Wishlist() {
       }
       return [];
     }
-  };
+  }, [user, token, wishlist]);
 
-  // Load wishlist on mount only
+  // ============ LOAD WISHLIST ON MOUNT ============
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -54,22 +57,23 @@ function Wishlist() {
       const data = getWishlistData();
       setDisplayWishlist(data);
       setIsGuest(!user || !token);
+      isGuestRef.current = !user || !token;
       setLoading(false);
     };
     
     loadData();
-  }, []); // Empty dependency array - runs only once on mount
+  }, []); // Only on mount
 
-  // Update display when wishlist context changes (for logged in users)
+  // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
   useEffect(() => {
     if (user && token && !isInitialMount.current) {
       const data = getWishlistData();
       setDisplayWishlist(data);
     }
     isInitialMount.current = false;
-  }, [wishlist, user, token]);
+  }, [wishlist, user, token, getWishlistData]);
 
-  // Listen for storage events (for guest users)
+  // ============ STORAGE EVENT LISTENER (Guest) ============
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'guestWishlist') {
@@ -90,15 +94,116 @@ function Wishlist() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('wishlistUpdated', handleCustomEvent);
     };
-  }, []);
+  }, [getWishlistData]);
 
-  // Save to localStorage when guest wishlist changes
+  // ============ SAVE GUEST WISHLIST TO LOCALSTORAGE ============
   useEffect(() => {
-    if (!user && !token && displayWishlist.length >= 0) {
+    if (!user && !token) {
       localStorage.setItem('guestWishlist', JSON.stringify(displayWishlist));
     }
   }, [displayWishlist, user, token]);
 
+  // ============ HANDLE: Move to Cart ============
+  const handleMoveToCart = async (product) => {
+    const productId = product._id || product.id;
+    if (!productId) return;
+    
+    setMovingProduct(productId);
+    
+    // Add to cart
+    addToCart({
+      id: productId,
+      name: product.name || 'Product',
+      price: product.price || 0,
+      quantity: 1,
+      image: product.images?.[0] || product.image || '',
+      stock: product.stock || 10
+    });
+    
+    toast.success('Added to cart! 🛒');
+    
+    // Remove from wishlist after adding to cart
+    try {
+      if (user && token) {
+        await removeFromWishlist(productId);
+        // Refresh wishlist from backend
+        await fetchWishlist();
+        const updated = getWishlistData();
+        setDisplayWishlist(updated);
+      } else {
+        // Guest: remove from local state
+        setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
+        // Update localStorage
+        localStorage.setItem('guestWishlist', JSON.stringify(
+          displayWishlist.filter(p => (p._id || p.id) !== productId)
+        ));
+      }
+    } catch (error) {
+      console.error('Error removing from wishlist:', error);
+      toast.error('Failed to remove from wishlist');
+    }
+    
+    setTimeout(() => setMovingProduct(null), 500);
+  };
+
+  // ============ HANDLE: Remove Single Item ============
+  const handleRemoveItem = async (productId) => {
+    if (!productId) return;
+    
+    setRemovingProduct(productId);
+    
+    try {
+      if (user && token) {
+        await removeFromWishlist(productId);
+        await fetchWishlist();
+        const updated = getWishlistData();
+        setDisplayWishlist(updated);
+        toast.success('Removed from wishlist ❌');
+      } else {
+        setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
+        toast.success('Removed from wishlist ❌');
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+      toast.error('Failed to remove from wishlist');
+    }
+    
+    setTimeout(() => setRemovingProduct(null), 300);
+  };
+
+  // ============ HANDLE: Clear All Wishlist ============
+  const handleClearAll = async () => {
+    if (displayWishlist.length === 0) {
+      toast.error('Wishlist is already empty');
+      return;
+    }
+    
+    if (!confirm('Are you sure you want to clear your entire wishlist?')) {
+      return;
+    }
+    
+    setIsClearing(true);
+    
+    try {
+      if (user && token && clearAllWishlist) {
+        await clearAllWishlist();
+        await fetchWishlist();
+        setDisplayWishlist([]);
+        toast.success('Wishlist cleared 🗑️');
+      } else {
+        setDisplayWishlist([]);
+        localStorage.setItem('guestWishlist', JSON.stringify([]));
+        toast.success('Wishlist cleared 🗑️');
+      }
+    } catch (error) {
+      console.error('Error clearing wishlist:', error);
+      toast.error('Failed to clear wishlist');
+    }
+    
+    setIsClearing(false);
+  };
+
+  // ============ HANDLE: Search ============
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -111,61 +216,38 @@ function Wishlist() {
     }
   };
 
-  const handleMoveToCart = async (product) => {
-    const productId = product._id || product.id;
-    setMovingProduct(productId);
-    
-    addToCart({
-      id: productId,
-      name: product.name,
-      price: product.price,
-      quantity: 1,
-      image: product.images?.[0] || product.image,
-      stock: product.stock
-    });
-    
-    toast.success('Added to cart!');
-    
-    if (user && token) {
-      await removeFromWishlist(productId);
-      const updated = getWishlistData();
-      setDisplayWishlist(updated);
-    } else {
-      setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
-    }
-    
-    setTimeout(() => setMovingProduct(null), 500);
-  };
-
-  const handleRemoveItem = async (productId) => {
-    if (user && token) {
-      await removeFromWishlist(productId);
-      const updated = getWishlistData();
-      setDisplayWishlist(updated);
-      toast.success('Removed from wishlist');
-    } else {
-      setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
-      toast.success('Removed from wishlist');
+  // ============ HANDLE: Share Wishlist ============
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'My Wishlist 💖',
+          text: `Check out my wishlist on MyPinkShop! ${displayWishlist.length} items ✨`,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Link copied to clipboard! 📋');
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Share error:', error);
+      }
     }
   };
 
-  const wishlistCount = displayWishlist.length;
+  // ============ SKELETON LOADER ============
+  const SkeletonCard = () => (
+    <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 p-4 animate-pulse">
+      <div className="h-52 bg-gray-200 rounded-lg mb-4"></div>
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+      <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
+      <div className="h-5 bg-gray-200 rounded w-1/3 mb-3"></div>
+      <div className="h-9 bg-gray-200 rounded-full w-full"></div>
+    </div>
+  );
 
-  // Force check localStorage on mount for debugging
-  useEffect(() => {
-    const saved = localStorage.getItem('guestWishlist');
-    console.log('🔍 Initial localStorage check:', saved);
-    if (saved && (!user || !token)) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          console.log('✅ Found products in localStorage:', parsed.length);
-          setDisplayWishlist(parsed);
-        }
-      } catch(e) {}
-    }
-  }, []);
-
+  // ============ SEO ============
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -183,14 +265,23 @@ function Wishlist() {
     "logo": "https://www.mypinkshop.com/logo.png"
   });
 
+  const wishlistCount = displayWishlist.length;
+
+  // ============ RENDER ============
   if (loading) {
     return (
       <>
         <Helmet><title>My Wishlist - MyPinkShop</title></Helmet>
-        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading your wishlist...</p>
+        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="mb-6">
+              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
           </div>
         </div>
       </>
@@ -200,8 +291,8 @@ function Wishlist() {
   return (
     <>
       <Helmet>
-        <title>My Wishlist - MyPinkShop | Save Your Favorite Items</title>
-        <meta name="description" content="View and manage your wishlist at MyPinkShop." />
+        <title>My Wishlist ({wishlistCount}) - MyPinkShop</title>
+        <meta name="description" content={`View and manage your wishlist at MyPinkShop. ${wishlistCount} items saved.`} />
         <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
@@ -211,6 +302,7 @@ function Wishlist() {
         
         <OfferBanner />
 
+        {/* ============ HEADER ============ */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -281,6 +373,7 @@ function Wishlist() {
           </div>
         </header>
 
+        {/* ============ BREADCRUMB ============ */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -289,7 +382,8 @@ function Wishlist() {
           </div>
         </div>
 
-        {displayWishlist.length === 0 ? (
+        {/* ============ EMPTY STATE ============ */}
+        {wishlistCount === 0 ? (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
               <div className="text-6xl mb-6">🤍</div>
@@ -310,95 +404,166 @@ function Wishlist() {
             </div>
           </div>
         ) : (
+          /* ============ WISHLIST WITH ITEMS ============ */
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="mb-8">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                My Wishlist 🤍 ({displayWishlist.length} {displayWishlist.length === 1 ? 'item' : 'items'})
-              </h1>
-              {isGuest && (
-                <p className="text-sm text-gray-500 mt-1">
-                  💡 Your wishlist is saved locally. 
-                  <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
-                </p>
-              )}
+            
+            {/* ============ HEADER WITH ACTIONS ============ */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                  My Wishlist 🤍 ({wishlistCount} {wishlistCount === 1 ? 'item' : 'items'})
+                </h1>
+                {isGuest && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    💡 Your wishlist is saved locally. 
+                    <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={handleShare}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm font-medium text-gray-700 transition flex items-center gap-2"
+                >
+                  <span>📤</span> Share
+                </button>
+                
+                {wishlistCount > 1 && (
+                  <button
+                    onClick={handleClearAll}
+                    disabled={isClearing}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-sm font-medium transition flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isClearing ? '⏳ Clearing...' : '🗑️ Clear All'}
+                  </button>
+                )}
+              </div>
             </div>
 
+            {/* ============ PRODUCT GRID ============ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {displayWishlist.map((product, index) => (
-                <div key={product._id || product.id || index} className="group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition hover:-translate-y-1">
-                  <Link to={`/product/${product._id || product.id}`}>
-                    <div className="relative h-52 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
-                      {(product.images?.[0] || product.image) ? (
-                        <img 
-                          src={product.images?.[0] || product.image} 
-                          alt={product.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                          loading="lazy"
-                          decoding="async"
-                          width="400"
-                          height="400"
-                          style={{ aspectRatio: '1/1' }}
-                          onError={(e) => {
-                            e.target.src = 'https://placehold.co/400x400/pink/white?text=Product';
+              {displayWishlist.map((product, index) => {
+                const productId = product._id || product.id;
+                const isMoving = movingProduct === productId;
+                const isRemoving = removingProduct === productId;
+                
+                return (
+                  <div 
+                    key={productId || index} 
+                    className={`group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${
+                      isRemoving ? 'opacity-50 scale-95' : ''
+                    }`}
+                  >
+                    <Link to={`/product/${productId}`}>
+                      <div className="relative h-52 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
+                        {(product.images?.[0] || product.image) ? (
+                          <img 
+                            src={product.images?.[0] || product.image} 
+                            alt={product.name || 'Product'} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                            loading="lazy"
+                            decoding="async"
+                            width="400"
+                            height="400"
+                            style={{ aspectRatio: '1/1' }}
+                            onError={(e) => {
+                              e.target.src = 'https://placehold.co/400x400/pink/white?text=Product';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300 bg-pink-100">
+                            🛍️
+                          </div>
+                        )}
+                        
+                        {/* Remove Button */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveItem(productId);
                           }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300 bg-pink-100">
-                          🛍️
-                        </div>
-                      )}
-                      
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleRemoveItem(product._id || product.id);
-                        }}
-                        className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-100 transition z-10"
-                        aria-label="Remove from wishlist"
-                      >
-                        <span className="text-red-500 text-lg">✕</span>
-                      </button>
-                    </div>
-                  </Link>
-                  
-                  <div className="p-4">
-                    <Link to={`/product/${product._id || product.id}`}>
-                      <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
-                        {product.name}
-                      </h3>
+                          disabled={isRemoving || isMoving}
+                          className="absolute top-3 right-3 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition z-10 disabled:opacity-50"
+                          aria-label="Remove from wishlist"
+                        >
+                          {isRemoving ? (
+                            <span className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></span>
+                          ) : (
+                            <span className="text-red-500 text-lg">✕</span>
+                          )}
+                        </button>
+                        
+                        {/* Quick Add to Cart Badge */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleMoveToCart(product);
+                          }}
+                          disabled={isMoving || isRemoving}
+                          className="absolute bottom-3 left-1/2 -translate-x-1/2 w-11/12 bg-white/95 backdrop-blur-sm text-gray-800 py-2 rounded-full text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-pink-500 hover:text-white shadow-lg disabled:opacity-50"
+                        >
+                          {isMoving ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                              Adding...
+                            </span>
+                          ) : (
+                            '🛒 Quick Add'
+                          )}
+                        </button>
+                      </div>
                     </Link>
                     
-                    <div className="flex items-center gap-1 mt-1">
-                      <div className="flex text-yellow-500 text-xs">
-                        {'★'.repeat(Math.floor(product.rating || 4))}
-                        {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+                    <div className="p-4">
+                      <Link to={`/product/${productId}`}>
+                        <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
+                          {product.name || 'Product'}
+                        </h3>
+                      </Link>
+                      
+                      <div className="flex items-center gap-1 mt-1">
+                        <div className="flex text-yellow-500 text-xs">
+                          {'★'.repeat(Math.floor(product.rating || 4))}
+                          {'☆'.repeat(5 - Math.floor(product.rating || 4))}
+                        </div>
+                        <span className="text-xs text-gray-400">({product.rating || 4})</span>
                       </div>
-                      <span className="text-xs text-gray-400">({product.rating || 4})</span>
+                      
+                      <div className="mt-2">
+                        <span className="text-lg font-bold text-pink-600">₹{product.price || 0}</span>
+                        {product.originalPrice && product.originalPrice > product.price && (
+                          <span className="text-xs text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => handleMoveToCart(product)}
+                        disabled={isMoving || isRemoving}
+                        className={`w-full mt-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                          isMoving
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {isMoving ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                            Adding...
+                          </span>
+                        ) : (
+                          'Move to Cart 🛒'
+                        )}
+                      </button>
                     </div>
-                    
-                    <div className="mt-2">
-                      <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-                      {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="text-xs text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
-                      )}
-                    </div>
-                    
-                    <button
-                      onClick={() => handleMoveToCart(product)}
-                      disabled={movingProduct === (product._id || product.id)}
-                      className={`w-full mt-3 py-2 rounded-full text-sm font-medium transition ${
-                        movingProduct === (product._id || product.id)
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg'
-                      }`}
-                    >
-                      {movingProduct === (product._id || product.id) ? '✓ Added to Cart!' : 'Move to Cart 🛒'}
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
+            {/* ============ CONTINUE SHOPPING ============ */}
             <div className="text-center mt-12">
               <Link 
                 to="/shop" 
@@ -410,6 +575,7 @@ function Wishlist() {
           </div>
         )}
 
+        {/* ============ FOOTER ============ */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
