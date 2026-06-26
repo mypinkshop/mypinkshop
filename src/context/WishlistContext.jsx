@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 
 const WishlistContext = createContext();
@@ -25,7 +25,27 @@ export const WishlistProvider = ({ children }) => {
     }
   };
 
-  // Load wishlist from localStorage and backend
+  // ============ GUEST: Load from localStorage ============
+  const loadGuestWishlist = useCallback(() => {
+    const saved = localStorage.getItem('guestWishlist');
+    console.log('🟢 CONTEXT - Loading guest wishlist:', saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const wishlistData = Array.isArray(parsed) ? parsed : [];
+        setWishlist(wishlistData);
+        setWishlistCount(wishlistData.length);
+      } catch (e) {
+        setWishlist([]);
+        setWishlistCount(0);
+      }
+    } else {
+      setWishlist([]);
+      setWishlistCount(0);
+    }
+  }, []);
+
+  // ============ Load wishlist on mount ============
   useEffect(() => {
     const loadWishlist = async () => {
       setLoading(true);
@@ -53,7 +73,6 @@ export const WishlistProvider = ({ children }) => {
           } else if (response.status === 401) {
             localStorage.removeItem('adminToken');
             localStorage.removeItem('token');
-            // Load from localStorage as guest
             loadGuestWishlist();
           }
         } catch (error) {
@@ -68,37 +87,35 @@ export const WishlistProvider = ({ children }) => {
       setLoading(false);
     };
     
-    const loadGuestWishlist = () => {
-      const saved = localStorage.getItem('guestWishlist');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const wishlistData = Array.isArray(parsed) ? parsed : [];
-          setWishlist(wishlistData);
-          setWishlistCount(wishlistData.length);
-        } catch (e) {
-          setWishlist([]);
-          setWishlistCount(0);
-        }
-      } else {
-        setWishlist([]);
-        setWishlistCount(0);
-      }
-    };
-    
     loadWishlist();
     
     // Listen for storage changes (for sync across tabs)
     const handleStorageChange = (e) => {
       if (e.key === 'guestWishlist') {
+        console.log('🟢 CONTEXT - Storage event detected');
         loadGuestWishlist();
       }
     };
     window.addEventListener('storage', handleStorageChange);
     
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    // Listen for custom event
+    const handleCustomEvent = () => {
+      console.log('🟢 CONTEXT - Custom event detected');
+      const token = getToken();
+      const user = getUser();
+      if (!token || !user) {
+        loadGuestWishlist();
+      }
+    };
+    window.addEventListener('wishlistUpdated', handleCustomEvent);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('wishlistUpdated', handleCustomEvent);
+    };
+  }, [loadGuestWishlist]);
 
+  // ============ ADD TO WISHLIST ============
   const addToWishlist = async (product) => {
     const productId = product._id || product.id;
     
@@ -128,10 +145,10 @@ export const WishlistProvider = ({ children }) => {
     
     // Save to localStorage (for guest and backup)
     localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
+    console.log('🟢 CONTEXT - Added to guest wishlist:', newWishlist);
     
     // Dispatch event for other components
     window.dispatchEvent(new CustomEvent('wishlistUpdated'));
-    window.dispatchEvent(new Event('storage'));
     
     // If user is logged in, save to backend
     const token = getToken();
@@ -157,65 +174,97 @@ export const WishlistProvider = ({ children }) => {
     toast.success(`${product.name} added to wishlist ❤️`);
   };
 
+  // ============ REMOVE FROM WISHLIST ============
   const removeFromWishlist = async (id) => {
-    const newWishlist = wishlist.filter(item => (item._id !== id && item.id !== id));
-    setWishlist(newWishlist);
-    setWishlistCount(newWishlist.length);
+    console.log('🟢 CONTEXT - removeFromWishlist:', id);
     
-    // Save to localStorage
-    localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
-    
-    // Dispatch event for other components
-    window.dispatchEvent(new CustomEvent('wishlistUpdated'));
-    window.dispatchEvent(new Event('storage'));
-    
-    // If user is logged in, remove from backend
     const token = getToken();
-    if (token) {
-      try {
-        const response = await fetch(`${API_URL}/api/wishlist/${id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-          console.error('Failed to remove from backend');
+    const user = getUser();
+    
+    // Guest mode - handle locally
+    if (!token || !user) {
+      console.log('🟢 CONTEXT - Guest mode remove');
+      const saved = localStorage.getItem('guestWishlist');
+      let currentList = [];
+      if (saved) {
+        try {
+          currentList = JSON.parse(saved);
+          if (!Array.isArray(currentList)) currentList = [];
+        } catch (e) {
+          currentList = [];
         }
-      } catch (error) {
-        console.error('Error removing from backend wishlist:', error);
       }
+      const newWishlist = currentList.filter(item => (item._id !== id && item.id !== id));
+      console.log('🟢 CONTEXT - New guest wishlist:', newWishlist);
+      
+      setWishlist(newWishlist);
+      setWishlistCount(newWishlist.length);
+      localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
+      
+      // Dispatch event
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+      toast.success('Removed from wishlist');
+      return;
     }
     
-    toast.success('Removed from wishlist');
+    // Logged in user - remove from backend
+    try {
+      const response = await fetch(`${API_URL}/api/wishlist/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const newWishlist = wishlist.filter(item => (item._id !== id && item.id !== id));
+        setWishlist(newWishlist);
+        setWishlistCount(newWishlist.length);
+        localStorage.setItem('guestWishlist', JSON.stringify(newWishlist));
+        window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+        toast.success('Removed from wishlist');
+      } else {
+        toast.error('Failed to remove from wishlist');
+      }
+    } catch (error) {
+      console.error('Error removing from backend wishlist:', error);
+      toast.error('Failed to remove from wishlist');
+    }
   };
 
+  // ============ IS IN WISHLIST ============
   const isInWishlist = (id) => {
     return wishlist.some(item => (item._id === id || item.id === id));
   };
 
+  // ============ CLEAR WISHLIST ============
   const clearWishlist = async () => {
-    setWishlist([]);
-    setWishlistCount(0);
-    localStorage.removeItem('guestWishlist');
-    localStorage.removeItem('pinkWishlist');
-    
-    // Dispatch event
-    window.dispatchEvent(new CustomEvent('wishlistUpdated'));
-    window.dispatchEvent(new Event('storage'));
-    
     const token = getToken();
-    if (token) {
-      try {
-        await fetch(`${API_URL}/api/wishlist/clear/all`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      } catch (error) {
-        console.error('Error clearing wishlist:', error);
-      }
+    const user = getUser();
+    
+    if (!token || !user) {
+      // Guest mode
+      setWishlist([]);
+      setWishlistCount(0);
+      localStorage.removeItem('guestWishlist');
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+      toast.success('Wishlist cleared');
+      return;
     }
     
-    toast.success('Wishlist cleared');
+    // Logged in user
+    try {
+      await fetch(`${API_URL}/api/wishlist/clear/all`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setWishlist([]);
+      setWishlistCount(0);
+      localStorage.removeItem('guestWishlist');
+      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
+      toast.success('Wishlist cleared');
+    } catch (error) {
+      console.error('Error clearing wishlist:', error);
+      toast.error('Failed to clear wishlist');
+    }
   };
 
   return (
