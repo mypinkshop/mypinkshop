@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VendorSidebar from './components/VendorSidebar';
 import VendorHeader from './components/VendorHeader';
+import toast from 'react-hot-toast';
 
 function VendorProfile() {
   const navigate = useNavigate();
@@ -45,7 +46,6 @@ function VendorProfile() {
     fetchVendorProfile(token);
   }, [navigate]);
 
-  // ✅ Fetch vendor profile
   const fetchVendorProfile = async (token) => {
     try {
       setLoading(true);
@@ -83,16 +83,17 @@ function VendorProfile() {
         });
       } else {
         setError(data.message || 'Failed to load profile');
+        toast.error(data.message || 'Failed to load profile');
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
       setError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Handle input change
   const handleChange = (e) => {
     const { name, value } = e.target;
     
@@ -113,7 +114,6 @@ function VendorProfile() {
     }
   };
 
-  // ✅ Update profile
   const updateProfile = async (e) => {
     e.preventDefault();
     
@@ -150,7 +150,8 @@ function VendorProfile() {
 
       if (data.success) {
         setSuccess('✅ Profile updated successfully!');
-        // Update localStorage
+        toast.success('✅ Profile updated successfully!');
+        
         const vendor = JSON.parse(localStorage.getItem('vendor') || '{}');
         vendor.name = formData.name;
         vendor.brandName = formData.brandName;
@@ -160,10 +161,12 @@ function VendorProfile() {
         setTimeout(() => setSuccess(''), 3000);
       } else {
         setError(data.message || 'Failed to update profile');
+        toast.error(data.message || 'Failed to update profile');
       }
     } catch (err) {
       console.error('Error updating profile:', err);
       setError('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -401,6 +404,20 @@ function VendorProfile() {
                 </div>
               </div>
             </div>
+
+            {/* ✅ FIXED: Address Display - Alag-alag fields mein */}
+            {vendorInfo && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-semibold text-gray-800 mb-3">📍 Current Address</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <p className="text-gray-600"><strong>Street:</strong> {vendorInfo.address?.street || 'N/A'}</p>
+                  <p className="text-gray-600"><strong>City:</strong> {vendorInfo.address?.city || 'N/A'}</p>
+                  <p className="text-gray-600"><strong>State:</strong> {vendorInfo.address?.state || 'N/A'}</p>
+                  <p className="text-gray-600"><strong>Pincode:</strong> {vendorInfo.address?.pincode || 'N/A'}</p>
+                  <p className="text-gray-600"><strong>Country:</strong> {vendorInfo.address?.country || 'India'}</p>
+                </div>
+              </div>
+            )}
 
             {/* Submit Button */}
             <div className="flex justify-end gap-3">
