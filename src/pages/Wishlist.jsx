@@ -23,60 +23,47 @@ function Wishlist() {
   const [isGuest, setIsGuest] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // ============ GUEST: Get from localStorage ============
-  const getGuestWishlist = useCallback(() => {
-    try {
-      const saved = localStorage.getItem('guestWishlist');
-      console.log('🟢 getGuestWishlist - Raw:', saved);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-        if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
-        if (parsed.wishlist && Array.isArray(parsed.wishlist)) return parsed.wishlist;
-      }
-    } catch (e) {
-      console.error('Error parsing wishlist:', e);
-    }
-    return [];
-  }, []);
-
-  // ============ GUEST: Save to localStorage ============
-  const saveGuestWishlist = useCallback((data) => {
-    console.log('🟢 saveGuestWishlist - Saving:', data);
-    localStorage.setItem('guestWishlist', JSON.stringify(data));
-    const saved = localStorage.getItem('guestWishlist');
-    console.log('🟢 saveGuestWishlist - Verified:', saved);
-  }, []);
-
   // ============ LOAD WISHLIST ============
   const loadWishlist = useCallback(async () => {
     console.log('🟢 loadWishlist - Starting...');
     
     if (user && token) {
+      // Logged in user
       console.log('🟢 loadWishlist - Logged in user');
       if (fetchWishlist) {
-        await fetchWishlist();
-        // ✅ After fetch, use context wishlist
-        const data = Array.isArray(wishlist) ? [...wishlist] : [];
-        console.log('🟢 loadWishlist - Fetched:', data.length, 'items');
-        setDisplayWishlist(data);
+        const data = await fetchWishlist();
+        console.log('🟢 loadWishlist - Fetched:', data?.length || 0, 'items');
+        setDisplayWishlist(data || []);
       }
     } else {
-      console.log('🟢 loadWishlist - Guest user - Using localStorage ONLY');
-      // ✅ Guest: ALWAYS use localStorage, ignore context
-      const data = getGuestWishlist();
-      console.log('🟢 loadWishlist - Got:', data.length, 'items');
-      setDisplayWishlist(data);
+      // Guest user - load from localStorage
+      console.log('🟢 loadWishlist - Guest user');
+      const saved = localStorage.getItem('guestWishlist');
+      console.log('🟢 loadWishlist - Raw:', saved);
+      try {
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const data = Array.isArray(parsed) ? parsed : [];
+          setDisplayWishlist(data);
+          console.log('🟢 loadWishlist - Got:', data.length, 'items');
+        } else {
+          setDisplayWishlist([]);
+          console.log('🟢 loadWishlist - Got: 0 items');
+        }
+      } catch (e) {
+        console.error('Error parsing wishlist:', e);
+        setDisplayWishlist([]);
+      }
     }
     setLoading(false);
-  }, [user, token, fetchWishlist, wishlist, getGuestWishlist]);
+  }, [user, token, fetchWishlist]);
 
   // ============ MOUNT ============
   useEffect(() => {
     console.log('🟢 useEffect - Mount');
     setIsGuest(!user || !token);
     loadWishlist();
-  }, []); // ✅ Empty dependency - runs only once on mount
+  }, []); // ✅ Only once on mount
 
   // ============ UPDATE ON CONTEXT CHANGE (ONLY FOR LOGGED IN) ============
   useEffect(() => {
@@ -86,29 +73,6 @@ function Wishlist() {
       setDisplayWishlist(data);
     }
   }, [wishlist, user, token, loading]);
-
-  // ============ REFRESH ON ROUTE CHANGE ============
-  useEffect(() => {
-    if (!loading) {
-      console.log('🟢 useEffect - Route changed, reloading wishlist');
-      loadWishlist();
-    }
-  }, [location.pathname, loadWishlist, loading]);
-
-  // ============ REFRESH ON TAB VISIBILITY ============
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !loading) {
-        console.log('🟢 useEffect - Tab visible, reloading wishlist');
-        loadWishlist();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [loadWishlist, loading]);
 
   // ============ HANDLE: Remove Single Item ============
   const handleRemoveItem = async (productId) => {
@@ -121,10 +85,8 @@ function Wishlist() {
       if (user && token) {
         console.log('🟢 handleRemoveItem - Logged in user');
         await removeFromWishlist(productId);
-        await fetchWishlist();
-        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
-        console.log('🟢 handleRemoveItem - Updated:', updated.length, 'items');
-        setDisplayWishlist(updated);
+        const data = await fetchWishlist();
+        setDisplayWishlist(data || []);
         toast.success('Removed from wishlist ❌');
       } else {
         console.log('🟢 handleRemoveItem - Guest user');
@@ -137,7 +99,7 @@ function Wishlist() {
         
         // ✅ Update state AND localStorage
         setDisplayWishlist(updatedList);
-        saveGuestWishlist(updatedList);
+        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
@@ -171,10 +133,8 @@ function Wishlist() {
       if (user && token) {
         console.log('🟢 handleMoveToCart - Logged in user');
         await removeFromWishlist(productId);
-        await fetchWishlist();
-        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
-        console.log('🟢 handleMoveToCart - Updated:', updated.length, 'items');
-        setDisplayWishlist(updated);
+        const data = await fetchWishlist();
+        setDisplayWishlist(data || []);
       } else {
         console.log('🟢 handleMoveToCart - Guest user');
         const currentList = [...displayWishlist];
@@ -185,7 +145,7 @@ function Wishlist() {
         console.log('🟢 handleMoveToCart - Updated List:', updatedList);
         
         setDisplayWishlist(updatedList);
-        saveGuestWishlist(updatedList);
+        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
       }
     } catch (error) {
       console.error('Error:', error);
@@ -211,13 +171,12 @@ function Wishlist() {
     try {
       if (user && token && clearAllWishlist) {
         await clearAllWishlist();
-        await fetchWishlist();
-        const updated = Array.isArray(wishlist) ? [...wishlist] : [];
-        setDisplayWishlist(updated);
+        const data = await fetchWishlist();
+        setDisplayWishlist(data || []);
         toast.success('Wishlist cleared 🗑️');
       } else {
         setDisplayWishlist([]);
-        saveGuestWishlist([]);
+        localStorage.removeItem('guestWishlist');
         toast.success('Wishlist cleared 🗑️');
       }
     } catch (error) {
