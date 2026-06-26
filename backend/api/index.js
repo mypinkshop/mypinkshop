@@ -37,6 +37,7 @@ const corsOptions = {
   origin: [
     'https://www.mypinkshop.com',
     'https://mypinkshop.com',
+    'https://api.mypinkshop.com',
     'https://mypinkshop.vercel.app',
     'http://localhost:3000',
     'http://localhost:8081',
@@ -53,6 +54,7 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'https://www.mypinkshop.com',
     'https://mypinkshop.com',
+    'https://api.mypinkshop.com',
     'https://mypinkshop.vercel.app',
     'http://localhost:3000',
     'http://localhost:8081'
