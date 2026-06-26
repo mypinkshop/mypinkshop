@@ -45,28 +45,44 @@ function Wishlist() {
     }
   }, [user, token, wishlist]);
 
-  // ============ REFRESH FUNCTION ============
+  // ============ REFRESH FUNCTION (Force Update) ============
   const refreshWishlist = useCallback(async () => {
     if (user && token && fetchWishlist) {
       await fetchWishlist();
-      const data = getWishlistData();
+      // ✅ Force update from wishlist context after fetch
+      const data = Array.isArray(wishlist) ? wishlist : [];
       setDisplayWishlist(data);
     } else {
       const data = getWishlistData();
       setDisplayWishlist(data);
     }
-  }, [user, token, fetchWishlist, getWishlistData]);
+  }, [user, token, fetchWishlist, wishlist, getWishlistData]);
 
   // ============ LOAD WISHLIST ON MOUNT ============
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await refreshWishlist();
+      if (user && token && fetchWishlist) {
+        await fetchWishlist();
+        const data = Array.isArray(wishlist) ? wishlist : [];
+        setDisplayWishlist(data);
+      } else {
+        const data = getWishlistData();
+        setDisplayWishlist(data);
+      }
       setIsGuest(!user || !token);
       setLoading(false);
     };
     loadData();
   }, []);
+
+  // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
+  useEffect(() => {
+    if (user && token) {
+      const data = Array.isArray(wishlist) ? wishlist : [];
+      setDisplayWishlist(data);
+    }
+  }, [wishlist, user, token]);
 
   // ============ REFRESH ON ROUTE CHANGE ============
   useEffect(() => {
@@ -89,14 +105,6 @@ function Wishlist() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refreshWishlist]);
-
-  // ============ UPDATE WHEN WISHLIST CONTEXT CHANGES ============
-  useEffect(() => {
-    if (user && token) {
-      const data = getWishlistData();
-      setDisplayWishlist(data);
-    }
-  }, [wishlist, user, token, getWishlistData]);
 
   // ============ STORAGE EVENT LISTENER ============
   useEffect(() => {
@@ -149,12 +157,14 @@ function Wishlist() {
     try {
       if (user && token) {
         await removeFromWishlist(productId);
-        await refreshWishlist();
+        await fetchWishlist();
+        // ✅ Force update after fetch
+        const updated = Array.isArray(wishlist) ? wishlist : [];
+        setDisplayWishlist(updated);
       } else {
-        setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
-        localStorage.setItem('guestWishlist', JSON.stringify(
-          displayWishlist.filter(p => (p._id || p.id) !== productId)
-        ));
+        const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
+        setDisplayWishlist(updatedList);
+        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
       }
     } catch (error) {
       console.error('Error removing from wishlist:', error);
@@ -173,13 +183,15 @@ function Wishlist() {
     try {
       if (user && token) {
         await removeFromWishlist(productId);
-        await refreshWishlist();
+        await fetchWishlist();
+        // ✅ Force update after fetch
+        const updated = Array.isArray(wishlist) ? wishlist : [];
+        setDisplayWishlist(updated);
         toast.success('Removed from wishlist ❌');
       } else {
-        setDisplayWishlist(prev => prev.filter(p => (p._id || p.id) !== productId));
-        localStorage.setItem('guestWishlist', JSON.stringify(
-          displayWishlist.filter(p => (p._id || p.id) !== productId)
-        ));
+        const updatedList = displayWishlist.filter(p => (p._id || p.id) !== productId);
+        setDisplayWishlist(updatedList);
+        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
@@ -206,7 +218,9 @@ function Wishlist() {
     try {
       if (user && token && clearAllWishlist) {
         await clearAllWishlist();
-        await refreshWishlist();
+        await fetchWishlist();
+        const updated = Array.isArray(wishlist) ? wishlist : [];
+        setDisplayWishlist(updated);
         toast.success('Wishlist cleared 🗑️');
       } else {
         setDisplayWishlist([]);
