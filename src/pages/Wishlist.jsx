@@ -11,7 +11,6 @@ import toast from 'react-hot-toast';
 function Wishlist() {
   const navigate = useNavigate();
   const location = useLocation();
-  // ✅ FIXED: clearAllWishlist → clearWishlist
   const { wishlist, removeFromWishlist, fetchWishlist, clearWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
   const { user, logout, token } = useAuth();
@@ -23,6 +22,31 @@ function Wishlist() {
   const [displayWishlist, setDisplayWishlist] = useState([]);
   const [isGuest, setIsGuest] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+
+  // ============ GUEST: Get from localStorage ============
+  const getGuestWishlist = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('guestWishlist');
+      console.log('🟢 getGuestWishlist - Raw:', saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed.items && Array.isArray(parsed.items)) return parsed.items;
+        if (parsed.wishlist && Array.isArray(parsed.wishlist)) return parsed.wishlist;
+      }
+    } catch (e) {
+      console.error('Error parsing wishlist:', e);
+    }
+    return [];
+  }, []);
+
+  // ============ GUEST: Save to localStorage ============
+  const saveGuestWishlist = useCallback((data) => {
+    console.log('🟢 saveGuestWishlist - Saving:', data);
+    localStorage.setItem('guestWishlist', JSON.stringify(data));
+    const saved = localStorage.getItem('guestWishlist');
+    console.log('🟢 saveGuestWishlist - Verified:', saved);
+  }, []);
 
   // ============ LOAD WISHLIST ============
   const loadWishlist = useCallback(async () => {
@@ -36,13 +60,14 @@ function Wishlist() {
         setDisplayWishlist(data || []);
       }
     } else {
-      console.log('🟢 loadWishlist - Guest user - Using context');
-      const data = Array.isArray(wishlist) ? [...wishlist] : [];
+      // ✅ GUEST: Directly from localStorage, ignore context
+      console.log('🟢 loadWishlist - Guest user - Using localStorage ONLY');
+      const data = getGuestWishlist();
       console.log('🟢 loadWishlist - Got:', data.length, 'items');
       setDisplayWishlist(data);
     }
     setLoading(false);
-  }, [user, token, fetchWishlist, wishlist]);
+  }, [user, token, fetchWishlist, getGuestWishlist]);
 
   // ============ MOUNT ============
   useEffect(() => {
@@ -51,14 +76,14 @@ function Wishlist() {
     loadWishlist();
   }, []);
 
-  // ============ UPDATE ON CONTEXT CHANGE ============
+  // ============ UPDATE ON CONTEXT CHANGE (ONLY FOR LOGGED IN) ============
   useEffect(() => {
-    if (!loading) {
+    if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      console.log('🟢 useEffect - Context changed:', data.length, 'items');
+      console.log('🟢 useEffect - Context changed for logged in user:', data.length, 'items');
       setDisplayWishlist(data);
     }
-  }, [wishlist, loading]);
+  }, [wishlist, user, token, loading]);
 
   // ============ HANDLE: Remove Single Item ============
   const handleRemoveItem = async (productId) => {
@@ -68,10 +93,25 @@ function Wishlist() {
     setRemovingProduct(productId);
     
     try {
-      await removeFromWishlist(productId);
-      const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      setDisplayWishlist(data);
-      toast.success('Removed from wishlist ❌');
+      if (user && token) {
+        console.log('🟢 handleRemoveItem - Logged in user');
+        await removeFromWishlist(productId);
+        const data = await fetchWishlist();
+        setDisplayWishlist(data || []);
+        toast.success('Removed from wishlist ❌');
+      } else {
+        // ✅ GUEST: Manually remove from state and localStorage
+        console.log('🟢 handleRemoveItem - Guest user');
+        const currentList = [...displayWishlist];
+        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
+        
+        console.log('🟢 handleRemoveItem - Before:', currentList.length, 'items');
+        console.log('🟢 handleRemoveItem - After:', updatedList.length, 'items');
+        
+        setDisplayWishlist(updatedList);
+        saveGuestWishlist(updatedList);
+        toast.success('Removed from wishlist ❌');
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
@@ -100,9 +140,23 @@ function Wishlist() {
     toast.success('Added to cart! 🛒');
     
     try {
-      await removeFromWishlist(productId);
-      const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      setDisplayWishlist(data);
+      if (user && token) {
+        console.log('🟢 handleMoveToCart - Logged in user');
+        await removeFromWishlist(productId);
+        const data = await fetchWishlist();
+        setDisplayWishlist(data || []);
+      } else {
+        // ✅ GUEST: Manually remove from state and localStorage
+        console.log('🟢 handleMoveToCart - Guest user');
+        const currentList = [...displayWishlist];
+        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
+        
+        console.log('🟢 handleMoveToCart - Before:', currentList.length, 'items');
+        console.log('🟢 handleMoveToCart - After:', updatedList.length, 'items');
+        
+        setDisplayWishlist(updatedList);
+        saveGuestWishlist(updatedList);
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
@@ -125,11 +179,19 @@ function Wishlist() {
     setIsClearing(true);
     
     try {
-      // ✅ FIXED: clearAllWishlist → clearWishlist
-      await clearWishlist();
-      const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      setDisplayWishlist(data);
-      toast.success('Wishlist cleared 🗑️');
+      if (user && token) {
+        console.log('🟢 handleClearAll - Logged in user');
+        await clearWishlist();
+        const data = await fetchWishlist();
+        setDisplayWishlist(data || []);
+        toast.success('Wishlist cleared 🗑️');
+      } else {
+        // ✅ GUEST: Clear state and localStorage
+        console.log('🟢 handleClearAll - Guest user');
+        setDisplayWishlist([]);
+        saveGuestWishlist([]);
+        toast.success('Wishlist cleared 🗑️');
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to clear wishlist');
