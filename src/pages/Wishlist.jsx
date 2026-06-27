@@ -11,7 +11,8 @@ import toast from 'react-hot-toast';
 function Wishlist() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { wishlist, removeFromWishlist, fetchWishlist, clearAllWishlist } = useWishlist();
+  // ✅ FIXED: clearAllWishlist → clearWishlist
+  const { wishlist, removeFromWishlist, fetchWishlist, clearWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
   const { user, logout, token } = useAuth();
   
@@ -28,7 +29,6 @@ function Wishlist() {
     console.log('🟢 loadWishlist - Starting...');
     
     if (user && token) {
-      // Logged in user
       console.log('🟢 loadWishlist - Logged in user');
       if (fetchWishlist) {
         const data = await fetchWishlist();
@@ -36,7 +36,6 @@ function Wishlist() {
         setDisplayWishlist(data || []);
       }
     } else {
-      // Guest user - load from context (which syncs with localStorage)
       console.log('🟢 loadWishlist - Guest user - Using context');
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
       console.log('🟢 loadWishlist - Got:', data.length, 'items');
@@ -69,10 +68,7 @@ function Wishlist() {
     setRemovingProduct(productId);
     
     try {
-      // ✅ Use context function for both logged in and guest
       await removeFromWishlist(productId);
-      
-      // ✅ Refresh display from context
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
       setDisplayWishlist(data);
       toast.success('Removed from wishlist ❌');
@@ -104,10 +100,7 @@ function Wishlist() {
     toast.success('Added to cart! 🛒');
     
     try {
-      // ✅ Use context function for both logged in and guest
       await removeFromWishlist(productId);
-      
-      // ✅ Refresh display from context
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
       setDisplayWishlist(data);
     } catch (error) {
@@ -132,10 +125,8 @@ function Wishlist() {
     setIsClearing(true);
     
     try {
-      // ✅ Use context function for both logged in and guest
-      await clearAllWishlist();
-      
-      // ✅ Refresh display from context
+      // ✅ FIXED: clearAllWishlist → clearWishlist
+      await clearWishlist();
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
       setDisplayWishlist(data);
       toast.success('Wishlist cleared 🗑️');
