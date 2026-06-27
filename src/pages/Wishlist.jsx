@@ -36,43 +36,30 @@ function Wishlist() {
         setDisplayWishlist(data || []);
       }
     } else {
-      // Guest user - load from localStorage
-      console.log('🟢 loadWishlist - Guest user');
-      const saved = localStorage.getItem('guestWishlist');
-      console.log('🟢 loadWishlist - Raw:', saved);
-      try {
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const data = Array.isArray(parsed) ? parsed : [];
-          setDisplayWishlist(data);
-          console.log('🟢 loadWishlist - Got:', data.length, 'items');
-        } else {
-          setDisplayWishlist([]);
-          console.log('🟢 loadWishlist - Got: 0 items');
-        }
-      } catch (e) {
-        console.error('Error parsing wishlist:', e);
-        setDisplayWishlist([]);
-      }
+      // Guest user - load from context (which syncs with localStorage)
+      console.log('🟢 loadWishlist - Guest user - Using context');
+      const data = Array.isArray(wishlist) ? [...wishlist] : [];
+      console.log('🟢 loadWishlist - Got:', data.length, 'items');
+      setDisplayWishlist(data);
     }
     setLoading(false);
-  }, [user, token, fetchWishlist]);
+  }, [user, token, fetchWishlist, wishlist]);
 
   // ============ MOUNT ============
   useEffect(() => {
     console.log('🟢 useEffect - Mount');
     setIsGuest(!user || !token);
     loadWishlist();
-  }, []); // ✅ Only once on mount
+  }, []);
 
-  // ============ UPDATE ON CONTEXT CHANGE (ONLY FOR LOGGED IN) ============
+  // ============ UPDATE ON CONTEXT CHANGE ============
   useEffect(() => {
-    if (user && token && !loading) {
+    if (!loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      console.log('🟢 useEffect - Context changed for logged in user:', data.length, 'items');
+      console.log('🟢 useEffect - Context changed:', data.length, 'items');
       setDisplayWishlist(data);
     }
-  }, [wishlist, user, token, loading]);
+  }, [wishlist, loading]);
 
   // ============ HANDLE: Remove Single Item ============
   const handleRemoveItem = async (productId) => {
@@ -82,26 +69,13 @@ function Wishlist() {
     setRemovingProduct(productId);
     
     try {
-      if (user && token) {
-        console.log('🟢 handleRemoveItem - Logged in user');
-        await removeFromWishlist(productId);
-        const data = await fetchWishlist();
-        setDisplayWishlist(data || []);
-        toast.success('Removed from wishlist ❌');
-      } else {
-        console.log('🟢 handleRemoveItem - Guest user');
-        const currentList = [...displayWishlist];
-        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
-        
-        console.log('🟢 handleRemoveItem - Before:', currentList.length, 'items');
-        console.log('🟢 handleRemoveItem - After:', updatedList.length, 'items');
-        console.log('🟢 handleRemoveItem - Updated List:', updatedList);
-        
-        // ✅ Update state AND localStorage
-        setDisplayWishlist(updatedList);
-        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
-        toast.success('Removed from wishlist ❌');
-      }
+      // ✅ Use context function for both logged in and guest
+      await removeFromWishlist(productId);
+      
+      // ✅ Refresh display from context
+      const data = Array.isArray(wishlist) ? [...wishlist] : [];
+      setDisplayWishlist(data);
+      toast.success('Removed from wishlist ❌');
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
@@ -130,23 +104,12 @@ function Wishlist() {
     toast.success('Added to cart! 🛒');
     
     try {
-      if (user && token) {
-        console.log('🟢 handleMoveToCart - Logged in user');
-        await removeFromWishlist(productId);
-        const data = await fetchWishlist();
-        setDisplayWishlist(data || []);
-      } else {
-        console.log('🟢 handleMoveToCart - Guest user');
-        const currentList = [...displayWishlist];
-        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
-        
-        console.log('🟢 handleMoveToCart - Before:', currentList.length, 'items');
-        console.log('🟢 handleMoveToCart - After:', updatedList.length, 'items');
-        console.log('🟢 handleMoveToCart - Updated List:', updatedList);
-        
-        setDisplayWishlist(updatedList);
-        localStorage.setItem('guestWishlist', JSON.stringify(updatedList));
-      }
+      // ✅ Use context function for both logged in and guest
+      await removeFromWishlist(productId);
+      
+      // ✅ Refresh display from context
+      const data = Array.isArray(wishlist) ? [...wishlist] : [];
+      setDisplayWishlist(data);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
@@ -169,16 +132,13 @@ function Wishlist() {
     setIsClearing(true);
     
     try {
-      if (user && token && clearAllWishlist) {
-        await clearAllWishlist();
-        const data = await fetchWishlist();
-        setDisplayWishlist(data || []);
-        toast.success('Wishlist cleared 🗑️');
-      } else {
-        setDisplayWishlist([]);
-        localStorage.removeItem('guestWishlist');
-        toast.success('Wishlist cleared 🗑️');
-      }
+      // ✅ Use context function for both logged in and guest
+      await clearAllWishlist();
+      
+      // ✅ Refresh display from context
+      const data = Array.isArray(wishlist) ? [...wishlist] : [];
+      setDisplayWishlist(data);
+      toast.success('Wishlist cleared 🗑️');
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to clear wishlist');
