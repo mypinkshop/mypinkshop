@@ -53,6 +53,7 @@ function Wishlist() {
     console.log('🟢 loadWishlist - Starting...');
     
     if (user && token) {
+      // Logged in user
       console.log('🟢 loadWishlist - Logged in user');
       if (fetchWishlist) {
         const data = await fetchWishlist();
@@ -60,7 +61,7 @@ function Wishlist() {
         setDisplayWishlist(data || []);
       }
     } else {
-      // ✅ GUEST: Directly from localStorage, ignore context
+      // ✅ GUEST: Directly from localStorage - IGNORE CONTEXT
       console.log('🟢 loadWishlist - Guest user - Using localStorage ONLY');
       const data = getGuestWishlist();
       console.log('🟢 loadWishlist - Got:', data.length, 'items');
@@ -78,6 +79,7 @@ function Wishlist() {
 
   // ============ UPDATE ON CONTEXT CHANGE (ONLY FOR LOGGED IN) ============
   useEffect(() => {
+    // ✅ ONLY for logged in users - Guest mode IGNORE context
     if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
       console.log('🟢 useEffect - Context changed for logged in user:', data.length, 'items');
@@ -94,22 +96,27 @@ function Wishlist() {
     
     try {
       if (user && token) {
+        // Logged in user
         console.log('🟢 handleRemoveItem - Logged in user');
         await removeFromWishlist(productId);
         const data = await fetchWishlist();
         setDisplayWishlist(data || []);
         toast.success('Removed from wishlist ❌');
       } else {
-        // ✅ GUEST: Manually remove from state and localStorage
+        // ✅ GUEST: Manually update localStorage and state
         console.log('🟢 handleRemoveItem - Guest user');
-        const currentList = [...displayWishlist];
-        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
+        const currentList = getGuestWishlist();
+        const updatedList = currentList.filter(p => (p._id !== productId && p.id !== productId));
         
         console.log('🟢 handleRemoveItem - Before:', currentList.length, 'items');
         console.log('🟢 handleRemoveItem - After:', updatedList.length, 'items');
         
+        // ✅ Update state
         setDisplayWishlist(updatedList);
+        
+        // ✅ Save to localStorage
         saveGuestWishlist(updatedList);
+        
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
@@ -141,15 +148,16 @@ function Wishlist() {
     
     try {
       if (user && token) {
+        // Logged in user
         console.log('🟢 handleMoveToCart - Logged in user');
         await removeFromWishlist(productId);
         const data = await fetchWishlist();
         setDisplayWishlist(data || []);
       } else {
-        // ✅ GUEST: Manually remove from state and localStorage
+        // ✅ GUEST: Manually update localStorage and state
         console.log('🟢 handleMoveToCart - Guest user');
-        const currentList = [...displayWishlist];
-        const updatedList = currentList.filter(p => (p._id || p.id) !== productId);
+        const currentList = getGuestWishlist();
+        const updatedList = currentList.filter(p => (p._id !== productId && p.id !== productId));
         
         console.log('🟢 handleMoveToCart - Before:', currentList.length, 'items');
         console.log('🟢 handleMoveToCart - After:', updatedList.length, 'items');
@@ -180,13 +188,14 @@ function Wishlist() {
     
     try {
       if (user && token) {
+        // Logged in user
         console.log('🟢 handleClearAll - Logged in user');
         await clearWishlist();
         const data = await fetchWishlist();
         setDisplayWishlist(data || []);
         toast.success('Wishlist cleared 🗑️');
       } else {
-        // ✅ GUEST: Clear state and localStorage
+        // ✅ GUEST: Clear localStorage and state
         console.log('🟢 handleClearAll - Guest user');
         setDisplayWishlist([]);
         saveGuestWishlist([]);
