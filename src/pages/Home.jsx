@@ -8,13 +8,24 @@ import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
-// Optimized Product Card Component
-const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
+// ============ FIXED: ProductCard - Guest Wishlist ============
+const ProductCard = ({ 
+  product, 
+  addToCart, 
+  isInWishlist, 
+  addToWishlist, 
+  removeFromWishlist, 
+  user,
+  wishlistContext 
+}) => {
   const navigate = useNavigate();
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+
+  // ✅ Guest wishlist from context
+  const contextWishlist = wishlistContext || [];
 
   // Optimize image URL - smaller size for faster loading
   const getOptimizedImage = (url) => {
@@ -25,36 +36,24 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     return url;
   };
 
+  // ✅ Check wishlist status - uses context for guest
+  const checkWishlistStatus = useCallback(() => {
+    const productId = product._id || product.id;
+    
+    if (user) {
+      setIsWishlisted(isInWishlist(productId));
+    } else {
+      // Guest: Check from context wishlist (which is synced with localStorage)
+      const exists = contextWishlist.some(item => (item._id === productId || item.id === productId));
+      setIsWishlisted(exists);
+    }
+  }, [product, user, isInWishlist, contextWishlist]);
+
   useEffect(() => {
-    const checkWishlist = () => {
-      if (user) {
-        setIsWishlisted(isInWishlist(product._id || product.id));
-      } else {
-        const saved = localStorage.getItem('guestWishlist');
-        if (saved) {
-          try {
-            const wishlist = JSON.parse(saved);
-            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
-            setIsWishlisted(exists);
-          } catch(e) {}
-        }
-      }
-    };
-    checkWishlist();
+    checkWishlistStatus();
     
     const handleUpdate = () => {
-      if (!user) {
-        const saved = localStorage.getItem('guestWishlist');
-        if (saved) {
-          try {
-            const wishlist = JSON.parse(saved);
-            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
-            setIsWishlisted(exists);
-          } catch(e) {}
-        }
-      } else {
-        setIsWishlisted(isInWishlist(product._id || product.id));
-      }
+      checkWishlistStatus();
     };
     
     window.addEventListener('wishlistUpdated', handleUpdate);
@@ -64,7 +63,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       window.removeEventListener('wishlistUpdated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
-  }, [product, user, isInWishlist]);
+  }, [checkWishlistStatus]);
 
   const handleAddToCart = () => {
     addToCart({
@@ -88,6 +87,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     const productId = product._id || product.id;
     
     if (user) {
+      // Logged in user
       if (isWishlisted) {
         removeFromWishlist(productId);
         setIsWishlisted(false);
@@ -98,46 +98,30 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         toast.success('Added to wishlist');
       }
     } else {
-      const productData = {
-        _id: productId,
-        id: productId,
-        name: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice,
-        images: product.images,
-        rating: product.rating,
-        brand: product.brand,
-        badge: product.badge,
-        isNew: product.isNew,
-        stock: product.stock,
-        emoji: product.emoji
-      };
-      
-      let wishlist = [];
-      const saved = localStorage.getItem('guestWishlist');
-      if (saved) {
-        try {
-          wishlist = JSON.parse(saved);
-          if (!Array.isArray(wishlist)) wishlist = [];
-        } catch(e) { wishlist = []; }
-      }
-      
-      const exists = wishlist.some(item => (item._id === productId || item.id === productId));
-      
-      if (!exists) {
-        wishlist.push(productData);
-        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
-        setIsWishlisted(true);
-        toast.success('Added to wishlist! 🤍');
-      } else {
-        wishlist = wishlist.filter(item => (item._id !== productId && item.id !== productId));
-        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
+      // ✅ GUEST: Use context functions (they handle localStorage)
+      if (isWishlisted) {
+        removeFromWishlist(productId);
         setIsWishlisted(false);
         toast.success('Removed from wishlist');
+      } else {
+        const productData = {
+          _id: productId,
+          id: productId,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          images: product.images,
+          rating: product.rating,
+          brand: product.brand,
+          badge: product.badge,
+          isNew: product.isNew,
+          stock: product.stock,
+          emoji: product.emoji
+        };
+        addToWishlist(productData);
+        setIsWishlisted(true);
+        toast.success('Added to wishlist! 🤍');
       }
-      
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
     }
   };
 
@@ -299,7 +283,7 @@ function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { wishlist, wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState([]);
@@ -714,6 +698,7 @@ function Home() {
                     addToWishlist={addToWishlist}
                     removeFromWishlist={removeFromWishlist}
                     user={user}
+                    wishlistContext={wishlist}
                   />
                 ))}
               </div>
@@ -739,6 +724,7 @@ function Home() {
                     addToWishlist={addToWishlist}
                     removeFromWishlist={removeFromWishlist}
                     user={user}
+                    wishlistContext={wishlist}
                   />
                 ))}
               </div>
@@ -764,6 +750,7 @@ function Home() {
                     addToWishlist={addToWishlist}
                     removeFromWishlist={removeFromWishlist}
                     user={user}
+                    wishlistContext={wishlist}
                   />
                 ))}
               </div>
@@ -793,6 +780,7 @@ function Home() {
                       addToWishlist={addToWishlist}
                       removeFromWishlist={removeFromWishlist}
                       user={user}
+                      wishlistContext={wishlist}
                     />
                   ))}
                 </div>
@@ -829,6 +817,7 @@ function Home() {
                       addToWishlist={addToWishlist}
                       removeFromWishlist={removeFromWishlist}
                       user={user}
+                      wishlistContext={wishlist}
                     />
                   ))}
                 </div>
@@ -865,6 +854,7 @@ function Home() {
                       addToWishlist={addToWishlist}
                       removeFromWishlist={removeFromWishlist}
                       user={user}
+                      wishlistContext={wishlist}
                     />
                   ))}
                 </div>
