@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const OTP = require('../models/OTP');
 const User = require('../models/User');
-const { sendEmail } = require('../services/emailService'); // ✅ NEW: Shared email service
+const { sendEmail } = require('../services/emailService');
 
 // ========== CHECK ENVIRONMENT VARIABLES FIRST ==========
 console.log('🔍 Checking environment variables:');
@@ -97,6 +97,17 @@ router.post('/send', async (req, res) => {
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // ✅ CHECK: User already exists?
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ 
+        error: 'An account with this email already exists.',
+        exists: true,
+        action: 'login',
+        message: 'Please login or use "Forgot Password" to reset your password.'
+      });
     }
     
     // Delete old OTPs
@@ -214,6 +225,17 @@ router.post('/resend', async (req, res) => {
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // ✅ CHECK: User already exists?
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ 
+        error: 'An account with this email already exists.',
+        exists: true,
+        action: 'login',
+        message: 'Please login or use "Forgot Password" to reset your password.'
+      });
     }
     
     await OTP.deleteMany({ email });
