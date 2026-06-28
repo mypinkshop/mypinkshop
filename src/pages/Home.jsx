@@ -7,8 +7,10 @@ import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
+import SkeletonCard from '../components/SkeletonCard';
+import SkeletonBanner from '../components/SkeletonBanner';
 
-// ============ FIXED: ProductCard - Guest Wishlist ============
+// ============ ProductCard - Guest Wishlist ============
 const ProductCard = ({ 
   product, 
   addToCart, 
@@ -24,10 +26,8 @@ const ProductCard = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  // ✅ Guest wishlist from context
   const contextWishlist = wishlistContext || [];
 
-  // Optimize image URL - smaller size for faster loading
   const getOptimizedImage = (url) => {
     if (!url) return null;
     if (url.includes('amazon') || url.includes('media-amazon')) {
@@ -36,14 +36,12 @@ const ProductCard = ({
     return url;
   };
 
-  // ✅ Check wishlist status - uses context for guest
   const checkWishlistStatus = useCallback(() => {
     const productId = product._id || product.id;
     
     if (user) {
       setIsWishlisted(isInWishlist(productId));
     } else {
-      // Guest: Check from context wishlist (which is synced with localStorage)
       const exists = contextWishlist.some(item => (item._id === productId || item.id === productId));
       setIsWishlisted(exists);
     }
@@ -87,7 +85,6 @@ const ProductCard = ({
     const productId = product._id || product.id;
     
     if (user) {
-      // Logged in user
       if (isWishlisted) {
         removeFromWishlist(productId);
         setIsWishlisted(false);
@@ -98,7 +95,6 @@ const ProductCard = ({
         toast.success('Added to wishlist');
       }
     } else {
-      // ✅ GUEST: Use context functions (they handle localStorage)
       if (isWishlisted) {
         removeFromWishlist(productId);
         setIsWishlisted(false);
@@ -215,7 +211,7 @@ const ProductCard = ({
   );
 };
 
-// Lazy load heavy components
+// ============ Newsletter Section ============
 const NewsletterSection = () => (
   <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
     <div className="max-w-2xl mx-auto text-center px-4">
@@ -229,6 +225,7 @@ const NewsletterSection = () => (
   </section>
 );
 
+// ============ Footer Section ============
 const FooterSection = () => (
   <footer className="bg-gray-900 text-gray-400 py-12">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -279,6 +276,7 @@ const FooterSection = () => (
   </footer>
 );
 
+// ============ HOME COMPONENT ============
 function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
@@ -290,7 +288,6 @@ function Home() {
   const [currentBanner, setCurrentBanner] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Intersection Observer for lazy loading sections
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
     makeup: false,
@@ -427,16 +424,6 @@ function Home() {
   };
 
   // Optimized data slices using useMemo
-  const dealsOfDay = useMemo(() => 
-    products.filter(p => p.originalPrice && p.originalPrice > p.price).slice(0, 4), 
-    [products]
-  );
-  
-  const bestsellers = useMemo(() => 
-    [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4), 
-    [products]
-  );
-  
   const newArrivals = useMemo(() => 
     products.filter(p => p.isNew).length > 0 
       ? products.filter(p => p.isNew).slice(0, 4)
@@ -489,13 +476,110 @@ function Home() {
     { name: 'Accessories', image: '👜', link: '/accessories' },
   ];
 
+  // ✅ SKELETON LOADING
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading your paradise...</p>
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+        <OfferBanner />
+
+        {/* Header Skeleton */}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 bg-gray-200 rounded-xl animate-pulse"></div>
+                <div className="hidden sm:block">
+                  <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
+                  <div className="h-3 bg-gray-200 rounded w-24 animate-pulse mt-1"></div>
+                </div>
+              </div>
+              <div className="flex-1 max-w-md lg:max-w-2xl">
+                <div className="h-10 bg-gray-200 rounded-full animate-pulse"></div>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
+                <div className="w-6 h-6 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-6 h-6 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Category Nav Skeleton */}
+        <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
+                <div key={i} className="h-5 bg-gray-200 rounded w-16 sm:w-20 animate-pulse"></div>
+              ))}
+            </div>
+          </div>
         </div>
+
+        {/* Banner Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <SkeletonBanner />
+        </div>
+
+        {/* Categories Skeleton */}
+        <section className="py-12 sm:py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <div className="h-8 bg-gray-200 rounded w-48 mx-auto animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-32 mx-auto mt-2 animate-pulse"></div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="bg-gray-200 rounded-2xl h-32 animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* New Arrivals Skeleton */}
+        <section className="py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center mb-6">
+              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Skincare Skeleton */}
+        <section className="py-12 bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center mb-6">
+              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Makeup Skeleton */}
+        <section className="py-12 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center mb-6">
+              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
+              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     );
   }
@@ -680,58 +764,6 @@ function Home() {
           </div>
         </section>
 
-        {/* Deals of the Day */}
-        {dealsOfDay.length > 0 && (
-          <section className="py-12 bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">⏰ Deals of the Day</h2>
-                <Link to="/shop?offer=sale" className="text-pink-500 text-sm hover:underline">View All →</Link>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {dealsOfDay.map(product => (
-                  <ProductCard 
-                    key={product._id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                    wishlistContext={wishlist}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Bestsellers */}
-        {bestsellers.length > 0 && (
-          <section className="py-12 bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">⭐ Bestsellers</h2>
-                <Link to="/shop?sort=bestseller" className="text-pink-500 text-sm hover:underline">View All →</Link>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {bestsellers.map(product => (
-                  <ProductCard 
-                    key={product._id} 
-                    product={product} 
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                    wishlistContext={wishlist}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* New Arrivals */}
         {newArrivals.length > 0 && (
           <section className="py-12 bg-white">
@@ -846,6 +878,80 @@ function Home() {
               {visibleSections.hair ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {hairProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                      wishlistContext={wishlist}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Clothing Section - Lazy Load */}
+        {clothingProducts.length > 0 && (
+          <section ref={sectionRefs.clothing} className="py-12 bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">👗</span>
+                  <h2 className="text-2xl font-bold text-gray-800">Clothing</h2>
+                </div>
+                <Link to="/clothing" className="text-pink-500 text-sm hover:underline">View All →</Link>
+              </div>
+              {visibleSections.clothing ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {clothingProducts.map(product => (
+                    <ProductCard 
+                      key={product._id} 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                      wishlistContext={wishlist}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-gray-100 rounded-2xl h-64 animate-pulse"></div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Accessories Section - Lazy Load */}
+        {accessoriesProducts.length > 0 && (
+          <section ref={sectionRefs.accessories} className="py-12 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">👜</span>
+                  <h2 className="text-2xl font-bold text-gray-800">Accessories</h2>
+                </div>
+                <Link to="/accessories" className="text-pink-500 text-sm hover:underline">View All →</Link>
+              </div>
+              {visibleSections.accessories ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                  {accessoriesProducts.map(product => (
                     <ProductCard 
                       key={product._id} 
                       product={product} 
