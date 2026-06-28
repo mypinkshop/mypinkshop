@@ -2476,8 +2476,11 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 
-// ========== ADDRESS ROUTES ==========
-app.get('/api/addresses', authMiddleware, async (req, res) => {
+// ========== ADDRESS ROUTES (WITH CORS) ==========
+app.options('/api/addresses', cors(corsOptions));
+app.options('/api/addresses/:id', cors(corsOptions));
+
+app.get('/api/addresses', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const addresses = await Address.find({ userId: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
     res.json(addresses);
@@ -2487,7 +2490,7 @@ app.get('/api/addresses', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/addresses', authMiddleware, async (req, res) => {
+app.post('/api/addresses', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     console.log('Received address data:', req.body);
     
@@ -2533,7 +2536,7 @@ app.post('/api/addresses', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
+app.put('/api/addresses/:id', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     console.log('Updating address:', id, req.body);
@@ -2570,7 +2573,7 @@ app.put('/api/addresses/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
+app.delete('/api/addresses/:id', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     console.log('Deleting address:', id);
@@ -2586,7 +2589,7 @@ app.delete('/api/addresses/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
+app.patch('/api/addresses/:id/default', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     console.log('Setting default address:', id);
@@ -2609,8 +2612,11 @@ app.patch('/api/addresses/:id/default', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== CART ROUTES ==========
-app.get('/api/cart', authMiddleware, async (req, res) => {
+// ========== CART ROUTES (WITH CORS) ==========
+app.options('/api/cart', cors(corsOptions));
+app.options('/api/cart/:itemId', cors(corsOptions));
+
+app.get('/api/cart', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     let cart = await Cart.findOne({ userId: req.user.id }).populate('items.productId');
     if (!cart) {
@@ -2624,7 +2630,7 @@ app.get('/api/cart', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/cart', authMiddleware, async (req, res) => {
+app.post('/api/cart', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { productId, quantity = 1 } = req.body;
     
@@ -2660,7 +2666,7 @@ app.post('/api/cart', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/cart/:itemId', authMiddleware, async (req, res) => {
+app.put('/api/cart/:itemId', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { itemId } = req.params;
     const { quantity } = req.body;
@@ -2687,7 +2693,7 @@ app.put('/api/cart/:itemId', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/cart/:itemId', authMiddleware, async (req, res) => {
+app.delete('/api/cart/:itemId', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { itemId } = req.params;
     
@@ -3110,8 +3116,12 @@ app.delete('/api/reviews/:reviewId', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== WISHLIST ROUTES ==========
-app.get('/api/wishlist', authMiddleware, async (req, res) => {
+// ========== WISHLIST ROUTES (WITH CORS) ==========
+app.options('/api/wishlist', cors(corsOptions));
+app.options('/api/wishlist/:productId', cors(corsOptions));
+app.options('/api/wishlist/clear/all', cors(corsOptions));
+
+app.get('/api/wishlist', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -3140,7 +3150,7 @@ app.get('/api/wishlist', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/wishlist', authMiddleware, async (req, res) => {
+app.post('/api/wishlist', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { productId } = req.body;
@@ -3175,7 +3185,7 @@ app.post('/api/wishlist', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/wishlist/:productId', authMiddleware, async (req, res) => {
+app.delete('/api/wishlist/:productId', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { productId } = req.params;
@@ -3196,7 +3206,7 @@ app.delete('/api/wishlist/:productId', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/wishlist/clear/all', authMiddleware, async (req, res) => {
+app.delete('/api/wishlist/clear/all', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     await Wishlist.findOneAndDelete({ userId });
@@ -3207,8 +3217,11 @@ app.delete('/api/wishlist/clear/all', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== ORDERS ROUTES ==========
-app.get('/api/orders', authMiddleware, async (req, res) => {
+// ========== ORDERS ROUTES (WITH CORS) ==========
+app.options('/api/orders', cors(corsOptions));
+app.options('/api/orders/:id', cors(corsOptions));
+
+app.get('/api/orders', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json(orders);
@@ -3218,7 +3231,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/orders/:id', authMiddleware, async (req, res) => {
+app.get('/api/orders/:id', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
     if (!order) {
@@ -3232,7 +3245,7 @@ app.get('/api/orders/:id', authMiddleware, async (req, res) => {
 });
 
 // ✅ ORDER CREATION WITH EMAIL
-app.post('/api/orders', authMiddleware, async (req, res) => {
+app.post('/api/orders', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { items, total, address, paymentMethod } = req.body;
     
@@ -3294,7 +3307,7 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
-app.patch('/api/orders/:id/status', authMiddleware, async (req, res) => {
+app.patch('/api/orders/:id/status', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
     const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
