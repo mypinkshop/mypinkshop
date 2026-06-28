@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -9,7 +9,7 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 import SkeletonCard from '../components/SkeletonCard';
 import SkeletonBanner from '../components/SkeletonBanner';
-import ProductCard from '../components/ProductCard'; // ✅ IMPORT ADDED
+import ProductCard from '../components/ProductCard';
 
 // ============ Newsletter Section ============
 const NewsletterSection = () => (
@@ -104,10 +104,13 @@ function Home() {
     accessories: useRef(null)
   };
 
-  const API_URL = 'https://api.mypinkshop.com';
+  // ✅ Environment variable
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Load products with caching
+  // Load products
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadProducts = async () => {
       try {
         setLoading(true);
@@ -123,7 +126,9 @@ function Home() {
           return;
         }
         
-        const response = await fetch(`${API_URL}/api/products`);
+        const response = await fetch(`${API_URL}/api/products`, {
+          signal: abortController.signal
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         let data = await response.json();
@@ -134,17 +139,23 @@ function Home() {
         
         setProducts(productsArray);
       } catch (error) {
-        console.error("Error loading products:", error);
-        setProducts([]);
+        if (error.name !== 'AbortError') {
+          console.error("Error loading products:", error);
+          setProducts([]);
+        }
       } finally {
         setLoading(false);
       }
     };
     loadProducts();
-  }, []);
+    
+    return () => abortController.abort();
+  }, [API_URL]);
 
-  // Load banners with caching
+  // Load banners
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadBanners = async () => {
       try {
         const cached = sessionStorage.getItem('banners_cache');
@@ -155,7 +166,9 @@ function Home() {
           return;
         }
         
-        const response = await fetch(`${API_URL}/api/banners/active`);
+        const response = await fetch(`${API_URL}/api/banners/active`, {
+          signal: abortController.signal
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
@@ -163,25 +176,35 @@ function Home() {
         sessionStorage.setItem('banners_cache', JSON.stringify(data));
         sessionStorage.setItem('banners_cache_time', Date.now().toString());
       } catch (error) {
-        console.error("Error loading banners:", error);
-        setBanners([]);
+        if (error.name !== 'AbortError') {
+          console.error("Error loading banners:", error);
+          setBanners([]);
+        }
       }
     };
     loadBanners();
-  }, []);
+    
+    return () => abortController.abort();
+  }, [API_URL]);
 
-  // Preload first banner image
+  // Preload first banner
   useEffect(() => {
-    if (banners.length > 0 && banners[0].images?.[0]) {
+    if (banners.length > 0 && banners[0]?.images?.[0]) {
       const link = document.createElement('link');
       link.rel = 'preload';
       link.as = 'image';
       link.href = banners[0].images[0];
       document.head.appendChild(link);
+      
+      return () => {
+        if (document.head.contains(link)) {
+          document.head.removeChild(link);
+        }
+      };
     }
   }, [banners]);
 
-  // Auto slide for carousel
+  // Auto slide carousel
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -190,73 +213,74 @@ function Home() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  // Intersection Observer setup
+  // Intersection Observer
   useEffect(() => {
+    if (!products.length) return;
+
     const observers = [];
-    Object.keys(sectionRefs).forEach((key) => {
-      if (sectionRefs[key].current) {
+    
+    Object.entries(sectionRefs).forEach(([key, ref]) => {
+      if (ref.current) {
         const observer = new IntersectionObserver(
           (entries) => {
-            if (entries[0].isIntersecting) {
+            if (entries[0]?.isIntersecting) {
               setVisibleSections(prev => ({ ...prev, [key]: true }));
               observer.disconnect();
             }
           },
           { threshold: 0.1, rootMargin: '100px' }
         );
-        observer.observe(sectionRefs[key].current);
+        observer.observe(ref.current);
         observers.push(observer);
       }
     });
-    return () => observers.forEach(obs => obs.disconnect());
+
+    return () => {
+      observers.forEach(obs => obs.disconnect());
+    };
   }, [products.length]);
 
-  const handleSearch = () => {
+  // Handlers
+  const handleSearch = useCallback(() => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
     }
-  };
+  }, [searchQuery, navigate]);
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
-  };
+  }, [handleSearch]);
 
-  // Optimized data slices using useMemo
-  const newArrivals = useMemo(() => 
-    products.filter(p => p.isNew).length > 0 
-      ? products.filter(p => p.isNew).slice(0, 4)
-      : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4), 
-    [products]
-  );
-  
-  const skincareProducts = useMemo(() => 
-    products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4), 
-    [products]
-  );
-  
-  const makeupProducts = useMemo(() => 
-    products.filter(p => p.mainCategory === 'Makeup' || p.category === 'Makeup').slice(0, 4), 
-    [products]
-  );
-  
-  const hairProducts = useMemo(() => 
-    products.filter(p => p.mainCategory === 'Hair' || p.category === 'Hair').slice(0, 4), 
-    [products]
-  );
-  
-  const clothingProducts = useMemo(() => 
-    products.filter(p => p.mainCategory === 'Clothing' || p.category === 'Clothing').slice(0, 4), 
-    [products]
-  );
-  
-  const accessoriesProducts = useMemo(() => 
-    products.filter(p => p.mainCategory === 'Accessories' || p.category === 'Accessories').slice(0, 4), 
-    [products]
-  );
+  // Product slices
+  const productSlices = useMemo(() => {
+    if (!products.length) {
+      return {
+        newArrivals: [],
+        skincareProducts: [],
+        makeupProducts: [],
+        hairProducts: [],
+        clothingProducts: [],
+        accessoriesProducts: []
+      };
+    }
 
-  const navLinks = [
+    return {
+      newArrivals: products.filter(p => p.isNew).length > 0 
+        ? products.filter(p => p.isNew).slice(0, 4)
+        : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4),
+      skincareProducts: products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4),
+      makeupProducts: products.filter(p => p.mainCategory === 'Makeup' || p.category === 'Makeup').slice(0, 4),
+      hairProducts: products.filter(p => p.mainCategory === 'Hair' || p.category === 'Hair').slice(0, 4),
+      clothingProducts: products.filter(p => p.mainCategory === 'Clothing' || p.category === 'Clothing').slice(0, 4),
+      accessoriesProducts: products.filter(p => p.mainCategory === 'Accessories' || p.category === 'Accessories').slice(0, 4)
+    };
+  }, [products]);
+
+  const { newArrivals, skincareProducts, makeupProducts, hairProducts, clothingProducts, accessoriesProducts } = productSlices;
+
+  const navLinks = useMemo(() => [
     { name: 'All', link: '/shop' },
     { name: 'Skincare', link: '/skincare' },
     { name: 'Makeup', link: '/makeup' },
@@ -266,23 +290,21 @@ function Home() {
     { name: 'Sale 🔥', link: '/shop?offer=sale' },
     { name: 'New Arrivals', link: '/shop?sort=newest' },
     { name: 'Bestsellers', link: '/shop?sort=bestseller' },
-  ];
+  ], []);
 
-  const categories = [
+  const categories = useMemo(() => [
     { name: 'Skincare', image: '🧴', link: '/skincare' },
     { name: 'Makeup', image: '💄', link: '/makeup' },
     { name: 'Hair', image: '💇‍♀️', link: '/hair' },
     { name: 'Clothing', image: '👗', link: '/clothing' },
     { name: 'Accessories', image: '👜', link: '/accessories' },
-  ];
+  ], []);
 
-  // ✅ SKELETON LOADING
+  // Skeleton Loading
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
-
-        {/* Header Skeleton */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -304,8 +326,6 @@ function Home() {
             </div>
           </div>
         </header>
-
-        {/* Category Nav Skeleton */}
         <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3">
@@ -315,13 +335,9 @@ function Home() {
             </div>
           </div>
         </div>
-
-        {/* Banner Skeleton */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <SkeletonBanner />
         </div>
-
-        {/* Categories Skeleton */}
         <section className="py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8">
@@ -335,8 +351,6 @@ function Home() {
             </div>
           </div>
         </section>
-
-        {/* New Arrivals Skeleton */}
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-6">
@@ -350,8 +364,6 @@ function Home() {
             </div>
           </div>
         </section>
-
-        {/* Skincare Skeleton */}
         <section className="py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-6">
@@ -365,8 +377,6 @@ function Home() {
             </div>
           </div>
         </section>
-
-        {/* Makeup Skeleton */}
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center mb-6">
@@ -393,10 +403,8 @@ function Home() {
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-        
         <OfferBanner />
 
-        {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -457,7 +465,6 @@ function Home() {
           </div>
         </header>
 
-        {/* Category Navigation */}
         <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
@@ -470,7 +477,6 @@ function Home() {
           </div>
         </div>
 
-        {/* Hero Carousel */}
         {banners.length > 0 ? (
           <div className="relative overflow-hidden group">
             <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
@@ -543,7 +549,6 @@ function Home() {
           </div>
         )}
 
-        {/* Categories Section */}
         <section className="py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8">
@@ -564,7 +569,6 @@ function Home() {
           </div>
         </section>
 
-        {/* New Arrivals */}
         {newArrivals.length > 0 && (
           <section className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -590,7 +594,6 @@ function Home() {
           </section>
         )}
 
-        {/* Skincare Section - Lazy Load */}
         {skincareProducts.length > 0 && (
           <section ref={sectionRefs.skincare} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -627,7 +630,6 @@ function Home() {
           </section>
         )}
 
-        {/* Makeup Section - Lazy Load */}
         {makeupProducts.length > 0 && (
           <section ref={sectionRefs.makeup} className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -664,7 +666,6 @@ function Home() {
           </section>
         )}
 
-        {/* Hair Section - Lazy Load */}
         {hairProducts.length > 0 && (
           <section ref={sectionRefs.hair} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -701,7 +702,6 @@ function Home() {
           </section>
         )}
 
-        {/* Clothing Section - Lazy Load */}
         {clothingProducts.length > 0 && (
           <section ref={sectionRefs.clothing} className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -738,7 +738,6 @@ function Home() {
           </section>
         )}
 
-        {/* Accessories Section - Lazy Load */}
         {accessoriesProducts.length > 0 && (
           <section ref={sectionRefs.accessories} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -775,12 +774,10 @@ function Home() {
           </section>
         )}
 
-        {/* Newsletter - Lazy Load */}
         <Suspense fallback={<div className="h-64 bg-pink-600" />}>
           <NewsletterSection />
         </Suspense>
 
-        {/* Footer - Lazy Load */}
         <Suspense fallback={<div className="h-80 bg-gray-900" />}>
           <FooterSection />
         </Suspense>
