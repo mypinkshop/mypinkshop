@@ -374,7 +374,7 @@ function Register() {
               </div>
             ) : 
 
-            {/* ============ OTP SCREEN ============ */}
+            // ============ OTP SCREEN ============
             step === 'otp' ? (
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
                 <div className="text-center mb-6">
@@ -459,7 +459,7 @@ function Register() {
               </div>
             ) : 
 
-            {/* ============ DETAILS FORM ============ */}
+            // ============ DETAILS FORM ============
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
