@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,8 @@ function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState('details');
   const [error, setError] = useState('');
@@ -18,6 +20,8 @@ function Register() {
   const [resendTimer, setResendTimer] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [accountExists, setAccountExists] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
   const { register } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
@@ -25,7 +29,33 @@ function Register() {
 
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Handle search
+  // ============ PASSWORD STRENGTH ============
+  const checkPasswordStrength = (pass) => {
+    let strength = 0;
+    if (pass.length >= 8) strength++;
+    if (pass.match(/[a-z]/) && pass.match(/[A-Z]/)) strength++;
+    if (pass.match(/\d/)) strength++;
+    if (pass.match(/[^a-zA-Z\d]/)) strength++;
+    setPasswordStrength(strength);
+  };
+
+  const getStrengthText = () => {
+    if (passwordStrength === 0) return '';
+    if (passwordStrength <= 1) return 'Weak';
+    if (passwordStrength === 2) return 'Fair';
+    if (passwordStrength === 3) return 'Good';
+    return 'Strong';
+  };
+
+  const getStrengthColor = () => {
+    if (passwordStrength === 0) return 'bg-gray-200';
+    if (passwordStrength <= 1) return 'bg-red-500';
+    if (passwordStrength === 2) return 'bg-yellow-500';
+    if (passwordStrength === 3) return 'bg-blue-500';
+    return 'bg-green-500';
+  };
+
+  // ============ HANDLE SEARCH ============
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -38,17 +68,33 @@ function Register() {
     }
   };
 
-  // Send OTP
+  // ============ SEND OTP ============
   const handleSendOTP = async (e) => {
     e.preventDefault();
     
-    if (!name || !email) {
-      setError('❌ Please enter your name and email');
+    // Validation
+    if (!name || !email || !password || !confirmPassword) {
+      setError('❌ Please fill all required fields');
       return;
     }
 
     if (!email.includes('@')) {
       setError('❌ Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('❌ Password must be at least 8 characters');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('❌ Passwords do not match');
+      return;
+    }
+
+    if (!agreeTerms) {
+      setError('❌ Please agree to Terms & Privacy Policy');
       return;
     }
 
@@ -60,7 +106,7 @@ function Register() {
       const response = await fetch(`${API_URL}/api/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name })
+        body: JSON.stringify({ email, name, phone })
       });
 
       const data = await response.json();
@@ -70,14 +116,13 @@ function Register() {
         setAccountExists(true);
         setError('⚠️ An account with this email already exists.');
         toast.error('Account already exists!');
-        // Still show login/forgot password options
         return;
       }
 
       if (response.ok && data.success) {
         setStep('otp');
         setResendTimer(60);
-        toast.success('OTP sent successfully!');
+        toast.success('OTP sent to your email!');
         
         const timer = setInterval(() => {
           setResendTimer((prev) => {
@@ -101,7 +146,7 @@ function Register() {
     }
   };
 
-  // Verify OTP
+  // ============ VERIFY OTP ============
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
@@ -123,12 +168,26 @@ function Register() {
       const data = await response.json();
 
       if (data.success && data.token) {
-        // Store token in localStorage
+        // ✅ Save user data
+        const userData = {
+          _id: data.user?._id || '',
+          name: data.user?.name || name,
+          email: data.user?.email || email,
+          role: data.user?.role || 'buyer',
+          phone: phone || ''
+        };
+
         localStorage.setItem('token', data.token);
-        localStorage.setItem('userRole', data.user?.role || 'buyer');
-        localStorage.setItem('userEmail', data.user?.email || email);
-        localStorage.setItem('userName', data.user?.name || name);
-        localStorage.setItem('userId', data.user?._id || '');
+        localStorage.setItem('userRole', userData.role);
+        localStorage.setItem('userEmail', userData.email);
+        localStorage.setItem('userName', userData.name);
+        localStorage.setItem('userId', userData._id);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        // ✅ Update auth context
+        if (register) {
+          register(userData, data.token);
+        }
         
         toast.success('Account created successfully! 🎉');
         setStep('success');
@@ -149,7 +208,7 @@ function Register() {
     }
   };
 
-  // Resend OTP
+  // ============ RESEND OTP ============
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
     
@@ -163,7 +222,6 @@ function Register() {
 
       const data = await response.json();
 
-      // ✅ Check if account already exists (shouldn't happen here, but just in case)
       if (response.status === 409 && data.exists) {
         setAccountExists(true);
         setError('⚠️ An account with this email already exists.');
@@ -196,7 +254,15 @@ function Register() {
     }
   };
 
-  // SEO Schema
+  // ============ GO BACK TO DETAILS ============
+  const goBackToDetails = () => {
+    setStep('details');
+    setOtp('');
+    setError('');
+    setAccountExists(false);
+  };
+
+  // ============ SEO SCHEMA ============
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -206,15 +272,16 @@ function Register() {
     ]
   });
 
+  // ============ RENDER ============
   return (
     <>
       <Helmet>
         <title>Create Account - Register at MyPinkShop | Join the Pink Club</title>
-        <meta name="description" content="Create a free account at MyPinkShop. Get 10% off on your first order, track orders, save wishlist items, and enjoy faster checkout. Join the Pink Club today!" />
-        <meta name="keywords" content="register, sign up, create account, mypinkshop account, join pink club, new user registration" />
+        <meta name="description" content="Create a free account at MyPinkShop. Get 10% off on your first order, track orders, save wishlist items, and enjoy faster checkout." />
+        <meta name="keywords" content="register, sign up, create account, mypinkshop account, join pink club" />
         <link rel="canonical" href="https://www.mypinkshop.com/register" />
         <meta property="og:title" content="Create Account - Register at MyPinkShop" />
-        <meta property="og:description" content="Join MyPinkShop and get 10% off on your first order. Fast checkout, order tracking, and wishlist features." />
+        <meta property="og:description" content="Join MyPinkShop and get 10% off on your first order." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://www.mypinkshop.com/register" />
         <meta property="og:image" content="https://www.mypinkshop.com/og-register.jpg" />
@@ -229,7 +296,7 @@ function Register() {
         
         <OfferBanner />
 
-        {/* Premium Header */}
+        {/* ============ HEADER ============ */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -282,7 +349,7 @@ function Register() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
+        {/* ============ BREADCRUMB ============ */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -291,11 +358,12 @@ function Register() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
+        {/* ============ MAIN CONTENT ============ */}
+        <main className="flex-1 flex items-center justify-center py-8 sm:py-12 px-4">
           <div className="max-w-md w-full">
+
+            {/* ============ SUCCESS SCREEN ============ */}
             {step === 'success' ? (
-              // Success Screen
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8 text-center">
                 <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                   <span className="text-white text-3xl">✓</span>
@@ -304,8 +372,10 @@ function Register() {
                 <p className="text-gray-500">Your account has been created successfully.</p>
                 <p className="text-gray-400 text-sm mt-2">Redirecting to home page...</p>
               </div>
-            ) : step === 'otp' ? (
-              // Step 2: OTP Verification
+            ) : 
+
+            {/* ============ OTP SCREEN ============ */}
+            step === 'otp' ? (
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -319,40 +389,20 @@ function Register() {
 
                 {error && (
                   <div className={`${accountExists ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-red-50 border-red-200 text-red-600'} border p-3 rounded-xl mb-4 text-sm flex items-center gap-2`}>
-                    <span>{accountExists ? '⚠️' : '⚠️'}</span> {error}
+                    <span>⚠️</span> {error}
                   </div>
                 )}
 
-                {/* ✅ Account exists warning with actions */}
+                {/* Account exists warning */}
                 {accountExists && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
                     <p className="text-yellow-800 text-sm font-medium mb-2">
                       ⚠️ An account with this email already exists.
                     </p>
                     <div className="flex gap-3 flex-wrap">
-                      <Link 
-                        to="/login" 
-                        className="text-pink-600 font-medium hover:underline text-sm"
-                      >
-                        Login →
-                      </Link>
-                      <Link 
-                        to="/forgot-password" 
-                        className="text-pink-600 font-medium hover:underline text-sm"
-                      >
-                        Forgot Password?
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setAccountExists(false);
-                          setError('');
-                          setEmail('');
-                          setName('');
-                        }}
-                        className="text-gray-500 font-medium hover:underline text-sm"
-                      >
-                        Try different email
-                      </button>
+                      <Link to="/login" className="text-pink-600 font-medium hover:underline text-sm">Login →</Link>
+                      <Link to="/forgot-password" className="text-pink-600 font-medium hover:underline text-sm">Forgot Password?</Link>
+                      <button onClick={goBackToDetails} className="text-gray-500 font-medium hover:underline text-sm">Try different email</button>
                     </div>
                   </div>
                 )}
@@ -399,12 +449,7 @@ function Register() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setStep('details');
-                        setOtp('');
-                        setError('');
-                        setAccountExists(false);
-                      }}
+                      onClick={goBackToDetails}
                       className="text-sm text-gray-500 hover:text-pink-600 transition ml-4"
                     >
                       Use different email
@@ -412,103 +457,181 @@ function Register() {
                   </div>
                 </form>
               </div>
-            ) : (
-              // Step 1: User Details
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                    <span className="text-white text-2xl">✨</span>
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club!</h1>
-                  <p className="text-gray-500 text-sm mt-1">Create your account with email verification</p>
+            ) : 
+
+            {/* ============ DETAILS FORM ============ */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <span className="text-white text-2xl">✨</span>
                 </div>
-
-                {error && !accountExists && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                    <span>⚠️</span> {error}
-                  </div>
-                )}
-
-                <form onSubmit={handleSendOTP} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Your name</label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                      placeholder="Enter your full name"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                      placeholder="Enter your email"
-                      required
-                    />
-                    <p className="text-xs text-gray-400 mt-1">We'll send you an OTP to verify this email.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mobile number (optional)</label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                      placeholder="Enter your mobile number"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
-                  >
-                    {loading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Sending OTP...
-                      </span>
-                    ) : (
-                      'Continue with Email'
-                    )}
-                  </button>
-                </form>
-
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-3 bg-white text-gray-500">Already have an account?</span>
-                  </div>
-                </div>
-
-                <Link
-                  to="/login"
-                  className="block w-full text-center border-2 border-pink-500 bg-transparent text-pink-600 font-medium py-2.5 rounded-xl hover:bg-pink-50 transition-all"
-                >
-                  Sign In
-                </Link>
-
-                <p className="text-center text-xs text-gray-400 mt-6">
-                  By creating an account, you agree to MyPinkShop's{' '}
-                  <Link to="/terms" className="text-pink-600 hover:underline">Terms of Service</Link> and{' '}
-                  <Link to="/privacy" className="text-pink-600 hover:underline">Privacy Policy</Link>.
-                </p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club!</h1>
+                <p className="text-gray-500 text-sm mt-1">Get 10% off on your first order 🎉</p>
               </div>
+
+              {error && !accountExists && (
+                <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
+                  <span>⚠️</span> {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSendOTP} className="space-y-4">
+
+                {/* Full Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    👤 Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    placeholder="Enter your full name"
+                    required
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    📧 Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    placeholder="Enter your email"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-1">We'll send an OTP to verify your email</p>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    🔒 Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      checkPasswordStrength(e.target.value);
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    placeholder="Min 8 characters"
+                    required
+                    minLength={8}
+                  />
+                  {password && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full ${getStrengthColor()} transition-all duration-300`} style={{ width: `${(passwordStrength / 4) * 100}%` }}></div>
+                        </div>
+                        <span className="text-xs font-medium text-gray-500">{getStrengthText()}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Min 8 characters with letters, numbers & symbols</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    🔒 Confirm Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    placeholder="Confirm your password"
+                    required
+                  />
+                  {confirmPassword && password !== confirmPassword && (
+                    <p className="text-xs text-red-500 mt-1">❌ Passwords do not match</p>
+                  )}
+                </div>
+
+                {/* Phone (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    📱 Phone Number <span className="text-gray-400 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    placeholder="Enter your mobile number"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">For delivery updates only — No OTP will be sent</p>
+                </div>
+
+                {/* Terms */}
+                <div className="flex items-start gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-pink-500 border-gray-300 rounded focus:ring-pink-500 cursor-pointer"
+                  />
+                  <label htmlFor="terms" className="text-sm text-gray-600">
+                    I agree to MyPinkShop's{' '}
+                    <Link to="/terms" className="text-pink-600 hover:underline">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy" className="text-pink-600 hover:underline">Privacy Policy</Link>
+                  </label>
+                </div>
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending OTP...
+                    </span>
+                  ) : (
+                    'Create Account 🚀'
+                  )}
+                </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-3 bg-white text-gray-500">Already have an account?</span>
+                </div>
+              </div>
+
+              {/* Sign In */}
+              <Link
+                to="/login"
+                className="block w-full text-center border-2 border-pink-500 bg-transparent text-pink-600 font-medium py-2.5 rounded-xl hover:bg-pink-50 transition-all"
+              >
+                Sign In
+              </Link>
+
+              <p className="text-center text-xs text-gray-400 mt-6">
+                By creating an account, you agree to MyPinkShop's Terms & Privacy Policy.
+              </p>
+            </div>
             )}
           </div>
         </main>
 
-        {/* Footer */}
+        {/* ============ FOOTER ============ */}
         <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
