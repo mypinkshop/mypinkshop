@@ -56,14 +56,13 @@ router.post('/register', async (req, res) => {
       console.error('❌ Failed to send verification email:', result.error);
     }
     
-    // ✅ FIX: Generate token
+    // ✅ Generate token for auto-login
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '365d' }
     );
     
-    // ✅ FIX: Send token + user data with response
     res.json({ 
       success: true, 
       message: 'Registration successful! Please check your email to verify your account.',
@@ -101,8 +100,8 @@ router.get('/verify-email/:token', async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
     
-    // ✅ Generate token for auto-login after verification
-    const token = jwt.sign(
+    // ✅ FIX: Use let instead of const (or different variable name)
+    const authToken = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '365d' }
@@ -111,7 +110,7 @@ router.get('/verify-email/:token', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Email verified successfully!',
-      token: token,
+      token: authToken,
       user: {
         _id: user._id,
         name: user.name,
