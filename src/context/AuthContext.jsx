@@ -11,59 +11,62 @@ export const AuthProvider = ({ children }) => {
 
   const API_URL = 'https://api.mypinkshop.com/api';
 
+  // ============ LOAD USER FROM LOCALSTORAGE ============
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
-    const storedUserEmail = localStorage.getItem('userEmail');
-    const storedUserName = localStorage.getItem('userName');
-    const storedUserRole = localStorage.getItem('userRole');
-    const storedUserId = localStorage.getItem('userId');
+    const storedUser = localStorage.getItem('user');
     
-    if (storedToken && storedUserEmail) {
-      setToken(storedToken);
-      setUser({
-        _id: storedUserId,
-        email: storedUserEmail,
-        name: storedUserName,
-        role: storedUserRole
-      });
+    if (storedToken && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setToken(storedToken);
+        setUser(userData);
+        console.log('✅ User loaded from localStorage:', userData);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+        // Fallback to individual items
+        const storedUserEmail = localStorage.getItem('userEmail');
+        const storedUserName = localStorage.getItem('userName');
+        const storedUserRole = localStorage.getItem('userRole');
+        const storedUserId = localStorage.getItem('userId');
+        
+        if (storedToken && storedUserEmail) {
+          setToken(storedToken);
+          setUser({
+            _id: storedUserId,
+            email: storedUserEmail,
+            name: storedUserName,
+            role: storedUserRole
+          });
+        }
+      }
     }
     setLoading(false);
   }, []);
 
-  // ========== PASSWORD-BASED METHODS ==========
-  
-  const registerWithPassword = async (name, email, password, role = 'buyer') => {
-    try {
-      const res = await fetch(`${API_URL}/auth/password/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role }),
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userEmail', data.user.email);
-        localStorage.setItem('userName', data.user.name);
-        localStorage.setItem('userRole', data.user.role);
-        localStorage.setItem('userId', data.user._id);
-        
-        setToken(data.token);
-        setUser(data.user);
-        
-        return { success: true, data: data.user };
-      } else {
-        return { success: false, error: data.error || 'Registration failed' };
-      }
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
+  // ============ REGISTER (For Register.jsx) ============
+  const register = (userData, token) => {
+    console.log('📝 Register called with:', userData);
+    
+    setUser(userData);
+    setToken(token);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('userEmail', userData.email);
+    localStorage.setItem('userName', userData.name);
+    localStorage.setItem('userRole', userData.role);
+    localStorage.setItem('userId', userData._id || '');
+    
+    console.log('✅ User registered and logged in:', userData);
+    return { success: true };
   };
 
-  const loginWithPassword = async (email, password) => {
+  // ============ LOGIN ============
+  const login = async (email, password) => {
     try {
-      const res = await fetch(`${API_URL}/auth/password/login`, {
+      console.log('🔐 Login attempt for:', email);
+      
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -72,89 +75,57 @@ export const AuthProvider = ({ children }) => {
       const data = await res.json();
       
       if (res.ok && data.success) {
+        const userData = {
+          _id: data.user._id || data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role || 'buyer'
+        };
+        
         localStorage.setItem('token', data.token);
-        localStorage.setItem('userEmail', data.user.email);
-        localStorage.setItem('userName', data.user.name);
-        localStorage.setItem('userRole', data.user.role);
-        localStorage.setItem('userId', data.user._id);
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('userEmail', userData.email);
+        localStorage.setItem('userName', userData.name);
+        localStorage.setItem('userRole', userData.role);
+        localStorage.setItem('userId', userData._id);
         
         setToken(data.token);
-        setUser(data.user);
+        setUser(userData);
         
-        return { success: true, data: data.user };
+        console.log('✅ Login successful:', userData);
+        return { success: true, data: userData };
       } else {
+        console.log('❌ Login failed:', data.error);
         return { success: false, error: data.error || 'Invalid email or password' };
       }
     } catch (error) {
+      console.error('❌ Login error:', error);
       return { success: false, error: error.message };
     }
   };
 
-  // ========== OTP-BASED METHODS ==========
-  
-  const sendOTP = async (email) => {
-    try {
-      const res = await fetch(`${API_URL}/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      
-      const data = await res.json();
-      return { success: res.ok, ...data };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
+  // ============ OTP LOGIN (For OTP flow) ============
+  const otpLogin = (userData, token) => {
+    console.log('🔐 OTP Login with:', userData);
+    
+    setUser(userData);
+    setToken(token);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('userEmail', userData.email);
+    localStorage.setItem('userName', userData.name);
+    localStorage.setItem('userRole', userData.role);
+    localStorage.setItem('userId', userData._id || '');
+    
+    return { success: true };
   };
 
-  const verifyOTP = async (email, otp) => {
-    try {
-      const res = await fetch(`${API_URL}/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp }),
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userEmail', data.user?.email || email);
-        localStorage.setItem('userName', data.user?.name || email.split('@')[0]);
-        localStorage.setItem('userRole', data.user?.role || 'buyer');
-        localStorage.setItem('userId', data.user?._id || '');
-        
-        setToken(data.token);
-        setUser(data.user || { email, name: email.split('@')[0], role: 'buyer' });
-        
-        return { success: true, data: data.user };
-      } else {
-        return { success: false, error: data.error || 'Invalid OTP' };
-      }
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  const resendOTP = async (email) => {
-    try {
-      const res = await fetch(`${API_URL}/auth/resend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      
-      const data = await res.json();
-      return { success: res.ok, ...data };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  // ========== COMMON METHODS ==========
-  
+  // ============ LOGOUT ============
   const logout = () => {
+    console.log('🚪 Logging out...');
+    
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
@@ -163,27 +134,21 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // ============ IS AUTHENTICATED ============
   const isAuthenticated = () => {
-    return !!token && !!localStorage.getItem('token');
+    const hasToken = !!token && !!localStorage.getItem('token');
+    console.log('🔍 isAuthenticated:', hasToken);
+    return hasToken;
   };
 
-  const getCurrentUser = () => user;
-  const getToken = () => token || localStorage.getItem('token');
-
-  // ========== ALIASES FOR COMPATIBILITY ==========
-  // These make sure existing Login/Register components work
-  
-  const register = async (name, email, password, role) => {
-    return await registerWithPassword(name, email, password, role);
+  // ============ GET CURRENT USER ============
+  const getCurrentUser = () => {
+    return user || JSON.parse(localStorage.getItem('user') || 'null');
   };
 
-  const login = async (email, password) => {
-    // If it's OTP login (password is 'otp_login'), don't do anything
-    if (password === 'otp_login') {
-      return { success: true };
-    }
-    // Otherwise do password login
-    return await loginWithPassword(email, password);
+  // ============ GET TOKEN ============
+  const getToken = () => {
+    return token || localStorage.getItem('token');
   };
 
   return (
@@ -191,17 +156,9 @@ export const AuthProvider = ({ children }) => {
       user,
       loading,
       token,
-      // Password-based methods
-      registerWithPassword,
-      loginWithPassword,
-      // OTP-based methods
-      sendOTP,
-      verifyOTP,
-      resendOTP,
-      // Aliases for compatibility
-      register,     // ✅ ADDED
-      login,        // ✅ ADDED
-      // Common methods
+      register,
+      login,
+      otpLogin,
       logout,
       isAuthenticated,
       getCurrentUser,
