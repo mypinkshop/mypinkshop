@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function Register() {
   const [name, setName] = useState('');
@@ -16,6 +17,7 @@ function Register() {
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [accountExists, setAccountExists] = useState(false);
   const { register } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
@@ -51,6 +53,7 @@ function Register() {
     }
 
     setError('');
+    setAccountExists(false);
     setLoading(true);
 
     try {
@@ -62,9 +65,19 @@ function Register() {
 
       const data = await response.json();
 
+      // ✅ Check if account already exists
+      if (response.status === 409 && data.exists) {
+        setAccountExists(true);
+        setError('⚠️ An account with this email already exists.');
+        toast.error('Account already exists!');
+        // Still show login/forgot password options
+        return;
+      }
+
       if (response.ok && data.success) {
         setStep('otp');
         setResendTimer(60);
+        toast.success('OTP sent successfully!');
         
         const timer = setInterval(() => {
           setResendTimer((prev) => {
@@ -77,16 +90,18 @@ function Register() {
         }, 1000);
       } else {
         setError(data.error || '❌ Failed to send OTP. Please try again.');
+        toast.error(data.error || 'Failed to send OTP');
       }
     } catch (err) {
       console.error('Send OTP error:', err);
       setError('❌ Network issue. Please check your connection.');
+      toast.error('Network issue. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Verify OTP - NO duplicate register call
+  // Verify OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     
@@ -115,9 +130,7 @@ function Register() {
         localStorage.setItem('userName', data.user?.name || name);
         localStorage.setItem('userId', data.user?._id || '');
         
-        // ✅ No need to call register again - OTP verification already created account
-        // The backend already created the user during OTP verification
-        
+        toast.success('Account created successfully! 🎉');
         setStep('success');
         
         setTimeout(() => {
@@ -125,10 +138,12 @@ function Register() {
         }, 2000);
       } else {
         setError(data.error || '❌ Invalid OTP. Please try again.');
+        toast.error(data.error || 'Invalid OTP');
       }
     } catch (err) {
       console.error('Verify OTP error:', err);
       setError('❌ Network issue. Please try again.');
+      toast.error('Network issue. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -148,8 +163,17 @@ function Register() {
 
       const data = await response.json();
 
+      // ✅ Check if account already exists (shouldn't happen here, but just in case)
+      if (response.status === 409 && data.exists) {
+        setAccountExists(true);
+        setError('⚠️ An account with this email already exists.');
+        toast.error('Account already exists!');
+        return;
+      }
+
       if (response.ok && data.success) {
         setResendTimer(60);
+        toast.success('OTP resent successfully!');
         const timer = setInterval(() => {
           setResendTimer((prev) => {
             if (prev <= 1) {
@@ -162,9 +186,11 @@ function Register() {
         setError('');
       } else {
         setError(data.error || 'Failed to resend OTP');
+        toast.error(data.error || 'Failed to resend OTP');
       }
     } catch (err) {
       setError('Failed to resend OTP. Please try again.');
+      toast.error('Failed to resend OTP');
     } finally {
       setLoading(false);
     }
@@ -201,7 +227,6 @@ function Register() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner - From Backend */}
         <OfferBanner />
 
         {/* Premium Header */}
@@ -293,8 +318,42 @@ function Register() {
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                    <span>⚠️</span> {error}
+                  <div className={`${accountExists ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-red-50 border-red-200 text-red-600'} border p-3 rounded-xl mb-4 text-sm flex items-center gap-2`}>
+                    <span>{accountExists ? '⚠️' : '⚠️'}</span> {error}
+                  </div>
+                )}
+
+                {/* ✅ Account exists warning with actions */}
+                {accountExists && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                    <p className="text-yellow-800 text-sm font-medium mb-2">
+                      ⚠️ An account with this email already exists.
+                    </p>
+                    <div className="flex gap-3 flex-wrap">
+                      <Link 
+                        to="/login" 
+                        className="text-pink-600 font-medium hover:underline text-sm"
+                      >
+                        Login →
+                      </Link>
+                      <Link 
+                        to="/forgot-password" 
+                        className="text-pink-600 font-medium hover:underline text-sm"
+                      >
+                        Forgot Password?
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setAccountExists(false);
+                          setError('');
+                          setEmail('');
+                          setName('');
+                        }}
+                        className="text-gray-500 font-medium hover:underline text-sm"
+                      >
+                        Try different email
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -310,13 +369,14 @@ function Register() {
                       placeholder="000000"
                       required
                       autoFocus
+                      disabled={accountExists}
                     />
                   </div>
 
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50"
+                    disabled={loading || accountExists}
+                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -332,7 +392,7 @@ function Register() {
                     <button
                       type="button"
                       onClick={handleResendOTP}
-                      disabled={resendTimer > 0}
+                      disabled={resendTimer > 0 || accountExists}
                       className="text-sm text-pink-600 hover:underline transition disabled:opacity-50"
                     >
                       {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
@@ -343,6 +403,7 @@ function Register() {
                         setStep('details');
                         setOtp('');
                         setError('');
+                        setAccountExists(false);
                       }}
                       className="text-sm text-gray-500 hover:text-pink-600 transition ml-4"
                     >
@@ -362,7 +423,7 @@ function Register() {
                   <p className="text-gray-500 text-sm mt-1">Create your account with email verification</p>
                 </div>
 
-                {error && (
+                {error && !accountExists && (
                   <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
                     <span>⚠️</span> {error}
                   </div>
