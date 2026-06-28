@@ -5,6 +5,7 @@ import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
+import FloatingCartButton from './components/FloatingCartButton'; // ✅ ADDED
 
 // ✅ CUSTOMER PAGES - Lazy Loaded
 const Home = lazy(() => import('./pages/Home'));
@@ -184,6 +185,10 @@ function App() {
                   <Route path="/vendor/profile" element={<VendorProfile />} />
                 </Routes>
               </Suspense>
+
+              {/* ✅ FLOATING CART BUTTON - Shows on all pages */}
+              <FloatingCartButton />
+              
             </ReviewProvider>
           </CartProvider>
         </WishlistProvider>
