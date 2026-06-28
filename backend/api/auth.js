@@ -13,7 +13,13 @@ router.post('/register', async (req, res) => {
     
     let user = await User.findOne({ email });
     if (user) {
-      return res.status(400).json({ error: 'User already exists' });
+      // ✅ Better response with action suggestion
+      return res.status(409).json({ 
+        error: 'An account with this email already exists.',
+        exists: true,
+        action: 'login',
+        message: 'Please login or use "Forgot Password" to reset your password.'
+      });
     }
     
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -56,7 +62,6 @@ router.post('/register', async (req, res) => {
       console.error('❌ Failed to send verification email:', result.error);
     }
     
-    // ✅ Generate token for auto-login
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -100,7 +105,6 @@ router.get('/verify-email/:token', async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
     
-    // ✅ FIX: Use let instead of const (or different variable name)
     const authToken = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -232,7 +236,6 @@ router.post('/reset-password/:token', async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
     
-    // ✅ Generate token for auto-login after reset
     const authToken = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
