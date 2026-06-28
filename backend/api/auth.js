@@ -3,9 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-// ❌ REMOVED: const nodemailer = require('nodemailer');
 const User = require('../models/User');
-const { sendEmail } = require('../services/emailService'); // ✅ NEW
+const { sendEmail } = require('../services/emailService');
 
 // ========== REGISTER ==========
 router.post('/register', async (req, res) => {
@@ -33,7 +32,6 @@ router.post('/register', async (req, res) => {
     
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
     
-    // ✅ UPDATED: Using sendEmail instead of transporter.sendMail
     const subject = 'Verify Your Email Address';
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
@@ -56,12 +54,27 @@ router.post('/register', async (req, res) => {
     
     if (!result.success && !result.mock) {
       console.error('❌ Failed to send verification email:', result.error);
-      // Still return success because user is created
     }
     
+    // ✅ FIX: Generate token
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+    
+    // ✅ FIX: Send token + user data with response
     res.json({ 
       success: true, 
-      message: 'Registration successful! Please check your email to verify your account.' 
+      message: 'Registration successful! Please check your email to verify your account.',
+      token: token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified
+      }
     });
     
   } catch (error) {
@@ -88,7 +101,25 @@ router.get('/verify-email/:token', async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
     
-    res.json({ success: true, message: 'Email verified successfully! You can now login.' });
+    // ✅ Generate token for auto-login after verification
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Email verified successfully!',
+      token: token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: true
+      }
+    });
     
   } catch (error) {
     res.status(500).json({ error: 'Verification failed' });
@@ -150,7 +181,6 @@ router.post('/forgot-password', async (req, res) => {
     
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
     
-    // ✅ UPDATED: Using sendEmail instead of transporter.sendMail
     const subject = '🔐 Reset Your Password';
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); border-radius: 20px;">
@@ -203,7 +233,25 @@ router.post('/reset-password/:token', async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
     
-    res.json({ success: true, message: 'Password reset successful! You can now login.' });
+    // ✅ Generate token for auto-login after reset
+    const authToken = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Password reset successful!',
+      token: authToken,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
     
   } catch (error) {
     res.status(500).json({ error: 'Password reset failed' });
