@@ -9,6 +9,12 @@ const initTransporter = () => {
   if (isInitialized && transporter) return transporter;
   
   try {
+    console.log('🔧 Initializing Sender.net SMTP...');
+    console.log('📧 SENDER_USERNAME:', process.env.SENDER_USERNAME ? '✅ Set' : '❌ Missing');
+    console.log('📧 SENDER_PASSWORD:', process.env.SENDER_PASSWORD ? '✅ Set' : '❌ Missing');
+    console.log('📧 SENDER_HOST:', process.env.SENDER_HOST || 'smtp.sender.net');
+    console.log('📧 SENDER_PORT:', process.env.SENDER_PORT || 587);
+
     transporter = nodemailer.createTransport({
       host: process.env.SENDER_HOST || 'smtp.sender.net',
       port: parseInt(process.env.SENDER_PORT) || 587,
@@ -25,21 +31,29 @@ const initTransporter = () => {
       socketTimeout: 30000
     });
 
-    // Verify connection
+    // ✅ FIXED: Full error details
     transporter.verify((error, success) => {
       if (error) {
-        console.error('❌ Sender.net SMTP error:', error.message);
+        console.error('❌❌❌ Sender.net SMTP ERROR ❌❌❌');
+        console.error('📛 Error message:', error.message);
+        console.error('📛 Error code:', error.code);
+        console.error('📛 Error command:', error.command);
+        console.error('📛 Error response:', error.response);
+        console.error('📛 Error responseCode:', error.responseCode);
+        console.error('📛 Full error:', JSON.stringify(error, null, 2));
         transporter = null;
         isInitialized = false;
       } else {
-        console.log('✅ Sender.net SMTP is ready');
+        console.log('✅✅✅ Sender.net SMTP is ready! ✅✅✅');
         isInitialized = true;
       }
     });
 
     return transporter;
   } catch (error) {
-    console.error('❌ Failed to create transporter:', error.message);
+    console.error('❌❌❌ Failed to create transporter ❌❌❌');
+    console.error('📛 Error:', error.message);
+    console.error('📛 Stack:', error.stack);
     transporter = null;
     isInitialized = false;
     return null;
@@ -48,8 +62,11 @@ const initTransporter = () => {
 
 // ============ GENERIC SEND FUNCTION ============
 const sendEmail = async (to, subject, html) => {
+  console.log('📨 sendEmail called to:', to);
+  
   // Initialize transporter if not ready
   if (!transporter || !isInitialized) {
+    console.log('🔄 Transporter not ready, initializing...');
     initTransporter();
   }
 
@@ -57,7 +74,7 @@ const sendEmail = async (to, subject, html) => {
   if (!transporter || !isInitialized) {
     console.log('🔐 MOCK MODE - Email to:', to);
     console.log('📧 Subject:', subject);
-    console.log('📝 HTML:', html?.substring(0, 200) + '...');
+    console.log('📝 HTML preview:', html?.substring(0, 200) + '...');
     return { 
       success: true, 
       mock: true, 
@@ -73,6 +90,7 @@ const sendEmail = async (to, subject, html) => {
   };
 
   try {
+    console.log('📤 Sending email to:', to);
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ Email sent successfully to:', to, '| MessageId:', info.messageId);
     return { 
@@ -82,6 +100,7 @@ const sendEmail = async (to, subject, html) => {
     };
   } catch (error) {
     console.error('❌ Send email error:', error.message);
+    console.error('❌ Full error:', JSON.stringify(error, null, 2));
     // Fallback to mock mode
     console.log('🔐 FALLBACK MOCK - Email to:', to);
     return { 
@@ -95,6 +114,7 @@ const sendEmail = async (to, subject, html) => {
 
 // ============ TEST FUNCTION ============
 const testEmailService = async () => {
+  console.log('🧪 Testing email service...');
   const result = await sendEmail(
     'test@mypinkshop.com',
     '🧪 Test Email from MyPinkShop',
