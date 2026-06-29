@@ -25,7 +25,7 @@ function AdminCoupons() {
     status: 'active'
   });
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = 'https://api.mypinkshop.com';
 
   // ✅ Check admin auth
   useEffect(() => {
