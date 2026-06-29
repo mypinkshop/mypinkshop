@@ -43,7 +43,7 @@ function AdminCoupons() {
       setLoading(true);
       setError('');
 
-      const res = await fetch(`${API_URL}/coupons/all`, {
+      const res = await fetch(`${API_URL}/api/coupons/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
