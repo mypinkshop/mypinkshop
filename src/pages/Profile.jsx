@@ -6,17 +6,22 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function Profile() {
   const navigate = useNavigate();
   const { user, logout, token } = useAuth();
-  const { cartCount } = useCart();
+  const { addToCart, cartCount } = useCart();
   const { wishlistCount, wishlist, removeFromWishlist } = useWishlist();
   const [activeTab, setActiveTab] = useState('orders');
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [profileImage, setProfileImage] = useState(null);
+  
+  // ✅ Profile Image - SessionStorage se load karo
+  const [profileImage, setProfileImage] = useState(() => {
+    return sessionStorage.getItem('user_profile_image') || null;
+  });
   const [profileImagePreview, setProfileImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   
@@ -50,6 +55,7 @@ function Profile() {
   
   // Addresses
   const [addresses, setAddresses] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [addressForm, setAddressForm] = useState({
@@ -61,11 +67,12 @@ function Profile() {
     city: '',
     state: '',
     isDefault: false,
-    addressType: 'home' // home, work, other
+    addressType: 'home'
   });
   
   // Orders
   const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchOrder, setSearchOrder] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -76,11 +83,13 @@ function Profile() {
   
   // Reviews
   const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
   const [reviewToDelete, setReviewToDelete] = useState(null);
   
   // Saved Cards
   const [savedCards, setSavedCards] = useState([]);
+  const [cardsLoading, setCardsLoading] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardForm, setCardForm] = useState({
     last4: '',
@@ -92,6 +101,7 @@ function Profile() {
   
   // Login History
   const [loginHistory, setLoginHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   
   // Delete Account Modal
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
@@ -99,7 +109,24 @@ function Profile() {
   
   const API_URL = 'https://api.mypinkshop.com';
 
-  // Handle search
+  // ========== VALIDATION FUNCTIONS ==========
+  const validateEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validatePhone = (phone) => {
+    return /^[0-9]{10}$/.test(phone);
+  };
+
+  const validatePincode = (pincode) => {
+    return /^[0-9]{6}$/.test(pincode);
+  };
+
+  const validatePassword = (password) => {
+    return password.length >= 6;
+  };
+
+  // ========== HANDLE SEARCH ==========
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -112,18 +139,18 @@ function Profile() {
     }
   };
 
-  // Handle profile image upload
+  // ========== PROFILE IMAGE UPLOAD ==========
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      toast.error('Please upload an image file');
       return;
     }
     
     if (file.size > 2 * 1024 * 1024) {
-      alert('Image size should be less than 2MB');
+      toast.error('Image size should be less than 2MB');
       return;
     }
     
@@ -144,26 +171,33 @@ function Profile() {
       
       const data = await response.json();
       if (data.success) {
+        const imageUrl = data.url;
+        
+        // ✅ Save to backend
         await fetch(`${API_URL}/api/users/profile`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ profileImage: data.url })
+          body: JSON.stringify({ profileImage: imageUrl })
         });
-        setProfileImage(data.url);
-        alert('Profile picture updated successfully!');
+        
+        // ✅ Save to state and sessionStorage
+        setProfileImage(imageUrl);
+        sessionStorage.setItem('user_profile_image', imageUrl);
+        
+        toast.success('Profile picture updated successfully!');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload profile picture');
+      toast.error('Failed to upload profile picture');
     } finally {
       setUploadingImage(false);
     }
   };
 
-  // Check if user is logged in
+  // ========== FETCH FUNCTIONS ==========
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
@@ -177,6 +211,14 @@ function Profile() {
     fetchSavedCards();
     fetchLoginHistory();
   }, [user, token, navigate]);
+
+  // ✅ Profile Image - SessionStorage se load on mount
+  useEffect(() => {
+    const savedImage = sessionStorage.getItem('user_profile_image');
+    if (savedImage) {
+      setProfileImage(savedImage);
+    }
+  }, []);
 
   // Fetch user profile
   const fetchUserData = async () => {
@@ -205,7 +247,13 @@ function Profile() {
           phoneVerified: data.phoneVerified || false,
           createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
         });
-        setProfileImage(data.profileImage || '');
+        
+        // ✅ Save profile image
+        if (data.profileImage) {
+          setProfileImage(data.profileImage);
+          sessionStorage.setItem('user_profile_image', data.profileImage);
+        }
+        
         setNewName(data.name || '');
         setNewEmail(data.email || '');
         setNewPhone(data.phone || '');
@@ -216,6 +264,7 @@ function Profile() {
     } catch (error) {
       console.error('Failed to fetch user data:', error);
       setApiError(true);
+      toast.error('Failed to load profile data');
     } finally {
       setLoading(false);
     }
@@ -224,6 +273,7 @@ function Profile() {
   // Fetch addresses
   const fetchAddresses = async () => {
     if (!token) return;
+    setAddressLoading(true);
     
     try {
       const response = await fetch(`${API_URL}/api/users/addresses`, {
@@ -236,12 +286,16 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch addresses:', error);
+      toast.error('Failed to load addresses');
+    } finally {
+      setAddressLoading(false);
     }
   };
 
   // Fetch orders
   const fetchOrders = async () => {
     if (!token) return;
+    setOrdersLoading(true);
     
     try {
       const response = await fetch(`${API_URL}/api/orders/my-orders`, {
@@ -256,12 +310,16 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
   // Fetch reviews
   const fetchReviews = async () => {
     if (!token) return;
+    setReviewsLoading(true);
     
     try {
       const response = await fetch(`${API_URL}/api/reviews/my-reviews`, {
@@ -274,12 +332,16 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
+      toast.error('Failed to load reviews');
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
   // Fetch saved cards
   const fetchSavedCards = async () => {
     if (!token) return;
+    setCardsLoading(true);
     
     try {
       const response = await fetch(`${API_URL}/api/users/cards`, {
@@ -292,12 +354,16 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch cards:', error);
+      toast.error('Failed to load cards');
+    } finally {
+      setCardsLoading(false);
     }
   };
 
   // Fetch login history
   const fetchLoginHistory = async () => {
     if (!token) return;
+    setHistoryLoading(true);
     
     try {
       const response = await fetch(`${API_URL}/api/users/login-history`, {
@@ -310,6 +376,9 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch login history:', error);
+      toast.error('Failed to load login history');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -317,17 +386,27 @@ function Profile() {
   useEffect(() => {
     let filtered = orders;
     if (searchOrder) {
-      filtered = filtered.filter(order => order._id?.toLowerCase().includes(searchOrder.toLowerCase()) || order.id?.toLowerCase().includes(searchOrder.toLowerCase()));
+      filtered = filtered.filter(order => 
+        order._id?.toLowerCase().includes(searchOrder.toLowerCase()) || 
+        order.id?.toLowerCase().includes(searchOrder.toLowerCase())
+      );
     }
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(order => order.status?.toLowerCase() === filterStatus.toLowerCase());
+      filtered = filtered.filter(order => 
+        order.status?.toLowerCase() === filterStatus.toLowerCase()
+      );
     }
     setFilteredOrders(filtered);
   }, [searchOrder, filterStatus, orders]);
 
+  // ========== UPDATE FUNCTIONS ==========
+  
   // Update name
   const handleNameUpdate = async () => {
-    if (!newName.trim()) return;
+    if (!newName.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
     
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -343,17 +422,17 @@ function Profile() {
         const data = await response.json();
         setUserData(prev => ({ ...prev, name: data.name }));
         setShowNameEdit(false);
-        alert('Name updated successfully!');
+        toast.success('Name updated successfully!');
       }
     } catch (error) {
-      alert('Error updating name');
+      toast.error('Error updating name');
     }
   };
 
   // Update email
   const handleEmailUpdate = async () => {
-    if (!newEmail.includes('@')) {
-      alert('Please enter a valid email address');
+    if (!validateEmail(newEmail)) {
+      toast.error('Please enter a valid email address');
       return;
     }
     
@@ -371,19 +450,20 @@ function Profile() {
         const data = await response.json();
         setUserData(prev => ({ ...prev, email: data.email, emailVerified: false }));
         setShowEmailEdit(false);
-        alert('Email updated successfully!');
+        toast.success('Email updated successfully!');
       } else {
-        alert('Email already in use or invalid');
+        const error = await response.json();
+        toast.error(error.error || 'Email already in use or invalid');
       }
     } catch (error) {
-      alert('Error updating email');
+      toast.error('Error updating email');
     }
   };
 
   // Update phone
   const handlePhoneUpdate = async () => {
-    if (!newPhone || newPhone.length < 10) {
-      alert('Please enter a valid 10-digit mobile number');
+    if (!validatePhone(newPhone)) {
+      toast.error('Please enter a valid 10-digit mobile number');
       return;
     }
     
@@ -401,10 +481,10 @@ function Profile() {
         const data = await response.json();
         setUserData(prev => ({ ...prev, phone: data.phone, phoneVerified: false }));
         setShowPhoneEdit(false);
-        alert('Phone number updated successfully!');
+        toast.success('Phone number updated successfully!');
       }
     } catch (error) {
-      alert('Error updating phone');
+      toast.error('Error updating phone');
     }
   };
 
@@ -424,10 +504,10 @@ function Profile() {
         const data = await response.json();
         setUserData(prev => ({ ...prev, gender: data.gender }));
         setShowGenderEdit(false);
-        alert('Gender updated successfully!');
+        toast.success('Gender updated successfully!');
       }
     } catch (error) {
-      alert('Error updating gender');
+      toast.error('Error updating gender');
     }
   };
 
@@ -447,21 +527,22 @@ function Profile() {
         const data = await response.json();
         setUserData(prev => ({ ...prev, dob: data.dob }));
         setShowDobEdit(false);
-        alert('Date of birth updated successfully!');
+        toast.success('Date of birth updated successfully!');
       }
     } catch (error) {
-      alert('Error updating date of birth');
+      toast.error('Error updating date of birth');
     }
   };
 
   // Change password
   const handlePasswordUpdate = async () => {
-    if (newPassword !== confirmPassword) {
-      alert('New passwords do not match');
+    if (!validatePassword(newPassword)) {
+      toast.error('Password must be at least 6 characters');
       return;
     }
-    if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters');
+    
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
       return;
     }
     
@@ -476,33 +557,40 @@ function Profile() {
       });
       
       if (response.ok) {
-        alert('Password changed successfully!');
+        toast.success('Password changed successfully!');
         setShowPasswordEdit(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
         const error = await response.json();
-        alert(error.error || 'Current password is incorrect');
+        toast.error(error.error || 'Current password is incorrect');
       }
     } catch (error) {
-      alert('Error changing password');
+      toast.error('Error changing password');
     }
   };
 
-  // Reorder
+  // ========== ORDER FUNCTIONS ==========
+  
+  // ✅ Reorder - Fixed with addToCart
   const handleReorder = async (order) => {
-    for (const item of order.items) {
-      addToCart({
-        id: item.productId,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image
-      });
+    try {
+      for (const item of order.items) {
+        addToCart({
+          id: item.productId || item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity || 1,
+          image: item.image,
+          stock: item.stock
+        });
+      }
+      toast.success('Items added to cart!');
+      navigate('/cart');
+    } catch (error) {
+      toast.error('Error adding items to cart');
     }
-    alert('Items added to cart!');
-    navigate('/cart');
   };
 
   // Download invoice
@@ -529,12 +617,13 @@ function Profile() {
     a.download = `invoice_${order._id}.html`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success('Invoice downloaded!');
   };
 
   // Request return
   const handleReturnRequest = async () => {
     if (!returnReason) {
-      alert('Please select a reason for return');
+      toast.error('Please select a reason for return');
       return;
     }
     
@@ -549,118 +638,70 @@ function Profile() {
       });
       
       if (response.ok) {
-        alert('Return request submitted successfully!');
+        toast.success('Return request submitted successfully!');
         setShowReturnModal(false);
         setReturnReason('');
         setReturnComment('');
         fetchOrders();
       } else {
-        alert('Failed to submit return request');
+        toast.error('Failed to submit return request');
       }
     } catch (error) {
-      alert('Error submitting return request');
+      toast.error('Error submitting return request');
     }
   };
 
-  // Delete review
-  const handleDeleteReview = async () => {
+  // Cancel order
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    
     try {
-      const response = await fetch(`${API_URL}/api/reviews/${reviewToDelete}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
+        method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.ok) {
-        alert('Review deleted successfully!');
-        setShowDeleteReviewModal(false);
-        fetchReviews();
+        toast.success('Order cancelled successfully');
+        fetchOrders();
       } else {
-        alert('Failed to delete review');
+        toast.error('Failed to cancel order');
       }
     } catch (error) {
-      alert('Error deleting review');
+      toast.error('Error cancelling order');
     }
   };
 
-  // Add card
-  const handleAddCard = async () => {
-    if (!cardForm.last4 || cardForm.last4.length !== 4) {
-      alert('Please enter last 4 digits');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/cards`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(cardForm)
-      });
-      
-      if (response.ok) {
-        alert('Card saved successfully!');
-        setShowCardModal(false);
-        setCardForm({ last4: '', cardType: '', expiryMonth: '', expiryYear: '', isDefault: false });
-        fetchSavedCards();
-      } else {
-        alert('Failed to save card');
-      }
-    } catch (error) {
-      alert('Error saving card');
-    }
-  };
-
-  // Delete card
-  const handleDeleteCard = async (cardId) => {
-    if (!window.confirm('Are you sure you want to delete this card?')) return;
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/cards/${cardId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        alert('Card deleted successfully!');
-        fetchSavedCards();
-      } else {
-        alert('Failed to delete card');
-      }
-    } catch (error) {
-      alert('Error deleting card');
-    }
-  };
-
-  // Delete account
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'DELETE') {
-      alert('Please type DELETE to confirm');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/account`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        alert('Account deleted successfully!');
-        logout();
-        navigate('/');
-      } else {
-        alert('Failed to delete account');
-      }
-    } catch (error) {
-      alert('Error deleting account');
-    }
-  };
-
-  // Address CRUD
+  // ========== ADDRESS FUNCTIONS ==========
+  
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
+    
+    // ✅ Validation
+    if (!addressForm.fullName.trim()) {
+      toast.error('Please enter full name');
+      return;
+    }
+    if (!validatePhone(addressForm.phone)) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+    if (!validatePincode(addressForm.pincode)) {
+      toast.error('Please enter a valid 6-digit pincode');
+      return;
+    }
+    if (!addressForm.addressLine1.trim()) {
+      toast.error('Please enter address line 1');
+      return;
+    }
+    if (!addressForm.city.trim()) {
+      toast.error('Please enter city');
+      return;
+    }
+    if (!addressForm.state.trim()) {
+      toast.error('Please enter state');
+      return;
+    }
     
     const url = editingAddress 
       ? `${API_URL}/api/users/addresses/${editingAddress._id}`
@@ -678,6 +719,7 @@ function Profile() {
       });
       
       if (response.ok) {
+        toast.success(editingAddress ? 'Address updated successfully!' : 'Address added successfully!');
         fetchAddresses();
         setShowAddressModal(false);
         setEditingAddress(null);
@@ -692,10 +734,11 @@ function Profile() {
           isDefault: false,
           addressType: 'home'
         });
-        alert('Address saved successfully!');
+      } else {
+        toast.error('Failed to save address');
       }
     } catch (error) {
-      alert('Error saving address');
+      toast.error('Error saving address');
     }
   };
 
@@ -709,11 +752,13 @@ function Profile() {
       });
       
       if (response.ok) {
+        toast.success('Address deleted successfully!');
         fetchAddresses();
-        alert('Address deleted successfully!');
+      } else {
+        toast.error('Failed to delete address');
       }
     } catch (error) {
-      alert('Error deleting address');
+      toast.error('Error deleting address');
     }
   };
 
@@ -725,33 +770,124 @@ function Profile() {
       });
       
       if (response.ok) {
+        toast.success('Default address updated!');
         fetchAddresses();
-        alert('Default address updated!');
+      } else {
+        toast.error('Failed to set default address');
       }
     } catch (error) {
-      alert('Error setting default address');
+      toast.error('Error setting default address');
     }
   };
 
-  // Cancel order
-  const cancelOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
-    
+  // ========== REVIEW FUNCTIONS ==========
+  
+  const handleDeleteReview = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
-        method: 'PATCH',
+      const response = await fetch(`${API_URL}/api/reviews/${reviewToDelete}`, {
+        method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.ok) {
-        fetchOrders();
-        alert('Order cancelled successfully');
+        toast.success('Review deleted successfully!');
+        setShowDeleteReviewModal(false);
+        fetchReviews();
+      } else {
+        toast.error('Failed to delete review');
       }
     } catch (error) {
-      alert('Error cancelling order');
+      toast.error('Error deleting review');
     }
   };
 
+  // ========== CARD FUNCTIONS ==========
+  
+  const handleAddCard = async () => {
+    if (!cardForm.last4 || cardForm.last4.length !== 4) {
+      toast.error('Please enter last 4 digits');
+      return;
+    }
+    if (!cardForm.expiryMonth || cardForm.expiryMonth.length !== 2) {
+      toast.error('Please enter valid expiry month (MM)');
+      return;
+    }
+    if (!cardForm.expiryYear || cardForm.expiryYear.length !== 4) {
+      toast.error('Please enter valid expiry year (YYYY)');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/cards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(cardForm)
+      });
+      
+      if (response.ok) {
+        toast.success('Card saved successfully!');
+        setShowCardModal(false);
+        setCardForm({ last4: '', cardType: '', expiryMonth: '', expiryYear: '', isDefault: false });
+        fetchSavedCards();
+      } else {
+        toast.error('Failed to save card');
+      }
+    } catch (error) {
+      toast.error('Error saving card');
+    }
+  };
+
+  const handleDeleteCard = async (cardId) => {
+    if (!window.confirm('Are you sure you want to delete this card?')) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/cards/${cardId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        toast.success('Card deleted successfully!');
+        fetchSavedCards();
+      } else {
+        toast.error('Failed to delete card');
+      }
+    } catch (error) {
+      toast.error('Error deleting card');
+    }
+  };
+
+  // ========== ACCOUNT FUNCTIONS ==========
+  
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error('Please type DELETE to confirm');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/account`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        toast.success('Account deleted successfully!');
+        logout();
+        navigate('/');
+      } else {
+        toast.error('Failed to delete account');
+      }
+    } catch (error) {
+      toast.error('Error deleting account');
+    }
+  };
+
+  // ========== UI HELPERS ==========
+  
   const getStatusColor = (status) => {
     switch(status?.toLowerCase()) {
       case 'delivered': return 'text-green-600';
@@ -804,17 +940,7 @@ function Profile() {
       <Helmet>
         <title>My Account - MyPinkShop | Profile, Orders & Addresses</title>
         <meta name="description" content="Manage your MyPinkShop account. View orders, manage addresses, update profile information, and track deliveries." />
-        <meta name="keywords" content="my account, profile, orders, addresses, order tracking, mypinkshop account" />
         <link rel="canonical" href="https://www.mypinkshop.com/profile" />
-        <meta property="og:title" content="My Account - MyPinkShop" />
-        <meta property="og:description" content="Manage your account, orders, and addresses." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com/profile" />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-profile.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="My Account - MyPinkShop" />
-        <meta name="twitter:description" content="Manage your account, orders, and addresses." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-profile.jpg" />
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -945,7 +1071,13 @@ function Profile() {
                       </select>
                     </div>
                   </div>
-                  {filteredOrders.length === 0 ? (
+                  
+                  {ordersLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading orders...</p>
+                    </div>
+                  ) : filteredOrders.length === 0 ? (
                     <div className="p-8 text-center">
                       <div className="text-6xl mb-4">📦</div>
                       <p className="text-gray-500">No orders found</p>
@@ -995,7 +1127,7 @@ function Profile() {
                               </>
                             )}
                             
-                            {(order.status === 'pending' || order.status === 'confirmed') && (
+                            {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') && (
                               <button onClick={() => cancelOrder(order._id || order.id)} className="text-sm text-red-600 hover:underline">
                                 Cancel Order
                               </button>
@@ -1034,7 +1166,13 @@ function Profile() {
                       + Add New Address
                     </button>
                   </div>
-                  {addresses.length === 0 ? (
+                  
+                  {addressLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading addresses...</p>
+                    </div>
+                  ) : addresses.length === 0 ? (
                     <div className="p-8 text-center">
                       <div className="text-6xl mb-4">📍</div>
                       <p className="text-gray-500">No addresses saved</p>
@@ -1121,7 +1259,7 @@ function Profile() {
                     <div className="p-4 flex flex-wrap justify-between items-center gap-3">
                       <div><p className="text-sm text-gray-500">Email Address</p><p className="font-medium text-gray-800">{userData.email}</p>{!userData.emailVerified && <p className="text-xs text-yellow-600">Not verified</p>}</div>
                       <div className="flex gap-3">
-                        {!userData.emailVerified && <button onClick={() => alert(`Verification link sent to ${userData.email}`)} className="text-blue-600 text-sm hover:underline">Verify</button>}
+                        {!userData.emailVerified && <button onClick={() => toast.success(`Verification link sent to ${userData.email}`)} className="text-blue-600 text-sm hover:underline">Verify</button>}
                         {showEmailEdit ? (
                           <div className="flex gap-2">
                             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
@@ -1139,7 +1277,7 @@ function Profile() {
                       <div><p className="text-sm text-gray-500">Mobile Number</p><p className="font-medium text-gray-800">{userData.phone || 'Not added'}</p></div>
                       {showPhoneEdit ? (
                         <div className="flex gap-2">
-                          <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="10-digit mobile" className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
+                          <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="10-digit mobile" maxLength="10" className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
                           <button onClick={handlePhoneUpdate} className="text-green-600 text-sm">Save</button>
                           <button onClick={() => setShowPhoneEdit(false)} className="text-gray-500 text-sm">Cancel</button>
                         </div>
@@ -1210,7 +1348,7 @@ function Profile() {
                       {showPasswordEdit ? (
                         <div className="space-y-3">
                           <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
-                          <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
+                          <input type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
                           <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
                           <div className="flex gap-2">
                             <button onClick={handlePasswordUpdate} className="bg-green-500 text-white px-4 py-2 rounded-xl text-sm">Save</button>
@@ -1236,7 +1374,13 @@ function Profile() {
                   <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
                     <h2 className="font-semibold text-gray-800">My Reviews</h2>
                   </div>
-                  {reviews.length === 0 ? (
+                  
+                  {reviewsLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading reviews...</p>
+                    </div>
+                  ) : reviews.length === 0 ? (
                     <div className="p-8 text-center">
                       <div className="text-6xl mb-4">⭐</div>
                       <p className="text-gray-500">No reviews yet</p>
@@ -1294,8 +1438,25 @@ function Profile() {
                             <Link to={`/product/${product.id}`}><h3 className="font-semibold text-gray-800 hover:text-pink-500">{product.name}</h3></Link>
                             <p className="text-pink-600 font-bold mt-1">₹{product.price}</p>
                             <div className="flex gap-3 mt-2">
-                              <button onClick={() => { addToCart(product); removeFromWishlist(product.id); }} className="text-sm bg-pink-500 text-white px-3 py-1 rounded">Move to Cart</button>
-                              <button onClick={() => removeFromWishlist(product.id)} className="text-sm text-red-500">Remove</button>
+                              <button 
+                                onClick={() => { 
+                                  addToCart(product); 
+                                  removeFromWishlist(product.id); 
+                                  toast.success('Moved to cart!');
+                                }} 
+                                className="text-sm bg-pink-500 text-white px-3 py-1 rounded"
+                              >
+                                Move to Cart
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  removeFromWishlist(product.id);
+                                  toast.success('Removed from wishlist');
+                                }} 
+                                className="text-sm text-red-500"
+                              >
+                                Remove
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1317,7 +1478,13 @@ function Profile() {
                     <h2 className="font-semibold text-gray-800">Saved Payment Methods</h2>
                     <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add New Card</button>
                   </div>
-                  {savedCards.length === 0 ? (
+                  
+                  {cardsLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading cards...</p>
+                    </div>
+                  ) : savedCards.length === 0 ? (
                     <div className="p-8 text-center">
                       <div className="text-6xl mb-4">💳</div>
                       <p className="text-gray-500">No saved payment methods</p>
@@ -1349,7 +1516,13 @@ function Profile() {
                   <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
                     <h2 className="font-semibold text-gray-800">Login History</h2>
                   </div>
-                  {loginHistory.length === 0 ? (
+                  
+                  {historyLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading history...</p>
+                    </div>
+                  ) : loginHistory.length === 0 ? (
                     <div className="p-8 text-center">
                       <div className="text-6xl mb-4">🕐</div>
                       <p className="text-gray-500">No login history available</p>
@@ -1402,22 +1575,82 @@ function Profile() {
                 <button onClick={() => setShowAddressModal(false)} className="text-gray-400 text-2xl">&times;</button>
               </div>
               <form onSubmit={handleAddressSubmit} className="p-5 space-y-3">
-                <input type="text" placeholder="Full Name" value={addressForm.fullName} onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" required />
-                <input type="tel" placeholder="Mobile Number" value={addressForm.phone} onChange={(e) => setAddressForm({...addressForm, phone: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" required />
-                <input type="text" placeholder="Pincode" value={addressForm.pincode} onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" required />
-                <input type="text" placeholder="Address Line 1" value={addressForm.addressLine1} onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" required />
-                <input type="text" placeholder="Address Line 2 (Optional)" value={addressForm.addressLine2} onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
+                <input 
+                  type="text" 
+                  placeholder="Full Name *" 
+                  value={addressForm.fullName} 
+                  onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} 
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  required 
+                />
+                <input 
+                  type="tel" 
+                  placeholder="Mobile Number (10 digits) *" 
+                  value={addressForm.phone} 
+                  onChange={(e) => setAddressForm({...addressForm, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10)})} 
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  required 
+                  maxLength="10"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Pincode (6 digits) *" 
+                  value={addressForm.pincode} 
+                  onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6)})} 
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  required 
+                  maxLength="6"
+                />
+                <input 
+                  type="text" 
+                  placeholder="Address Line 1 *" 
+                  value={addressForm.addressLine1} 
+                  onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} 
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  required 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Address Line 2 (Optional)" 
+                  value={addressForm.addressLine2} 
+                  onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} 
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                />
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="City" value={addressForm.city} onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" required />
-                  <input type="text" placeholder="State" value={addressForm.state} onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" required />
+                  <input 
+                    type="text" 
+                    placeholder="City *" 
+                    value={addressForm.city} 
+                    onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} 
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                    required 
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="State *" 
+                    value={addressForm.state} 
+                    onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} 
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                    required 
+                  />
                 </div>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2"><input type="radio" name="addressType" checked={addressForm.addressType === 'home'} onChange={() => setAddressForm({...addressForm, addressType: 'home'})} /> 🏠 Home</label>
-                  <label className="flex items-center gap-2"><input type="radio" name="addressType" checked={addressForm.addressType === 'work'} onChange={() => setAddressForm({...addressForm, addressType: 'work'})} /> 💼 Work</label>
-                  <label className="flex items-center gap-2"><input type="radio" name="addressType" checked={addressForm.addressType === 'other'} onChange={() => setAddressForm({...addressForm, addressType: 'other'})} /> 📍 Other</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="addressType" checked={addressForm.addressType === 'home'} onChange={() => setAddressForm({...addressForm, addressType: 'home'})} /> 🏠 Home
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="addressType" checked={addressForm.addressType === 'work'} onChange={() => setAddressForm({...addressForm, addressType: 'work'})} /> 💼 Work
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="addressType" checked={addressForm.addressType === 'other'} onChange={() => setAddressForm({...addressForm, addressType: 'other'})} /> 📍 Other
+                  </label>
                 </div>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({...addressForm, isDefault: e.target.checked})} /> Make this my default address</label>
-                <button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl font-medium">{editingAddress ? 'Update Address' : 'Add Address'}</button>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({...addressForm, isDefault: e.target.checked})} /> Make this my default address
+                </label>
+                <button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl font-medium hover:shadow-lg transition">
+                  {editingAddress ? 'Update Address' : 'Add Address'}
+                </button>
               </form>
             </div>
           </div>
@@ -1428,7 +1661,7 @@ function Profile() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6">
               <h3 className="text-lg font-semibold mb-4">Request Return</h3>
-              <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3">
+              <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none">
                 <option value="">Select reason</option>
                 <option value="damaged">Product damaged</option>
                 <option value="wrong">Wrong product received</option>
@@ -1436,10 +1669,16 @@ function Profile() {
                 <option value="quality">Quality issue</option>
                 <option value="other">Other</option>
               </select>
-              <textarea placeholder="Additional comments (optional)" value={returnComment} onChange={(e) => setReturnComment(e.target.value)} rows="3" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-4"></textarea>
+              <textarea 
+                placeholder="Additional comments (optional)" 
+                value={returnComment} 
+                onChange={(e) => setReturnComment(e.target.value)} 
+                rows="3" 
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none mb-4"
+              ></textarea>
               <div className="flex gap-3">
-                <button onClick={handleReturnRequest} className="flex-1 bg-pink-500 text-white py-2 rounded-xl">Submit Request</button>
-                <button onClick={() => { setShowReturnModal(false); setReturnReason(''); setReturnComment(''); }} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl">Cancel</button>
+                <button onClick={handleReturnRequest} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Submit Request</button>
+                <button onClick={() => { setShowReturnModal(false); setReturnReason(''); setReturnComment(''); }} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
               </div>
             </div>
           </div>
@@ -1453,8 +1692,8 @@ function Profile() {
               <h3 className="text-lg font-semibold mb-2">Delete Review?</h3>
               <p className="text-gray-500 mb-4">This action cannot be undone</p>
               <div className="flex gap-3">
-                <button onClick={handleDeleteReview} className="flex-1 bg-red-500 text-white py-2 rounded-xl">Delete</button>
-                <button onClick={() => setShowDeleteReviewModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl">Cancel</button>
+                <button onClick={handleDeleteReview} className="flex-1 bg-red-500 text-white py-2 rounded-xl hover:bg-red-600 transition">Delete</button>
+                <button onClick={() => setShowDeleteReviewModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
               </div>
             </div>
           </div>
@@ -1465,21 +1704,48 @@ function Profile() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6">
               <h3 className="text-lg font-semibold mb-4">Add New Card</h3>
-              <select value={cardForm.cardType} onChange={(e) => setCardForm({...cardForm, cardType: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3">
+              <select value={cardForm.cardType} onChange={(e) => setCardForm({...cardForm, cardType: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none">
                 <option value="">Select Card Type</option>
                 <option value="visa">Visa</option>
                 <option value="mastercard">Mastercard</option>
                 <option value="rupay">RuPay</option>
+                <option value="amex">American Express</option>
               </select>
-              <input type="text" placeholder="Last 4 digits" maxLength="4" value={cardForm.last4} onChange={(e) => setCardForm({...cardForm, last4: e.target.value.replace(/[^0-9]/g, '')})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3" />
+              <input 
+                type="text" 
+                placeholder="Last 4 digits *" 
+                maxLength="4" 
+                value={cardForm.last4} 
+                onChange={(e) => setCardForm({...cardForm, last4: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} 
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                required 
+              />
               <div className="grid grid-cols-2 gap-3 mb-3">
-                <input type="text" placeholder="Expiry Month (MM)" maxLength="2" value={cardForm.expiryMonth} onChange={(e) => setCardForm({...cardForm, expiryMonth: e.target.value.replace(/[^0-9]/g, '')})} className="px-4 py-2.5 border border-gray-200 rounded-xl" />
-                <input type="text" placeholder="Expiry Year (YYYY)" maxLength="4" value={cardForm.expiryYear} onChange={(e) => setCardForm({...cardForm, expiryYear: e.target.value.replace(/[^0-9]/g, '')})} className="px-4 py-2.5 border border-gray-200 rounded-xl" />
+                <input 
+                  type="text" 
+                  placeholder="Expiry Month (MM) *" 
+                  maxLength="2" 
+                  value={cardForm.expiryMonth} 
+                  onChange={(e) => setCardForm({...cardForm, expiryMonth: e.target.value.replace(/[^0-9]/g, '').slice(0, 2)})} 
+                  className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  required 
+                />
+                <input 
+                  type="text" 
+                  placeholder="Expiry Year (YYYY) *" 
+                  maxLength="4" 
+                  value={cardForm.expiryYear} 
+                  onChange={(e) => setCardForm({...cardForm, expiryYear: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} 
+                  className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  required 
+                />
               </div>
-              <label className="flex items-center gap-2 mb-4"><input type="checkbox" checked={cardForm.isDefault} onChange={(e) => setCardForm({...cardForm, isDefault: e.target.checked})} /> Set as default payment method</label>
+              <label className="flex items-center gap-2 mb-4 cursor-pointer">
+                <input type="checkbox" checked={cardForm.isDefault} onChange={(e) => setCardForm({...cardForm, isDefault: e.target.checked})} /> Set as default payment method
+              </label>
               <div className="flex gap-3">
-                <button onClick={handleAddCard} className="flex-1 bg-pink-500 text-white py-2 rounded-xl">Save Card</button>
-                <button onClick={() => setShowCardModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl">Cancel</button>
+                <button onClick={handleAddCard} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save Card</button>
+                <button onClick={() => setShowCardModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
               </div>
             </div>
           </div>
@@ -1496,11 +1762,17 @@ function Profile() {
               </div>
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2">Type <strong className="text-red-600">DELETE</strong> to confirm</p>
-                <input type="text" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-center" placeholder="DELETE" />
+                <input 
+                  type="text" 
+                  value={deleteConfirmText} 
+                  onChange={(e) => setDeleteConfirmText(e.target.value)} 
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-center focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  placeholder="DELETE" 
+                />
               </div>
               <div className="flex gap-3">
-                <button onClick={handleDeleteAccount} className="flex-1 bg-red-500 text-white py-2 rounded-xl">Delete Account</button>
-                <button onClick={() => { setShowDeleteAccountModal(false); setDeleteConfirmText(''); }} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl">Cancel</button>
+                <button onClick={handleDeleteAccount} className="flex-1 bg-red-500 text-white py-2 rounded-xl hover:bg-red-600 transition">Delete Account</button>
+                <button onClick={() => { setShowDeleteAccountModal(false); setDeleteConfirmText(''); }} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
               </div>
             </div>
           </div>
