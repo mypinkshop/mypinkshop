@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function Cart() {
   const navigate = useNavigate();
@@ -15,6 +16,32 @@ function Cart() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [imgErrors, setImgErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  // ✅ Coupon States
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [discount, setDiscount] = useState(0);
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+
+  const API_URL = 'https://api.mypinkshop.com';
+
+  // ✅ Fetch available coupons
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      try {
+        const response = await fetch(`${API_URL}/coupons/active`);
+        const data = await response.json();
+        if (data.success) {
+          setAvailableCoupons(data.coupons || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch coupons:', error);
+      }
+    };
+    fetchCoupons();
+  }, []);
 
   const handleCheckout = () => {
     setIsCheckingOut(true);
@@ -39,11 +66,88 @@ function Cart() {
     }
   };
 
+  // ✅ Update quantity with validation
+  const handleUpdateQuantity = (id, newQuantity, stock) => {
+    if (newQuantity < 1) {
+      removeFromCart(id);
+      toast.success('Item removed from cart');
+      return;
+    }
+    
+    if (stock && newQuantity > stock) {
+      toast.error('Not enough stock available');
+      return;
+    }
+    
+    updateQuantity(id, newQuantity);
+  };
+
+  // ✅ Remove item with confirmation
+  const handleRemoveItem = (id, name) => {
+    if (window.confirm(`Remove "${name}" from cart?`)) {
+      removeFromCart(id);
+      toast.success('Item removed from cart');
+    }
+  };
+
+  // ✅ Apply Coupon
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    setValidatingCoupon(true);
+
+    try {
+      const response = await fetch(`${API_URL}/coupons/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(user && { 'Authorization': `Bearer ${localStorage.getItem('token')}` })
+        },
+        body: JSON.stringify({
+          code: couponCode.toUpperCase(),
+          cartTotal: subtotal,
+          userId: user?._id || null
+        })
+      });
+
+      const data = await response.json();
+
+      if (!data.valid) {
+        toast.error(data.message || 'Invalid coupon');
+        return;
+      }
+
+      // ✅ Coupon valid
+      setDiscount(data.coupon.discountAmount);
+      setAppliedCoupon(data.coupon);
+      setCouponApplied(true);
+      toast.success(`🎉 ${data.coupon.code} applied! You saved ₹${data.coupon.discountAmount}`);
+      setCouponCode('');
+
+    } catch (error) {
+      toast.error('Error applying coupon');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  // ✅ Remove Coupon
+  const removeCoupon = () => {
+    setDiscount(0);
+    setAppliedCoupon(null);
+    setCouponApplied(false);
+    toast.success('Coupon removed');
+  };
+
   const subtotal = cartTotal();
   const FREE_SHIPPING_THRESHOLD = 499;
-  const shipping = subtotal > FREE_SHIPPING_THRESHOLD ? 0 : 49;
-  const total = subtotal + shipping;
-  const remainingForFree = FREE_SHIPPING_THRESHOLD - subtotal;
+  const totalWithDiscount = subtotal - discount;
+  const shipping = totalWithDiscount > FREE_SHIPPING_THRESHOLD ? 0 : 49;
+  const finalTotal = totalWithDiscount + shipping;
+  const remainingForFree = FREE_SHIPPING_THRESHOLD - totalWithDiscount;
 
   // SEO Schema
   const generateBreadcrumbSchema = () => ({
@@ -85,11 +189,8 @@ function Cart() {
         </Helmet>
 
         <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-          
-          {/* Dynamic Offer Banner - From Admin */}
           <OfferBanner />
 
-          {/* Premium Header */}
           <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
               <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -149,7 +250,6 @@ function Cart() {
             </div>
           </header>
 
-          {/* Empty Cart */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
               <div className="text-8xl mb-6 animate-bounce">🛒</div>
@@ -161,7 +261,6 @@ function Cart() {
             </div>
           </div>
 
-          {/* Footer */}
           <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -236,10 +335,8 @@ function Cart() {
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner - From Admin */}
         <OfferBanner />
 
-        {/* Premium Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -302,7 +399,6 @@ function Cart() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Home</Link>
@@ -311,7 +407,6 @@ function Cart() {
           </div>
         </div>
 
-        {/* Cart Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex flex-wrap items-center gap-2">
             <span>🛒</span> Shopping Cart
@@ -357,7 +452,7 @@ function Cart() {
                         </Link>
                         <p className="text-xs text-gray-400 mt-1 capitalize">{item.category || 'Product'}</p>
                         <button 
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => handleRemoveItem(item.id, item.name)}
                           className="text-xs text-red-400 mt-2 hover:text-red-600 transition flex items-center gap-1"
                         >
                           <span>🗑️</span> Remove
@@ -373,14 +468,14 @@ function Cart() {
                     <div className="md:col-span-2 flex justify-start md:justify-center">
                       <div className="flex items-center gap-3 border border-pink-200 rounded-full px-3 py-1 bg-white shadow-sm">
                         <button 
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1, item.stock)}
                           className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition flex items-center justify-center"
                         >
                           -
                         </button>
                         <span className="w-8 text-center font-medium">{item.quantity}</span>
                         <button 
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, item.stock)}
                           className="w-7 h-7 rounded-full hover:bg-pink-100 text-pink-500 font-bold transition flex items-center justify-center"
                         >
                           +
@@ -413,6 +508,61 @@ function Cart() {
                     <span>Subtotal</span>
                     <span>₹{subtotal}</span>
                   </div>
+
+                  {/* ✅ COUPON SECTION */}
+                  {couponApplied ? (
+                    <div className="flex justify-between text-green-600 py-2 border-t border-pink-100">
+                      <span>Discount ({appliedCoupon?.code})</span>
+                      <div className="flex items-center gap-2">
+                        <span>-₹{discount}</span>
+                        <button 
+                          onClick={removeCoupon} 
+                          className="text-xs text-red-400 hover:text-red-600 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Coupon code" 
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                        disabled={validatingCoupon}
+                      />
+                      <button 
+                        onClick={handleApplyCoupon}
+                        disabled={validatingCoupon || !couponCode.trim()}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                          validatingCoupon || !couponCode.trim()
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-pink-500 text-white hover:bg-pink-600 hover:shadow-md'
+                        }`}
+                      >
+                        {validatingCoupon ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Available Coupons */}
+                  {!couponApplied && availableCoupons.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <span className="text-xs text-gray-500 mr-1">Available:</span>
+                      {availableCoupons.slice(0, 3).map((c, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCouponCode(c.code)}
+                          className="text-xs px-2 py-0.5 border border-dashed border-pink-200 text-pink-600 rounded hover:bg-pink-50 transition"
+                        >
+                          {c.code}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
                     <span className={shipping === 0 ? 'text-green-500 font-medium' : ''}>
@@ -423,7 +573,7 @@ function Cart() {
 
                 <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-pink-100 mb-6">
                   <span>Total</span>
-                  <span className="text-pink-500">₹{total}</span>
+                  <span className="text-pink-500">₹{finalTotal}</span>
                 </div>
 
                 {shipping > 0 && (
