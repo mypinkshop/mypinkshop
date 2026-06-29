@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 function Avatar({ user, onLogout }) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
@@ -31,11 +32,21 @@ function Avatar({ user, onLogout }) {
     return colors[index];
   };
 
-  // ✅ Get profile image from localStorage (tumhara existing logic)
+  // ✅ FIX: sessionStorage se image lo (aur user object se bhi)
   const getProfileImage = () => {
-    const storedImage = localStorage.getItem('profileImage');
+    // Pehle user object se check karo
+    if (user?.profileImage) {
+      return user.profileImage;
+    }
+    // Phir sessionStorage se check karo
+    const storedImage = sessionStorage.getItem('user_profile_image');
     if (storedImage && storedImage !== 'undefined' && storedImage !== 'null') {
       return storedImage;
+    }
+    // Phir localStorage se check karo (backward compatibility)
+    const oldImage = localStorage.getItem('profileImage');
+    if (oldImage && oldImage !== 'undefined' && oldImage !== 'null') {
+      return oldImage;
     }
     return null;
   };
@@ -78,23 +89,15 @@ function Avatar({ user, onLogout }) {
         className="flex items-center gap-2 text-gray-600 hover:text-pink-500 transition focus:outline-none group"
         aria-label="User menu"
       >
-        {profileImage ? (
+        {profileImage && !imageError ? (
           <img
             src={profileImage}
-            alt="Profile"
-            className="w-8 h-8 rounded-full object-cover border-2 border-pink-200 group-hover:border-pink-400 transition"
-            onError={(e) => {
-              // ✅ If image fails, show initials
-              e.target.style.display = 'none';
-              e.target.parentElement.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-gradient-to-r ${getAvatarColor(user?.name)} flex items-center justify-center text-white text-sm font-bold border-2 border-pink-200 group-hover:border-pink-400 transition">
-                  ${getInitial()}
-                </div>
-              `;
-            }}
+            alt={user?.name || 'Profile'}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border-2 border-pink-200 group-hover:border-pink-400 transition"
+            onError={() => setImageError(true)}
           />
         ) : (
-          <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getAvatarColor(user?.name)} flex items-center justify-center text-white text-sm font-bold border-2 border-pink-200 group-hover:border-pink-400 transition`}>
+          <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-r ${getAvatarColor(user?.name)} flex items-center justify-center text-white text-sm font-bold border-2 border-pink-200 group-hover:border-pink-400 transition`}>
             {getInitial()}
           </div>
         )}
