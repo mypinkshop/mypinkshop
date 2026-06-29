@@ -54,18 +54,51 @@ function ProductCard({
     };
   }, [checkWishlistStatus]);
 
+  // ✅ ADD TO CART - Permanent "Go to Cart" + Toast with Action
   const handleAddToCart = () => {
+    const productId = product._id || product.id;
+    
+    if (product.stock === 0) {
+      toast.error('Out of stock!');
+      return;
+    }
+    
     addToCart({
-      id: product._id || product.id,
+      id: productId,
       name: product.name,
       price: product.price,
       quantity: 1,
       image: product.images?.[0],
       stock: product.stock
     });
+    
+    // ✅ Button permanently "Go to Cart" ho jayega
     setIsAdded(true);
-    toast.success('Added to cart!');
-    setTimeout(() => setIsAdded(false), 2000);
+    
+    // ✅ Toast with "Go to Cart" button
+    toast.success((t) => (
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium">Added to cart! 🛒</span>
+        <button
+          onClick={() => {
+            toast.dismiss(t.id);
+            navigate('/cart');
+          }}
+          className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-1.5 rounded-full text-xs font-medium transition shadow-md"
+        >
+          View Cart
+        </button>
+      </div>
+    ), {
+      duration: 4000,
+      position: 'bottom-center',
+      style: {
+        background: '#1f2937',
+        color: '#fff',
+        padding: '12px 16px',
+        borderRadius: '12px',
+      },
+    });
   };
 
   const handleGoToCart = () => {
@@ -112,9 +145,12 @@ function ProductCard({
     }
   };
 
+  const productId = product._id || product.id;
+  const isOutOfStock = product.stock === 0;
+
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-pink-100">
-      <Link to={`/product/${product._id || product.id}`}>
+      <Link to={`/product/${productId}`}>
         <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {!imageLoaded && !imgError && (
             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
@@ -137,24 +173,37 @@ function ProductCard({
               {product.emoji || '✨'}
             </div>
           )}
+          
           {product.badge && (
             <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               {product.badge}
             </span>
           )}
+          
           {product.isNew && (
             <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
+          
+          {/* ✅ Out of Stock Overlay */}
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
+              <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">
+                Out of Stock
+              </span>
+            </div>
+          )}
         </div>
       </Link>
+      
       <div className="p-4">
-        <Link to={`/product/${product._id || product.id}`}>
+        <Link to={`/product/${productId}`}>
           <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-1 hover:text-pink-500 transition">
             {product.name}
           </h3>
         </Link>
+        
         <div className="flex items-center gap-1 mb-2">
           <div className="flex text-yellow-400 text-sm">
             {'★'.repeat(Math.floor(product.rating || 4))}
@@ -162,6 +211,7 @@ function ProductCard({
           </div>
           <span className="text-xs text-gray-400">({product.rating || 4})</span>
         </div>
+        
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
           {product.originalPrice && product.originalPrice > product.price && (
@@ -173,26 +223,33 @@ function ProductCard({
             </>
           )}
         </div>
+        
         <div className="flex gap-2">
           {isAdded ? (
+            // ✅ PERMANENT "Go to Cart" Button - Jab tak user manually navigate nahi karta
             <button 
               onClick={handleGoToCart}
-              className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 text-white hover:bg-green-600"
+              className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg flex items-center justify-center gap-1"
             >
-              ✓ Go to Cart
+              <span>✓</span> Go to Cart
             </button>
           ) : (
             <button 
               onClick={handleAddToCart}
-              className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg"
+              disabled={isOutOfStock}
+              className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                !isOutOfStock 
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105' 
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
             >
-              Add to Cart
+              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
             </button>
           )}
           
           <button 
             onClick={handleWishlistToggle}
-            className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50"
+            className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50 hover:border-pink-300"
           >
             {isWishlisted ? '❤️' : '🤍'}
           </button>
