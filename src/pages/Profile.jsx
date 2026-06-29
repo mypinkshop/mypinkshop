@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 
 function Profile() {
   const navigate = useNavigate();
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, updateUserProfile } = useAuth(); // ✅ Add updateUserProfile
   const { addToCart, cartCount } = useCart();
   const { wishlistCount, wishlist, removeFromWishlist } = useWishlist();
   const [activeTab, setActiveTab] = useState('orders');
@@ -139,7 +139,7 @@ function Profile() {
     }
   };
 
-  // ========== PROFILE IMAGE UPLOAD ==========
+  // ========== PROFILE IMAGE UPLOAD ========== ✅ FIXED
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -174,7 +174,7 @@ function Profile() {
         const imageUrl = data.url;
         
         // ✅ Save to backend
-        await fetch(`${API_URL}/api/users/profile`, {
+        const updateResponse = await fetch(`${API_URL}/api/users/profile`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -183,9 +183,23 @@ function Profile() {
           body: JSON.stringify({ profileImage: imageUrl })
         });
         
-        // ✅ Save to state and sessionStorage
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update profile image');
+        }
+        
+        // ✅ Save to state
         setProfileImage(imageUrl);
+        
+        // ✅ Save to sessionStorage
         sessionStorage.setItem('user_profile_image', imageUrl);
+        
+        // ✅ Save to localStorage (for Avatar component)
+        localStorage.setItem('profileImage', imageUrl);
+        
+        // ✅ CRITICAL: Update AuthContext user object
+        if (updateUserProfile) {
+          updateUserProfile({ profileImage: imageUrl });
+        }
         
         toast.success('Profile picture updated successfully!');
       }
@@ -252,6 +266,12 @@ function Profile() {
         if (data.profileImage) {
           setProfileImage(data.profileImage);
           sessionStorage.setItem('user_profile_image', data.profileImage);
+          localStorage.setItem('profileImage', data.profileImage);
+          
+          // ✅ Update AuthContext
+          if (updateUserProfile) {
+            updateUserProfile({ profileImage: data.profileImage });
+          }
         }
         
         setNewName(data.name || '');
@@ -573,7 +593,6 @@ function Profile() {
 
   // ========== ORDER FUNCTIONS ==========
   
-  // ✅ Reorder - Fixed with addToCart
   const handleReorder = async (order) => {
     try {
       for (const item of order.items) {
@@ -677,7 +696,6 @@ function Profile() {
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
     
-    // ✅ Validation
     if (!addressForm.fullName.trim()) {
       toast.error('Please enter full name');
       return;
@@ -1101,7 +1119,6 @@ function Profile() {
                             </div>
                           </div>
                           
-                          {/* Order Actions */}
                           <div className="flex flex-wrap gap-2 mt-3">
                             <Link to={`/track-order/${order._id || order.id}`} className="text-sm text-pink-600 hover:underline">
                               Track Order →
