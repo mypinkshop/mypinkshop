@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
         const storedUserName = localStorage.getItem('userName');
         const storedUserRole = localStorage.getItem('userRole');
         const storedUserId = localStorage.getItem('userId');
+        const storedProfileImage = localStorage.getItem('profileImage') || sessionStorage.getItem('user_profile_image');
         
         if (storedToken && storedUserEmail) {
           setToken(storedToken);
@@ -36,7 +37,8 @@ export const AuthProvider = ({ children }) => {
             _id: storedUserId,
             email: storedUserEmail,
             name: storedUserName,
-            role: storedUserRole
+            role: storedUserRole,
+            profileImage: storedProfileImage || null
           });
         }
       }
@@ -44,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  // ============ REGISTER (For Register.jsx) ============
+  // ============ REGISTER ============
   const register = (userData, token) => {
     console.log('📝 Register called with:', userData);
     
@@ -56,6 +58,10 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userName', userData.name);
     localStorage.setItem('userRole', userData.role);
     localStorage.setItem('userId', userData._id || '');
+    if (userData.profileImage) {
+      localStorage.setItem('profileImage', userData.profileImage);
+      sessionStorage.setItem('user_profile_image', userData.profileImage);
+    }
     
     console.log('✅ User registered and logged in:', userData);
     return { success: true };
@@ -79,7 +85,8 @@ export const AuthProvider = ({ children }) => {
           _id: data.user._id || data.user.id,
           name: data.user.name,
           email: data.user.email,
-          role: data.user.role || 'buyer'
+          role: data.user.role || 'buyer',
+          profileImage: data.user.profileImage || null
         };
         
         localStorage.setItem('token', data.token);
@@ -88,6 +95,10 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('userName', userData.name);
         localStorage.setItem('userRole', userData.role);
         localStorage.setItem('userId', userData._id);
+        if (userData.profileImage) {
+          localStorage.setItem('profileImage', userData.profileImage);
+          sessionStorage.setItem('user_profile_image', userData.profileImage);
+        }
         
         setToken(data.token);
         setUser(userData);
@@ -104,7 +115,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ============ OTP LOGIN (For OTP flow) ============
+  // ============ OTP LOGIN ============
   const otpLogin = (userData, token) => {
     console.log('🔐 OTP Login with:', userData);
     
@@ -116,8 +127,31 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userName', userData.name);
     localStorage.setItem('userRole', userData.role);
     localStorage.setItem('userId', userData._id || '');
+    if (userData.profileImage) {
+      localStorage.setItem('profileImage', userData.profileImage);
+      sessionStorage.setItem('user_profile_image', userData.profileImage);
+    }
     
     return { success: true };
+  };
+
+  // ============ UPDATE PROFILE ============ ✅ NEW
+  const updateUserProfile = (updatedData) => {
+    setUser(prev => {
+      const newUser = { ...prev, ...updatedData };
+      
+      // ✅ Save to localStorage
+      localStorage.setItem('user', JSON.stringify(newUser));
+      
+      // ✅ Save profileImage separately
+      if (updatedData.profileImage) {
+        localStorage.setItem('profileImage', updatedData.profileImage);
+        sessionStorage.setItem('user_profile_image', updatedData.profileImage);
+      }
+      
+      console.log('✅ User profile updated:', newUser);
+      return newUser;
+    });
   };
 
   // ============ LOGOUT ============
@@ -130,6 +164,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
     localStorage.removeItem('userId');
+    localStorage.removeItem('profileImage');
+    sessionStorage.removeItem('user_profile_image');
+    
     setToken(null);
     setUser(null);
   };
@@ -137,7 +174,6 @@ export const AuthProvider = ({ children }) => {
   // ============ IS AUTHENTICATED ============
   const isAuthenticated = () => {
     const hasToken = !!token && !!localStorage.getItem('token');
-    console.log('🔍 isAuthenticated:', hasToken);
     return hasToken;
   };
 
@@ -160,6 +196,7 @@ export const AuthProvider = ({ children }) => {
       login,
       otpLogin,
       logout,
+      updateUserProfile, // ✅ NEW - Export this!
       isAuthenticated,
       getCurrentUser,
       getToken
