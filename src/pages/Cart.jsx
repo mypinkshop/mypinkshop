@@ -510,12 +510,12 @@ function Cart() {
                     <span>₹{subtotal}</span>
                   </div>
 
-                  {/* ✅ COUPON SECTION WITH DESCRIPTION */}
+                  {/* ✅ COUPON SECTION WITH BEAUTIFUL DISPLAY */}
                   {couponApplied ? (
                     <div className="flex flex-col gap-1 py-2 border-t border-pink-100">
                       <div className="flex justify-between text-green-600">
                         <div className="flex flex-col items-start">
-                          <span>Discount ({appliedCoupon?.code})</span>
+                          <span className="font-medium">Discount ({appliedCoupon?.code})</span>
                           {appliedCoupon?.description && (
                             <span className="text-[10px] text-gray-500 font-normal">
                               {appliedCoupon.description}
@@ -530,7 +530,7 @@ function Cart() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span>-₹{discount}</span>
+                          <span className="font-semibold">-₹{discount}</span>
                           <button 
                             onClick={removeCoupon} 
                             className="text-xs text-red-400 hover:text-red-600 transition"
@@ -545,7 +545,7 @@ function Cart() {
                       <div className="flex gap-2">
                         <input 
                           type="text" 
-                          placeholder="Coupon code" 
+                          placeholder="Enter coupon code" 
                           value={couponCode}
                           onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                           className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
@@ -564,43 +564,51 @@ function Cart() {
                         </button>
                       </div>
                       
-                      {/* Available Coupons with Description */}
+                      {/* ✅ BEAUTIFUL AVAILABLE COUPONS - EK EK KARKE NEECHE */}
                       {!couponApplied && availableCoupons.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          <span className="text-xs text-gray-500 mr-1">Available:</span>
-                          {availableCoupons.slice(0, 4).map((c, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => setCouponCode(c.code)}
-                              className="text-xs px-2 py-0.5 border border-dashed border-pink-200 text-pink-600 rounded hover:bg-pink-50 transition flex items-center gap-1"
-                              title={c.description || c.code}
-                            >
-                              <span>{c.code}</span>
-                              {c.description && (
-                                <span className="text-[10px] text-gray-400">
-                                  ({c.description.length > 20 
-                                    ? c.description.substring(0, 20) + '...' 
-                                    : c.description})
-                                </span>
-                              )}
-                              {!c.description && c.discountValue && (
-                                <span className="text-[10px] text-gray-400">
-                                  ({c.discountType === 'percentage' 
-                                    ? `${c.discountValue}% off` 
-                                    : `₹${c.discountValue} off`})
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                          {availableCoupons.length > 4 && (
-                            <span className="text-[10px] text-gray-400">+{availableCoupons.length - 4} more</span>
-                          )}
+                        <div className="mt-1">
+                          <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
+                            <span>🎫</span> Available Coupons
+                          </p>
+                          <div className="flex flex-col gap-1.5">
+                            {availableCoupons.map((c, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => setCouponCode(c.code)}
+                                className="w-full text-left px-3 py-2 border border-dashed border-pink-200 rounded-lg hover:border-pink-400 hover:bg-pink-50/50 transition group flex flex-col"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-pink-600 text-sm group-hover:text-pink-700">
+                                      {c.code}
+                                    </span>
+                                    <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">
+                                      {c.discountType === 'percentage' ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-pink-500 group-hover:text-pink-700 group-hover:underline">
+                                    Apply →
+                                  </span>
+                                </div>
+                                {c.description && (
+                                  <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
+                                    {c.description}
+                                  </p>
+                                )}
+                                {!c.description && (
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    Min. Order ₹{c.minOrderValue}
+                                  </p>
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
                   )}
                   
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-gray-600 pt-1 border-t border-pink-100">
                     <span>Shipping</span>
                     <span className={shipping === 0 ? 'text-green-500 font-medium' : ''}>
                       {shipping === 0 ? 'FREE' : '₹' + shipping}
