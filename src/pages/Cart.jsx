@@ -25,7 +25,8 @@ function Cart() {
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState([]);
 
-  const API_URL = 'https://api.mypinkshop.com';
+  // ✅ FIXED: Add /api to URL
+  const API_URL = 'https://api.mypinkshop.com/api';
 
   // ✅ Fetch available coupons
   useEffect(() => {
