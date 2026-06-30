@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VendorSidebar from './components/VendorSidebar';
 import VendorHeader from './components/VendorHeader';
+import toast from 'react-hot-toast';
 
 function VendorCoupons() {
   const [coupons, setCoupons] = useState([]);
@@ -21,10 +22,10 @@ function VendorCoupons() {
   });
 
   const navigate = useNavigate();
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = 'https://api.mypinkshop.com/api';
 
   useEffect(() => {
-    const token = localStorage.getItem('vendorToken');
+    const token = localStorage.getItem('vendorToken') || localStorage.getItem('token');
     if (!token) {
       navigate('/vendor/login');
       return;
@@ -39,7 +40,7 @@ function VendorCoupons() {
       setError('');
 
       // 1. Fetch vendor profile
-      const profileRes = await fetch(`${API_URL}/api/vendor/profile`, {
+      const profileRes = await fetch(`${API_URL}/vendor/profile`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const profileData = await profileRes.json();
@@ -48,7 +49,7 @@ function VendorCoupons() {
       }
 
       // 2. Fetch vendor coupons
-      const couponsRes = await fetch(`${API_URL}/api/coupons/vendor`, {
+      const couponsRes = await fetch(`${API_URL}/coupons/vendor`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const couponsData = await couponsRes.json();
@@ -56,12 +57,12 @@ function VendorCoupons() {
       if (couponsData.success) {
         setCoupons(couponsData.coupons || []);
       } else {
-        // If API doesn't exist yet, use empty array
         setCoupons([]);
       }
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Network error. Please try again.');
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -70,15 +71,15 @@ function VendorCoupons() {
   // ✅ Create coupon
   const createCoupon = async () => {
     if (!newCoupon.code || !newCoupon.discount) {
-      alert('⚠️ Please fill all required fields');
+      toast.error('⚠️ Please fill all required fields');
       return;
     }
 
-    const token = localStorage.getItem('vendorToken');
+    const token = localStorage.getItem('vendorToken') || localStorage.getItem('token');
     setSaving(true);
 
     try {
-      const res = await fetch(`${API_URL}/api/coupons/vendor/create`, {
+      const res = await fetch(`${API_URL}/coupons/vendor/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,8 +93,7 @@ function VendorCoupons() {
           maxDiscount: parseFloat(newCoupon.maxDiscount) || 0,
           usageLimit: parseInt(newCoupon.usageLimit) || 100,
           endDate: newCoupon.validTill || null,
-          vendorId: vendorInfo?._id || vendorInfo?.id,
-          vendorName: vendorInfo?.brandName || vendorInfo?.name
+          vendorId: vendorInfo?._id || vendorInfo?.id
         })
       });
 
@@ -102,14 +102,26 @@ function VendorCoupons() {
       if (res.ok && data.success) {
         setCoupons([data.coupon, ...coupons]);
         setShowModal(false);
-        setNewCoupon({ code: '', discount: '', type: 'percentage', minOrder: '', maxDiscount: '', usageLimit: 100, validTill: '' });
-        alert('✅ Coupon created successfully!');
+        setNewCoupon({ 
+          code: '', 
+          discount: '', 
+          type: 'percentage', 
+          minOrder: '', 
+          maxDiscount: '', 
+          usageLimit: 100, 
+          validTill: '' 
+        });
+        toast.success('✅ Coupon created successfully!');
+        
+        // ✅ Update coupon list
+        const token = localStorage.getItem('vendorToken') || localStorage.getItem('token');
+        fetchVendorData(token);
       } else {
-        alert(data.message || 'Failed to create coupon');
+        toast.error(data.message || 'Failed to create coupon');
       }
     } catch (err) {
       console.error('Error creating coupon:', err);
-      alert('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -117,42 +129,43 @@ function VendorCoupons() {
 
   // ✅ Toggle coupon status
   const toggleStatus = async (id, currentStatus) => {
-    const token = localStorage.getItem('vendorToken');
+    const token = localStorage.getItem('vendorToken') || localStorage.getItem('token');
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
 
     try {
-      const res = await fetch(`${API_URL}/api/coupons/vendor/${id}/toggle`, {
+      const res = await fetch(`${API_URL}/coupons/vendor/${id}/toggle`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ isActive: newStatus === 'active' })
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
         setCoupons(coupons.map(c => 
-          c._id === id ? { ...c, status: newStatus } : c
+          c._id === id ? { ...c, isActive: newStatus === 'active', status: newStatus } : c
         ));
+        toast.success(`Coupon ${newStatus === 'active' ? 'activated' : 'deactivated'}!`);
       } else {
-        alert(data.message || 'Failed to update status');
+        toast.error(data.message || 'Failed to update status');
       }
     } catch (err) {
       console.error('Error updating status:', err);
-      alert('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     }
   };
 
   // ✅ Delete coupon
   const deleteCoupon = async (id) => {
-    if (!confirm('Delete this coupon?')) return;
+    if (!window.confirm('Delete this coupon?')) return;
 
-    const token = localStorage.getItem('vendorToken');
+    const token = localStorage.getItem('vendorToken') || localStorage.getItem('token');
 
     try {
-      const res = await fetch(`${API_URL}/api/coupons/vendor/${id}`, {
+      const res = await fetch(`${API_URL}/coupons/vendor/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -163,14 +176,18 @@ function VendorCoupons() {
 
       if (res.ok && data.success) {
         setCoupons(coupons.filter(c => c._id !== id));
-        alert('✅ Coupon deleted successfully!');
+        toast.success('✅ Coupon deleted successfully!');
       } else {
-        alert(data.message || 'Failed to delete coupon');
+        toast.error(data.message || 'Failed to delete coupon');
       }
     } catch (err) {
       console.error('Error deleting coupon:', err);
-      alert('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
     }
+  };
+
+  const isExpired = (validTill) => {
+    return validTill && new Date(validTill) < new Date();
   };
 
   if (loading) {
@@ -213,15 +230,21 @@ function VendorCoupons() {
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
               <p className="text-sm text-gray-500">Active</p>
-              <p className="text-2xl font-bold text-green-600">{coupons.filter(c => c.status === 'active').length}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {coupons.filter(c => c.isActive !== false && !isExpired(c.endDate)).length}
+              </p>
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-500">Inactive</p>
-              <p className="text-2xl font-bold text-gray-400">{coupons.filter(c => c.status === 'inactive').length}</p>
+              <p className="text-sm text-gray-500">Expired/Inactive</p>
+              <p className="text-2xl font-bold text-gray-400">
+                {coupons.filter(c => !c.isActive || isExpired(c.endDate)).length}
+              </p>
             </div>
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
               <p className="text-sm text-gray-500">Total Used</p>
-              <p className="text-2xl font-bold text-blue-600">{coupons.reduce((sum, c) => sum + (c.usedCount || 0), 0)}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {coupons.reduce((sum, c) => sum + (c.usedCount || 0), 0)}
+              </p>
             </div>
           </div>
 
@@ -254,48 +277,63 @@ function VendorCoupons() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {coupons.map(c => (
-                      <tr key={c._id} className="hover:bg-gray-50 transition">
-                        <td className="px-4 py-3 font-mono font-bold text-pink-600">{c.code}</td>
-                        <td className="px-4 py-3 text-center font-medium">
-                          {c.discountType === 'percentage' ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
-                        </td>
-                        <td className="px-4 py-3 text-right">₹{c.minOrderValue || 0}</td>
-                        <td className="px-4 py-3 text-center text-gray-500">
-                          {c.endDate ? new Date(c.endDate).toLocaleDateString() : 'No expiry'}
-                        </td>
-                        <td className="px-4 py-3 text-center">{c.usedCount || 0}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            c.status === 'active' 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {c.status || 'active'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex justify-center gap-2">
-                            <button 
-                              onClick={() => toggleStatus(c._id, c.status)} 
-                              className={`text-sm font-medium transition ${
-                                c.status === 'active' 
-                                  ? 'text-yellow-600 hover:text-yellow-800' 
-                                  : 'text-green-600 hover:text-green-800'
-                              }`}
-                            >
-                              {c.status === 'active' ? '⏸️ Disable' : '▶️ Enable'}
-                            </button>
-                            <button 
-                              onClick={() => deleteCoupon(c._id)} 
-                              className="text-red-500 hover:text-red-700 transition"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {coupons.map(c => {
+                      const isCouponExpired = isExpired(c.endDate);
+                      const isActive = c.isActive !== false && !isCouponExpired;
+                      
+                      return (
+                        <tr key={c._id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 font-mono font-bold text-pink-600">{c.code}</td>
+                          <td className="px-4 py-3 text-center font-medium">
+                            {c.discountType === 'percentage' ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
+                          </td>
+                          <td className="px-4 py-3 text-right">₹{c.minOrderValue || 0}</td>
+                          <td className="px-4 py-3 text-center text-gray-500">
+                            {c.endDate ? new Date(c.endDate).toLocaleDateString() : 'No expiry'}
+                            {isCouponExpired && (
+                              <span className="ml-1 text-red-500 text-xs">(Expired)</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">{c.usedCount || 0}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              isActive 
+                                ? 'bg-green-100 text-green-700' 
+                                : isCouponExpired 
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {isActive ? 'Active' : isCouponExpired ? 'Expired' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex justify-center gap-2">
+                              {!isCouponExpired && (
+                                <button 
+                                  onClick={() => toggleStatus(c._id, isActive ? 'active' : 'inactive')} 
+                                  className={`text-sm font-medium transition ${
+                                    isActive 
+                                      ? 'text-yellow-600 hover:text-yellow-800' 
+                                      : 'text-green-600 hover:text-green-800'
+                                  }`}
+                                >
+                                  {isActive ? '⏸️ Disable' : '▶️ Enable'}
+                                </button>
+                              )}
+                              {isCouponExpired && (
+                                <span className="text-xs text-gray-400">Expired</span>
+                              )}
+                              <button 
+                                onClick={() => deleteCoupon(c._id)} 
+                                className="text-red-500 hover:text-red-700 transition"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
