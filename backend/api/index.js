@@ -14,7 +14,7 @@ const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
 const notificationRoutes = require('../routes/notificationRoutes');
 
-// ✅ VENDOR EMAIL SERVICE IMPORTS (UPDATED WITH ALL FUNCTIONS)
+// ✅ VENDOR EMAIL SERVICE IMPORTS
 const { 
   sendVendorApproved, 
   sendVendorRejected, 
@@ -1238,7 +1238,6 @@ app.patch('/api/admin/vendors/:id/approve', authMiddleware, adminMiddleware, asy
     vendor.updatedAt = new Date();
     await vendor.save();
 
-    // ✅ SEND EMAIL: Vendor Approved
     try {
       await sendVendorApproved(vendor);
       console.log('📧 Approval email sent to:', vendor.email);
@@ -1283,7 +1282,6 @@ app.patch('/api/admin/vendors/:id/reject', authMiddleware, adminMiddleware, asyn
     vendor.updatedAt = new Date();
     await vendor.save();
 
-    // ✅ SEND EMAIL: Vendor Rejected
     try {
       await sendVendorRejected(vendor, reason);
       console.log('📧 Rejection email sent to:', vendor.email);
@@ -1328,7 +1326,6 @@ app.patch('/api/admin/vendors/:id/suspend', authMiddleware, adminMiddleware, asy
     vendor.updatedAt = new Date();
     await vendor.save();
 
-    // ✅ SEND EMAIL: Vendor Blocked
     try {
       await sendVendorBlocked(vendor, reason);
       console.log('📧 Blocked email sent to:', vendor.email);
@@ -1371,7 +1368,6 @@ app.patch('/api/admin/vendors/:id/unblock', authMiddleware, adminMiddleware, asy
     vendor.updatedAt = new Date();
     await vendor.save();
 
-    // ✅ SEND EMAIL: Vendor Unblocked
     try {
       await sendVendorUnblocked(vendor);
       console.log('📧 Unblocked email sent to:', vendor.email);
@@ -1425,7 +1421,6 @@ app.patch('/api/admin/brand-applications/:id/approve', authMiddleware, adminMidd
     application.updatedAt = new Date();
     await application.save();
 
-    // Update vendor brand
     await Vendor.findByIdAndUpdate(application.vendorId, {
       brandName: application.brandName,
       status: 'approved',
@@ -1481,7 +1476,6 @@ app.patch('/api/admin/products/:id/approve', authMiddleware, adminMiddleware, as
     product.updatedAt = new Date();
     await product.save();
 
-    // ✅ SEND EMAIL: Product Approved
     if (product.vendorId) {
       try {
         const vendor = await Vendor.findById(product.vendorId);
@@ -1531,7 +1525,6 @@ app.patch('/api/admin/products/:id/reject', authMiddleware, adminMiddleware, asy
     product.updatedAt = new Date();
     await product.save();
 
-    // ✅ SEND EMAIL: Product Rejected
     if (product.vendorId) {
       try {
         const vendor = await Vendor.findById(product.vendorId);
@@ -1563,7 +1556,6 @@ app.patch('/api/admin/products/:id/reject', authMiddleware, adminMiddleware, asy
 // ✅ VENDOR PRODUCT ROUTES
 // ============================================
 
-// Get vendor's own products
 app.get('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1598,7 +1590,6 @@ app.get('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, re
   }
 });
 
-// Add vendor product
 app.post('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1710,7 +1701,6 @@ app.post('/api/vendor/products', authMiddleware, vendorMiddleware, async (req, r
 // ✅ VENDOR PRODUCT UPDATE & DELETE
 // ============================================
 
-// Update vendor product
 app.put('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1737,7 +1727,6 @@ app.put('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (req
   }
 });
 
-// Delete vendor product
 app.delete('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1758,7 +1747,6 @@ app.delete('/api/vendor/products/:id', authMiddleware, vendorMiddleware, async (
 // ✅ VENDOR ORDERS
 // ============================================
 
-// Get vendor orders
 app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1823,7 +1811,6 @@ app.get('/api/vendor/orders', authMiddleware, vendorMiddleware, async (req, res)
   }
 });
 
-// ✅ ACCEPT ORDER - Shiprocket Integration (WITH EMAIL)
 app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1832,7 +1819,6 @@ app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, asy
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    // Check if order belongs to this vendor
     const belongsToVendor = order.items.some(item => 
       item.vendorId && item.vendorId.toString() === req.user.id
     );
@@ -1846,7 +1832,6 @@ app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, asy
     order.courierName = 'Shiprocket';
     await order.save();
 
-    // ✅ SEND EMAIL: Order Confirmed
     try {
       const vendor = await Vendor.findById(req.user.id);
       if (vendor) {
@@ -1870,7 +1855,6 @@ app.patch('/api/vendor/orders/:id/accept', authMiddleware, vendorMiddleware, asy
   }
 });
 
-// ✅ REJECT ORDER
 app.patch('/api/vendor/orders/:id/reject', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1896,7 +1880,6 @@ app.patch('/api/vendor/orders/:id/reject', authMiddleware, vendorMiddleware, asy
   }
 });
 
-// Update order status (WITH EMAIL)
 app.patch('/api/vendor/orders/:id/status', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -1931,7 +1914,6 @@ app.patch('/api/vendor/orders/:id/status', authMiddleware, vendorMiddleware, asy
     
     await order.save();
 
-    // ✅ SEND EMAILS based on status change
     try {
       const vendor = await Vendor.findById(req.user.id);
       if (vendor) {
@@ -2012,7 +1994,6 @@ app.get('/api/vendor/earnings', authMiddleware, vendorMiddleware, async (req, re
 // ✅ VENDOR BUSINESS DETAILS
 // ============================================
 
-// Save business details
 app.post('/api/vendor/business-details', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2040,7 +2021,6 @@ app.post('/api/vendor/business-details', authMiddleware, vendorMiddleware, async
   }
 });
 
-// Get business details
 app.get('/api/vendor/business-details', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2071,7 +2051,6 @@ app.get('/api/vendor/business-details', authMiddleware, vendorMiddleware, async 
 // ✅ VENDOR BRAND APPLICATION
 // ============================================
 
-// Submit brand application
 app.post('/api/vendor/brand-application', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2104,7 +2083,6 @@ app.post('/api/vendor/brand-application', authMiddleware, vendorMiddleware, asyn
   }
 });
 
-// Get brand application status
 app.get('/api/vendor/brand-application/status', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2120,7 +2098,6 @@ app.get('/api/vendor/brand-application/status', authMiddleware, vendorMiddleware
 // ✅ VENDOR RETURNS
 // ============================================
 
-// Get vendor returns
 app.get('/api/vendor/returns', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2147,7 +2124,6 @@ app.get('/api/vendor/returns', authMiddleware, vendorMiddleware, async (req, res
   }
 });
 
-// Update return status
 app.patch('/api/vendor/returns/:id/status', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2195,7 +2171,6 @@ app.patch('/api/orders/:id/return-request', authMiddleware, async (req, res) => 
     order.returnStatus = 'pending';
     await order.save();
 
-    // ✅ SEND EMAIL: Return Requested to Vendor
     try {
       const vendorIds = [...new Set(order.items.map(item => item.vendorId).filter(id => id))];
       
@@ -2245,7 +2220,6 @@ app.patch('/api/vendor/returns/:id/approve', authMiddleware, vendorMiddleware, a
     order.returnStatus = 'approved';
     await order.save();
 
-    // ✅ SEND EMAIL: Return Approved to Vendor
     try {
       const vendor = await Vendor.findById(req.user.id);
       if (vendor) {
@@ -2293,7 +2267,6 @@ app.patch('/api/vendor/returns/:id/reject', authMiddleware, vendorMiddleware, as
     order.returnResolution = reason || 'Return request does not meet our return policy.';
     await order.save();
 
-    // ✅ SEND EMAIL: Return Rejected to Vendor
     try {
       const vendor = await Vendor.findById(req.user.id);
       if (vendor) {
@@ -2323,7 +2296,6 @@ app.patch('/api/vendor/returns/:id/reject', authMiddleware, vendorMiddleware, as
 // ✅ VENDOR COUPONS
 // ============================================
 
-// Get vendor coupons
 app.get('/api/vendor/coupons', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2335,7 +2307,6 @@ app.get('/api/vendor/coupons', authMiddleware, vendorMiddleware, async (req, res
   }
 });
 
-// Create coupon
 app.post('/api/vendor/coupons/create', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2366,7 +2337,6 @@ app.post('/api/vendor/coupons/create', authMiddleware, vendorMiddleware, async (
   }
 });
 
-// Toggle coupon status
 app.patch('/api/vendor/coupons/:id/toggle', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2385,7 +2355,6 @@ app.patch('/api/vendor/coupons/:id/toggle', authMiddleware, vendorMiddleware, as
   }
 });
 
-// Delete coupon
 app.delete('/api/vendor/coupons/:id', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2405,7 +2374,6 @@ app.delete('/api/vendor/coupons/:id', authMiddleware, vendorMiddleware, async (r
 // ✅ VENDOR SHIPPING SETTINGS
 // ============================================
 
-// Get shipping settings
 app.get('/api/vendor/shipping', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2426,7 +2394,6 @@ app.get('/api/vendor/shipping', authMiddleware, vendorMiddleware, async (req, re
   }
 });
 
-// Save shipping settings
 app.post('/api/vendor/shipping/settings', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -2453,7 +2420,6 @@ app.post('/api/vendor/shipping/settings', authMiddleware, vendorMiddleware, asyn
 // ✅ VENDOR SHIPPING ZONES
 // ============================================
 
-// Get shipping zones
 app.get('/api/vendor/shipping/zones', authMiddleware, vendorMiddleware, async (req, res) => {
   try {
     const defaultZones = [
@@ -3244,7 +3210,6 @@ app.get('/api/orders/:id', cors(corsOptions), authMiddleware, async (req, res) =
   }
 });
 
-// ✅ ORDER CREATION WITH EMAIL
 app.post('/api/orders', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const { items, total, address, paymentMethod } = req.body;
@@ -3276,7 +3241,6 @@ app.post('/api/orders', cors(corsOptions), authMiddleware, async (req, res) => {
     
     await Cart.findOneAndDelete({ userId: req.user.id });
 
-    // ✅ SEND EMAIL: New Order to Vendor
     try {
       const vendorIds = [...new Set(items.map(item => item.vendorId).filter(id => id))];
       
@@ -3514,7 +3478,33 @@ app.get('/api/shipping/settings', async (req, res) => {
   });
 });
 
-// ========== COUPON ROUTES ==========
+// ============================================
+// ✅ ✅ ✅ FIXED: COUPON ROUTES WITH /active
+// ============================================
+
+// ✅ GET active coupons (For Cart page)
+app.get('/api/coupons/active', async (req, res) => {
+  try {
+    await connectDB();
+    const now = new Date();
+    const coupons = await Coupon.find({
+      isActive: true,
+      startDate: { $lte: now },
+      $or: [
+        { endDate: { $gte: now } },
+        { endDate: null }
+      ],
+      $expr: { $lt: ['$usedCount', '$usageLimit'] }
+    }).select('code description discountType discountValue minOrderValue maxDiscount');
+    
+    res.json({ success: true, coupons });
+  } catch (error) {
+    console.error('Error fetching active coupons:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ✅ Validate coupon
 app.post('/api/coupons/validate', async (req, res) => {
   try {
     await connectDB();
@@ -3572,6 +3562,7 @@ app.post('/api/coupons/validate', async (req, res) => {
   }
 });
 
+// ✅ Admin - Get all coupons
 app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3582,6 +3573,7 @@ app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
+// ✅ Admin - Create coupon
 app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3602,6 +3594,7 @@ app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res
   }
 });
 
+// ✅ Admin - Update coupon
 app.put('/api/coupons/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3617,6 +3610,7 @@ app.put('/api/coupons/update/:id', authMiddleware, adminMiddleware, async (req, 
   }
 });
 
+// ✅ Admin - Toggle coupon status
 app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3631,6 +3625,7 @@ app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
+// ✅ Admin - Delete coupon
 app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
