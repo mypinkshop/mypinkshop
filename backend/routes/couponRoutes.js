@@ -5,7 +5,28 @@ const { protect, admin } = require('../middleware/auth');
 
 // ========== PUBLIC ROUTES ==========
 
-// ✅ Validate coupon (Checkout page ke liye)
+// ✅ GET active coupons (For Cart page)
+router.get('/active', async (req, res) => {
+  try {
+    const now = new Date();
+    const coupons = await Coupon.find({
+      isActive: true,
+      startDate: { $lte: now },
+      $or: [
+        { endDate: { $gte: now } },
+        { endDate: null }
+      ],
+      $expr: { $lt: ['$usedCount', '$usageLimit'] }
+    }).select('code description discountType discountValue minOrderValue maxDiscount');
+    
+    res.json({ success: true, coupons });
+  } catch (error) {
+    console.error('Error fetching active coupons:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ✅ Validate coupon
 router.post('/validate', async (req, res) => {
   try {
     const { code, cartTotal, userId } = req.body;
@@ -28,7 +49,6 @@ router.post('/validate', async (req, res) => {
       });
     }
     
-    // Check usage limit
     if (coupon.usedCount >= coupon.usageLimit) {
       return res.json({ 
         valid: false, 
@@ -36,7 +56,6 @@ router.post('/validate', async (req, res) => {
       });
     }
     
-    // Check min order value
     if (cartTotal < coupon.minOrderValue) {
       return res.json({ 
         valid: false, 
@@ -44,7 +63,6 @@ router.post('/validate', async (req, res) => {
       });
     }
     
-    // Calculate discount
     let discountAmount = 0;
     if (coupon.discountType === 'percentage') {
       discountAmount = (cartTotal * coupon.discountValue) / 100;
