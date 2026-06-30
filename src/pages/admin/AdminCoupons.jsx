@@ -13,6 +13,8 @@ function AdminCoupons() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [processingId, setProcessingId] = useState(null);
+  const [vendors, setVendors] = useState([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
   const [formData, setFormData] = useState({
     code: '',
     discount: '',
@@ -22,10 +24,10 @@ function AdminCoupons() {
     validTill: '',
     usageLimit: '',
     description: '',
-    status: 'active'
+    status: 'active',
+    vendorId: '' // ✅ New field
   });
 
-  // ✅ FIXED: API_URL with /api
   const API_URL = 'https://api.mypinkshop.com/api';
 
   useEffect(() => {
@@ -35,9 +37,31 @@ function AdminCoupons() {
       return;
     }
     loadCoupons(token);
+    loadVendors(token);
   }, [navigate]);
 
-  // ✅ LOAD COUPONS - Fixed URL
+  // ✅ Load vendors for dropdown
+  const loadVendors = async (token) => {
+    try {
+      setLoadingVendors(true);
+      const res = await fetch(`${API_URL}/admin/vendors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setVendors(data.vendors || []);
+      }
+    } catch (error) {
+      console.error('Error loading vendors:', error);
+    } finally {
+      setLoadingVendors(false);
+    }
+  };
+
   const loadCoupons = async (token) => {
     try {
       setLoading(true);
@@ -76,7 +100,6 @@ function AdminCoupons() {
     }
   };
 
-  // ✅ SAVE COUPON - Fixed URL
   const saveCouponToAPI = async (couponData, isEdit = false) => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
@@ -95,7 +118,8 @@ function AdminCoupons() {
       usageLimit: parseInt(couponData.usageLimit) || 100,
       endDate: couponData.validTill || null,
       description: couponData.description || '',
-      isActive: couponData.status === 'active'
+      isActive: couponData.status === 'active',
+      vendorId: couponData.vendorId || null // ✅ Send vendorId
     };
 
     const res = await fetch(url, {
@@ -121,7 +145,6 @@ function AdminCoupons() {
     return data;
   };
 
-  // ✅ DELETE COUPON - Fixed URL
   const deleteCouponFromAPI = async (id) => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
@@ -147,7 +170,6 @@ function AdminCoupons() {
     return true;
   };
 
-  // ✅ TOGGLE COUPON - Fixed URL
   const toggleCouponStatusAPI = async (id, currentStatus) => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
@@ -226,7 +248,8 @@ function AdminCoupons() {
       validTill: '',
       usageLimit: '',
       description: '',
-      status: 'active'
+      status: 'active',
+      vendorId: ''
     });
   };
 
@@ -241,7 +264,8 @@ function AdminCoupons() {
       validTill: coupon.endDate || coupon.validTill,
       usageLimit: coupon.usageLimit || '',
       description: coupon.description || '',
-      status: coupon.isActive !== undefined ? (coupon.isActive ? 'active' : 'inactive') : coupon.status || 'active'
+      status: coupon.isActive !== undefined ? (coupon.isActive ? 'active' : 'inactive') : coupon.status || 'active',
+      vendorId: coupon.vendorId || '' // ✅ Edit vendorId
     });
     setShowModal(true);
   };
@@ -295,6 +319,13 @@ function AdminCoupons() {
     if (type === 'fixed') return `₹${discount} OFF`;
     if (type === 'shipping') return 'Free Shipping';
     return `${discount} OFF`;
+  };
+
+  const getVendorName = (coupon) => {
+    if (coupon.vendorId) {
+      return coupon.vendorName || coupon.vendor?.brandName || coupon.vendor?.name || 'Vendor';
+    }
+    return 'All Products';
   };
 
   const filteredCoupons = coupons.filter(c => {
@@ -433,6 +464,7 @@ function AdminCoupons() {
                     <th className="px-4 py-3 text-center">Discount</th>
                     <th className="px-4 py-3 text-center">Min Order</th>
                     <th className="px-4 py-3 text-center">Max Discount</th>
+                    <th className="px-4 py-3 text-center">Applicable On</th>
                     <th className="px-4 py-3 text-center">Valid Till</th>
                     <th className="px-4 py-3 text-center">Used</th>
                     <th className="px-4 py-3 text-center">Status</th>
@@ -442,7 +474,7 @@ function AdminCoupons() {
                 <tbody className="divide-y">
                   {filteredCoupons.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-4 py-12 text-center text-gray-400">
+                      <td colSpan="9" className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">🎫</div>
                         <p>No coupons found</p>
                         <button onClick={() => { setEditingCoupon(null); resetForm(); setShowModal(true); }} className="mt-3 text-pink-500 text-sm hover:underline">
@@ -465,6 +497,17 @@ function AdminCoupons() {
                         <td className="px-4 py-3 text-center">₹{(coupon.minOrderValue || coupon.minOrder || 0).toLocaleString()}</td>
                         <td className="px-4 py-3 text-center">
                           {(coupon.maxDiscount || 0) > 0 ? `₹${(coupon.maxDiscount || 0).toLocaleString()}` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {coupon.vendorId ? (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full whitespace-nowrap">
+                              🛍️ {getVendorName(coupon)}
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap">
+                              🌐 All Products
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-xs ${isExpired(coupon.endDate || coupon.validTill) ? 'text-red-500' : 'text-gray-600'}`}>
@@ -613,6 +656,27 @@ function AdminCoupons() {
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl" 
                   />
                 </div>
+              </div>
+
+              {/* ✅ VENDOR SELECTION */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Applicable On</label>
+                <select 
+                  name="vendorId" 
+                  value={formData.vendorId} 
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                >
+                  <option value="">🌐 All Products (Sitewide)</option>
+                  {vendors.map(vendor => (
+                    <option key={vendor._id} value={vendor._id}>
+                      🛍️ {vendor.brandName || vendor.name || vendor.storeName || vendor.email}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  {formData.vendorId ? 'This coupon will only apply to this vendor\'s products' : 'This coupon will apply to all products'}
+                </p>
               </div>
 
               <div>
