@@ -24,8 +24,8 @@ function Cart() {
   const [couponApplied, setCouponApplied] = useState(false);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [eligibleCoupons, setEligibleCoupons] = useState([]);
 
-  // ✅ FIXED: Add /api to URL
   const API_URL = 'https://api.mypinkshop.com/api';
 
   // ✅ Fetch available coupons
@@ -43,6 +43,26 @@ function Cart() {
     };
     fetchCoupons();
   }, []);
+
+  // ✅ Filter eligible coupons based on cart
+  useEffect(() => {
+    if (!availableCoupons.length || !cart.length) {
+      setEligibleCoupons([]);
+      return;
+    }
+
+    const eligible = availableCoupons.filter(coupon => {
+      // ✅ Admin coupon (vendorId: null) - Always eligible
+      if (!coupon.vendorId) {
+        return true;
+      }
+
+      // ✅ Vendor coupon - Check if cart has vendor's products
+      return cart.some(item => item.vendorId === coupon.vendorId);
+    });
+
+    setEligibleCoupons(eligible);
+  }, [availableCoupons, cart]);
 
   const handleCheckout = () => {
     setIsCheckingOut(true);
@@ -67,7 +87,6 @@ function Cart() {
     }
   };
 
-  // ✅ Update quantity with validation
   const handleUpdateQuantity = (id, newQuantity, stock) => {
     if (newQuantity < 1) {
       removeFromCart(id);
@@ -83,7 +102,6 @@ function Cart() {
     updateQuantity(id, newQuantity);
   };
 
-  // ✅ Remove item with confirmation
   const handleRemoveItem = (id, name) => {
     if (window.confirm(`Remove "${name}" from cart?`)) {
       removeFromCart(id);
@@ -91,7 +109,7 @@ function Cart() {
     }
   };
 
-  // ✅ Apply Coupon
+  // ✅ Apply Coupon - With vendor support
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Please enter a coupon code');
@@ -101,6 +119,15 @@ function Cart() {
     setValidatingCoupon(true);
 
     try {
+      // ✅ Send cart items with vendorId for vendor coupon validation
+      const cartItemsWithVendor = cart.map(item => ({
+        id: item.id,
+        productId: item.id,
+        price: item.price,
+        quantity: item.quantity,
+        vendorId: item.vendorId || null
+      }));
+
       const response = await fetch(`${API_URL}/coupons/validate`, {
         method: 'POST',
         headers: {
@@ -110,7 +137,8 @@ function Cart() {
         body: JSON.stringify({
           code: couponCode.toUpperCase(),
           cartTotal: subtotal,
-          userId: user?._id || null
+          userId: user?._id || null,
+          cartItems: cartItemsWithVendor // ✅ Send cart items
         })
       });
 
@@ -125,7 +153,14 @@ function Cart() {
       setDiscount(data.coupon.discountAmount);
       setAppliedCoupon(data.coupon);
       setCouponApplied(true);
-      toast.success(`🎉 ${data.coupon.code} applied! You saved ₹${data.coupon.discountAmount}`);
+      
+      // ✅ Show vendor-specific message if vendor coupon
+      if (data.coupon.isVendorCoupon && data.coupon.vendorName) {
+        toast.success(`🎉 ${data.coupon.code} applied! You saved ₹${data.coupon.discountAmount} on ${data.coupon.vendorName} products`);
+      } else {
+        toast.success(`🎉 ${data.coupon.code} applied! You saved ₹${data.coupon.discountAmount}`);
+      }
+      
       setCouponCode('');
 
     } catch (error) {
@@ -135,7 +170,6 @@ function Cart() {
     }
   };
 
-  // ✅ Remove Coupon
   const removeCoupon = () => {
     setDiscount(0);
     setAppliedCoupon(null);
@@ -451,7 +485,10 @@ function Cart() {
                         <Link to={`/product/${item.id}`}>
                           <h3 className="font-semibold text-gray-800 hover:text-pink-500 transition line-clamp-1">{item.name}</h3>
                         </Link>
-                        <p className="text-xs text-gray-400 mt-1 capitalize">{item.category || 'Product'}</p>
+                        {item.vendorId && (
+                          <p className="text-[10px] text-purple-500 mt-0.5">🛍️ Vendor Product</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-0.5 capitalize">{item.category || 'Product'}</p>
                         <button 
                           onClick={() => handleRemoveItem(item.id, item.name)}
                           className="text-xs text-red-400 mt-2 hover:text-red-600 transition flex items-center gap-1"
@@ -510,12 +547,17 @@ function Cart() {
                     <span>₹{subtotal}</span>
                   </div>
 
-                  {/* ✅ COUPON SECTION WITH BEAUTIFUL DISPLAY */}
+                  {/* ✅ COUPON SECTION WITH VENDOR SUPPORT */}
                   {couponApplied ? (
                     <div className="flex flex-col gap-1 py-2 border-t border-pink-100">
                       <div className="flex justify-between text-green-600">
                         <div className="flex flex-col items-start">
                           <span className="font-medium">Discount ({appliedCoupon?.code})</span>
+                          {appliedCoupon?.isVendorCoupon && appliedCoupon?.vendorName && (
+                            <span className="text-[10px] text-purple-600 font-normal">
+                              🛍️ Applicable on {appliedCoupon.vendorName} products only
+                            </span>
+                          )}
                           {appliedCoupon?.description && (
                             <span className="text-[10px] text-gray-500 font-normal">
                               {appliedCoupon.description}
@@ -564,27 +606,40 @@ function Cart() {
                         </button>
                       </div>
                       
-                      {/* ✅ BEAUTIFUL AVAILABLE COUPONS - EK EK KARKE NEECHE */}
-                      {!couponApplied && availableCoupons.length > 0 && (
+                      {/* ✅ BEAUTIFUL AVAILABLE COUPONS - WITH VENDOR INFO */}
+                      {!couponApplied && eligibleCoupons.length > 0 && (
                         <div className="mt-1">
                           <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
                             <span>🎫</span> Available Coupons
+                            <span className="text-[10px] text-gray-400 font-normal">
+                              ({eligibleCoupons.length} eligible)
+                            </span>
                           </p>
                           <div className="flex flex-col gap-1.5">
-                            {availableCoupons.map((c, idx) => (
+                            {eligibleCoupons.map((c, idx) => (
                               <button
                                 key={idx}
                                 onClick={() => setCouponCode(c.code)}
                                 className="w-full text-left px-3 py-2 border border-dashed border-pink-200 rounded-lg hover:border-pink-400 hover:bg-pink-50/50 transition group flex flex-col"
                               >
                                 <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-mono font-bold text-pink-600 text-sm group-hover:text-pink-700">
                                       {c.code}
                                     </span>
                                     <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">
                                       {c.discountType === 'percentage' ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
                                     </span>
+                                    {c.vendorId && (
+                                      <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
+                                        🛍️ {c.vendorName || 'Vendor'}
+                                      </span>
+                                    )}
+                                    {!c.vendorId && (
+                                      <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">
+                                        🌐 All Products
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-pink-500 group-hover:text-pink-700 group-hover:underline">
                                     Apply →
@@ -603,6 +658,19 @@ function Cart() {
                               </button>
                             ))}
                           </div>
+                        </div>
+                      )}
+                      
+                      {/* ✅ Show ineligible coupons message */}
+                      {!couponApplied && availableCoupons.length > 0 && eligibleCoupons.length === 0 && (
+                        <div className="mt-1">
+                          <p className="text-xs text-gray-400 flex items-center gap-1">
+                            <span>🔒</span> No coupons available for your cart
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {availableCoupons.some(c => c.vendorId) && 
+                              'Vendor coupons require products from that vendor in your cart'}
+                          </p>
                         </div>
                       )}
                     </div>
