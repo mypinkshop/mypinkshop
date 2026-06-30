@@ -49,7 +49,7 @@ function VendorCoupons() {
       }
 
       // 2. Fetch vendor coupons
-      const couponsRes = await fetch(`${API_URL}/coupons/vendor`, {
+      const couponsRes = await fetch(`${API_URL}/vendor/coupons`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const couponsData = await couponsRes.json();
@@ -79,7 +79,7 @@ function VendorCoupons() {
     setSaving(true);
 
     try {
-      const res = await fetch(`${API_URL}/coupons/vendor/create`, {
+      const res = await fetch(`${API_URL}/vendor/coupons/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ function VendorCoupons() {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
 
     try {
-      const res = await fetch(`${API_URL}/coupons/vendor/${id}/toggle`, {
+      const res = await fetch(`${API_URL}/vendor/coupons/${id}/toggle`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ function VendorCoupons() {
     const token = localStorage.getItem('vendorToken') || localStorage.getItem('token');
 
     try {
-      const res = await fetch(`${API_URL}/coupons/vendor/${id}`, {
+      const res = await fetch(`${API_URL}/vendor/coupons/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
