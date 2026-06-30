@@ -510,57 +510,93 @@ function Cart() {
                     <span>₹{subtotal}</span>
                   </div>
 
-                  {/* ✅ COUPON SECTION */}
+                  {/* ✅ COUPON SECTION WITH DESCRIPTION */}
                   {couponApplied ? (
-                    <div className="flex justify-between text-green-600 py-2 border-t border-pink-100">
-                      <span>Discount ({appliedCoupon?.code})</span>
-                      <div className="flex items-center gap-2">
-                        <span>-₹{discount}</span>
-                        <button 
-                          onClick={removeCoupon} 
-                          className="text-xs text-red-400 hover:text-red-600 transition"
-                        >
-                          ✕
-                        </button>
+                    <div className="flex flex-col gap-1 py-2 border-t border-pink-100">
+                      <div className="flex justify-between text-green-600">
+                        <div className="flex flex-col items-start">
+                          <span>Discount ({appliedCoupon?.code})</span>
+                          {appliedCoupon?.description && (
+                            <span className="text-[10px] text-gray-500 font-normal">
+                              {appliedCoupon.description}
+                            </span>
+                          )}
+                          {!appliedCoupon?.description && appliedCoupon?.discountValue && (
+                            <span className="text-[10px] text-gray-500 font-normal">
+                              {appliedCoupon.discountType === 'percentage' 
+                                ? `${appliedCoupon.discountValue}% off` 
+                                : `₹${appliedCoupon.discountValue} off`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span>-₹{discount}</span>
+                          <button 
+                            onClick={removeCoupon} 
+                            className="text-xs text-red-400 hover:text-red-600 transition"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="Coupon code" 
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
-                        disabled={validatingCoupon}
-                      />
-                      <button 
-                        onClick={handleApplyCoupon}
-                        disabled={validatingCoupon || !couponCode.trim()}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                          validatingCoupon || !couponCode.trim()
-                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            : 'bg-pink-500 text-white hover:bg-pink-600 hover:shadow-md'
-                        }`}
-                      >
-                        {validatingCoupon ? '...' : 'Apply'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Available Coupons */}
-                  {!couponApplied && availableCoupons.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <span className="text-xs text-gray-500 mr-1">Available:</span>
-                      {availableCoupons.slice(0, 3).map((c, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setCouponCode(c.code)}
-                          className="text-xs px-2 py-0.5 border border-dashed border-pink-200 text-pink-600 rounded hover:bg-pink-50 transition"
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Coupon code" 
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                          disabled={validatingCoupon}
+                        />
+                        <button 
+                          onClick={handleApplyCoupon}
+                          disabled={validatingCoupon || !couponCode.trim()}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                            validatingCoupon || !couponCode.trim()
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-pink-500 text-white hover:bg-pink-600 hover:shadow-md'
+                          }`}
                         >
-                          {c.code}
+                          {validatingCoupon ? '...' : 'Apply'}
                         </button>
-                      ))}
+                      </div>
+                      
+                      {/* Available Coupons with Description */}
+                      {!couponApplied && availableCoupons.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs text-gray-500 mr-1">Available:</span>
+                          {availableCoupons.slice(0, 4).map((c, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setCouponCode(c.code)}
+                              className="text-xs px-2 py-0.5 border border-dashed border-pink-200 text-pink-600 rounded hover:bg-pink-50 transition flex items-center gap-1"
+                              title={c.description || c.code}
+                            >
+                              <span>{c.code}</span>
+                              {c.description && (
+                                <span className="text-[10px] text-gray-400">
+                                  ({c.description.length > 20 
+                                    ? c.description.substring(0, 20) + '...' 
+                                    : c.description})
+                                </span>
+                              )}
+                              {!c.description && c.discountValue && (
+                                <span className="text-[10px] text-gray-400">
+                                  ({c.discountType === 'percentage' 
+                                    ? `${c.discountValue}% off` 
+                                    : `₹${c.discountValue} off`})
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                          {availableCoupons.length > 4 && (
+                            <span className="text-[10px] text-gray-400">+{availableCoupons.length - 4} more</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   
