@@ -25,9 +25,9 @@ function AdminCoupons() {
     status: 'active'
   });
 
-  const API_URL = 'https://api.mypinkshop.com';
+  // ✅ FIXED: API_URL with /api
+  const API_URL = 'https://api.mypinkshop.com/api';
 
-  // ✅ Check admin auth
   useEffect(() => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     if (!token) {
@@ -37,13 +37,13 @@ function AdminCoupons() {
     loadCoupons(token);
   }, [navigate]);
 
-  // ✅ Load coupons from backend
+  // ✅ LOAD COUPONS - Fixed URL
   const loadCoupons = async (token) => {
     try {
       setLoading(true);
       setError('');
 
-      const res = await fetch(`${API_URL}/api/coupons/all`, {
+      const res = await fetch(`${API_URL}/coupons/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -76,7 +76,7 @@ function AdminCoupons() {
     }
   };
 
-  // ✅ Save coupon to backend
+  // ✅ SAVE COUPON - Fixed URL
   const saveCouponToAPI = async (couponData, isEdit = false) => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
@@ -121,7 +121,7 @@ function AdminCoupons() {
     return data;
   };
 
-  // ✅ Delete coupon from backend
+  // ✅ DELETE COUPON - Fixed URL
   const deleteCouponFromAPI = async (id) => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
@@ -147,7 +147,7 @@ function AdminCoupons() {
     return true;
   };
 
-  // ✅ Toggle coupon status
+  // ✅ TOGGLE COUPON - Fixed URL
   const toggleCouponStatusAPI = async (id, currentStatus) => {
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
@@ -650,5 +650,4 @@ function AdminCoupons() {
   );
 }
 
-// ✅ ENSURE DEFAULT EXPORT AT THE END
 export default AdminCoupons;
