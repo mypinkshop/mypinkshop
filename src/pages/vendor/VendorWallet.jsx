@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const VendorWallet = () => {
+  const navigate = useNavigate();
   const { token } = useAuth();
   const [loading, setLoading] = useState(true);
   const [wallet, setWallet] = useState({
@@ -143,10 +144,28 @@ const VendorWallet = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">💰 Wallet</h1>
-          <p className="text-gray-500 text-sm">Manage your wallet balance and transactions</p>
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-3 mb-6">
+          {/* ✅ BACK BUTTON */}
+          <button
+            onClick={() => navigate(-1)}
+            className="group flex items-center gap-2 bg-white hover:bg-pink-50 border border-gray-200 hover:border-pink-300 text-gray-700 hover:text-pink-600 px-4 py-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <svg 
+              className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span className="font-medium">Back</span>
+          </button>
+          
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">💰 Wallet</h1>
+            <p className="text-gray-500 text-sm">Manage your wallet balance and transactions</p>
+          </div>
         </div>
 
         {/* Wallet Balance Card */}
