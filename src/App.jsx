@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
 import FloatingCartButton from './components/FloatingCartButton'; // ✅ ADDED
+import VendorWallet from './pages/vendor/VendorWallet';
 
 // ✅ CUSTOMER PAGES - Lazy Loaded
 const Home = lazy(() => import('./pages/Home'));
@@ -183,6 +184,7 @@ function App() {
                   <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
                   <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />
                   <Route path="/vendor/profile" element={<VendorProfile />} />
+                  <Route path="/vendor/wallet" element={<VendorWallet />} />
                 </Routes>
               </Suspense>
 
