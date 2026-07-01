@@ -20,7 +20,7 @@ const protect = async (req, res, next) => {
   }
 };
 
-const adminOnly = (req, res, next) => {
+const adminMiddleware = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     next();
   } else {
@@ -28,7 +28,7 @@ const adminOnly = (req, res, next) => {
   }
 };
 
-const vendorOnly = (req, res, next) => {
+const vendorMiddleware = (req, res, next) => {
   if (req.user && (req.user.role === 'vendor' || req.user.role === 'admin')) {
     next();
   } else {
@@ -36,4 +36,4 @@ const vendorOnly = (req, res, next) => {
   }
 };
 
-module.exports = { protect, adminOnly, vendorOnly };
+module.exports = { protect, adminMiddleware, vendorMiddleware };
