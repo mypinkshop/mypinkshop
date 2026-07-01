@@ -1,17 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const Coupon = require('../models/Coupon');
-const Product = require('../models/Product'); // ✅ Import Product model
-const Vendor = require('../models/Vendor'); // ✅ Import Vendor model
+const Product = require('../models/Product');
+const Vendor = require('../models/Vendor');
 const { protect, admin } = require('../middleware/auth');
 
 // ========== PUBLIC ROUTES ==========
 
-// ✅ GET active coupons (For Cart page) - WITH VENDOR INFO
+// ✅ GET active coupons - WITH VENDOR FILTER (Sirf applicable coupons dikhein)
 router.get('/active', async (req, res) => {
   try {
     const now = new Date();
-    const coupons = await Coupon.find({
+    
+    // ✅ Cart items lo query se
+    const { cartItems } = req.query;
+    let vendorIdsInCart = [];
+    
+    if (cartItems) {
+      try {
+        const parsed = JSON.parse(cartItems);
+        vendorIdsInCart = [...new Set(parsed.map(item => item.vendorId).filter(id => id))];
+      } catch (e) {}
+    }
+    
+    // ✅ Query build karo
+    const query = {
       isActive: true,
       startDate: { $lte: now },
       $or: [
@@ -19,22 +32,37 @@ router.get('/active', async (req, res) => {
         { endDate: null }
       ],
       $expr: { $lt: ['$usedCount', '$usageLimit'] }
-    }).lean();
+    };
     
-    // ✅ Populate vendor info for vendor coupons
+    // ✅ Vendor filter - Sirf admin coupons + matching vendor coupons
+    if (vendorIdsInCart.length > 0) {
+      query.$or = [
+        { vendorId: null },                     // Admin coupon (sabko dikhega)
+        { vendorId: { $in: vendorIdsInCart } }  // Vendor coupon (sirf us vendor ke products wali cart mein)
+      ];
+    } else {
+      // ✅ Empty cart → Sirf admin coupons
+      query.vendorId = null;
+    }
+    
+    const coupons = await Coupon.find(query).lean();
+    
+    // ✅ Vendor info populate karo
     const couponsWithVendor = await Promise.all(coupons.map(async (coupon) => {
       if (coupon.vendorId) {
         const vendor = await Vendor.findById(coupon.vendorId).select('name brandName storeName');
         return {
           ...coupon,
           vendorName: vendor?.brandName || vendor?.name || vendor?.storeName || 'Vendor',
-          vendorStoreName: vendor?.storeName || vendor?.brandName || 'Vendor Store'
+          vendorStoreName: vendor?.storeName || vendor?.brandName || 'Vendor Store',
+          isVendorCoupon: true
         };
       }
       return {
         ...coupon,
         vendorName: null,
-        vendorStoreName: null
+        vendorStoreName: null,
+        isVendorCoupon: false
       };
     }));
     
@@ -206,7 +234,7 @@ router.post('/create', protect, admin, async (req, res) => {
       usageLimit, 
       startDate, 
       endDate,
-      vendorId // ✅ New field
+      vendorId
     } = req.body;
     
     const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
@@ -233,7 +261,7 @@ router.post('/create', protect, admin, async (req, res) => {
       startDate: startDate || new Date(),
       endDate: endDate || null,
       isActive: true,
-      vendorId: vendorId || null // ✅ Store vendorId
+      vendorId: vendorId || null
     });
     
     await coupon.save();
