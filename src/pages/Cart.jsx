@@ -28,41 +28,42 @@ function Cart() {
 
   const API_URL = 'https://api.mypinkshop.com/api';
 
-  // ✅ Fetch available coupons
+  // ✅ Fetch available coupons - WITH CART ITEMS
   useEffect(() => {
     const fetchCoupons = async () => {
       try {
-        const response = await fetch(`${API_URL}/coupons/active`);
+        // ✅ Cart items se vendorId nikaalo
+        const cartItemsWithVendor = cart.map(item => ({
+          id: item.id,
+          productId: item.id,
+          vendorId: item.vendorId || null,
+          price: item.price,
+          quantity: item.quantity
+        }));
+
+        // ✅ Backend ko bhejo
+        const response = await fetch(
+          `${API_URL}/coupons/active?cartItems=${encodeURIComponent(JSON.stringify(cartItemsWithVendor))}`
+        );
         const data = await response.json();
+
         if (data.success) {
           setAvailableCoupons(data.coupons || []);
+          
+          // ✅ Frontend filter (safety)
+          const eligible = data.coupons.filter(coupon => {
+            if (!coupon.vendorId) return true; // Admin coupon - always eligible
+            return cart.some(item => item.vendorId === coupon.vendorId); // Vendor coupon - only if vendor's products in cart
+          });
+          setEligibleCoupons(eligible);
         }
       } catch (error) {
         console.error('Failed to fetch coupons:', error);
       }
     };
+
     fetchCoupons();
-  }, []);
-
-  // ✅ Filter eligible coupons based on cart
-  useEffect(() => {
-    if (!availableCoupons.length || !cart.length) {
-      setEligibleCoupons([]);
-      return;
-    }
-
-    const eligible = availableCoupons.filter(coupon => {
-      // ✅ Admin coupon (vendorId: null) - Always eligible
-      if (!coupon.vendorId) {
-        return true;
-      }
-
-      // ✅ Vendor coupon - Check if cart has vendor's products
-      return cart.some(item => item.vendorId === coupon.vendorId);
-    });
-
-    setEligibleCoupons(eligible);
-  }, [availableCoupons, cart]);
+  }, [cart]);
 
   const handleCheckout = () => {
     setIsCheckingOut(true);
@@ -606,7 +607,7 @@ function Cart() {
                         </button>
                       </div>
                       
-                      {/* ✅ BEAUTIFUL AVAILABLE COUPONS - WITH VENDOR INFO */}
+                      {/* ✅ Available Coupons with Vendor Info */}
                       {!couponApplied && eligibleCoupons.length > 0 && (
                         <div className="mt-1">
                           <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
