@@ -2441,6 +2441,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/api/wallet', require('./routes/walletRoutes'));
 
 // ========== ADDRESS ROUTES (WITH CORS) ==========
 app.options('/api/addresses', cors(corsOptions));
