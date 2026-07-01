@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const VendorAds = () => {
+  const navigate = useNavigate();
   const { token } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [stats, setStats] = useState({
+    activeCampaigns: 0,
+    totalBudget: 0,
+    totalSpent: 0,
+    totalImpressions: 0,
+    totalClicks: 0,
+    totalRevenue: 0
+  });
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -22,7 +32,24 @@ const VendorAds = () => {
 
   useEffect(() => {
     fetchCampaigns();
+    fetchWalletBalance();
   }, [currentPage, filterStatus, filterType]);
+
+  const fetchWalletBalance = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/wallet`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setWalletBalance(data.wallet.balance);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet:', error);
+    }
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -40,6 +67,22 @@ const VendorAds = () => {
       if (data.success) {
         setCampaigns(data.campaigns);
         setPagination(data.pagination);
+        
+        const activeCampaigns = data.campaigns.filter(c => c.status === 'active').length;
+        const totalBudget = data.campaigns.reduce((sum, c) => sum + c.budget, 0);
+        const totalSpent = data.campaigns.reduce((sum, c) => sum + c.spent, 0);
+        const totalImpressions = data.campaigns.reduce((sum, c) => sum + (c.impressions || 0), 0);
+        const totalClicks = data.campaigns.reduce((sum, c) => sum + (c.clicks || 0), 0);
+        const totalRevenue = data.campaigns.reduce((sum, c) => sum + (c.revenue || 0), 0);
+        
+        setStats({
+          activeCampaigns,
+          totalBudget,
+          totalSpent,
+          totalImpressions,
+          totalClicks,
+          totalRevenue
+        });
       }
     } catch (error) {
       console.error('Error fetching campaigns:', error);
@@ -149,20 +192,94 @@ const VendorAds = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Header with Wallet Balance */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">📢 Advertising</h1>
             <p className="text-gray-500 text-sm">Manage your ad campaigns</p>
           </div>
-          <div className="flex gap-2">
-            <Link
-              to="/vendor/create-ad"
-              className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition"
-            >
-              + Create Campaign
-            </Link>
-          </div>
+          
+          {/* ✅ Wallet Balance - Clickable */}
+          <button
+            onClick={() => navigate('/vendor/wallet')}
+            className="flex items-center gap-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2.5 rounded-xl hover:shadow-lg transition-all hover:scale-[1.02]"
+          >
+            <span className="text-lg">💰</span>
+            <div className="text-left">
+              <p className="text-xs text-pink-100">Wallet Balance</p>
+              <p className="text-sm font-bold">{formatCurrency(walletBalance)}</p>
+            </div>
+            <span className="text-pink-100 text-xs">→</span>
+          </button>
+        </div>
+
+        {/* ✅ STATS CARDS - Clickable */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <button
+            onClick={() => {
+              setFilterStatus('active');
+              setCurrentPage(1);
+            }}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:border-pink-300 text-left"
+          >
+            <p className="text-sm text-gray-500">Active Campaigns</p>
+            <p className="text-2xl font-bold text-green-600">{stats.activeCampaigns}</p>
+            <p className="text-xs text-gray-400 mt-1">Click to filter</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/vendor/wallet')}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:border-pink-300 text-left"
+          >
+            <p className="text-sm text-gray-500">Total Budget</p>
+            <p className="text-2xl font-bold text-blue-600">{formatCurrency(stats.totalBudget)}</p>
+            <p className="text-xs text-gray-400 mt-1">View wallet</p>
+          </button>
+
+          <button
+            onClick={() => {
+              setFilterStatus('active,paused,completed');
+              setCurrentPage(1);
+            }}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:border-pink-300 text-left"
+          >
+            <p className="text-sm text-gray-500">Total Spent</p>
+            <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.totalSpent)}</p>
+            <p className="text-xs text-gray-400 mt-1">View all campaigns</p>
+          </button>
+
+          <button
+            onClick={() => {
+              setFilterStatus('active');
+              setCurrentPage(1);
+            }}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:border-pink-300 text-left"
+          >
+            <p className="text-sm text-gray-500">Impressions</p>
+            <p className="text-2xl font-bold text-purple-600">{stats.totalImpressions.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1">View active ads</p>
+          </button>
+
+          <button
+            onClick={() => {
+              setFilterStatus('active');
+              setCurrentPage(1);
+            }}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:border-pink-300 text-left"
+          >
+            <p className="text-sm text-gray-500">Clicks</p>
+            <p className="text-2xl font-bold text-pink-600">{stats.totalClicks.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mt-1">View active ads</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/vendor/earnings')}
+            className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:border-pink-300 text-left"
+          >
+            <p className="text-sm text-gray-500">Sales Generated</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.totalRevenue)}</p>
+            <p className="text-xs text-gray-400 mt-1">View earnings</p>
+          </button>
         </div>
 
         {/* Filters */}
@@ -308,11 +425,17 @@ const VendorAds = () => {
 
                   {/* Stats */}
                   <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-500">
-                    <span>Impressions: {campaign.impressions || 0}</span>
-                    <span>Clicks: {campaign.clicks || 0}</span>
-                    <span>Conversions: {campaign.conversions || 0}</span>
-                    {campaign.clicks > 0 && (
-                      <span>CTR: {(campaign.clicks / campaign.impressions * 100).toFixed(1)}%</span>
+                    <span>👁️ Impressions: {campaign.impressions || 0}</span>
+                    <span>👆 Clicks: {campaign.clicks || 0}</span>
+                    <span>🛒 Conversions: {campaign.conversions || 0}</span>
+                    {campaign.impressions > 0 && (
+                      <span>📊 CTR: {(campaign.clicks / campaign.impressions * 100).toFixed(1)}%</span>
+                    )}
+                    {campaign.revenue > 0 && (
+                      <span>💰 Revenue: {formatCurrency(campaign.revenue)}</span>
+                    )}
+                    {campaign.spent > 0 && campaign.revenue > 0 && (
+                      <span>📈 ROI: {((campaign.revenue - campaign.spent) / campaign.spent * 100).toFixed(1)}%</span>
                     )}
                   </div>
                 </div>
