@@ -5,12 +5,7 @@ import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
-import FloatingCartButton from './components/FloatingCartButton'; // ✅ ADDED
-import VendorWallet from './pages/vendor/VendorWallet';
-import VendorAds from './pages/vendor/VendorAds';
-import CreateAd from './pages/vendor/CreateAd';
-import AdDetail from './pages/vendor/AdDetail';
-
+import FloatingCartButton from './components/FloatingCartButton';
 
 // ✅ CUSTOMER PAGES - Lazy Loaded
 const Home = lazy(() => import('./pages/Home'));
@@ -76,7 +71,10 @@ const VendorProducts = lazy(() => import('./pages/vendor/VendorProducts'));
 const VendorAddProduct = lazy(() => import('./pages/vendor/VendorAddProduct'));
 const VendorOrders = lazy(() => import('./pages/vendor/VendorOrders'));
 const VendorEarnings = lazy(() => import('./pages/vendor/VendorEarnings'));
-const VendorAds = lazy(() => import('./pages/vendor/VendorAds'));
+const VendorAds = lazy(() => import('./pages/vendor/VendorAds'));           // ✅ Only ONE lazy import
+const CreateAd = lazy(() => import('./pages/vendor/CreateAd'));
+const AdDetail = lazy(() => import('./pages/vendor/AdDetail'));
+const VendorWallet = lazy(() => import('./pages/vendor/VendorWallet'));     // ✅ ONLY ONE lazy import
 const VendorShipping = lazy(() => import('./pages/vendor/VendorShipping'));
 const VendorTax = lazy(() => import('./pages/vendor/VendorTax'));
 const VendorReports = lazy(() => import('./pages/vendor/VendorReports'));
@@ -175,6 +173,9 @@ function App() {
                   <Route path="/vendor/orders" element={<VendorOrders />} />
                   <Route path="/vendor/earnings" element={<VendorEarnings />} />
                   <Route path="/vendor/ads" element={<VendorAds />} />
+                  <Route path="/vendor/create-ad" element={<CreateAd />} />      {/* ✅ Fixed path */}
+                  <Route path="/vendor/ads/:id" element={<AdDetail />} />        {/* ✅ Fixed path */}
+                  <Route path="/vendor/wallet" element={<VendorWallet />} />
                   <Route path="/vendor/shipping" element={<VendorShipping />} />
                   <Route path="/vendor/tax" element={<VendorTax />} />
                   <Route path="/vendor/reports" element={<VendorReports />} />
@@ -188,10 +189,6 @@ function App() {
                   <Route path="/vendor/store-builder" element={<VendorStoreBuilder />} />
                   <Route path="/vendor/bulk-upload" element={<VendorBulkUpload />} />
                   <Route path="/vendor/profile" element={<VendorProfile />} />
-                  <Route path="/vendor/wallet" element={<VendorWallet />} />
-                  <Route path="ads" element={<VendorAds />} />
-                  <Route path="create-ad" element={<CreateAd />} />
-                  <Route path="ads/:id" element={<AdDetail />} />
                 </Routes>
               </Suspense>
 
