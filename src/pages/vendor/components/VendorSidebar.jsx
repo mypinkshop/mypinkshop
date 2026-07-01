@@ -9,7 +9,7 @@ function VendorSidebar({ activeTab }) {
     { id: 'orders', label: 'Orders', icon: '📋', path: '/vendor/orders' },
     { id: 'returns', label: 'Returns', icon: '🔄', path: '/vendor/returns' },
     { id: 'ads', label: 'Advertising', icon: '📢', path: '/vendor/ads' },
-    { id: 'coupons', label: 'Coupons', icon: '🎫', path: '/vendor/coupons' },
+   // { id: 'coupons', label: 'Coupons', icon: '🎫', path: '/vendor/coupons' },
     { id: 'reports', label: 'Reports', icon: '📊', path: '/vendor/reports' },
     { id: 'order-reports', label: 'Order Reports', icon: '📋', path: '/vendor/order-reports' },
     { id: 'performance', label: 'Account Health', icon: '💚', path: '/vendor/account-health' },
