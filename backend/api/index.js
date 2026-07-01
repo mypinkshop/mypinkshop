@@ -7,6 +7,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const multer = require('multer');
 const AWS = require('aws-sdk');
+
+// ========== ROUTES IMPORTS ==========
 const otpRoutes = require('./otp');
 const authRoutes = require('./auth');
 const userRoutes = require('./users');
@@ -14,7 +16,23 @@ const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
 const notificationRoutes = require('../routes/notificationRoutes');
 
-// ✅ VENDOR EMAIL SERVICE IMPORTS
+// ========== MODEL IMPORTS ==========
+const User = require('../models/User');
+const Vendor = require('../models/Vendor');
+const Product = require('../models/Product');
+const Order = require('../models/Order');
+const Coupon = require('../models/Coupon');
+const Review = require('../models/Review');
+const Wishlist = require('../models/Wishlist');
+const Cart = require('../models/Cart');
+const Banner = require('../models/Banner');
+const Offer = require('../models/Offer');
+const Address = require('../models/Address');
+const Wallet = require('../models/Wallet');
+const AdCampaign = require('../models/AdCampaign');
+const BrandApplication = require('../models/BrandApplication');
+
+// ========== VENDOR EMAIL SERVICE IMPORTS ==========
 const { 
   sendVendorApproved, 
   sendVendorRejected, 
@@ -224,340 +242,6 @@ class ShiprocketService {
 }
 
 const shiprocket = new ShiprocketService();
-
-// ============================================
-// ✅ VENDOR SCHEMA
-// ============================================
-const vendorSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  brandName: { type: String, required: true },
-  storeName: { type: String, default: '' },
-  storeId: { type: String, unique: true, sparse: true },
-  phone: { type: String, default: '' },
-  address: {
-    street: { type: String, default: '' },
-    city: { type: String, default: '' },
-    state: { type: String, default: '' },
-    pincode: { type: String, default: '' },
-    country: { type: String, default: 'India' }
-  },
-  gstNumber: { type: String, default: '' },
-  panNumber: { type: String, default: '' },
-  bankDetails: {
-    accountNumber: { type: String, default: '' },
-    ifscCode: { type: String, default: '' },
-    accountHolderName: { type: String, default: '' }
-  },
-  shippingRate: { type: Number, default: 49 },
-  expressRate: { type: Number, default: 99 },
-  freeShippingThreshold: { type: Number, default: 999 },
-  processingTime: { type: String, default: '1-2 days' },
-  status: { 
-    type: String, 
-    enum: ['pending', 'approved', 'rejected', 'suspended', 'blocked'], 
-    default: 'pending' 
-  },
-  vendorStatus: { 
-    type: String, 
-    enum: ['pending', 'approved', 'rejected', 'suspended'], 
-    default: 'pending' 
-  },
-  permissions: { 
-    type: [String], 
-    default: ['manage_products', 'view_orders', 'manage_inventory', 'view_analytics'] 
-  },
-  loginAttempts: { type: Number, default: 0 },
-  lockUntil: { type: Date, default: null },
-  lastLogin: { type: Date },
-  twoFactorEnabled: { type: Boolean, default: false },
-  twoFactorSecret: { type: String, default: '' },
-  resetPasswordToken: { type: String, default: '' },
-  resetPasswordExpires: { type: Date },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-vendorSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-vendorSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
-vendorSchema.pre('save', function(next) {
-  if (!this.storeId) {
-    this.storeId = `STORE_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-  }
-  this.updatedAt = new Date();
-  next();
-});
-
-const Vendor = mongoose.models.Vendor || mongoose.model('Vendor', vendorSchema);
-
-// ============================================
-// ✅ BRAND APPLICATION SCHEMA
-// ============================================
-const brandApplicationSchema = new mongoose.Schema({
-  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
-  brandName: { type: String, required: true },
-  trademarkNumber: { type: String, required: true },
-  trademarkOffice: { type: String, default: 'india' },
-  brandWebsite: { type: String, default: '' },
-  productCategories: { type: [String], default: [] },
-  manufacturingCountries: { type: [String], default: [] },
-  brandCertificate: { type: String, default: '' },
-  brandLogo: { type: String, default: '' },
-  status: { 
-    type: String, 
-    enum: ['pending', 'approved', 'rejected'], 
-    default: 'pending' 
-  },
-  adminRemarks: { type: String, default: '' },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-const BrandApplication = mongoose.models.BrandApplication || mongoose.model('BrandApplication', brandApplicationSchema);
-
-// ========== SCHEMAS ==========
-
-const productSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  brand: { type: String, default: '' },
-  category: { type: String, required: true },
-  mainCategory: { type: String, default: '' },
-  subCategory: { type: String, default: '' },
-  subcategory: { type: String, default: '' },
-  price: { type: Number, required: true },
-  originalPrice: { type: Number, default: 0 },
-  stock: { type: Number, default: 0 },
-  images: { type: [String], default: [] },
-  description: { type: mongoose.Schema.Types.Mixed, default: '' },
-  shortDescription: { type: String, default: '' },
-  keyFeatures: { type: [String], default: [] },
-  rating: { type: Number, default: 4.0 },
-  badge: { type: String, default: '' },
-  isNew: { type: Boolean, default: false },
-  status: { type: String, default: 'active' },
-  adminApproved: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now },
-  sizes: { type: [String], default: [] },
-  colors: { type: [String], default: [] },
-  variants: { type: Array, default: [] },
-  variations: { type: Array, default: [] },
-  fabric: { type: String, default: '' },
-  material: { type: String, default: '' },
-  gender: { type: String, default: 'unisex' },
-  weight: { type: String, default: '' },
-  dimensions: { type: String, default: '' },
-  ingredients: { type: String, default: '' },
-  metaTitle: { type: String, default: '' },
-  metaDescription: { type: String, default: '' },
-  metaKeywords: { type: String, default: '' },
-  slug: { type: String, default: '' },
-  reviewCount: { type: Number, default: 0 },
-  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null }
-});
-
-const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
-
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['buyer', 'vendor', 'admin'], default: 'buyer' },
-  phone: { type: String, default: '' },
-  address: { type: String, default: '' },
-  isEmailVerified: { type: Boolean, default: false },
-  emailVerificationToken: { type: String, default: '' },
-  emailVerificationExpires: { type: Date },
-  resetPasswordToken: { type: String, default: '' },
-  resetPasswordExpires: { type: Date },
-  createdAt: { type: Date, default: Date.now }
-});
-
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
-const User = mongoose.models.User || mongoose.model('User', userSchema);
-
-const addressSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  fullName: { type: String, required: true },
-  phone: { type: String, required: true },
-  addressLine1: { type: String, required: true },
-  addressLine2: { type: String, default: '' },
-  landmark: { type: String, default: '' },
-  city: { type: String, required: true },
-  state: { type: String, required: true },
-  pincode: { type: String, required: true },
-  country: { type: String, default: 'India' },
-  type: { type: String, enum: ['Home', 'Work', 'Other'], default: 'Home' },
-  isDefault: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
-
-const bannerSchema = new mongoose.Schema({
-  title: { type: String, default: '' },
-  subtitle: { type: String, default: '' },
-  buttonText: { type: String, default: '' },
-  link: { type: String, default: '/shop' },
-  images: { type: [String], default: [] },
-  order: { type: Number, default: 0 },
-  active: { type: Boolean, default: true },
-  showTextOverlay: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Banner = mongoose.models.Banner || mongoose.model('Banner', bannerSchema);
-
-const offerSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-  isActive: { type: Boolean, default: true },
-  type: { type: String, default: 'top_banner' },
-  discountType: { type: String, default: 'percentage' },
-  discountValue: { type: Number, default: 10 },
-  minOrderValue: { type: Number, default: 499 },
-  startDate: { type: Date, default: Date.now },
-  endDate: { type: Date },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-const Offer = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
-
-const couponSchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true, uppercase: true },
-  description: { type: String, default: '' },
-  discountType: { type: String, enum: ['percentage', 'fixed'], default: 'percentage' },
-  discountValue: { type: Number, required: true },
-  minOrderValue: { type: Number, default: 0 },
-  maxDiscount: { type: Number, default: 0 },
-  usageLimit: { type: Number, default: 1 },
-  usedCount: { type: Number, default: 0 },
-  isActive: { type: Boolean, default: true },
-  startDate: { type: Date, default: Date.now },
-  endDate: { type: Date },
-  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
-
-const reviewSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
-  rating: { type: Number, required: true, min: 1, max: 5 },
-  title: { type: String, default: '', trim: true, maxlength: 100 },
-  comment: { type: String, required: true, trim: true, maxlength: 2000 },
-  images: { type: [String], default: [] },
-  videos: { type: [String], default: [] },
-  status: { type: String, enum: ['pending', 'approved', 'rejected', 'spam'], default: 'pending' },
-  isVerifiedPurchase: { type: Boolean, default: false },
-  helpful: { type: Number, default: 0 },
-  helpfulUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  adminNote: { type: String, default: '' },
-  reviewedAt: { type: Date, default: Date.now },
-  approvedAt: { type: Date }
-}, { timestamps: true });
-
-reviewSchema.index({ productId: 1, status: 1 });
-reviewSchema.index({ userId: 1, productId: 1 }, { unique: true });
-
-reviewSchema.statics.getAverageRating = async function(productId) {
-  const result = await this.aggregate([
-    { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
-    { $group: { _id: '$productId', avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
-  ]);
-  return { rating: result[0]?.avgRating || 0, count: result[0]?.count || 0 };
-};
-
-const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
-
-const orderItemSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  name: String,
-  price: Number,
-  quantity: Number,
-  image: String,
-  variationName: String,
-  variationSecondary: String
-});
-
-const orderSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  items: [orderItemSchema],
-  total: Number,
-  status: { type: String, enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'], default: 'pending' },
-  paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
-  address: Object,
-  trackingNumber: { type: String, default: '' },
-  courierName: { type: String, default: '' },
-  shipmentId: { type: String, default: '' },
-  returnRequested: { type: Boolean, default: false },
-  returnReason: { type: String, default: '' },
-  returnStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-  returnType: { type: String, default: 'refund' },
-  returnResolution: { type: String, default: '' },
-  acceptedAt: { type: Date },
-  shippedAt: { type: Date },
-  deliveredAt: { type: Date },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
-
-const wishlistItemSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  addedAt: { type: Date, default: Date.now }
-});
-
-const wishlistSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-  items: [wishlistItemSchema],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-wishlistSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-const Wishlist = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);
-
-const cartItemSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  quantity: { type: Number, default: 1, min: 1 }
-});
-
-const cartSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-  items: [cartItemSchema],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-
-const Cart = mongoose.models.Cart || mongoose.model('Cart', cartSchema);
 
 // ========== AUTH MIDDLEWARE ==========
 const authMiddleware = (req, res, next) => {
@@ -2445,7 +2129,7 @@ app.use('/api/wallet', require('../routes/walletRoutes'));
 app.use('/api/ads', require('../routes/adRoutes'));
 app.use('/api/coupons', require('../routes/couponRoutes'));
 
-// ========== ADDRESS ROUTES (WITH CORS) ==========
+// ========== ADDRESS ROUTES ==========
 app.options('/api/addresses', cors(corsOptions));
 app.options('/api/addresses/:id', cors(corsOptions));
 
@@ -2581,7 +2265,7 @@ app.patch('/api/addresses/:id/default', cors(corsOptions), authMiddleware, async
   }
 });
 
-// ========== CART ROUTES (WITH CORS) ==========
+// ========== CART ROUTES ==========
 app.options('/api/cart', cors(corsOptions));
 app.options('/api/cart/:itemId', cors(corsOptions));
 
@@ -3085,7 +2769,7 @@ app.delete('/api/reviews/:reviewId', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== WISHLIST ROUTES (WITH CORS) ==========
+// ========== WISHLIST ROUTES ==========
 app.options('/api/wishlist', cors(corsOptions));
 app.options('/api/wishlist/:productId', cors(corsOptions));
 app.options('/api/wishlist/clear/all', cors(corsOptions));
@@ -3186,7 +2870,7 @@ app.delete('/api/wishlist/clear/all', cors(corsOptions), authMiddleware, async (
   }
 });
 
-// ========== ORDERS ROUTES (WITH CORS) ==========
+// ========== ORDERS ROUTES ==========
 app.options('/api/orders', cors(corsOptions));
 app.options('/api/orders/:id', cors(corsOptions));
 
@@ -3482,10 +3166,9 @@ app.get('/api/shipping/settings', async (req, res) => {
 });
 
 // ============================================
-// ✅ ✅ ✅ FIXED: COUPON ROUTES WITH /active
+// ✅ COUPON ROUTES
 // ============================================
 
-// ✅ GET active coupons (For Cart page)
 app.get('/api/coupons/active', async (req, res) => {
   try {
     await connectDB();
@@ -3507,7 +3190,6 @@ app.get('/api/coupons/active', async (req, res) => {
   }
 });
 
-// ✅ Validate coupon
 app.post('/api/coupons/validate', async (req, res) => {
   try {
     await connectDB();
@@ -3565,7 +3247,6 @@ app.post('/api/coupons/validate', async (req, res) => {
   }
 });
 
-// ✅ Admin - Get all coupons
 app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3576,7 +3257,6 @@ app.get('/api/coupons/all', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
-// ✅ Admin - Create coupon
 app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3597,7 +3277,6 @@ app.post('/api/coupons/create', authMiddleware, adminMiddleware, async (req, res
   }
 });
 
-// ✅ Admin - Update coupon
 app.put('/api/coupons/update/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3613,7 +3292,6 @@ app.put('/api/coupons/update/:id', authMiddleware, adminMiddleware, async (req, 
   }
 });
 
-// ✅ Admin - Toggle coupon status
 app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
@@ -3628,7 +3306,6 @@ app.patch('/api/coupons/toggle/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
-// ✅ Admin - Delete coupon
 app.delete('/api/coupons/delete/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     await connectDB();
