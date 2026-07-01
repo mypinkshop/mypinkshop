@@ -7,8 +7,6 @@ const adCampaignSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  
-  // Campaign Details
   name: {
     type: String,
     required: true,
@@ -24,8 +22,6 @@ const adCampaignSchema = new mongoose.Schema({
     enum: ['pending', 'active', 'paused', 'completed', 'rejected', 'ended'],
     default: 'pending'
   },
-  
-  // Budget
   budget: {
     type: Number,
     required: true,
@@ -40,8 +36,6 @@ const adCampaignSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
-  // Bidding
   bidType: {
     type: String,
     enum: ['cpc', 'cpm'],
@@ -52,8 +46,6 @@ const adCampaignSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
-  
-  // Schedule
   startDate: {
     type: Date,
     required: true
@@ -62,8 +54,6 @@ const adCampaignSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  
-  // Targeting
   targeting: {
     categories: [{
       type: String,
@@ -92,15 +82,11 @@ const adCampaignSchema = new mongoose.Schema({
       max: { type: Number, default: 65 }
     }
   },
-  
-  // Product Ad Specific
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     index: true
   },
-  
-  // Banner Ad Specific
   banner: {
     imageUrl: { type: String, default: '' },
     linkUrl: { type: String, default: '' },
@@ -116,8 +102,6 @@ const adCampaignSchema = new mongoose.Schema({
     },
     mobileImage: { type: String, default: '' }
   },
-  
-  // Analytics
   impressions: {
     type: Number,
     default: 0
@@ -134,8 +118,6 @@ const adCampaignSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
-  // Daily Stats
   dailyStats: [{
     date: {
       type: Date,
@@ -147,8 +129,6 @@ const adCampaignSchema = new mongoose.Schema({
     conversions: { type: Number, default: 0 },
     revenue: { type: Number, default: 0 }
   }],
-  
-  // Admin
   adminApproved: {
     type: Boolean,
     default: false
@@ -161,8 +141,6 @@ const adCampaignSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  
-  // Timestamps
   createdAt: {
     type: Date,
     default: Date.now
@@ -181,13 +159,11 @@ const adCampaignSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
 adCampaignSchema.index({ vendorId: 1, status: 1 });
 adCampaignSchema.index({ startDate: 1, endDate: 1 });
 adCampaignSchema.index({ type: 1, status: 1 });
 adCampaignSchema.index({ 'targeting.categories': 1 });
 
-// Methods
 adCampaignSchema.methods.isActive = function() {
   const now = new Date();
   return this.status === 'active' && 
@@ -248,7 +224,6 @@ adCampaignSchema.methods.recordImpression = async function() {
 adCampaignSchema.methods.recordClick = async function() {
   this.clicks += 1;
   
-  // For CPC, deduct bid amount from budget
   if (this.bidType === 'cpc') {
     this.spent += this.bidAmount;
   }
@@ -276,7 +251,6 @@ adCampaignSchema.methods.recordClick = async function() {
     }
   }
   
-  // Check if budget exhausted
   if (this.spent >= this.budget) {
     this.status = 'completed';
     this.completedAt = new Date();
@@ -304,7 +278,6 @@ adCampaignSchema.methods.recordConversion = async function(revenue = 0) {
   return await this.save();
 };
 
-// Static method to get active campaigns for placement
 adCampaignSchema.statics.getActiveForPlacement = async function(type, category = null, limit = 10) {
   const now = new Date();
   const query = {
@@ -326,6 +299,5 @@ adCampaignSchema.statics.getActiveForPlacement = async function(type, category =
     .populate('productId', 'name price images brand');
 };
 
-const AdCampaign = mongoose.model('AdCampaign', adCampaignSchema);
-
+const AdCampaign = mongoose.models.AdCampaign || mongoose.model('AdCampaign', adCampaignSchema);
 module.exports = AdCampaign;
