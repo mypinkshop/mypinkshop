@@ -87,6 +87,7 @@ function Home() {
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sponsoredProducts, setSponsoredProducts] = useState([]); // ✅ NEW
   
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
@@ -104,7 +105,6 @@ function Home() {
     accessories: useRef(null)
   };
 
-  // ✅ Environment variable
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   // Load products
@@ -185,6 +185,22 @@ function Home() {
     loadBanners();
     
     return () => abortController.abort();
+  }, [API_URL]);
+
+  // ✅ NEW: Fetch sponsored products
+  useEffect(() => {
+    const fetchSponsoredProducts = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/ads/public/sponsored-products?limit=4`);
+        const data = await response.json();
+        if (data.success && data.products) {
+          setSponsoredProducts(data.products);
+        }
+      } catch (error) {
+        console.error('Error fetching sponsored products:', error);
+      }
+    };
+    fetchSponsoredProducts();
   }, [API_URL]);
 
   // Preload first banner
@@ -568,6 +584,37 @@ function Home() {
             </div>
           </div>
         </section>
+
+        {/* ✅ SPONSORED PRODUCTS SECTION */}
+        {sponsoredProducts.length > 0 && (
+          <section className="py-12 bg-gradient-to-r from-blue-50 to-purple-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-2 mb-6">
+                <span className="text-xl">📢</span>
+                <h2 className="text-2xl font-bold text-gray-800">Sponsored Products</h2>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">Ads</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {sponsoredProducts.map(product => (
+                  <div key={product._id} className="relative">
+                    <div className="absolute top-3 left-3 z-10 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
+                      <span>📢</span> Sponsored
+                    </div>
+                    <ProductCard 
+                      product={product} 
+                      addToCart={addToCart}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                      wishlistContext={wishlist}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {newArrivals.length > 0 && (
           <section className="py-12 bg-white">
