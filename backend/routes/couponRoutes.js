@@ -3,7 +3,9 @@ const router = express.Router();
 const Coupon = require('../models/Coupon');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
-const { protect, admin } = require('../middleware/auth');
+
+// ✅ CHANGE: admin → adminMiddleware
+const { protect, adminMiddleware } = require('../middleware/auth');
 
 // ========== PUBLIC ROUTES ==========
 
@@ -12,7 +14,6 @@ router.get('/active', async (req, res) => {
   try {
     const now = new Date();
     
-    // ✅ Cart items lo query se
     const { cartItems } = req.query;
     let vendorIdsInCart = [];
     
@@ -23,7 +24,6 @@ router.get('/active', async (req, res) => {
       } catch (e) {}
     }
     
-    // ✅ Query build karo
     const query = {
       isActive: true,
       startDate: { $lte: now },
@@ -34,20 +34,17 @@ router.get('/active', async (req, res) => {
       $expr: { $lt: ['$usedCount', '$usageLimit'] }
     };
     
-    // ✅ Vendor filter - Sirf admin coupons + matching vendor coupons
     if (vendorIdsInCart.length > 0) {
       query.$or = [
-        { vendorId: null },                     // Admin coupon (sabko dikhega)
-        { vendorId: { $in: vendorIdsInCart } }  // Vendor coupon (sirf us vendor ke products wali cart mein)
+        { vendorId: null },
+        { vendorId: { $in: vendorIdsInCart } }
       ];
     } else {
-      // ✅ Empty cart → Sirf admin coupons
       query.vendorId = null;
     }
     
     const coupons = await Coupon.find(query).lean();
     
-    // ✅ Vendor info populate karo
     const couponsWithVendor = await Promise.all(coupons.map(async (coupon) => {
       if (coupon.vendorId) {
         const vendor = await Vendor.findById(coupon.vendorId).select('name brandName storeName');
@@ -73,7 +70,7 @@ router.get('/active', async (req, res) => {
   }
 });
 
-// ✅ Validate coupon - WITH VENDOR PRODUCT CHECK
+// ✅ Validate coupon
 router.post('/validate', async (req, res) => {
   try {
     const { code, cartTotal, userId, cartItems } = req.body;
@@ -103,7 +100,6 @@ router.post('/validate', async (req, res) => {
       });
     }
     
-    // ✅ VENDOR COUPON LOGIC
     let applicableCartTotal = cartTotal;
     let isVendorCoupon = false;
     let vendorName = null;
@@ -186,8 +182,8 @@ router.post('/validate', async (req, res) => {
 
 // ========== ADMIN ROUTES ==========
 
-// ✅ Get all coupons - WITH VENDOR INFO
-router.get('/all', protect, admin, async (req, res) => {
+// ✅ CHANGE: admin → adminMiddleware
+router.get('/all', protect, adminMiddleware, async (req, res) => {
   try {
     const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
     
@@ -213,8 +209,8 @@ router.get('/all', protect, admin, async (req, res) => {
   }
 });
 
-// ✅ Create coupon - WITH VENDOR SUPPORT
-router.post('/create', protect, admin, async (req, res) => {
+// ✅ CHANGE: admin → adminMiddleware
+router.post('/create', protect, adminMiddleware, async (req, res) => {
   try {
     const { 
       code, 
@@ -275,8 +271,8 @@ router.post('/create', protect, admin, async (req, res) => {
   }
 });
 
-// ✅ Update coupon
-router.put('/update/:id', protect, admin, async (req, res) => {
+// ✅ CHANGE: admin → adminMiddleware
+router.put('/update/:id', protect, adminMiddleware, async (req, res) => {
   try {
     const { vendorId, ...updateData } = req.body;
     
@@ -307,8 +303,8 @@ router.put('/update/:id', protect, admin, async (req, res) => {
   }
 });
 
-// ✅ Toggle coupon status
-router.patch('/toggle/:id', protect, admin, async (req, res) => {
+// ✅ CHANGE: admin → adminMiddleware
+router.patch('/toggle/:id', protect, adminMiddleware, async (req, res) => {
   try {
     const coupon = await Coupon.findById(req.params.id);
     if (!coupon) {
@@ -325,8 +321,8 @@ router.patch('/toggle/:id', protect, admin, async (req, res) => {
   }
 });
 
-// ✅ Delete coupon
-router.delete('/delete/:id', protect, admin, async (req, res) => {
+// ✅ CHANGE: admin → adminMiddleware
+router.delete('/delete/:id', protect, adminMiddleware, async (req, res) => {
   try {
     await Coupon.findByIdAndDelete(req.params.id);
     res.json({ success: true });
