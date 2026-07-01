@@ -14,7 +14,6 @@ router.get('/', protect, vendorMiddleware, async (req, res) => {
     let wallet = await Wallet.findOne({ vendorId: req.user.id });
     
     if (!wallet) {
-      // Create wallet if doesn't exist
       wallet = new Wallet({
         vendorId: req.user.id,
         balance: 0,
@@ -68,7 +67,6 @@ router.get('/transactions', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Filter transactions
     let transactions = wallet.transactions;
     
     if (type) {
@@ -78,7 +76,6 @@ router.get('/transactions', protect, vendorMiddleware, async (req, res) => {
       transactions = transactions.filter(tx => tx.status === status);
     }
 
-    // Sort by newest first
     transactions = transactions.sort((a, b) => b.createdAt - a.createdAt);
 
     const total = transactions.length;
@@ -105,7 +102,7 @@ router.get('/transactions', protect, vendorMiddleware, async (req, res) => {
   }
 });
 
-// ========== RECHARGE WALLET (MANUAL - TEMPORARY) ==========
+// ========== RECHARGE WALLET ==========
 router.post('/recharge', protect, vendorMiddleware, async (req, res) => {
   try {
     const { amount, paymentMethod = 'manual', reference = '' } = req.body;
@@ -143,7 +140,6 @@ router.post('/recharge', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Add balance
     await wallet.addBalance(
       amount,
       `Wallet recharge via ${paymentMethod}`,
@@ -186,7 +182,6 @@ router.get('/summary', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Calculate last 30 days spending
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -223,7 +218,6 @@ router.get('/summary', protect, vendorMiddleware, async (req, res) => {
 // ✅ ADMIN WALLET ROUTES
 // ============================================
 
-// ========== GET ALL VENDOR WALLETS ==========
 router.get('/admin/all', protect, adminMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 20, search } = req.query;
@@ -234,7 +228,6 @@ router.get('/admin/all', protect, adminMiddleware, async (req, res) => {
 
     let query = {};
     
-    // Search by vendor name or email
     if (search) {
       const vendors = await Vendor.find({
         $or: [
@@ -256,15 +249,16 @@ router.get('/admin/all', protect, adminMiddleware, async (req, res) => {
 
     const total = await Wallet.countDocuments(query);
 
-    // Calculate summary
     const summary = await Wallet.aggregate([
-      { $group: {
-        _id: null,
-        totalBalance: { $sum: '$balance' },
-        totalRecharged: { $sum: '$totalRecharged' },
-        totalSpent: { $sum: '$totalSpent' },
-        totalVendors: { $sum: 1 }
-      }}
+      {
+        $group: {
+          _id: null,
+          totalBalance: { $sum: '$balance' },
+          totalRecharged: { $sum: '$totalRecharged' },
+          totalSpent: { $sum: '$totalSpent' },
+          totalVendors: { $sum: 1 }
+        }
+      }
     ]);
 
     res.json({
@@ -292,7 +286,6 @@ router.get('/admin/all', protect, adminMiddleware, async (req, res) => {
   }
 });
 
-// ========== ADMIN: MANUALLY ADD BALANCE ==========
 router.patch('/admin/:vendorId/add', protect, adminMiddleware, async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -337,7 +330,6 @@ router.patch('/admin/:vendorId/add', protect, adminMiddleware, async (req, res) 
   }
 });
 
-// ========== ADMIN: MANUALLY DEDUCT BALANCE ==========
 router.patch('/admin/:vendorId/deduct', protect, adminMiddleware, async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -389,7 +381,6 @@ router.patch('/admin/:vendorId/deduct', protect, adminMiddleware, async (req, re
   }
 });
 
-// ========== ADMIN: GET SINGLE VENDOR WALLET ==========
 router.get('/admin/:vendorId', protect, adminMiddleware, async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -417,7 +408,6 @@ router.get('/admin/:vendorId', protect, adminMiddleware, async (req, res) => {
   }
 });
 
-// ========== ADMIN: GET WALLET STATS ==========
 router.get('/admin/stats/overview', protect, adminMiddleware, async (req, res) => {
   try {
     const stats = await Wallet.aggregate([
@@ -435,18 +425,15 @@ router.get('/admin/stats/overview', protect, adminMiddleware, async (req, res) =
       }
     ]);
 
-    // Get low balance vendors (less than ₹500)
     const lowBalanceVendors = await Wallet.find({ balance: { $lt: 500 } })
       .populate('vendorId', 'name email brandName')
       .limit(10);
 
-    // Get top 5 vendors by balance
     const topVendors = await Wallet.find()
       .populate('vendorId', 'name email brandName')
       .sort({ balance: -1 })
       .limit(5);
 
-    // Get today's transactions
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -499,4 +486,5 @@ router.get('/admin/stats/overview', protect, adminMiddleware, async (req, res) =
   }
 });
 
+// ✅ VERY IMPORTANT - Export router
 module.exports = router;
