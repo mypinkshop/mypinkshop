@@ -7,7 +7,7 @@ const { protect, admin } = require('../middleware/auth');
 
 // ========== PUBLIC ROUTES ==========
 
-// ✅ GET active coupons - WITH VENDOR FILTER (Sirf applicable coupons dikhein)
+// ✅ GET active coupons - WITH VENDOR FILTER
 router.get('/active', async (req, res) => {
   try {
     const now = new Date();
@@ -113,7 +113,6 @@ router.post('/validate', async (req, res) => {
       isVendorCoupon = true;
       vendorId = coupon.vendorId;
       
-      // ✅ Check if cart has vendor's products
       if (!cartItems || cartItems.length === 0) {
         return res.json({
           valid: false,
@@ -121,7 +120,6 @@ router.post('/validate', async (req, res) => {
         });
       }
       
-      // ✅ Calculate total of vendor's products only
       const vendorItems = cartItems.filter(item => item.vendorId === coupon.vendorId.toString());
       
       if (vendorItems.length === 0) {
@@ -131,14 +129,11 @@ router.post('/validate', async (req, res) => {
         });
       }
       
-      // ✅ Calculate vendor total
       applicableCartTotal = vendorItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       
-      // ✅ Get vendor name
       const vendor = await Vendor.findById(coupon.vendorId).select('name brandName storeName');
       vendorName = vendor?.brandName || vendor?.name || vendor?.storeName || 'Vendor';
       
-      // ✅ Check min order on vendor total
       if (applicableCartTotal < coupon.minOrderValue) {
         return res.json({
           valid: false,
@@ -146,7 +141,6 @@ router.post('/validate', async (req, res) => {
         });
       }
     } else {
-      // ✅ Admin coupon - Check min order on total cart
       if (cartTotal < coupon.minOrderValue) {
         return res.json({ 
           valid: false, 
@@ -155,7 +149,6 @@ router.post('/validate', async (req, res) => {
       }
     }
     
-    // ✅ Calculate discount
     let discountAmount = 0;
     if (coupon.discountType === 'percentage') {
       discountAmount = (applicableCartTotal * coupon.discountValue) / 100;
@@ -198,7 +191,6 @@ router.get('/all', protect, admin, async (req, res) => {
   try {
     const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
     
-    // ✅ Populate vendor info
     const couponsWithVendor = await Promise.all(coupons.map(async (coupon) => {
       if (coupon.vendorId) {
         const vendor = await Vendor.findById(coupon.vendorId).select('name brandName storeName email');
@@ -242,7 +234,6 @@ router.post('/create', protect, admin, async (req, res) => {
       return res.status(400).json({ error: 'Coupon code already exists' });
     }
     
-    // ✅ If vendorId is provided, verify vendor exists
     if (vendorId) {
       const vendor = await Vendor.findById(vendorId);
       if (!vendor) {
@@ -266,7 +257,6 @@ router.post('/create', protect, admin, async (req, res) => {
     
     await coupon.save();
     
-    // ✅ Get vendor name for response
     let vendorName = null;
     if (vendorId) {
       const vendor = await Vendor.findById(vendorId).select('name brandName');
@@ -290,7 +280,6 @@ router.put('/update/:id', protect, admin, async (req, res) => {
   try {
     const { vendorId, ...updateData } = req.body;
     
-    // ✅ If vendorId is provided, verify vendor exists
     if (vendorId) {
       const vendor = await Vendor.findById(vendorId);
       if (!vendor) {
