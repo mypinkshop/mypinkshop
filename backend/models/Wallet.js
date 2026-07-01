@@ -72,11 +72,9 @@ const walletSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for faster queries
 walletSchema.index({ vendorId: 1 });
 walletSchema.index({ 'transactions.createdAt': -1 });
 
-// Method to add balance
 walletSchema.methods.addBalance = async function(amount, description, reference = '') {
   this.balance += amount;
   this.totalRecharged += amount;
@@ -91,7 +89,6 @@ walletSchema.methods.addBalance = async function(amount, description, reference 
   return await this.save();
 };
 
-// Method to deduct balance
 walletSchema.methods.deductBalance = async function(amount, description, reference = '') {
   if (this.balance < amount) {
     throw new Error('Insufficient balance');
@@ -109,11 +106,9 @@ walletSchema.methods.deductBalance = async function(amount, description, referen
   return await this.save();
 };
 
-// Method to check if balance is sufficient
 walletSchema.methods.hasSufficientBalance = function(amount) {
   return this.balance >= amount;
 };
 
-const Wallet = mongoose.model('Wallet', walletSchema);
-
+const Wallet = mongoose.models.Wallet || mongoose.model('Wallet', walletSchema);
 module.exports = Wallet;
