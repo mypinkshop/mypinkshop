@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 function AdminAdvertising() {
   const navigate = useNavigate();
-  const { token } = useAuth();
+  
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -30,8 +29,14 @@ function AdminAdvertising() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
+  // ✅ Get token from localStorage
+  const getToken = () => {
+    return localStorage.getItem('adminToken');
+  };
+
   // ✅ Check auth on mount
   useEffect(() => {
+    const token = getToken();
     if (!token) {
       toast.error('Please login as admin');
       navigate('/admin/login');
@@ -44,7 +49,7 @@ function AdminAdvertising() {
     try {
       setLoading(true);
       
-      // ✅ Check token before making request
+      const token = getToken();
       if (!token) {
         toast.error('Session expired. Please login again.');
         navigate('/admin/login');
@@ -62,9 +67,9 @@ function AdminAdvertising() {
 
       console.log('📡 Response status:', response.status);
 
-      // ✅ Handle 403/401 errors
       if (response.status === 401 || response.status === 403) {
         toast.error('Unauthorized. Please login again.');
+        localStorage.removeItem('adminToken');
         navigate('/admin/login');
         return;
       }
@@ -77,7 +82,6 @@ function AdminAdvertising() {
       
       if (data.success) {
         setCampaigns(data.campaigns || []);
-        // Calculate stats from campaigns
         const activeCampaigns = (data.campaigns || []).filter(c => c.status === 'active').length;
         const totalSpent = (data.campaigns || []).reduce((sum, c) => sum + (c.spent || 0), 0);
         const totalImpressions = (data.campaigns || []).reduce((sum, c) => sum + (c.impressions || 0), 0);
@@ -109,7 +113,7 @@ function AdminAdvertising() {
       return;
     }
 
-    // ✅ Check token before making request
+    const token = getToken();
     if (!token) {
       toast.error('Session expired. Please login again.');
       navigate('/admin/login');
@@ -153,7 +157,7 @@ function AdminAdvertising() {
   };
 
   const handleDeleteCampaign = async (id) => {
-    // ✅ Check token before making request
+    const token = getToken();
     if (!token) {
       toast.error('Session expired. Please login again.');
       navigate('/admin/login');
@@ -182,7 +186,7 @@ function AdminAdvertising() {
   };
 
   const toggleCampaignStatus = async (id, currentStatus) => {
-    // ✅ Check token before making request
+    const token = getToken();
     if (!token) {
       toast.error('Session expired. Please login again.');
       navigate('/admin/login');
@@ -211,7 +215,7 @@ function AdminAdvertising() {
   };
 
   const handleApprove = async (id) => {
-    // ✅ Check token before making request
+    const token = getToken();
     if (!token) {
       toast.error('Session expired. Please login again.');
       navigate('/admin/login');
@@ -236,7 +240,7 @@ function AdminAdvertising() {
   };
 
   const handleReject = async (id) => {
-    // ✅ Check token before making request
+    const token = getToken();
     if (!token) {
       toast.error('Session expired. Please login again.');
       navigate('/admin/login');
