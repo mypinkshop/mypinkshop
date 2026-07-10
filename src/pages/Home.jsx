@@ -87,8 +87,9 @@ function Home() {
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sponsoredProducts, setSponsoredProducts] = useState([]); // ✅ NEW
-  
+  const [sponsoredProducts, setSponsoredProducts] = useState([]);
+  const [bannerAds, setBannerAds] = useState([]);
+
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
     makeup: false,
@@ -187,7 +188,7 @@ function Home() {
     return () => abortController.abort();
   }, [API_URL]);
 
-  // ✅ NEW: Fetch sponsored products
+  // Fetch sponsored products
   useEffect(() => {
     const fetchSponsoredProducts = async () => {
       try {
@@ -201,6 +202,22 @@ function Home() {
       }
     };
     fetchSponsoredProducts();
+  }, [API_URL]);
+
+  // ✅ Fetch Banner Ads
+  useEffect(() => {
+    const fetchBannerAds = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/ads/public/banners?position=homepage_top&limit=3`);
+        const data = await response.json();
+        if (data.success && data.banners) {
+          setBannerAds(data.banners);
+        }
+      } catch (error) {
+        console.error('Error fetching banner ads:', error);
+      }
+    };
+    fetchBannerAds();
   }, [API_URL]);
 
   // Preload first banner
@@ -584,6 +601,61 @@ function Home() {
             </div>
           </div>
         </section>
+
+        {/* ✅ BANNER ADS SECTION */}
+        {bannerAds.length > 0 && (
+          <section className="py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-lg">📢</span>
+                <h2 className="text-xl font-bold text-gray-800">Sponsored</h2>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">Ads</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bannerAds.map((banner) => (
+                  <a
+                    key={banner._id}
+                    href={banner.banner?.linkUrl || '/shop'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all hover:scale-[1.01]"
+                  >
+                    {banner.banner?.imageUrl ? (
+                      <img
+                        src={banner.banner.imageUrl}
+                        alt={banner.name || 'Sponsored banner'}
+                        loading="lazy"
+                        className="w-full h-48 sm:h-56 md:h-64 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-48 sm:h-56 md:h-64 bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center">
+                        <span className="text-white text-2xl font-bold">📢 {banner.name || 'Sponsored'}</span>
+                      </div>
+                    )}
+                    
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
+                      <div className="text-white">
+                        <p className="text-sm font-semibold">{banner.name || 'Sponsored'}</p>
+                        <p className="text-xs text-white/80">{banner.vendorName || 'Vendor'}</p>
+                        {banner.banner?.ctaText && (
+                          <span className="inline-block mt-1 bg-white/20 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full">
+                            {banner.banner.ctaText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Sponsored Badge */}
+                    <div className="absolute top-3 right-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
+                      <span>📢</span> Sponsored
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ✅ SPONSORED PRODUCTS SECTION */}
         {sponsoredProducts.length > 0 && (
