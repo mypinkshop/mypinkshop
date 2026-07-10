@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ReviewProvider } from './context/ReviewContext';
 import FloatingCartButton from './components/FloatingCartButton';
+import AdminAdAnalytics from './pages/admin/AdminAdAnalytics';
 
 // ✅ CUSTOMER PAGES - Lazy Loaded
 const Home = lazy(() => import('./pages/Home'));
@@ -161,6 +162,7 @@ function App() {
                   <Route path="/admin/offers" element={<AdminOffers />} />
                   <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
                   <Route path="/admin/notifications" element={<AdminNotifications />} />
+                  <Route path="/admin/ad-analytics" element={<AdminAdAnalytics />} />
 
                   {/* ============ VENDOR ROUTES ============ */}
                   <Route path="/vendor/login" element={<VendorLogin />} />
