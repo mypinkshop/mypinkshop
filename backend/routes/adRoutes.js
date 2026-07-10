@@ -4,7 +4,11 @@ const AdCampaign = require('../models/AdCampaign');
 const Wallet = require('../models/Wallet');
 const Product = require('../models/Product');
 const Vendor = require('../models/Vendor');
+const User = require('../models/User');
 const { protect, vendorMiddleware, adminMiddleware } = require('../middleware/auth');
+
+// ✅ Import email service
+const emailService = require('../services/emailService');
 
 // ============================================
 // ✅ VENDOR AD ROUTES
@@ -105,7 +109,7 @@ router.post('/product', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // ✅ Check wallet balance
+    // Check wallet balance
     const wallet = await Wallet.findOne({ vendorId: req.user.id });
     if (!wallet) {
       return res.status(400).json({
@@ -140,12 +144,26 @@ router.post('/product', protect, vendorMiddleware, async (req, res) => {
 
     await campaign.save();
 
-    // ✅ Deduct budget from wallet (hold amount)
+    // Deduct budget from wallet (hold amount)
     await wallet.deductBalance(
       budget,
       `Ad campaign hold: ${name}`,
       `CAMPAIGN_${campaign._id}`
     );
+
+    // ✅ Send email notification to admin
+    try {
+      const admin = await User.findOne({ role: 'admin' });
+      const vendor = await Vendor.findById(req.user.id);
+      if (admin && vendor) {
+        await emailService.sendNewCampaignToAdmin(admin.email, campaign, vendor);
+        console.log(`📧 Admin notified about new campaign: ${campaign.name}`);
+      } else {
+        console.log('⚠️ Admin or vendor not found for email notification');
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send admin notification:', emailError.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -188,7 +206,7 @@ router.post('/banner', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // ✅ Check wallet balance
+    // Check wallet balance
     const wallet = await Wallet.findOne({ vendorId: req.user.id });
     if (!wallet) {
       return res.status(400).json({
@@ -223,12 +241,24 @@ router.post('/banner', protect, vendorMiddleware, async (req, res) => {
 
     await campaign.save();
 
-    // ✅ Deduct budget from wallet (hold amount)
+    // Deduct budget from wallet (hold amount)
     await wallet.deductBalance(
       budget,
       `Banner ad campaign hold: ${name}`,
       `CAMPAIGN_${campaign._id}`
     );
+
+    // ✅ Send email notification to admin
+    try {
+      const admin = await User.findOne({ role: 'admin' });
+      const vendor = await Vendor.findById(req.user.id);
+      if (admin && vendor) {
+        await emailService.sendNewCampaignToAdmin(admin.email, campaign, vendor);
+        console.log(`📧 Admin notified about new banner campaign: ${campaign.name}`);
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send admin notification:', emailError.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -256,7 +286,6 @@ router.put('/:id', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Can only edit pending or paused campaigns
     if (campaign.status === 'active') {
       return res.status(400).json({
         success: false,
@@ -356,7 +385,6 @@ router.patch('/:id/resume', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Check if campaign is still within dates
     const now = new Date();
     if (campaign.endDate < now) {
       campaign.status = 'ended';
@@ -367,7 +395,6 @@ router.patch('/:id/resume', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Check if budget is exhausted
     if (campaign.spent >= campaign.budget) {
       campaign.status = 'completed';
       await campaign.save();
@@ -407,7 +434,6 @@ router.delete('/:id', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Only allow deletion of pending or completed campaigns
     if (campaign.status === 'active' || campaign.status === 'paused') {
       return res.status(400).json({
         success: false,
@@ -415,7 +441,6 @@ router.delete('/:id', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // ✅ Refund remaining budget if any
     if (campaign.status === 'pending' && campaign.spent === 0) {
       const wallet = await Wallet.findOne({ vendorId: req.user.id });
       if (wallet) {
@@ -466,7 +491,7 @@ router.get('/:id/stats', protect, vendorMiddleware, async (req, res) => {
       conversionRate: campaign.clicks > 0 ? (campaign.conversions / campaign.clicks * 100).toFixed(2) : 0,
       cpc: campaign.clicks > 0 ? (campaign.spent / campaign.clicks).toFixed(2) : 0,
       cpm: campaign.impressions > 0 ? (campaign.spent / campaign.impressions * 1000).toFixed(2) : 0,
-      dailyStats: campaign.dailyStats.slice(-30) // Last 30 days
+      dailyStats: campaign.dailyStats.slice(-30)
     };
 
     res.json({ success: true, stats });
@@ -480,7 +505,6 @@ router.get('/:id/stats', protect, vendorMiddleware, async (req, res) => {
 // ✅ PUBLIC AD ROUTES
 // ============================================
 
-// ========== GET ACTIVE SPONSORED PRODUCTS ==========
 router.get('/public/sponsored-products', async (req, res) => {
   try {
     const { category, limit = 10 } = req.query;
@@ -504,7 +528,6 @@ router.get('/public/sponsored-products', async (req, res) => {
   }
 });
 
-// ========== GET ACTIVE BANNER ADS ==========
 router.get('/public/banners', async (req, res) => {
   try {
     const { position = 'homepage_top', limit = 5 } = req.query;
@@ -523,7 +546,6 @@ router.get('/public/banners', async (req, res) => {
     .limit(parseInt(limit))
     .select('banner vendorId name');
 
-    // Get vendor names
     const bannersWithVendor = await Promise.all(banners.map(async (banner) => {
       const vendor = await Vendor.findById(banner.vendorId).select('brandName storeName');
       return {
@@ -546,7 +568,6 @@ router.get('/public/banners', async (req, res) => {
 // ✅ ADMIN AD ROUTES
 // ============================================
 
-// ========== GET ALL CAMPAIGNS (ADMIN) ==========
 router.get('/admin/all', protect, adminMiddleware, async (req, res) => {
   try {
     const { page = 1, limit = 20, status, type } = req.query;
@@ -603,7 +624,6 @@ router.patch('/admin/:id/approve', protect, adminMiddleware, async (req, res) =>
       });
     }
 
-    // ✅ Check if vendor wallet still has sufficient balance
     const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
     if (!wallet || wallet.balance < campaign.budget) {
       return res.status(400).json({
@@ -618,6 +638,17 @@ router.patch('/admin/:id/approve', protect, adminMiddleware, async (req, res) =>
     campaign.updatedAt = new Date();
     await campaign.save();
 
+    // ✅ Send email notification to vendor
+    try {
+      const vendor = await Vendor.findById(campaign.vendorId);
+      if (vendor) {
+        await emailService.sendCampaignApproved(vendor, campaign);
+        console.log(`📧 Campaign approved email sent to: ${vendor.email}`);
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send approval email:', emailError.message);
+    }
+
     res.json({
       success: true,
       message: 'Campaign approved successfully',
@@ -629,7 +660,7 @@ router.patch('/admin/:id/approve', protect, adminMiddleware, async (req, res) =>
   }
 });
 
-// ========== ADMIN: REJECT CAMPAIGN (WITH REFUND) ==========
+// ========== ADMIN: REJECT CAMPAIGN ==========
 router.patch('/admin/:id/reject', protect, adminMiddleware, async (req, res) => {
   try {
     const campaign = await AdCampaign.findById(req.params.id);
@@ -657,7 +688,6 @@ router.patch('/admin/:id/reject', protect, adminMiddleware, async (req, res) => 
     campaign.updatedAt = new Date();
     await campaign.save();
 
-    // ✅ Refund the budget back to vendor wallet
     const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
     if (wallet && campaign.spent === 0) {
       await wallet.addBalance(
@@ -666,6 +696,17 @@ router.patch('/admin/:id/reject', protect, adminMiddleware, async (req, res) => 
         `REFUND_${campaign._id}`
       );
       console.log(`💰 Refunded ₹${campaign.budget} to vendor wallet for rejected campaign`);
+    }
+
+    // ✅ Send email notification to vendor
+    try {
+      const vendor = await Vendor.findById(campaign.vendorId);
+      if (vendor) {
+        await emailService.sendCampaignRejected(vendor, campaign, reason);
+        console.log(`📧 Campaign rejected email sent to: ${vendor.email}`);
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send rejection email:', emailError.message);
     }
 
     res.json({
@@ -706,7 +747,6 @@ router.patch('/admin/:id/end', protect, adminMiddleware, async (req, res) => {
     campaign.updatedAt = new Date();
     await campaign.save();
 
-    // ✅ Refund remaining budget
     const remaining = campaign.budget - campaign.spent;
     if (remaining > 0) {
       const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
@@ -753,7 +793,6 @@ router.get('/admin/stats', protect, adminMiddleware, async (req, res) => {
       }
     ]);
 
-    // Monthly trend
     const monthlyTrend = await AdCampaign.aggregate([
       {
         $match: {
@@ -799,10 +838,9 @@ router.get('/admin/stats', protect, adminMiddleware, async (req, res) => {
 });
 
 // ============================================
-// ✅ TRACKING ROUTES WITH AUTO BUDGET DEDUCTION
+// ✅ TRACKING ROUTES WITH AUTO BUDGET DEDUCTION & EMAIL
 // ============================================
 
-// ========== TRACK IMPRESSION ==========
 router.post('/track/impression/:campaignId', async (req, res) => {
   try {
     const campaign = await AdCampaign.findById(req.params.campaignId);
@@ -820,7 +858,7 @@ router.post('/track/impression/:campaignId', async (req, res) => {
   }
 });
 
-// ========== TRACK CLICK WITH AUTO DEDUCTION ==========
+// ========== TRACK CLICK WITH AUTO DEDUCTION & EMAIL ==========
 router.get('/track/click/:campaignId', async (req, res) => {
   try {
     const campaign = await AdCampaign.findById(req.params.campaignId);
@@ -829,7 +867,6 @@ router.get('/track/click/:campaignId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Campaign not found' });
     }
 
-    // ✅ Check if campaign is active
     if (campaign.status !== 'active') {
       return res.status(400).json({ success: false, message: 'Campaign is not active' });
     }
@@ -839,11 +876,33 @@ router.get('/track/click/:campaignId', async (req, res) => {
       campaign.status = 'completed';
       campaign.completedAt = new Date();
       await campaign.save();
+
+      // ✅ Send budget exhausted notification
+      try {
+        const vendor = await Vendor.findById(campaign.vendorId);
+        if (vendor) {
+          await emailService.sendBudgetExhausted(vendor, campaign);
+          console.log(`📧 Budget exhausted email sent to: ${vendor.email}`);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send budget exhausted email:', emailError.message);
+      }
+
       return res.status(400).json({ success: false, message: 'Campaign budget exhausted' });
     }
 
     // ✅ Check daily budget
     if (campaign.isDailyBudgetExceeded()) {
+      // ✅ Send daily budget reached notification (only once per day)
+      try {
+        const vendor = await Vendor.findById(campaign.vendorId);
+        if (vendor) {
+          await emailService.sendDailyBudgetReached(vendor, campaign);
+          console.log(`📧 Daily budget reached email sent to: ${vendor.email}`);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send daily budget email:', emailError.message);
+      }
       return res.status(400).json({ success: false, message: 'Daily budget limit reached' });
     }
 
@@ -862,7 +921,6 @@ router.get('/track/click/:campaignId', async (req, res) => {
         console.log(`💰 Deducted ₹${campaign.bidAmount} from vendor wallet for click on ${campaign.name}`);
       } catch (walletError) {
         console.error('Wallet deduction failed:', walletError.message);
-        // If wallet has insufficient balance, pause the campaign
         if (walletError.message === 'Insufficient balance') {
           campaign.status = 'paused';
           campaign.pausedAt = new Date();
@@ -872,6 +930,35 @@ router.get('/track/click/:campaignId', async (req, res) => {
             message: 'Vendor wallet insufficient balance. Campaign paused.' 
           });
         }
+      }
+    }
+
+    // ✅ Check click threshold (100, 500, 1000, 5000)
+    const thresholds = [100, 500, 1000, 5000];
+    const clickedThreshold = thresholds.find(t => campaign.clicks === t);
+    if (clickedThreshold) {
+      try {
+        const vendor = await Vendor.findById(campaign.vendorId);
+        if (vendor) {
+          await emailService.sendClickThreshold(vendor, campaign, clickedThreshold);
+          console.log(`📧 Click threshold (${clickedThreshold}) email sent to: ${vendor.email}`);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send click threshold email:', emailError.message);
+      }
+    }
+
+    // ✅ Admin high spend alert (₹50,000)
+    if (campaign.spent >= 50000 && campaign.spent - campaign.bidAmount < 50000) {
+      try {
+        const admin = await User.findOne({ role: 'admin' });
+        const vendor = await Vendor.findById(campaign.vendorId);
+        if (admin && vendor) {
+          await emailService.sendAdminHighSpend(admin.email, campaign, vendor);
+          console.log(`📧 High spend alert sent to admin`);
+        }
+      } catch (emailError) {
+        console.error('❌ Failed to send high spend alert:', emailError.message);
       }
     }
 
@@ -892,7 +979,6 @@ router.get('/track/click/:campaignId', async (req, res) => {
   }
 });
 
-// ========== TRACK CONVERSION ==========
 router.post('/track/conversion/:campaignId', async (req, res) => {
   try {
     const { revenue = 0 } = req.body;
