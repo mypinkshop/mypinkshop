@@ -1,4 +1,3 @@
-// backend/services/emailService.js
 const nodemailer = require('nodemailer');
 
 // ============ TRANSPORTER ============
@@ -7,10 +6,7 @@ let isInitialized = false;
 let initializationPromise = null;
 
 const initTransporter = () => {
-  // If already initialized, return
   if (isInitialized && transporter) return Promise.resolve(transporter);
-  
-  // If already initializing, return existing promise
   if (initializationPromise) return initializationPromise;
   
   console.log('🔧 Initializing Sender.net SMTP...');
@@ -37,7 +33,6 @@ const initTransporter = () => {
         socketTimeout: 30000
       });
 
-      // Verify connection with callback
       transporter.verify((error, success) => {
         if (error) {
           console.error('❌❌❌ Sender.net SMTP ERROR ❌❌❌');
@@ -46,7 +41,6 @@ const initTransporter = () => {
           console.error('📛 Error command:', error.command);
           console.error('📛 Error response:', error.response);
           console.error('📛 Error responseCode:', error.responseCode);
-          console.error('📛 Full error:', JSON.stringify(error, null, 2));
           transporter = null;
           isInitialized = false;
           initializationPromise = null;
@@ -75,14 +69,12 @@ const initTransporter = () => {
 const sendEmail = async (to, subject, html) => {
   console.log('📨 sendEmail called to:', to);
   
-  // Initialize transporter if not ready
   if (!transporter || !isInitialized) {
     console.log('🔄 Transporter not ready, initializing...');
     try {
       await initTransporter();
     } catch (error) {
       console.error('❌ Transporter initialization failed:', error.message);
-      // Fallback to mock mode
       console.log('🔐 FALLBACK MOCK - Email to:', to);
       return { 
         success: true, 
@@ -93,7 +85,6 @@ const sendEmail = async (to, subject, html) => {
     }
   }
 
-  // Mock mode if no transporter
   if (!transporter || !isInitialized) {
     console.log('🔐 MOCK MODE - Email to:', to);
     console.log('📧 Subject:', subject);
@@ -123,8 +114,6 @@ const sendEmail = async (to, subject, html) => {
     };
   } catch (error) {
     console.error('❌ Send email error:', error.message);
-    console.error('❌ Full error:', JSON.stringify(error, null, 2));
-    // Fallback to mock mode
     console.log('🔐 FALLBACK MOCK - Email to:', to);
     return { 
       success: true, 
@@ -146,8 +135,256 @@ const testEmailService = async () => {
   return result;
 };
 
+// ============================================
+// ✅ AD CAMPAIGN EMAIL TEMPLATES & FUNCTIONS
+// ============================================
+
+// 1. Admin - New campaign pending approval
+const sendNewCampaignToAdmin = async (adminEmail, campaign, vendor) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #EC4899, #F43F5E); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">📢 New Ad Campaign</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Hello Admin,</p>
+        <p style="color: #555; font-size: 15px;">A new ad campaign has been created and is pending your approval.</p>
+        
+        <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Vendor:</strong> ${vendor?.brandName || vendor?.name || 'Vendor'}</p>
+          <p style="margin: 5px 0;"><strong>Type:</strong> ${campaign.type === 'product' ? 'Product Ad' : 'Banner Ad'}</p>
+          <p style="margin: 5px 0;"><strong>Budget:</strong> ₹${campaign.budget?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Bid:</strong> ₹${campaign.bidAmount}/${campaign.bidType === 'cpc' ? 'click' : '1000 impressions'}</p>
+          <p style="margin: 5px 0;"><strong>Dates:</strong> ${new Date(campaign.startDate).toLocaleDateString()} - ${new Date(campaign.endDate).toLocaleDateString()}</p>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/admin/advertising" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Review Campaign</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Admin Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(adminEmail, `📢 New Ad Campaign Pending: ${campaign.name}`, html);
+};
+
+// 2. Vendor - Campaign approved
+const sendCampaignApproved = async (vendor, campaign) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">✅ Campaign Approved!</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear ${vendor.name},</p>
+        <p style="color: #555; font-size: 15px;">Great news! Your ad campaign has been approved and is now live.</p>
+        
+        <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Type:</strong> ${campaign.type === 'product' ? 'Product Ad' : 'Banner Ad'}</p>
+          <p style="margin: 5px 0;"><strong>Budget:</strong> ₹${campaign.budget?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> 🟢 Active</p>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/vendor/ads/${campaign._id}" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">View Campaign</a>
+          <a href="https://www.mypinkshop.com/vendor/dashboard" style="background: #6B7280; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Dashboard</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(vendor.email, `✅ Campaign Approved: ${campaign.name}`, html);
+};
+
+// 3. Vendor - Campaign rejected
+const sendCampaignRejected = async (vendor, campaign, reason) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #EF4444, #DC2626); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">❌ Campaign Rejected</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear ${vendor.name},</p>
+        <p style="color: #555; font-size: 15px;">Your ad campaign has been rejected.</p>
+        
+        <div style="background: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Reason:</strong> ${reason || 'Not specified'}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> ❌ Rejected</p>
+        </div>
+        
+        <p style="color: #555; font-size: 14px;">Your budget has been refunded to your wallet. You can create a new campaign with the suggested improvements.</p>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/vendor/ads" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">View Campaigns</a>
+          <a href="https://www.mypinkshop.com/vendor/wallet" style="background: #10B981; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Check Wallet</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(vendor.email, `❌ Campaign Rejected: ${campaign.name}`, html);
+};
+
+// 4. Vendor - Budget exhausted
+const sendBudgetExhausted = async (vendor, campaign) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #F59E0B, #D97706); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">⚠️ Budget Exhausted</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear ${vendor.name},</p>
+        <p style="color: #555; font-size: 15px;">Your campaign has reached its budget limit and has been automatically paused.</p>
+        
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Budget:</strong> ₹${campaign.budget?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Spent:</strong> ₹${campaign.spent?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Clicks:</strong> ${campaign.clicks?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Impressions:</strong> ${campaign.impressions?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Revenue Generated:</strong> ₹${campaign.revenue?.toLocaleString() || 0}</p>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/vendor/wallet" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Recharge Wallet</a>
+          <a href="https://www.mypinkshop.com/vendor/ads/${campaign._id}" style="background: #6B7280; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">View Campaign</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(vendor.email, `⚠️ Campaign Budget Exhausted: ${campaign.name}`, html);
+};
+
+// 5. Vendor - Daily budget reached
+const sendDailyBudgetReached = async (vendor, campaign) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">📊 Daily Budget Limit</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear ${vendor.name},</p>
+        <p style="color: #555; font-size: 15px;">Your campaign has reached its daily budget limit. Ads will resume tomorrow.</p>
+        
+        <div style="background: #f5f3ff; border: 1px solid #c4b5fd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Daily Budget:</strong> ₹${campaign.dailyBudget?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> ⏸️ Paused (Resumes Tomorrow)</p>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(vendor.email, `📊 Daily Budget Limit Reached: ${campaign.name}`, html);
+};
+
+// 6. Vendor - Campaign expiring
+const sendCampaignExpiring = async (vendor, campaign) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #F59E0B, #D97706); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Campaign Expiring Soon</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear ${vendor.name},</p>
+        <p style="color: #555; font-size: 15px;">Your campaign will expire in 3 days. Renew it to continue advertising.</p>
+        
+        <div style="background: #fffbeb; border: 1px solid #fcd34d; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>End Date:</strong> ${new Date(campaign.endDate).toLocaleDateString()}</p>
+          <p style="margin: 5px 0;"><strong>Days Left:</strong> 3 days</p>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/vendor/ads/${campaign._id}" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Renew Campaign</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(vendor.email, `⏰ Campaign Expiring Soon: ${campaign.name}`, html);
+};
+
+// 7. Vendor - Click threshold reached
+const sendClickThreshold = async (vendor, campaign, clicks) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">🎯 ${clicks} Clicks Achieved!</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear ${vendor.name},</p>
+        <p style="color: #555; font-size: 15px;">Congratulations! Your campaign has reached <strong>${clicks} clicks</strong>.</p>
+        
+        <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Total Clicks:</strong> ${campaign.clicks?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Impressions:</strong> ${campaign.impressions?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>CTR:</strong> ${campaign.impressions > 0 ? (campaign.clicks / campaign.impressions * 100).toFixed(2) : 0}%</p>
+          <p style="margin: 5px 0;"><strong>Revenue:</strong> ₹${campaign.revenue?.toLocaleString() || 0}</p>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/vendor/ads/${campaign._id}" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">View Campaign</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(vendor.email, `🎯 ${clicks} Clicks Achieved: ${campaign.name}`, html);
+};
+
+// 8. Admin - High spend alert
+const sendAdminHighSpend = async (adminEmail, campaign, vendor) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #EF4444, #DC2626); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">💰 High Spend Alert</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Hello Admin,</p>
+        <p style="color: #555; font-size: 15px;">A campaign has crossed ₹50,000 in spend. Please review.</p>
+        
+        <div style="background: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Campaign:</strong> ${campaign.name}</p>
+          <p style="margin: 5px 0;"><strong>Vendor:</strong> ${vendor?.brandName || vendor?.name || 'Vendor'}</p>
+          <p style="margin: 5px 0;"><strong>Total Spent:</strong> ₹${campaign.spent?.toLocaleString() || 0}</p>
+          <p style="margin: 5px 0;"><strong>Budget:</strong> ₹${campaign.budget?.toLocaleString() || 0}</p>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <a href="https://www.mypinkshop.com/admin/advertising" style="background: #EC4899; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; display: inline-block;">Review Campaign</a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Admin Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(adminEmail, `💰 High Spend Alert: ${campaign.name}`, html);
+};
+
 module.exports = {
   sendEmail,
   testEmailService,
-  initTransporter
+  initTransporter,
+  // Ad email functions
+  sendNewCampaignToAdmin,
+  sendCampaignApproved,
+  sendCampaignRejected,
+  sendBudgetExhausted,
+  sendDailyBudgetReached,
+  sendCampaignExpiring,
+  sendClickThreshold,
+  sendAdminHighSpend
 };
