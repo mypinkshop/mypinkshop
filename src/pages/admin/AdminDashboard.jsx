@@ -43,9 +43,14 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Check auth on mount
+  // ✅ Get token from localStorage
+  const getToken = () => {
+    return localStorage.getItem('adminToken');
+  };
+
+  // ✅ Check auth on mount
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = getToken();
     if (!token) {
       navigate('/admin/login');
       return;
@@ -54,6 +59,11 @@ function AdminDashboard() {
 
   // Load dashboard data when period changes
   useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      navigate('/admin/login');
+      return;
+    }
     loadDashboardData();
     loadActiveOffer();
     loadUnreadNotifications();
@@ -62,7 +72,7 @@ function AdminDashboard() {
   // Load unread notifications count
   const loadUnreadNotifications = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = getToken();
       const response = await fetch(`${API_URL}/api/notifications/unread-count`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -92,8 +102,14 @@ function AdminDashboard() {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('adminToken');
+      const token = getToken();
       
+      if (!token) {
+        toast.error('Session expired. Please login again.');
+        navigate('/admin/login');
+        return;
+      }
+
       // ✅ FIX: Use correct admin endpoints
       const [productsRes, ordersRes, vendorsRes] = await Promise.all([
         fetch(`${API_URL}/api/products`, {
@@ -286,14 +302,14 @@ function AdminDashboard() {
         totalOrders,
         totalProducts: approvedProducts.length,
         totalVendors: allVendors.length || 0,
-        totalCustomers: 0, // Will be fetched separately if needed
+        totalCustomers: 0,
         pendingVendors: pendingVendors,
         pendingProducts: pendingProducts.length,
         lowStockProducts: lowStockProducts.length,
         todaySales,
         todayOrders: todayOrders.length,
         monthlyGrowth: Number(monthlyGrowth),
-        conversionRate: (totalOrders / (allCustomersCount || 1) * 100).toFixed(1),
+        conversionRate: (totalOrders / (stats.totalCustomers || 1) * 100).toFixed(1),
         avgOrderValue: Math.round(avgOrderValue)
       });
 
@@ -321,7 +337,7 @@ function AdminDashboard() {
     try {
       setSendingNotification(true);
       setNotificationStatus(null);
-      const token = localStorage.getItem('adminToken');
+      const token = getToken();
       
       const response = await fetch(`${API_URL}/api/notifications/send`, {
         method: 'POST',
