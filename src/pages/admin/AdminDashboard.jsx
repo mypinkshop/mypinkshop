@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import AdminSidebar from './components/AdminSidebar';
+import AdminSidebar from '../../components/admin/AdminSidebar';
 
 function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,7 @@ function AdminDashboard() {
   const [notificationStatus, setNotificationStatus] = useState(null);
 
   const navigate = useNavigate();
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   // Check auth on mount
   useEffect(() => {
@@ -94,33 +94,43 @@ function AdminDashboard() {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
       
-      // Fetch all data in parallel for better performance
-      const [productsRes, ordersRes, vendorsRes, customersRes] = await Promise.all([
+      // ✅ FIX: Use correct admin endpoints
+      const [productsRes, ordersRes, vendorsRes] = await Promise.all([
         fetch(`${API_URL}/api/products`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${API_URL}/api/orders`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`${API_URL}/api/vendors`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${API_URL}/api/customers`, {
+        fetch(`${API_URL}/api/admin/vendors`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
-      // Parse responses
-      const productsData = await productsRes.json();
-      const ordersData = await ordersRes.json();
-      const vendorsData = await vendorsRes.json();
-      const customersData = await customersRes.json();
+      // Parse responses with safe fallbacks
+      let productsData = [];
+      let ordersData = [];
+      let vendorsData = [];
 
-      // Extract data
-      const allProducts = productsData.products || productsData || [];
-      const allOrders = ordersData.orders || ordersData || [];
-      const allVendors = vendorsData.vendors || vendorsData || [];
-      const allCustomers = customersData.customers || customersData || [];
+      try {
+        const pData = await productsRes.json();
+        productsData = pData?.products || (Array.isArray(pData) ? pData : []);
+      } catch (e) { console.error('Products parse error:', e); }
+
+      try {
+        const oData = await ordersRes.json();
+        ordersData = oData?.orders || (Array.isArray(oData) ? oData : []);
+      } catch (e) { console.error('Orders parse error:', e); }
+
+      try {
+        const vData = await vendorsRes.json();
+        vendorsData = vData?.success ? vData.vendors : (Array.isArray(vData) ? vData : []);
+      } catch (e) { console.error('Vendors parse error:', e); }
+
+      // ✅ Ensure arrays
+      const allProducts = Array.isArray(productsData) ? productsData : [];
+      const allOrders = Array.isArray(ordersData) ? ordersData : [];
+      const allVendors = Array.isArray(vendorsData) ? vendorsData : [];
 
       // Products calculations
       const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
@@ -177,7 +187,8 @@ function AdminDashboard() {
       // Top products by sales (from orders)
       const productSalesMap = {};
       allOrders.forEach(order => {
-        (order.items || order.products || []).forEach(item => {
+        const items = order.items || order.products || [];
+        items.forEach(item => {
           const productId = item.productId || item.id || item._id;
           if (productId) {
             const product = approvedProducts.find(p => p._id === productId || p.id === productId);
@@ -196,7 +207,6 @@ function AdminDashboard() {
         .slice(0, 5);
       
       if (topProductsList.length === 0) {
-        // Fallback to stock-based if no sales data
         const fallbackProducts = [...approvedProducts]
           .sort((a, b) => (b.stock || 0) - (a.stock || 0))
           .slice(0, 5)
@@ -267,20 +277,23 @@ function AdminDashboard() {
         }));
       setRecentOrders(recentOrdersList);
 
+      // ✅ Calculate pending vendors
+      const pendingVendors = allVendors.filter(v => v.status === 'pending' || v.vendorStatus === 'pending').length;
+
       // Update stats
       setStats({
         totalRevenue,
         totalOrders,
         totalProducts: approvedProducts.length,
-        totalVendors: allVendors.length || 8,
-        totalCustomers: allCustomers.length || 245,
-        pendingVendors: allVendors.filter(v => v.status === 'pending' || v.approved === false).length || 2,
+        totalVendors: allVendors.length || 0,
+        totalCustomers: 0, // Will be fetched separately if needed
+        pendingVendors: pendingVendors,
         pendingProducts: pendingProducts.length,
         lowStockProducts: lowStockProducts.length,
         todaySales,
         todayOrders: todayOrders.length,
         monthlyGrowth: Number(monthlyGrowth),
-        conversionRate: (totalOrders / (allCustomers.length || 1) * 100).toFixed(1),
+        conversionRate: (totalOrders / (allCustomersCount || 1) * 100).toFixed(1),
         avgOrderValue: Math.round(avgOrderValue)
       });
 
@@ -333,7 +346,6 @@ function AdminDashboard() {
           message: `✅ Notification sent to ${data.count || 0} users!`
         });
         setNotificationForm({ title: '', message: '', userType: 'all', userId: '', type: 'system' });
-        // Refresh notification count
         loadUnreadNotifications();
       } else {
         setNotificationStatus({
@@ -394,6 +406,7 @@ function AdminDashboard() {
 
   // Calculate max sales for chart
   const maxSales = Math.max(...salesData.map(d => d.sales), 1);
+  const allCustomersCount = stats.totalCustomers || 1;
 
   // Loading state
   if (loading) {
