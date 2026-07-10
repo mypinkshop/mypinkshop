@@ -105,12 +105,19 @@ router.post('/product', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Check wallet balance
+    // ✅ Check wallet balance
     const wallet = await Wallet.findOne({ vendorId: req.user.id });
-    if (!wallet || wallet.balance < budget) {
+    if (!wallet) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient wallet balance. Need ₹${budget}. Available: ₹${wallet?.balance || 0}`
+        message: 'Wallet not found. Please recharge your wallet first.'
+      });
+    }
+
+    if (wallet.balance < budget) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient wallet balance. Need ₹${budget}. Available: ₹${wallet.balance}`
       });
     }
 
@@ -133,7 +140,7 @@ router.post('/product', protect, vendorMiddleware, async (req, res) => {
 
     await campaign.save();
 
-    // Deduct budget from wallet (hold amount)
+    // ✅ Deduct budget from wallet (hold amount)
     await wallet.deductBalance(
       budget,
       `Ad campaign hold: ${name}`,
@@ -181,12 +188,19 @@ router.post('/banner', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Check wallet balance
+    // ✅ Check wallet balance
     const wallet = await Wallet.findOne({ vendorId: req.user.id });
-    if (!wallet || wallet.balance < budget) {
+    if (!wallet) {
       return res.status(400).json({
         success: false,
-        message: `Insufficient wallet balance. Need ₹${budget}. Available: ₹${wallet?.balance || 0}`
+        message: 'Wallet not found. Please recharge your wallet first.'
+      });
+    }
+
+    if (wallet.balance < budget) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient wallet balance. Need ₹${budget}. Available: ₹${wallet.balance}`
       });
     }
 
@@ -209,7 +223,7 @@ router.post('/banner', protect, vendorMiddleware, async (req, res) => {
 
     await campaign.save();
 
-    // Deduct budget from wallet (hold amount)
+    // ✅ Deduct budget from wallet (hold amount)
     await wallet.deductBalance(
       budget,
       `Banner ad campaign hold: ${name}`,
@@ -401,7 +415,7 @@ router.delete('/:id', protect, vendorMiddleware, async (req, res) => {
       });
     }
 
-    // Refund remaining budget if any
+    // ✅ Refund remaining budget if any
     if (campaign.status === 'pending' && campaign.spent === 0) {
       const wallet = await Wallet.findOne({ vendorId: req.user.id });
       if (wallet) {
@@ -410,6 +424,7 @@ router.delete('/:id', protect, vendorMiddleware, async (req, res) => {
           `Campaign cancelled: ${campaign.name}`,
           `REFUND_${campaign._id}`
         );
+        console.log(`💰 Refunded ₹${campaign.budget} to vendor wallet for deleted campaign`);
       }
     }
 
@@ -588,6 +603,15 @@ router.patch('/admin/:id/approve', protect, adminMiddleware, async (req, res) =>
       });
     }
 
+    // ✅ Check if vendor wallet still has sufficient balance
+    const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
+    if (!wallet || wallet.balance < campaign.budget) {
+      return res.status(400).json({
+        success: false,
+        message: `Vendor wallet insufficient balance. Need ₹${campaign.budget}. Available: ₹${wallet?.balance || 0}`
+      });
+    }
+
     campaign.status = 'active';
     campaign.adminApproved = true;
     campaign.adminRemarks = req.body.remarks || '';
@@ -633,7 +657,7 @@ router.patch('/admin/:id/reject', protect, adminMiddleware, async (req, res) => 
     campaign.updatedAt = new Date();
     await campaign.save();
 
-    // Refund the budget back to vendor wallet
+    // ✅ Refund the budget back to vendor wallet
     const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
     if (wallet && campaign.spent === 0) {
       await wallet.addBalance(
@@ -641,6 +665,7 @@ router.patch('/admin/:id/reject', protect, adminMiddleware, async (req, res) => 
         `Campaign rejected: ${campaign.name}`,
         `REFUND_${campaign._id}`
       );
+      console.log(`💰 Refunded ₹${campaign.budget} to vendor wallet for rejected campaign`);
     }
 
     res.json({
@@ -681,7 +706,7 @@ router.patch('/admin/:id/end', protect, adminMiddleware, async (req, res) => {
     campaign.updatedAt = new Date();
     await campaign.save();
 
-    // Refund remaining budget
+    // ✅ Refund remaining budget
     const remaining = campaign.budget - campaign.spent;
     if (remaining > 0) {
       const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
@@ -691,6 +716,7 @@ router.patch('/admin/:id/end', protect, adminMiddleware, async (req, res) => {
           `Campaign ended early by admin: ${campaign.name}`,
           `REFUND_${campaign._id}`
         );
+        console.log(`💰 Refunded ₹${remaining} to vendor wallet for ended campaign`);
       }
     }
 
@@ -773,7 +799,7 @@ router.get('/admin/stats', protect, adminMiddleware, async (req, res) => {
 });
 
 // ============================================
-// ✅ TRACKING ROUTES
+// ✅ TRACKING ROUTES WITH AUTO BUDGET DEDUCTION
 // ============================================
 
 // ========== TRACK IMPRESSION ==========
@@ -794,7 +820,7 @@ router.post('/track/impression/:campaignId', async (req, res) => {
   }
 });
 
-// ========== TRACK CLICK ==========
+// ========== TRACK CLICK WITH AUTO DEDUCTION ==========
 router.get('/track/click/:campaignId', async (req, res) => {
   try {
     const campaign = await AdCampaign.findById(req.params.campaignId);
@@ -803,19 +829,66 @@ router.get('/track/click/:campaignId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Campaign not found' });
     }
 
+    // ✅ Check if campaign is active
+    if (campaign.status !== 'active') {
+      return res.status(400).json({ success: false, message: 'Campaign is not active' });
+    }
+
+    // ✅ Check if budget is remaining
+    if (campaign.spent >= campaign.budget) {
+      campaign.status = 'completed';
+      campaign.completedAt = new Date();
+      await campaign.save();
+      return res.status(400).json({ success: false, message: 'Campaign budget exhausted' });
+    }
+
+    // ✅ Check daily budget
+    if (campaign.isDailyBudgetExceeded()) {
+      return res.status(400).json({ success: false, message: 'Daily budget limit reached' });
+    }
+
+    // ✅ Record click - this will deduct budget
     await campaign.recordClick();
 
-    // Redirect to product or banner link
+    // ✅ Deduct from vendor wallet
+    const wallet = await Wallet.findOne({ vendorId: campaign.vendorId });
+    if (wallet) {
+      try {
+        await wallet.deductBalance(
+          campaign.bidAmount,
+          `Ad click - Campaign: ${campaign.name}`,
+          `CLICK_${campaign._id}_${Date.now()}`
+        );
+        console.log(`💰 Deducted ₹${campaign.bidAmount} from vendor wallet for click on ${campaign.name}`);
+      } catch (walletError) {
+        console.error('Wallet deduction failed:', walletError.message);
+        // If wallet has insufficient balance, pause the campaign
+        if (walletError.message === 'Insufficient balance') {
+          campaign.status = 'paused';
+          campaign.pausedAt = new Date();
+          await campaign.save();
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Vendor wallet insufficient balance. Campaign paused.' 
+          });
+        }
+      }
+    }
+
+    // ✅ Redirect to product or banner link
     if (campaign.type === 'product' && campaign.productId) {
-      return res.redirect(`/product/${campaign.productId._id || campaign.productId}`);
+      const product = await Product.findById(campaign.productId);
+      if (product) {
+        return res.redirect(`/product/${product._id}`);
+      }
     } else if (campaign.type === 'banner' && campaign.banner?.linkUrl) {
       return res.redirect(campaign.banner.linkUrl);
     }
 
-    res.json({ success: true });
+    res.json({ success: true, message: 'Click tracked successfully' });
   } catch (error) {
     console.error('Track click error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
