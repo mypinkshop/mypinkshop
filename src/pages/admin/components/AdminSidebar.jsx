@@ -75,6 +75,8 @@ function AdminSidebar() {
     { name: 'Banners', icon: '🎨', path: '/admin/banners', badge: null },
     { name: 'Coupons', icon: '🎫', path: '/admin/coupons', badge: null },
     { name: 'Homepage', icon: '🏠', path: '/admin/homepage', badge: null },
+    { name: 'Advertising', icon: '📢', path: '/admin/advertising', badge: null },  // ✅ NEW
+    { name: 'Ad Analytics', icon: '📊', path: '/admin/ad-analytics', badge: null }, // ✅ NEW
     
     // Management
     { name: 'Notifications', icon: '🔔', path: '/admin/notifications', badge: unreadNotifications > 0 ? unreadNotifications : null },
