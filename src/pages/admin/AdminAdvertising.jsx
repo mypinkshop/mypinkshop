@@ -1,59 +1,199 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
 
 function AdminAdvertising() {
   const navigate = useNavigate();
-  const [campaigns, setCampaigns] = useState([
-    { id: 1, name: 'Summer Sale Campaign', budget: 5000, spent: 3240, status: 'active', impressions: 12500, clicks: 432, sales: 12499, startDate: '2024-05-01', endDate: '2024-06-30', ctr: 3.46, conversion: 2.8 },
-    { id: 2, name: 'Diwali Special', budget: 10000, spent: 8920, status: 'active', impressions: 28700, clicks: 892, sales: 28750, startDate: '2024-10-15', endDate: '2024-11-15', ctr: 3.11, conversion: 3.1 },
-    { id: 3, name: 'New Year Offer', budget: 3000, spent: 3000, status: 'ended', impressions: 8900, clicks: 234, sales: 5670, startDate: '2024-12-20', endDate: '2025-01-05', ctr: 2.63, conversion: 2.4 },
-  ]);
+  const { token } = useAuth();
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [stats, setStats] = useState({
+    totalCampaigns: 0,
+    activeCampaigns: 0,
+    totalSpent: 0,
+    totalImpressions: 0,
+    totalClicks: 0,
+    totalRevenue: 0
+  });
   const [newCampaign, setNewCampaign] = useState({
     name: '',
     budget: '',
+    dailyBudget: '',
+    bidAmount: '',
+    bidType: 'cpc',
     startDate: '',
     endDate: '',
   });
 
-  const handleCreateCampaign = () => {
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
+  // Fetch campaigns on load
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/ads/admin/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCampaigns(data.campaigns);
+        // Calculate stats from campaigns
+        const activeCampaigns = data.campaigns.filter(c => c.status === 'active').length;
+        const totalSpent = data.campaigns.reduce((sum, c) => sum + c.spent, 0);
+        const totalImpressions = data.campaigns.reduce((sum, c) => sum + c.impressions, 0);
+        const totalClicks = data.campaigns.reduce((sum, c) => sum + c.clicks, 0);
+        const totalRevenue = data.campaigns.reduce((sum, c) => sum + c.revenue, 0);
+
+        setStats({
+          totalCampaigns: data.campaigns.length,
+          activeCampaigns,
+          totalSpent,
+          totalImpressions,
+          totalClicks,
+          totalRevenue
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      toast.error('Failed to load campaigns');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCampaign = async () => {
     if (!newCampaign.name || !newCampaign.budget) {
-      alert('Please fill campaign name and budget');
+      toast.error('Please fill campaign name and budget');
       return;
     }
 
-    const campaign = {
-      id: Date.now(),
-      name: newCampaign.name,
-      budget: parseInt(newCampaign.budget),
-      spent: 0,
-      status: 'active',
-      impressions: 0,
-      clicks: 0,
-      sales: 0,
-      startDate: newCampaign.startDate || new Date().toISOString().split('T')[0],
-      endDate: newCampaign.endDate || '',
-      ctr: 0,
-      conversion: 0,
-    };
+    try {
+      const payload = {
+        name: newCampaign.name,
+        budget: parseFloat(newCampaign.budget),
+        dailyBudget: parseFloat(newCampaign.dailyBudget) || parseFloat(newCampaign.budget) / 30,
+        bidAmount: parseFloat(newCampaign.bidAmount) || 5,
+        bidType: newCampaign.bidType || 'cpc',
+        startDate: newCampaign.startDate || new Date().toISOString().split('T')[0],
+        endDate: newCampaign.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        type: 'product'
+      };
 
-    setCampaigns([campaign, ...campaigns]);
-    setShowCreateModal(false);
-    setNewCampaign({ name: '', budget: '', startDate: '', endDate: '' });
-    alert('Campaign created successfully!');
+      const response = await fetch(`${API_URL}/api/ads/product`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Campaign created successfully!');
+        setShowCreateModal(false);
+        setNewCampaign({ name: '', budget: '', dailyBudget: '', bidAmount: '', bidType: 'cpc', startDate: '', endDate: '' });
+        fetchCampaigns();
+      } else {
+        toast.error(data.message || 'Failed to create campaign');
+      }
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      toast.error('Something went wrong');
+    }
   };
 
-  const handleDeleteCampaign = (id) => {
-    setCampaigns(campaigns.filter(c => c.id !== id));
-    setShowDeleteConfirm(null);
-    alert('Campaign deleted successfully!');
+  const handleDeleteCampaign = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/api/ads/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Campaign deleted successfully!');
+        setShowDeleteConfirm(null);
+        fetchCampaigns();
+      } else {
+        toast.error(data.message || 'Failed to delete campaign');
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      toast.error('Something went wrong');
+    }
   };
 
-  const toggleCampaignStatus = (id) => {
-    setCampaigns(campaigns.map(c => 
-      c.id === id ? { ...c, status: c.status === 'active' ? 'paused' : 'active' } : c
-    ));
+  const toggleCampaignStatus = async (id, currentStatus) => {
+    try {
+      const action = currentStatus === 'active' ? 'pause' : 'resume';
+      const response = await fetch(`${API_URL}/api/ads/${id}/${action}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Campaign ${action}ed successfully!`);
+        fetchCampaigns();
+      } else {
+        toast.error(data.message || `Failed to ${action} campaign`);
+      }
+    } catch (error) {
+      console.error('Error toggling campaign status:', error);
+      toast.error('Something went wrong');
+    }
+  };
+
+  const handleApprove = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/api/ads/admin/${id}/approve`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Campaign approved!');
+        fetchCampaigns();
+      }
+    } catch (error) {
+      toast.error('Failed to approve campaign');
+    }
+  };
+
+  const handleReject = async (id) => {
+    const reason = prompt('Enter rejection reason:');
+    if (reason === null) return;
+    try {
+      const response = await fetch(`${API_URL}/api/ads/admin/${id}/reject`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Campaign rejected!');
+        fetchCampaigns();
+      }
+    } catch (error) {
+      toast.error('Failed to reject campaign');
+    }
   };
 
   const calculateROI = (spent, sales) => {
@@ -61,13 +201,20 @@ function AdminAdvertising() {
     return ((sales - spent) / spent * 100).toFixed(1);
   };
 
-  const totalStats = {
-    activeCampaigns: campaigns.filter(c => c.status === 'active').length,
-    totalSpend: campaigns.reduce((sum, c) => sum + c.spent, 0),
-    totalImpressions: campaigns.reduce((sum, c) => sum + c.impressions, 0),
-    totalSales: campaigns.reduce((sum, c) => sum + c.sales, 0),
-    totalClicks: campaigns.reduce((sum, c) => sum + c.clicks, 0),
+  const formatCurrency = (amount) => {
+    return `₹${amount.toLocaleString('en-IN')}`;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading campaigns...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -81,7 +228,7 @@ function AdminAdvertising() {
             </button>
             <div>
               <h1 className="text-xl font-semibold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Advertising</h1>
-              <p className="text-xs text-gray-500 mt-0.5">Manage your ad campaigns</p>
+              <p className="text-xs text-gray-500 mt-0.5">Manage all ad campaigns</p>
             </div>
           </div>
           <button 
@@ -96,118 +243,137 @@ function AdminAdvertising() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-500">Active Campaigns</p>
-              <span className="text-2xl">📢</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{totalStats.activeCampaigns}</p>
-            <p className="text-xs text-gray-400 mt-1">Total campaigns: {campaigns.length}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-sm text-gray-500">Total Campaigns</p>
+            <p className="text-2xl font-bold text-gray-800">{stats.totalCampaigns}</p>
           </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-500">Total Spend</p>
-              <span className="text-2xl">💰</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">₹{totalStats.totalSpend.toLocaleString()}</p>
-            <p className="text-xs text-green-600 mt-1">ROI: {calculateROI(totalStats.totalSpend, totalStats.totalSales)}%</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-sm text-gray-500">Active</p>
+            <p className="text-2xl font-bold text-green-600">{stats.activeCampaigns}</p>
           </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-500">Total Impressions</p>
-              <span className="text-2xl">👁️</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{totalStats.totalImpressions.toLocaleString()}</p>
-            <p className="text-xs text-gray-400 mt-1">CTR: {((totalStats.totalClicks / totalStats.totalImpressions) * 100).toFixed(2)}%</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-sm text-gray-500">Total Spend</p>
+            <p className="text-2xl font-bold text-orange-600">{formatCurrency(stats.totalSpent)}</p>
           </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-500">Sales Generated</p>
-              <span className="text-2xl">🛍️</span>
-            </div>
-            <p className="text-2xl font-bold text-green-600">₹{totalStats.totalSales.toLocaleString()}</p>
-            <p className="text-xs text-gray-400 mt-1">Total clicks: {totalStats.totalClicks.toLocaleString()}</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-sm text-gray-500">Impressions</p>
+            <p className="text-2xl font-bold text-purple-600">{stats.totalImpressions.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-sm text-gray-500">Clicks</p>
+            <p className="text-2xl font-bold text-pink-600">{stats.totalClicks.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <p className="text-sm text-gray-500">Revenue</p>
+            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.totalRevenue)}</p>
           </div>
         </div>
 
         {/* Campaigns Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 flex justify-between items-center">
             <h2 className="font-semibold text-gray-800">All Campaigns</h2>
+            <span className="text-sm text-gray-500">{campaigns.length} campaigns</span>
           </div>
           
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-4 py-3 text-left">Campaign Name</th>
+                  <th className="px-4 py-3 text-left">Campaign</th>
                   <th className="px-4 py-3 text-right">Budget</th>
                   <th className="px-4 py-3 text-right">Spent</th>
                   <th className="px-4 py-3 text-right">Impressions</th>
                   <th className="px-4 py-3 text-right">Clicks</th>
                   <th className="px-4 py-3 text-right">CTR</th>
-                  <th className="px-4 py-3 text-right">Sales</th>
+                  <th className="px-4 py-3 text-right">Revenue</th>
                   <th className="px-4 py-3 text-right">ROI</th>
                   <th className="px-4 py-3 text-center">Status</th>
                   <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {campaigns.map(campaign => (
-                  <tr key={campaign.id} className="hover:bg-gray-50 transition">
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {campaign.name}
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {campaign.startDate} → {campaign.endDate || 'Ongoing'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">₹{campaign.budget.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">₹{campaign.spent.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">{campaign.impressions.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">{campaign.clicks.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={campaign.ctr > 3 ? 'text-green-600' : 'text-gray-600'}>
-                        {campaign.ctr}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-green-600 font-medium">₹{campaign.sales.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={calculateROI(campaign.spent, campaign.sales) > 50 ? 'text-green-600 font-semibold' : 'text-gray-600'}>
-                        {calculateROI(campaign.spent, campaign.sales)}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => toggleCampaignStatus(campaign.id)}
-                        className={`px-2 py-1 rounded-full text-xs font-medium transition ${
-                          campaign.status === 'active' 
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {campaign.status === 'active' ? 'Active' : 'Paused'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-2">
-                        <button className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">
-                          ✏️
-                        </button>
-                        <button 
-                          onClick={() => setShowDeleteConfirm(campaign.id)} 
-                          className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition"
-                          title="Delete"
+                {campaigns.map(campaign => {
+                  const ctr = campaign.impressions > 0 ? (campaign.clicks / campaign.impressions * 100).toFixed(2) : 0;
+                  const roi = calculateROI(campaign.spent, campaign.revenue);
+                  
+                  return (
+                    <tr key={campaign._id} className="hover:bg-gray-50 transition">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">{campaign.name}</div>
+                        <div className="text-xs text-gray-400 flex gap-2">
+                          <span className="capitalize">{campaign.type}</span>
+                          {campaign.vendorId && (
+                            <span className="text-pink-500">
+                              {campaign.vendorId.brandName || campaign.vendorId.name}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">{formatCurrency(campaign.budget)}</td>
+                      <td className="px-4 py-3 text-right">{formatCurrency(campaign.spent)}</td>
+                      <td className="px-4 py-3 text-right">{campaign.impressions.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">{campaign.clicks.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={ctr > 3 ? 'text-green-600' : 'text-gray-600'}>
+                          {ctr}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-green-600 font-medium">{formatCurrency(campaign.revenue)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={roi > 50 ? 'text-green-600 font-semibold' : 'text-gray-600'}>
+                          {roi}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => toggleCampaignStatus(campaign._id, campaign.status)}
+                          className={`px-2 py-1 rounded-full text-xs font-medium transition ${
+                            campaign.status === 'active' 
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                              : campaign.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : campaign.status === 'paused'
+                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
                         >
-                          🗑️
+                          {campaign.status}
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex justify-center gap-2">
+                          {campaign.status === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleApprove(campaign._id)} 
+                                className="p-1 text-green-500 hover:bg-green-50 rounded-lg transition"
+                                title="Approve"
+                              >
+                                ✅
+                              </button>
+                              <button 
+                                onClick={() => handleReject(campaign._id)} 
+                                className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                title="Reject"
+                              >
+                                ❌
+                              </button>
+                            </>
+                          )}
+                          <button 
+                            onClick={() => setShowDeleteConfirm(campaign._id)} 
+                            className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition"
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -226,18 +392,32 @@ function AdminAdvertising() {
           )}
         </div>
 
-        {/* Insights Section */}
+        {/* Quick Stats */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
             <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <span>📊</span> Performance Tips
+              <span>📊</span> Campaign Summary
             </h3>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-center gap-2">• Campaigns with ₹5k+ budget perform 40% better</li>
-              <li className="flex items-center gap-2">• Optimal CTR range: 2-5%</li>
-              <li className="flex items-center gap-2">• Weekend campaigns get 25% more impressions</li>
-              <li className="flex items-center gap-2">• Video ads have 3x higher engagement</li>
-            </ul>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between py-1 border-b border-gray-50">
+                <span className="text-gray-500">Total Budget</span>
+                <span className="font-medium">{formatCurrency(campaigns.reduce((sum, c) => sum + c.budget, 0))}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-50">
+                <span className="text-gray-500">Total Spent</span>
+                <span className="font-medium text-orange-600">{formatCurrency(stats.totalSpent)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-50">
+                <span className="text-gray-500">Total Revenue</span>
+                <span className="font-medium text-green-600">{formatCurrency(stats.totalRevenue)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-gray-500">Overall ROI</span>
+                <span className={`font-medium ${stats.totalSpent > 0 && stats.totalRevenue > stats.totalSpent ? 'text-green-600' : 'text-red-500'}`}>
+                  {stats.totalSpent > 0 ? ((stats.totalRevenue - stats.totalSpent) / stats.totalSpent * 100).toFixed(1) : 0}%
+                </span>
+              </div>
+            </div>
           </div>
           
           <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-5 border border-pink-100">
@@ -245,14 +425,20 @@ function AdminAdvertising() {
               <span>🚀</span> Quick Actions
             </h3>
             <div className="flex flex-wrap gap-3">
-              <button className="px-4 py-2 bg-white rounded-xl text-sm text-pink-600 border border-pink-200 hover:shadow-md transition">
-                Boost Best Campaign
+              <button 
+                onClick={() => setShowCreateModal(true)} 
+                className="px-4 py-2 bg-white rounded-xl text-sm text-pink-600 border border-pink-200 hover:shadow-md transition"
+              >
+                + New Campaign
               </button>
               <button className="px-4 py-2 bg-white rounded-xl text-sm text-pink-600 border border-pink-200 hover:shadow-md transition">
-                Download Report
+                📥 Download Report
               </button>
-              <button className="px-4 py-2 bg-white rounded-xl text-sm text-pink-600 border border-pink-200 hover:shadow-md transition">
-                Schedule Campaign
+              <button 
+                onClick={() => fetchCampaigns()} 
+                className="px-4 py-2 bg-white rounded-xl text-sm text-pink-600 border border-pink-200 hover:shadow-md transition"
+              >
+                🔄 Refresh
               </button>
             </div>
           </div>
@@ -286,6 +472,27 @@ function AdminAdvertising() {
                   onChange={(e) => setNewCampaign({ ...newCampaign, budget: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
                   placeholder="5000"
+                  min="100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Daily Budget (₹)</label>
+                <input
+                  type="number"
+                  value={newCampaign.dailyBudget}
+                  onChange={(e) => setNewCampaign({ ...newCampaign, dailyBudget: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                  placeholder="Auto-calculated"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bid Amount (₹)</label>
+                <input
+                  type="number"
+                  value={newCampaign.bidAmount}
+                  onChange={(e) => setNewCampaign({ ...newCampaign, bidAmount: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                  placeholder="5"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
