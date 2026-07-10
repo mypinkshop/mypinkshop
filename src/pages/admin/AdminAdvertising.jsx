@@ -30,37 +30,70 @@ function AdminAdvertising() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Fetch campaigns on load
+  // ✅ Check auth on mount
   useEffect(() => {
+    if (!token) {
+      toast.error('Please login as admin');
+      navigate('/admin/login');
+      return;
+    }
     fetchCampaigns();
   }, []);
 
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
+      
+      // ✅ Check token before making request
+      if (!token) {
+        toast.error('Session expired. Please login again.');
+        navigate('/admin/login');
+        return;
+      }
+
+      console.log('🔑 Fetching campaigns with token:', token ? 'Present' : 'Missing');
+
       const response = await fetch(`${API_URL}/api/ads/admin/all`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
+
+      console.log('📡 Response status:', response.status);
+
+      // ✅ Handle 403/401 errors
+      if (response.status === 401 || response.status === 403) {
+        toast.error('Unauthorized. Please login again.');
+        navigate('/admin/login');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
+      
       if (data.success) {
-        setCampaigns(data.campaigns);
+        setCampaigns(data.campaigns || []);
         // Calculate stats from campaigns
-        const activeCampaigns = data.campaigns.filter(c => c.status === 'active').length;
-        const totalSpent = data.campaigns.reduce((sum, c) => sum + c.spent, 0);
-        const totalImpressions = data.campaigns.reduce((sum, c) => sum + c.impressions, 0);
-        const totalClicks = data.campaigns.reduce((sum, c) => sum + c.clicks, 0);
-        const totalRevenue = data.campaigns.reduce((sum, c) => sum + c.revenue, 0);
+        const activeCampaigns = (data.campaigns || []).filter(c => c.status === 'active').length;
+        const totalSpent = (data.campaigns || []).reduce((sum, c) => sum + (c.spent || 0), 0);
+        const totalImpressions = (data.campaigns || []).reduce((sum, c) => sum + (c.impressions || 0), 0);
+        const totalClicks = (data.campaigns || []).reduce((sum, c) => sum + (c.clicks || 0), 0);
+        const totalRevenue = (data.campaigns || []).reduce((sum, c) => sum + (c.revenue || 0), 0);
 
         setStats({
-          totalCampaigns: data.campaigns.length,
+          totalCampaigns: data.campaigns?.length || 0,
           activeCampaigns,
           totalSpent,
           totalImpressions,
           totalClicks,
           totalRevenue
         });
+      } else {
+        toast.error(data.message || 'Failed to load campaigns');
       }
     } catch (error) {
       console.error('Error fetching campaigns:', error);
@@ -73,6 +106,13 @@ function AdminAdvertising() {
   const handleCreateCampaign = async () => {
     if (!newCampaign.name || !newCampaign.budget) {
       toast.error('Please fill campaign name and budget');
+      return;
+    }
+
+    // ✅ Check token before making request
+    if (!token) {
+      toast.error('Session expired. Please login again.');
+      navigate('/admin/login');
       return;
     }
 
@@ -113,6 +153,13 @@ function AdminAdvertising() {
   };
 
   const handleDeleteCampaign = async (id) => {
+    // ✅ Check token before making request
+    if (!token) {
+      toast.error('Session expired. Please login again.');
+      navigate('/admin/login');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/ads/${id}`, {
         method: 'DELETE',
@@ -135,6 +182,13 @@ function AdminAdvertising() {
   };
 
   const toggleCampaignStatus = async (id, currentStatus) => {
+    // ✅ Check token before making request
+    if (!token) {
+      toast.error('Session expired. Please login again.');
+      navigate('/admin/login');
+      return;
+    }
+
     try {
       const action = currentStatus === 'active' ? 'pause' : 'resume';
       const response = await fetch(`${API_URL}/api/ads/${id}/${action}`, {
@@ -157,6 +211,13 @@ function AdminAdvertising() {
   };
 
   const handleApprove = async (id) => {
+    // ✅ Check token before making request
+    if (!token) {
+      toast.error('Session expired. Please login again.');
+      navigate('/admin/login');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/ads/admin/${id}/approve`, {
         method: 'PATCH',
@@ -175,6 +236,13 @@ function AdminAdvertising() {
   };
 
   const handleReject = async (id) => {
+    // ✅ Check token before making request
+    if (!token) {
+      toast.error('Session expired. Please login again.');
+      navigate('/admin/login');
+      return;
+    }
+
     const reason = prompt('Enter rejection reason:');
     if (reason === null) return;
     try {
