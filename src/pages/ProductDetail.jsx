@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import ReviewSection from '../components/ReviewSection';
+import QuickRating from '../components/QuickRating';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
@@ -365,6 +366,23 @@ function ProductDetail() {
     }
   };
 
+  // ✅ Refresh product data after rating
+  const handleRatingSubmitted = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/products/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data._id) {
+          setProduct(data);
+          sessionStorage.setItem(`product_${id}`, JSON.stringify(data));
+          sessionStorage.setItem(`product_cache_time_${id}`, Date.now().toString());
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing product:', error);
+    }
+  };
+
   const productImages = product?.images && product.images.length > 0 ? product.images : [];
 
   const getDescriptionBullets = () => {
@@ -581,13 +599,28 @@ function ProductDetail() {
             <div className="space-y-4">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{product.name}</h1>
               
-              <div className="flex items-center gap-2">
-                <div className="flex text-yellow-400 text-sm">
-                  {'★'.repeat(Math.floor(product.rating || 0))}{'☆'.repeat(5 - Math.floor(product.rating || 0))}
+              {/* ✅ Rating Summary + Quick Rating */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <span className="text-yellow-400 text-base">
+                    {'★'.repeat(Math.floor(product.rating || 0))}
+                    {'☆'.repeat(5 - Math.floor(product.rating || 0))}
+                  </span>
+                  <span className="text-sm font-medium text-gray-700">{product.rating || 0}</span>
+                  <span className="text-sm text-gray-400">({product.reviewCount || 0} reviews)</span>
                 </div>
-                <span className="text-sm font-medium">{product.rating || 0}</span>
-                <span className="text-gray-300">|</span>
-                <span className="text-sm text-gray-500">{product.reviewCount || 0} reviews</span>
+                
+                {/* ✅ Quick Rating - Only for logged in users */}
+                {user && (
+                  <div className="border-l pl-3 border-gray-200">
+                    <QuickRating 
+                      productId={id}
+                      onRatingSubmitted={handleRatingSubmitted}
+                      buttonText="⭐ Rate"
+                      showPopup={true}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-baseline gap-3">
