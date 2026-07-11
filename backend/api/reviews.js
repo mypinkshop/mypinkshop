@@ -149,16 +149,28 @@ router.get('/can-review/:productId', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== CREATE REVIEW ==========
+// ========== CREATE REVIEW (UPDATED - Rating Only Support) ==========
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { productId, orderId, rating, title, comment, images, videos } = req.body;
+    const { 
+      productId, 
+      orderId, 
+      rating, 
+      title, 
+      comment, 
+      images, 
+      videos,
+      isRatingOnly = false  // ✅ New field
+    } = req.body;
+    
     const userId = req.user.id;
     
+    // Validate product
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
     
+    // Check if user can review
     const order = await Order.findOne({
       _id: orderId,
       userId,
@@ -170,10 +182,20 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'You can only review products after delivery' });
     }
     
-    const existingReview = await Review.findOne({ productId, userId, orderId });
+    // Check if already reviewed
+    const existingReview = await Review.findOne({ 
+      productId, 
+      userId, 
+      orderId 
+    });
+    
     if (existingReview) {
       return res.status(400).json({ error: 'You have already reviewed this product' });
     }
+    
+    // ✅ Rating only - Auto approve
+    // ✅ Full review - Pending approval
+    const status = isRatingOnly ? 'approved' : 'pending';
     
     const review = new Review({
       productId,
@@ -181,31 +203,42 @@ router.post('/', authMiddleware, async (req, res) => {
       orderId,
       rating,
       title: title || '',
-      comment,
+      comment: comment || '',
       images: images || [],
       videos: videos || [],
-      isVerifiedPurchase: true, // ✅ Auto verified because order is delivered
-      status: 'pending'
+      isVerifiedPurchase: true,
+      isRatingOnly: isRatingOnly,
+      status: status,
+      approvedAt: isRatingOnly ? new Date() : null
     });
     
     await review.save();
     
+    // ✅ Update product rating immediately (for both)
+    await updateProductRating(productId);
+    
+    const message = isRatingOnly 
+      ? 'Rating submitted successfully!' 
+      : 'Review submitted! Awaiting admin approval.';
+    
     res.status(201).json({
       success: true,
       review,
-      message: 'Review submitted successfully! Awaiting admin approval.'
+      message,
+      autoApproved: isRatingOnly
     });
+    
   } catch (error) {
     console.error('Create review error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// ========== GET APPROVED REVIEWS FOR PRODUCT ==========
+// ========== GET APPROVED REVIEWS FOR PRODUCT (UPDATED) ==========
 router.get('/product/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, type = 'all' } = req.query;
     
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.json({
@@ -215,32 +248,65 @@ router.get('/product/:productId', async (req, res) => {
         page: 1,
         pages: 0,
         averageRating: 0,
-        totalReviews: 0
+        totalReviews: 0,
+        ratingCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+        ratingOnlyCount: 0,
+        reviewWithCommentCount: 0
       });
     }
     
-    const [reviews, total, avgResult] = await Promise.all([
-      Review.find({ productId, status: 'approved' })
+    // ✅ Filter based on type
+    let filter = { productId: new mongoose.Types.ObjectId(productId), status: 'approved' };
+    
+    if (type === 'rating_only') {
+      filter.isRatingOnly = true;
+    } else if (type === 'with_comment') {
+      filter.isRatingOnly = false;
+      filter.comment = { $ne: '' };
+    }
+    
+    const [reviews, total, avgResult, ratingCounts, ratingOnlyCount, commentCount] = await Promise.all([
+      Review.find(filter)
         .populate('userId', 'name')
         .sort({ helpful: -1, createdAt: -1 })
-        .skip((page - 1) * limit)
+        .skip((parseInt(page) - 1) * parseInt(limit))
         .limit(parseInt(limit))
         .lean(),
-      Review.countDocuments({ productId, status: 'approved' }),
+      Review.countDocuments(filter),
       Review.aggregate([
         { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
         { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
-      ])
+      ]),
+      Review.aggregate([
+        { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
+        { $group: { _id: '$rating', count: { $sum: 1 } } }
+      ]),
+      Review.countDocuments({ productId, status: 'approved', isRatingOnly: true }),
+      Review.countDocuments({ 
+        productId, 
+        status: 'approved', 
+        isRatingOnly: false,
+        comment: { $ne: '' } 
+      })
     ]);
+    
+    // Format rating counts
+    const formattedCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    ratingCounts.forEach(item => {
+      formattedCounts[item._id] = item.count;
+    });
     
     res.json({
       success: true,
       reviews: reviews || [],
       total: total || 0,
       page: parseInt(page),
-      pages: Math.ceil((total || 0) / limit),
+      pages: Math.ceil((total || 0) / parseInt(limit)),
       averageRating: avgResult.length > 0 ? Math.round(avgResult[0].avgRating * 10) / 10 : 0,
-      totalReviews: avgResult.length > 0 ? avgResult[0].count : 0
+      totalReviews: avgResult.length > 0 ? avgResult[0].count : 0,
+      ratingCounts: formattedCounts,
+      ratingOnlyCount: ratingOnlyCount,
+      reviewWithCommentCount: commentCount
     });
   } catch (error) {
     console.error('Get reviews error:', error);
@@ -252,6 +318,9 @@ router.get('/product/:productId', async (req, res) => {
       pages: 0,
       averageRating: 0,
       totalReviews: 0,
+      ratingCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+      ratingOnlyCount: 0,
+      reviewWithCommentCount: 0,
       error: error.message
     });
   }
@@ -310,7 +379,13 @@ router.get('/my-reviews', authMiddleware, async (req, res) => {
 // ========== ADMIN: GET PENDING REVIEWS ==========
 router.get('/admin/pending', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const reviews = await Review.find({ status: 'pending' })
+    // ✅ Only full reviews (with comment) go to pending
+    // Rating only reviews are auto-approved
+    const reviews = await Review.find({ 
+      status: 'pending',
+      isRatingOnly: false,
+      comment: { $ne: '' }
+    })
       .populate('userId', 'name email')
       .populate('productId', 'name images brand category')
       .sort({ createdAt: -1 });
@@ -325,15 +400,21 @@ router.get('/admin/pending', authMiddleware, adminMiddleware, async (req, res) =
 // ========== ADMIN: GET ALL REVIEWS ==========
 router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, page = 1, limit = 20, type = 'all' } = req.query;
+    
     const filter = {};
     if (status && status !== 'all') filter.status = status;
+    if (type === 'rating_only') filter.isRatingOnly = true;
+    if (type === 'with_comment') { 
+      filter.isRatingOnly = false;
+      filter.comment = { $ne: '' };
+    }
     
     const reviews = await Review.find(filter)
       .populate('userId', 'name email')
       .populate('productId', 'name images brand category')
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
+      .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit));
     
     const total = await Review.countDocuments(filter);
@@ -342,7 +423,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
       reviews: reviews || [],
       total: total || 0,
       page: parseInt(page),
-      pages: Math.ceil((total || 0) / limit)
+      pages: Math.ceil((total || 0) / parseInt(limit))
     });
   } catch (error) {
     console.error('Get all reviews error:', error);
@@ -353,7 +434,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
 // ========== ADMIN: GET REVIEW STATS ==========
 router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const [total, pending, approved, rejected, ratingDistribution] = await Promise.all([
+    const [total, pending, approved, rejected, ratingDistribution, ratingOnlyCount, commentCount] = await Promise.all([
       Review.countDocuments(),
       Review.countDocuments({ status: 'pending' }),
       Review.countDocuments({ status: 'approved' }),
@@ -362,7 +443,13 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
         { $match: { status: 'approved' } },
         { $group: { _id: '$rating', count: { $sum: 1 } } },
         { $sort: { _id: 1 } }
-      ])
+      ]),
+      Review.countDocuments({ isRatingOnly: true, status: 'approved' }),
+      Review.countDocuments({ 
+        isRatingOnly: false, 
+        status: 'approved',
+        comment: { $ne: '' } 
+      })
     ]);
     
     // Monthly trends
@@ -393,6 +480,8 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
           acc[curr._id] = curr.count;
           return acc;
         }, {}),
+        ratingOnlyCount,
+        reviewWithCommentCount: commentCount,
         monthlyTrends: monthlyTrends.map(item => ({
           month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
           count: item.count,
@@ -425,22 +514,23 @@ router.patch('/admin/:reviewId/approve', authMiddleware, adminMiddleware, async 
     }
     
     review.status = 'approved';
-    review.isVerifiedPurchase = true; // ✅ Auto verified
+    review.isVerifiedPurchase = true;
     review.approvedAt = new Date();
     if (adminNote) review.adminNote = adminNote;
     await review.save();
     
-    // ✅ Update product rating
     await updateProductRating(review.productId);
     
-    // ✅ Send approval email to customer
-    await sendReviewApprovedEmail(review.userId.email, {
-      name: review.userId.name,
-      productName: review.productId.name,
-      productId: review.productId._id,
-      rating: review.rating,
-      comment: review.comment
-    });
+    // ✅ Send email only for full reviews (not rating only)
+    if (!review.isRatingOnly && review.comment) {
+      await sendReviewApprovedEmail(review.userId.email, {
+        name: review.userId.name,
+        productName: review.productId.name,
+        productId: review.productId._id,
+        rating: review.rating,
+        comment: review.comment
+      });
+    }
     
     res.json({ success: true, review });
   } catch (error) {
@@ -529,12 +619,14 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
     if (adminNote) review.adminNote = adminNote;
     await review.save();
     
-    // ✅ Send rejection email to customer
-    await sendReviewRejectedEmail(review.userId.email, {
-      name: review.userId.name,
-      productName: review.productId.name,
-      reason: adminNote || 'Does not meet our review guidelines'
-    });
+    // ✅ Send email only for full reviews
+    if (!review.isRatingOnly && review.comment) {
+      await sendReviewRejectedEmail(review.userId.email, {
+        name: review.userId.name,
+        productName: review.productId.name,
+        reason: adminNote || 'Does not meet our review guidelines'
+      });
+    }
     
     res.json({ success: true, review });
   } catch (error) {
@@ -543,7 +635,7 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
   }
 });
 
-// ========== ADMIN: DELETE REVIEW (FIXED - updates rating) ==========
+// ========== ADMIN: DELETE REVIEW ==========
 router.delete('/admin/:reviewId', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -560,7 +652,6 @@ router.delete('/admin/:reviewId', authMiddleware, adminMiddleware, async (req, r
     const productId = review.productId;
     await review.deleteOne();
     
-    // ✅ Update product rating after deletion
     await updateProductRating(productId);
     
     res.json({ success: true, message: 'Review deleted successfully' });
@@ -588,7 +679,6 @@ router.delete('/:reviewId', authMiddleware, async (req, res) => {
     const productId = review.productId;
     await review.deleteOne();
     
-    // ✅ Update product rating after deletion
     await updateProductRating(productId);
     
     res.json({ success: true, message: 'Review deleted successfully' });
@@ -610,13 +700,13 @@ router.get('/admin/export', authMiddleware, adminMiddleware, async (req, res) =>
       .populate('productId', 'name brand category price')
       .sort({ createdAt: -1 });
     
-    // CSV header
-    let csv = 'Product,Customer,Rating,Title,Comment,Status,Verified,Helpful,Date\n';
+    let csv = 'Product,Customer,Rating,Title,Comment,Status,Verified,Rating Only,Helpful,Date\n';
     
     reviews.forEach(r => {
       csv += `"${r.productId?.name || 'N/A'}","${r.userId?.name || 'Anonymous'} (${r.userId?.email || ''})",`;
       csv += `${r.rating},"${(r.title || '').replace(/"/g, '""')}","${(r.comment || '').replace(/"/g, '""')}",`;
-      csv += `${r.status},${r.isVerifiedPurchase ? 'Yes' : 'No'},${r.helpful || 0},${new Date(r.createdAt).toLocaleDateString()}\n`;
+      csv += `${r.status},${r.isVerifiedPurchase ? 'Yes' : 'No'},${r.isRatingOnly ? 'Yes' : 'No'},`;
+      csv += `${r.helpful || 0},${new Date(r.createdAt).toLocaleDateString()}\n`;
     });
     
     res.setHeader('Content-Type', 'text/csv');
