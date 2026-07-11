@@ -1,3 +1,5 @@
+// src/pages/TrackOrder.jsx
+
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -6,6 +8,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import { getTrackingDetails } from '../utils/shipping';
 
 function TrackOrder() {
   const { orderId } = useParams();
@@ -52,14 +55,24 @@ function TrackOrder() {
         const orderData = await orderResponse.json();
         setOrder(orderData);
 
-        if (orderData.awb) {
-          const trackingResponse = await fetch(`${API_URL}/api/tracking/${orderData.awb}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (trackingResponse.ok) {
-            const trackingData = await trackingResponse.json();
-            setTracking(trackingData);
+        // ✅ Check if order has Shiprocket order ID
+        if (orderData.shipping?.shiprocketOrderId) {
+          try {
+            const trackingResult = await getTrackingDetails(
+              orderData.shipping.shiprocketOrderId, 
+              token
+            );
+            
+            if (trackingResult.success) {
+              setTracking(trackingResult);
+            } else {
+              console.log('No Shiprocket tracking yet');
+            }
+          } catch (error) {
+            console.log('Shiprocket tracking not available:', error.message);
           }
+        } else {
+          console.log('No Shiprocket order ID found');
         }
       } catch (error) {
         console.error('Error fetching order:', error);
@@ -133,18 +146,21 @@ function TrackOrder() {
   };
 
   const getProgressPercentage = () => {
-    if (tracking?.current_status) {
+    // ✅ Check Shiprocket tracking first
+    if (tracking?.status) {
       const statusMap = {
-        'Pickup Requested': 10,
-        'Pickup Scheduled': 20,
-        'Pickup Completed': 30,
-        'In Transit': 50,
-        'Out for Delivery': 80,
-        'Delivered': 100
+        'pending': 10,
+        'confirmed': 25,
+        'picked_up': 40,
+        'in_transit': 60,
+        'out_for_delivery': 85,
+        'delivered': 100,
+        'cancelled': 0
       };
-      return statusMap[tracking.current_status] || 20;
+      return statusMap[tracking.status.toLowerCase()] || 20;
     }
     
+    // Fallback to order status
     if (order?.status) {
       const statusMap = {
         'pending': 10,
@@ -158,6 +174,14 @@ function TrackOrder() {
       return statusMap[order.status] || 10;
     }
     return 0;
+  };
+
+  // Get latest tracking status
+  const getLatestTrackingStatus = () => {
+    if (tracking?.tracking && tracking.tracking.length > 0) {
+      return tracking.tracking[0].status;
+    }
+    return null;
   };
 
   // SEO Schema
@@ -349,6 +373,7 @@ function TrackOrder() {
   }
 
   const progress = getProgressPercentage();
+  const latestStatus = getLatestTrackingStatus();
 
   return (
     <>
@@ -480,21 +505,47 @@ function TrackOrder() {
                 ></div>
               </div>
               <p className="text-sm text-gray-500 mt-2 text-center">
-                {progress === 100 ? 'Order Delivered' : `${Math.round(progress)}% Complete`}
+                {progress === 100 ? '✅ Order Delivered' : `${Math.round(progress)}% Complete`}
               </p>
             </div>
 
-            {/* AWB Number Display */}
-            {order.awb && (
+            {/* ✅ Shiprocket Status Badge */}
+            {order.shipping?.trackingStatus && (
+              <div className="flex items-center gap-2 mb-4 bg-gray-50 rounded-lg p-3">
+                <span className="text-xs text-gray-500 font-medium">Shiprocket Status:</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  order.shipping.trackingStatus === 'delivered' ? 'bg-green-100 text-green-700' :
+                  order.shipping.trackingStatus === 'in_transit' ? 'bg-blue-100 text-blue-700' :
+                  order.shipping.trackingStatus === 'picked_up' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {order.shipping.trackingStatus?.toUpperCase() || 'PENDING'}
+                </span>
+                {latestStatus && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    Latest: {latestStatus}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* ✅ AWB Number Display */}
+            {order.shipping?.awb && (
               <div className="bg-pink-50 rounded-xl p-4 mb-6">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-xl">📦</span>
                   <div className="flex-1">
                     <p className="text-xs text-gray-500">AWB Number (Tracking ID)</p>
-                    <p className="font-semibold text-gray-800 font-mono text-sm break-all">{order.awb}</p>
+                    <p className="font-semibold text-gray-800 font-mono text-sm break-all">{order.shipping.awb}</p>
+                    {order.shipping.courierName && (
+                      <p className="text-xs text-gray-400">Courier: {order.shipping.courierName}</p>
+                    )}
                   </div>
                   <button 
-                    onClick={() => navigator.clipboard.writeText(order.awb)}
+                    onClick={() => {
+                      navigator.clipboard.writeText(order.shipping.awb);
+                      alert('✅ AWB copied to clipboard!');
+                    }}
                     className="text-pink-500 text-sm hover:underline"
                   >
                     Copy
@@ -503,13 +554,13 @@ function TrackOrder() {
               </div>
             )}
 
-            {/* Tracking Timeline */}
-            {tracking?.data?.tracking_data?.current_status && (
+            {/* ✅ Tracking Timeline - Shiprocket */}
+            {tracking?.tracking && tracking.tracking.length > 0 ? (
               <div className="space-y-0">
-                <h3 className="font-semibold text-gray-800 mb-4">Tracking Timeline</h3>
-                {tracking.data.tracking_data.tracking_details?.map((step, idx) => (
+                <h3 className="font-semibold text-gray-800 mb-4">📦 Tracking Timeline</h3>
+                {tracking.tracking.map((step, idx) => (
                   <div key={idx} className="relative pb-6 last:pb-0">
-                    {idx !== tracking.data.tracking_data.tracking_details.length - 1 && (
+                    {idx !== tracking.tracking.length - 1 && (
                       <div className="absolute left-5 top-8 w-0.5 h-10 bg-pink-200"></div>
                     )}
                     <div className="flex gap-3">
@@ -522,43 +573,53 @@ function TrackOrder() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-800">{step.status}</p>
-                        <p className="text-sm text-gray-500">{step.location}</p>
-                        <p className="text-xs text-gray-400">{step.datetime}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Fallback: Order Status Timeline */}
-            {(!tracking || !tracking.data) && order.tracking && (
-              <div className="space-y-0">
-                <h3 className="font-semibold text-gray-800 mb-4">Order Timeline</h3>
-                {order.tracking.map((step, idx) => (
-                  <div key={idx} className="relative pb-6 last:pb-0">
-                    {idx !== order.tracking.length - 1 && (
-                      <div className="absolute left-5 top-8 w-0.5 h-10 bg-pink-200"></div>
-                    )}
-                    <div className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${
-                        step.completed ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-400'
-                      }`}>
-                        {step.completed ? '✓' : idx + 1}
-                      </div>
-                      <div className="flex-1">
-                        <p className={`font-medium ${step.completed ? 'text-gray-800' : 'text-gray-400'}`}>
-                          {step.stage}
-                        </p>
-                        <p className="text-sm text-gray-500">{step.description}</p>
-                        {step.timestamp && step.timestamp !== 'Pending' && (
-                          <p className="text-xs text-gray-400">{step.timestamp}</p>
+                        <p className="text-sm text-gray-500">{step.location || 'N/A'}</p>
+                        {step.date && (
+                          <p className="text-xs text-gray-400">
+                            {new Date(step.date).toLocaleString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+            ) : (
+              // ✅ Fallback: Order Status Timeline
+              order.tracking && order.tracking.length > 0 && (
+                <div className="space-y-0">
+                  <h3 className="font-semibold text-gray-800 mb-4">Order Timeline</h3>
+                  {order.tracking.map((step, idx) => (
+                    <div key={idx} className="relative pb-6 last:pb-0">
+                      {idx !== order.tracking.length - 1 && (
+                        <div className="absolute left-5 top-8 w-0.5 h-10 bg-pink-200"></div>
+                      )}
+                      <div className="flex gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${
+                          step.completed ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-400'
+                        }`}>
+                          {step.completed ? '✓' : idx + 1}
+                        </div>
+                        <div className="flex-1">
+                          <p className={`font-medium ${step.completed ? 'text-gray-800' : 'text-gray-400'}`}>
+                            {step.stage}
+                          </p>
+                          <p className="text-sm text-gray-500">{step.description}</p>
+                          {step.timestamp && step.timestamp !== 'Pending' && (
+                            <p className="text-xs text-gray-400">{step.timestamp}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
 
@@ -604,10 +665,10 @@ function TrackOrder() {
                   <span>-₹{order.discount}</span>
                 </div>
               )}
-              {order.shippingCharge > 0 && (
+              {order.shipping?.shippingCharges > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Delivery Charges</span>
-                  <span className="text-gray-800">₹{order.shippingCharge}</span>
+                  <span className="text-gray-800">₹{order.shipping.shippingCharges}</span>
                 </div>
               )}
               {order.tax > 0 && (
@@ -630,6 +691,16 @@ function TrackOrder() {
             <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-pink-100">
               <p className="text-xs text-gray-500">Payment: {order.paymentMethod || 'Online'}</p>
               <p className="text-xs text-gray-500">Delivery: {order.deliveryMethod === 'express' ? 'Express' : 'Standard'}</p>
+              {/* ✅ Show estimated delivery */}
+              {order.shipping?.estimatedDelivery?.maxDate && (
+                <p className="text-xs text-pink-500 font-medium">
+                  🚚 Est. Delivery: {new Date(order.shipping.estimatedDelivery.maxDate).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  })}
+                </p>
+              )}
             </div>
           </div>
 
