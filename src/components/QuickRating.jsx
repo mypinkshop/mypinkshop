@@ -1,4 +1,5 @@
 // src/components/QuickRating.jsx
+
 import { useState, useEffect } from 'react';
 import { useReviews } from '../context/ReviewContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,7 +10,7 @@ const QuickRating = ({
   onRatingSubmitted, 
   className = '',
   buttonText = 'Rate Now',
-  showPopup = true
+  enablePopup = true  // ✅ showPopup → enablePopup
 }) => {
   const { user } = useAuth();
   const { 
@@ -23,7 +24,7 @@ const QuickRating = ({
   const [rating, setRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showPopup, setShowPopup] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);  // ✅ State same rahega
   const [canReview, setCanReview] = useState(false);
   const [checking, setChecking] = useState(true);
   const [alreadyReviewed, setAlreadyReviewed] = useState(false);
@@ -71,7 +72,7 @@ const QuickRating = ({
     
     setRating(selectedRating);
     
-    if (showPopup) {
+    if (enablePopup) {  // ✅ enablePopup use karo
       setShowPopup(true);
     } else {
       submitRating(selectedRating);
@@ -97,7 +98,7 @@ const QuickRating = ({
         '', // No title
         '', // No comment
         [], // No images
-        true // ✅ isRatingOnly
+        true // isRatingOnly
       );
       
       if (result.success) {
@@ -177,7 +178,7 @@ const QuickRating = ({
       )}
       
       {/* Rating Confirmation Popup */}
-      {showPopup && showPopup && rating > 0 && (
+      {enablePopup && showPopup && rating > 0 && (  // ✅ enablePopup + showPopup
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
             <div className="text-center">
