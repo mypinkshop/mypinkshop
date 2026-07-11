@@ -3,12 +3,14 @@ const router = express.Router();
 const multer = require('multer');
 const AWS = require('aws-sdk');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose'); // ✅ ADD THIS
+const mongoose = require('mongoose');
 const Review = require('../models/Review');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const User = require('../models/User');
+const { sendReviewApprovedEmail, sendReviewRejectedEmail } = require('../services/emailService');
 
-// ========== Cloudflare R2 for review images ==========
+// ========== Cloudflare R2 ==========
 const s3 = new AWS.S3({
   endpoint: `http://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   accessKeyId: process.env.R2_ACCESS_KEY_ID,
@@ -34,7 +36,7 @@ const upload = multer({
   }
 });
 
-// Auth middleware
+// ========== Auth Middleware ==========
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -55,6 +57,26 @@ const adminMiddleware = (req, res, next) => {
     return res.status(403).json({ message: 'Admin access required' });
   }
   next();
+};
+
+// ========== UPDATE PRODUCT RATING (Helper) ==========
+const updateProductRating = async (productId) => {
+  const avgResult = await Review.aggregate([
+    { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
+    { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+  ]);
+  
+  if (avgResult.length > 0) {
+    await Product.findByIdAndUpdate(productId, {
+      rating: Math.round(avgResult[0].avgRating * 10) / 10,
+      reviewCount: avgResult[0].count
+    });
+  } else {
+    await Product.findByIdAndUpdate(productId, {
+      rating: 0,
+      reviewCount: 0
+    });
+  }
 };
 
 // ========== UPLOAD REVIEW MEDIA ==========
@@ -100,7 +122,6 @@ router.get('/can-review/:productId', authMiddleware, async (req, res) => {
     const { productId } = req.params;
     const userId = req.user.id;
     
-    // ✅ Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.json({ canReview: false, alreadyReviewed: false, orderId: null });
     }
@@ -134,7 +155,6 @@ router.post('/', authMiddleware, async (req, res) => {
     const { productId, orderId, rating, title, comment, images, videos } = req.body;
     const userId = req.user.id;
     
-    // ✅ Validate ObjectIds
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
@@ -164,7 +184,7 @@ router.post('/', authMiddleware, async (req, res) => {
       comment,
       images: images || [],
       videos: videos || [],
-      isVerifiedPurchase: true,
+      isVerifiedPurchase: true, // ✅ Auto verified because order is delivered
       status: 'pending'
     });
     
@@ -181,15 +201,15 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== GET APPROVED REVIEWS FOR PRODUCT (FIXED) ==========
+// ========== GET APPROVED REVIEWS FOR PRODUCT ==========
 router.get('/product/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
     const { page = 1, limit = 10 } = req.query;
     
-    // ✅ FIX: Validate ObjectId first
     if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(200).json({
+      return res.json({
+        success: true,
         reviews: [],
         total: 0,
         page: 1,
@@ -199,48 +219,33 @@ router.get('/product/:productId', async (req, res) => {
       });
     }
     
-    const reviews = await Review.find({
-      productId: productId,
-      status: 'approved'
-    })
-    .populate('userId', 'name')
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(parseInt(limit));
-    
-    const total = await Review.countDocuments({ 
-      productId: productId, 
-      status: 'approved' 
-    });
-    
-    // ✅ FIX: Manual average calculation (since static method might not exist)
-    let averageRating = 0;
-    let totalReviews = 0;
-    
-    if (total > 0) {
-      const avgResult = await Review.aggregate([
+    const [reviews, total, avgResult] = await Promise.all([
+      Review.find({ productId, status: 'approved' })
+        .populate('userId', 'name')
+        .sort({ helpful: -1, createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit))
+        .lean(),
+      Review.countDocuments({ productId, status: 'approved' }),
+      Review.aggregate([
         { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
         { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
-      ]);
-      
-      if (avgResult.length > 0) {
-        averageRating = Math.round(avgResult[0].avgRating * 10) / 10;
-        totalReviews = avgResult[0].count;
-      }
-    }
+      ])
+    ]);
     
     res.json({
+      success: true,
       reviews: reviews || [],
       total: total || 0,
       page: parseInt(page),
       pages: Math.ceil((total || 0) / limit),
-      averageRating: averageRating,
-      totalReviews: totalReviews
+      averageRating: avgResult.length > 0 ? Math.round(avgResult[0].avgRating * 10) / 10 : 0,
+      totalReviews: avgResult.length > 0 ? avgResult[0].count : 0
     });
   } catch (error) {
     console.error('Get reviews error:', error);
-    // ✅ FIX: Return empty data instead of 500 error
-    res.status(200).json({
+    res.json({
+      success: false,
       reviews: [],
       total: 0,
       page: 1,
@@ -258,7 +263,6 @@ router.patch('/:reviewId/helpful', authMiddleware, async (req, res) => {
     const { reviewId } = req.params;
     const userId = req.user.id;
     
-    // ✅ Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {
       return res.status(400).json({ error: 'Invalid review ID' });
     }
@@ -308,7 +312,7 @@ router.get('/admin/pending', authMiddleware, adminMiddleware, async (req, res) =
   try {
     const reviews = await Review.find({ status: 'pending' })
       .populate('userId', 'name email')
-      .populate('productId', 'name images')
+      .populate('productId', 'name images brand category')
       .sort({ createdAt: -1 });
     
     res.json(reviews || []);
@@ -327,7 +331,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
     
     const reviews = await Review.find(filter)
       .populate('userId', 'name email')
-      .populate('productId', 'name images')
+      .populate('productId', 'name images brand category')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
@@ -346,43 +350,158 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
+// ========== ADMIN: GET REVIEW STATS ==========
+router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const [total, pending, approved, rejected, ratingDistribution] = await Promise.all([
+      Review.countDocuments(),
+      Review.countDocuments({ status: 'pending' }),
+      Review.countDocuments({ status: 'approved' }),
+      Review.countDocuments({ status: 'rejected' }),
+      Review.aggregate([
+        { $match: { status: 'approved' } },
+        { $group: { _id: '$rating', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } }
+      ])
+    ]);
+    
+    // Monthly trends
+    const monthlyTrends = await Review.aggregate([
+      { $match: { status: 'approved' } },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 },
+          avgRating: { $avg: '$rating' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $limit: 12 }
+    ]);
+    
+    res.json({
+      success: true,
+      stats: {
+        total,
+        pending,
+        approved,
+        rejected,
+        ratingDistribution: ratingDistribution.reduce((acc, curr) => {
+          acc[curr._id] = curr.count;
+          return acc;
+        }, {}),
+        monthlyTrends: monthlyTrends.map(item => ({
+          month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
+          count: item.count,
+          avgRating: Math.round(item.avgRating * 10) / 10
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== ADMIN: APPROVE REVIEW ==========
 router.patch('/admin/:reviewId/approve', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { reviewId } = req.params;
     const { adminNote } = req.body;
     
-    // ✅ Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {
       return res.status(400).json({ error: 'Invalid review ID' });
     }
     
-    const review = await Review.findById(reviewId);
+    const review = await Review.findById(reviewId)
+      .populate('userId', 'name email')
+      .populate('productId', 'name');
+    
     if (!review) {
       return res.status(404).json({ error: 'Review not found' });
     }
     
     review.status = 'approved';
+    review.isVerifiedPurchase = true; // ✅ Auto verified
     review.approvedAt = new Date();
     if (adminNote) review.adminNote = adminNote;
     await review.save();
     
-    // ✅ Calculate and update product rating
-    const avgResult = await Review.aggregate([
-      { $match: { productId: review.productId, status: 'approved' } },
-      { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
-    ]);
+    // ✅ Update product rating
+    await updateProductRating(review.productId);
     
-    if (avgResult.length > 0) {
-      await Product.findByIdAndUpdate(review.productId, {
-        rating: Math.round(avgResult[0].avgRating * 10) / 10,
-        reviewCount: avgResult[0].count
-      });
-    }
+    // ✅ Send approval email to customer
+    await sendReviewApprovedEmail(review.userId.email, {
+      name: review.userId.name,
+      productName: review.productId.name,
+      productId: review.productId._id,
+      rating: review.rating,
+      comment: review.comment
+    });
     
     res.json({ success: true, review });
   } catch (error) {
     console.error('Approve review error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN: BULK APPROVE REVIEWS ==========
+router.patch('/admin/bulk-approve', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { reviewIds } = req.body;
+    
+    if (!reviewIds || !Array.isArray(reviewIds) || reviewIds.length === 0) {
+      return res.status(400).json({ error: 'No review IDs provided' });
+    }
+    
+    const validIds = reviewIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    
+    const reviews = await Review.find({ _id: { $in: validIds } });
+    
+    for (const review of reviews) {
+      review.status = 'approved';
+      review.isVerifiedPurchase = true;
+      review.approvedAt = new Date();
+      await review.save();
+      await updateProductRating(review.productId);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `${reviews.length} reviews approved successfully` 
+    });
+  } catch (error) {
+    console.error('Bulk approve error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN: BULK REJECT REVIEWS ==========
+router.patch('/admin/bulk-reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { reviewIds } = req.body;
+    
+    if (!reviewIds || !Array.isArray(reviewIds) || reviewIds.length === 0) {
+      return res.status(400).json({ error: 'No review IDs provided' });
+    }
+    
+    const validIds = reviewIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    
+    await Review.updateMany(
+      { _id: { $in: validIds } },
+      { status: 'rejected', rejectedAt: new Date() }
+    );
+    
+    res.json({ 
+      success: true, 
+      message: `${validIds.length} reviews rejected successfully` 
+    });
+  } catch (error) {
+    console.error('Bulk reject error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -393,7 +512,42 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
     const { reviewId } = req.params;
     const { adminNote } = req.body;
     
-    // ✅ Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return res.status(400).json({ error: 'Invalid review ID' });
+    }
+    
+    const review = await Review.findById(reviewId)
+      .populate('userId', 'name email')
+      .populate('productId', 'name');
+    
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    review.status = 'rejected';
+    review.rejectedAt = new Date();
+    if (adminNote) review.adminNote = adminNote;
+    await review.save();
+    
+    // ✅ Send rejection email to customer
+    await sendReviewRejectedEmail(review.userId.email, {
+      name: review.userId.name,
+      productName: review.productId.name,
+      reason: adminNote || 'Does not meet our review guidelines'
+    });
+    
+    res.json({ success: true, review });
+  } catch (error) {
+    console.error('Reject review error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN: DELETE REVIEW (FIXED - updates rating) ==========
+router.delete('/admin/:reviewId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {
       return res.status(400).json({ error: 'Invalid review ID' });
     }
@@ -403,28 +557,11 @@ router.patch('/admin/:reviewId/reject', authMiddleware, adminMiddleware, async (
       return res.status(404).json({ error: 'Review not found' });
     }
     
-    review.status = 'rejected';
-    if (adminNote) review.adminNote = adminNote;
-    await review.save();
+    const productId = review.productId;
+    await review.deleteOne();
     
-    res.json({ success: true, review });
-  } catch (error) {
-    console.error('Reject review error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== ADMIN: DELETE REVIEW ==========
-router.delete('/admin/:reviewId', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const { reviewId } = req.params;
-    
-    // ✅ Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
-      return res.status(400).json({ error: 'Invalid review ID' });
-    }
-    
-    await Review.findByIdAndDelete(reviewId);
+    // ✅ Update product rating after deletion
+    await updateProductRating(productId);
     
     res.json({ success: true, message: 'Review deleted successfully' });
   } catch (error) {
@@ -439,7 +576,6 @@ router.delete('/:reviewId', authMiddleware, async (req, res) => {
     const { reviewId } = req.params;
     const userId = req.user.id;
     
-    // ✅ Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(reviewId)) {
       return res.status(400).json({ error: 'Invalid review ID' });
     }
@@ -449,10 +585,45 @@ router.delete('/:reviewId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Review not found' });
     }
     
+    const productId = review.productId;
     await review.deleteOne();
+    
+    // ✅ Update product rating after deletion
+    await updateProductRating(productId);
+    
     res.json({ success: true, message: 'Review deleted successfully' });
   } catch (error) {
     console.error('Delete own review error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ADMIN: EXPORT REVIEWS AS CSV ==========
+router.get('/admin/export', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = {};
+    if (status && status !== 'all') filter.status = status;
+    
+    const reviews = await Review.find(filter)
+      .populate('userId', 'name email')
+      .populate('productId', 'name brand category price')
+      .sort({ createdAt: -1 });
+    
+    // CSV header
+    let csv = 'Product,Customer,Rating,Title,Comment,Status,Verified,Helpful,Date\n';
+    
+    reviews.forEach(r => {
+      csv += `"${r.productId?.name || 'N/A'}","${r.userId?.name || 'Anonymous'} (${r.userId?.email || ''})",`;
+      csv += `${r.rating},"${(r.title || '').replace(/"/g, '""')}","${(r.comment || '').replace(/"/g, '""')}",`;
+      csv += `${r.status},${r.isVerifiedPurchase ? 'Yes' : 'No'},${r.helpful || 0},${new Date(r.createdAt).toLocaleDateString()}\n`;
+    });
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=reviews-${new Date().toISOString().split('T')[0]}.csv`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export error:', error);
     res.status(500).json({ error: error.message });
   }
 });
