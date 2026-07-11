@@ -374,11 +374,130 @@ const sendAdminHighSpend = async (adminEmail, campaign, vendor) => {
   return await sendEmail(adminEmail, `💰 High Spend Alert: ${campaign.name}`, html);
 };
 
+// ============================================
+// ✅ REVIEW EMAIL TEMPLATES & FUNCTIONS (NEW)
+// ============================================
+
+// 9. Customer - Review Reminder (after delivery)
+const sendReviewReminderEmail = async (email, data) => {
+  const { name, productName, productId, orderId } = data;
+  
+  const reviewLink = `${process.env.FRONTEND_URL || 'https://www.mypinkshop.com'}/product/${productId}#reviews`;
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #EC4899, #F43F5E); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">📝 Review Your Purchase</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #555; font-size: 15px;">Thank you for purchasing <strong>${productName}</strong> from MyPinkShop!</p>
+        <p style="color: #555; font-size: 15px;">We'd love to hear about your experience. Your review helps other customers make informed decisions.</p>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${reviewLink}" style="background: linear-gradient(135deg, #EC4899, #F43F5E); color: white; padding: 14px 40px; text-decoration: none; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
+            ✍️ Write a Review
+          </a>
+        </div>
+        
+        <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="color: #92400e; margin: 0;">🎁 <strong>Bonus:</strong> Get <strong>50 Loyalty Points</strong> for your review!</p>
+        </div>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+        <p style="color: #888; font-size: 13px;">Order ID: ${orderId}</p>
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(email, `📝 Review Your Purchase - ${productName}`, html);
+};
+
+// 10. Customer - Review Approved
+const sendReviewApprovedEmail = async (email, data) => {
+  const { name, productName, productId, rating, comment } = data;
+  
+  const productLink = `${process.env.FRONTEND_URL || 'https://www.mypinkshop.com'}/product/${productId}`;
+  const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">🎉 Review Approved!</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #555; font-size: 15px;">Great news! Your review for <strong>${productName}</strong> has been approved and is now live on our website.</p>
+        
+        <div style="background: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 0; color: #4b5563;">⭐ ${stars}</p>
+          <p style="margin: 5px 0 0 0; color: #1f2937; font-style: italic;">"${comment}"</p>
+        </div>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${productLink}" style="background: linear-gradient(135deg, #EC4899, #F43F5E); color: white; padding: 14px 40px; text-decoration: none; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
+            👀 View Your Review
+          </a>
+        </div>
+        
+        <p style="color: #555; font-size: 15px;">Thank you for helping other customers make better choices!</p>
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(email, `🎉 Your Review for ${productName} is Live!`, html);
+};
+
+// 11. Customer - Review Rejected
+const sendReviewRejectedEmail = async (email, data) => {
+  const { name, productName, reason } = data;
+  
+  const productLink = `${process.env.FRONTEND_URL || 'https://www.mypinkshop.com'}/product/${productId}`;
+  
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+      <div style="background: linear-gradient(135deg, #EF4444, #DC2626); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">⚠️ Review Update</h1>
+      </div>
+      <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <p style="color: #333; font-size: 16px;">Dear <strong>${name}</strong>,</p>
+        <p style="color: #555; font-size: 15px;">Your review for <strong>${productName}</strong> was not approved.</p>
+        
+        <div style="background: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p style="margin: 0; color: #991b1b;"><strong>Reason:</strong> ${reason}</p>
+        </div>
+        
+        <p style="color: #555; font-size: 14px;">You can submit a new review following our guidelines:</p>
+        <ul style="color: #4b5563; font-size: 14px; padding-left: 20px;">
+          <li>Be honest and respectful</li>
+          <li>Focus on product quality and experience</li>
+          <li>Avoid promotional content</li>
+        </ul>
+        
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${productLink}" style="background: linear-gradient(135deg, #EC4899, #F43F5E); color: white; padding: 14px 40px; text-decoration: none; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
+            ✍️ Submit New Review
+          </a>
+        </div>
+        
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">MyPinkShop Team</p>
+      </div>
+    </div>
+  `;
+  return await sendEmail(email, `⚠️ Review Update for ${productName}`, html);
+};
+
+// ============================================
+// ✅ EXPORT ALL FUNCTIONS
+// ============================================
+
 module.exports = {
+  // Core
   sendEmail,
   testEmailService,
   initTransporter,
-  // Ad email functions
+  
+  // Ad Campaign Emails
   sendNewCampaignToAdmin,
   sendCampaignApproved,
   sendCampaignRejected,
@@ -386,5 +505,10 @@ module.exports = {
   sendDailyBudgetReached,
   sendCampaignExpiring,
   sendClickThreshold,
-  sendAdminHighSpend
+  sendAdminHighSpend,
+  
+  // Review Emails (NEW)
+  sendReviewReminderEmail,
+  sendReviewApprovedEmail,
+  sendReviewRejectedEmail
 };
