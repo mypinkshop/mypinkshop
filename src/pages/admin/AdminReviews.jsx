@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
-import { useReviews } from '../context/ReviewContext';
+import { useReviews } from '../../context/ReviewContext';
 
 function AdminReviews() {
   const navigate = useNavigate();
