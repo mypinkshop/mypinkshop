@@ -13,7 +13,7 @@ export const ReviewProvider = ({ children }) => {
   const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
   const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
 
-  // ✅ Fetch approved reviews for a product
+  // ✅ Fetch approved reviews for a product (UPDATED - with rating counts)
   const fetchProductReviews = useCallback(async (productId, page = 1, limit = 10) => {
     setLoading(true);
     try {
@@ -28,7 +28,11 @@ export const ReviewProvider = ({ children }) => {
           page: data.page || 1,
           pages: data.pages || 1,
           averageRating: data.averageRating || 0,
-          totalReviews: data.totalReviews || 0
+          totalReviews: data.totalReviews || 0,
+          // ✅ New fields
+          ratingCounts: data.ratingCounts || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+          ratingOnlyCount: data.ratingOnlyCount || 0,
+          reviewWithCommentCount: data.reviewWithCommentCount || 0
         }
       }));
       
@@ -59,12 +63,17 @@ export const ReviewProvider = ({ children }) => {
 
   // ✅ Get rating distribution
   const getRatingDistribution = (productId) => {
-    const productReviews = getProductReviews(productId);
-    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    productReviews.forEach(review => {
-      distribution[review.rating]++;
-    });
-    return distribution;
+    return reviews[productId]?.ratingCounts || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  };
+
+  // ✅ Get rating only count
+  const getRatingOnlyCount = (productId) => {
+    return reviews[productId]?.ratingOnlyCount || 0;
+  };
+
+  // ✅ Get review with comment count
+  const getReviewWithCommentCount = (productId) => {
+    return reviews[productId]?.reviewWithCommentCount || 0;
   };
 
   // ✅ Check if user can review
@@ -110,8 +119,8 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // ✅ Add a review
-  const addReview = async (productId, orderId, rating, title, comment, images = [], videos = []) => {
+  // ✅ Add a review (UPDATED - with isRatingOnly)
+  const addReview = async (productId, orderId, rating, title, comment, images = [], videos = [], isRatingOnly = false) => {
     const token = getToken();
     if (!token) return { success: false, message: 'Please login to review' };
     
@@ -129,7 +138,8 @@ export const ReviewProvider = ({ children }) => {
           title,
           comment,
           images,
-          videos
+          videos,
+          isRatingOnly
         })
       });
       
@@ -139,12 +149,18 @@ export const ReviewProvider = ({ children }) => {
         return { success: false, message: data.error };
       }
       
+      // ✅ Refresh product reviews
       await fetchProductReviews(productId);
+      
+      const message = isRatingOnly 
+        ? 'Rating submitted successfully!' 
+        : 'Thank you! Your review has been submitted and is awaiting admin approval.';
       
       return { 
         success: true, 
-        message: 'Thank you! Your review has been submitted and is awaiting admin approval.',
-        review: data.review
+        message: message,
+        review: data.review,
+        autoApproved: data.autoApproved
       };
     } catch (err) {
       console.error('Add review error:', err);
@@ -180,7 +196,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // ✅ DELETE review (FIXED)
+  // ✅ DELETE review (ADMIN)
   const deleteReview = async (reviewId, productId) => {
     const token = getToken();
     if (!token) return false;
@@ -247,12 +263,12 @@ export const ReviewProvider = ({ children }) => {
   };
 
   // ✅ ADMIN: Fetch all reviews
-  const fetchAllReviews = async (status = 'all', page = 1, limit = 20) => {
+  const fetchAllReviews = async (status = 'all', page = 1, limit = 20, type = 'all') => {
     const token = getToken();
     if (!token) return null;
     
     try {
-      const response = await fetch(`${API_URL}/api/reviews/admin/all?status=${status}&page=${page}&limit=${limit}`, {
+      const response = await fetch(`${API_URL}/api/reviews/admin/all?status=${status}&page=${page}&limit=${limit}&type=${type}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -410,7 +426,7 @@ export const ReviewProvider = ({ children }) => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Export error:', err);
-      toast.error('Failed to export reviews');
+      alert('Failed to export reviews');
     }
   };
 
@@ -425,6 +441,8 @@ export const ReviewProvider = ({ children }) => {
       getAverageRating,
       getReviewCount,
       getRatingDistribution,
+      getRatingOnlyCount,
+      getReviewWithCommentCount,
       canUserReview,
       uploadReviewMedia,
       addReview,
