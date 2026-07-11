@@ -10,10 +10,10 @@ export const ReviewProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
   const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
 
-  // Fetch approved reviews for a product
+  // ✅ Fetch approved reviews for a product
   const fetchProductReviews = useCallback(async (productId, page = 1, limit = 10) => {
     setLoading(true);
     try {
@@ -42,22 +42,32 @@ export const ReviewProvider = ({ children }) => {
     }
   }, []);
 
-  // Get product reviews from state
+  // ✅ Get product reviews from state
   const getProductReviews = (productId) => {
     return reviews[productId]?.reviews || [];
   };
 
-  // Get average rating
+  // ✅ Get average rating
   const getAverageRating = (productId) => {
     return reviews[productId]?.averageRating || 0;
   };
 
-  // Get total review count
+  // ✅ Get total review count
   const getReviewCount = (productId) => {
     return reviews[productId]?.totalReviews || 0;
   };
 
-  // Check if user can review (after delivery)
+  // ✅ Get rating distribution
+  const getRatingDistribution = (productId) => {
+    const productReviews = getProductReviews(productId);
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    productReviews.forEach(review => {
+      distribution[review.rating]++;
+    });
+    return distribution;
+  };
+
+  // ✅ Check if user can review
   const canUserReview = async (productId) => {
     const token = getToken();
     if (!token) return { canReview: false, alreadyReviewed: false, orderId: null };
@@ -74,7 +84,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Upload review images/videos
+  // ✅ Upload review images/videos
   const uploadReviewMedia = async (files) => {
     const token = getToken();
     if (!token) throw new Error('Please login to upload media');
@@ -100,7 +110,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Add a review (goes to pending approval)
+  // ✅ Add a review
   const addReview = async (productId, orderId, rating, title, comment, images = [], videos = []) => {
     const token = getToken();
     if (!token) return { success: false, message: 'Please login to review' };
@@ -129,7 +139,6 @@ export const ReviewProvider = ({ children }) => {
         return { success: false, message: data.error };
       }
       
-      // Refresh product reviews to show updated average
       await fetchProductReviews(productId);
       
       return { 
@@ -143,7 +152,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Mark review as helpful
+  // ✅ Mark review as helpful
   const markHelpful = async (productId, reviewId) => {
     const token = getToken();
     if (!token) return;
@@ -156,7 +165,6 @@ export const ReviewProvider = ({ children }) => {
       
       const data = await response.json();
       
-      // Update local state
       setReviews(prev => {
         const productReviews = prev[productId]?.reviews || [];
         const updatedReviews = productReviews.map(review => 
@@ -172,9 +180,55 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // ========== ADMIN FUNCTIONS ==========
-  
-  // Fetch all pending reviews (admin only)
+  // ✅ DELETE review (FIXED)
+  const deleteReview = async (reviewId, productId) => {
+    const token = getToken();
+    if (!token) return false;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/reviews/admin/${reviewId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        if (productId) {
+          await fetchProductReviews(productId);
+        }
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Delete review error:', err);
+      return false;
+    }
+  };
+
+  // ✅ User delete own review
+  const deleteOwnReview = async (reviewId, productId) => {
+    const token = getToken();
+    if (!token) return false;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/reviews/${reviewId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        await fetchProductReviews(productId);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Delete own review error:', err);
+      return false;
+    }
+  };
+
+  // ✅ ADMIN: Fetch pending reviews
   const fetchPendingReviews = async () => {
     const token = getToken();
     if (!token) return [];
@@ -192,7 +246,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Fetch all reviews (admin only)
+  // ✅ ADMIN: Fetch all reviews
   const fetchAllReviews = async (status = 'all', page = 1, limit = 20) => {
     const token = getToken();
     if (!token) return null;
@@ -209,7 +263,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Approve review (admin only)
+  // ✅ ADMIN: Approve review
   const approveReview = async (reviewId, adminNote = '') => {
     const token = getToken();
     if (!token) return false;
@@ -226,9 +280,7 @@ export const ReviewProvider = ({ children }) => {
       
       const data = await response.json();
       if (data.success) {
-        // Refresh pending reviews list
         await fetchPendingReviews();
-        // Refresh product reviews for that product
         if (data.review?.productId) {
           await fetchProductReviews(data.review.productId);
         }
@@ -241,7 +293,7 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Reject review (admin only)
+  // ✅ ADMIN: Reject review
   const rejectReview = async (reviewId, adminNote = '') => {
     const token = getToken();
     if (!token) return false;
@@ -268,72 +320,98 @@ export const ReviewProvider = ({ children }) => {
     }
   };
 
-  // Delete review (admin only)
-  const deleteReview = async (reviewId, productId) => {
+  // ✅ ADMIN: Bulk approve
+  const bulkApproveReviews = async (reviewIds) => {
     const token = getToken();
     if (!token) return false;
     
     try {
-      const response = await fetch(`${API_URL}/api/reviews/admin/${reviewId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await fetch(`${API_URL}/api/reviews/admin/bulk-approve`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reviewIds })
       });
       
       const data = await response.json();
       if (data.success) {
-        // Refresh product reviews
-        if (productId) {
-          await fetchProductReviews(productId);
-        }
+        await fetchPendingReviews();
         return true;
       }
       return false;
     } catch (err) {
-      console.error('Delete review error:', err);
+      console.error('Bulk approve error:', err);
       return false;
     }
   };
 
-  // User delete own review
-  const deleteOwnReview = async (reviewId, productId) => {
+  // ✅ ADMIN: Bulk reject
+  const bulkRejectReviews = async (reviewIds) => {
     const token = getToken();
     if (!token) return false;
     
     try {
-      const response = await fetch(`${API_URL}/api/reviews/${reviewId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await fetch(`${API_URL}/api/reviews/admin/bulk-reject`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reviewIds })
       });
       
       const data = await response.json();
       if (data.success) {
-        await fetchProductReviews(productId);
+        await fetchPendingReviews();
         return true;
       }
       return false;
     } catch (err) {
-      console.error('Delete review error:', err);
+      console.error('Bulk reject error:', err);
       return false;
     }
   };
 
-  // Get all pending reviews (admin)
-  const getAllPendingReviews = () => pendingReviews;
-
-  // Get all approved reviews (admin)
-  const getAllApprovedReviews = async () => {
-    const data = await fetchAllReviews('approved');
-    return data?.reviews || [];
+  // ✅ ADMIN: Get review stats
+  const getReviewStats = async () => {
+    const token = getToken();
+    if (!token) return null;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/reviews/admin/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      return data.stats;
+    } catch (err) {
+      console.error('Stats error:', err);
+      return null;
+    }
   };
 
-  // Get rating distribution
-  const getRatingDistribution = (productId) => {
-    const productReviews = getProductReviews(productId);
-    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    productReviews.forEach(review => {
-      distribution[review.rating]++;
-    });
-    return distribution;
+  // ✅ ADMIN: Export reviews as CSV
+  const exportReviews = async (status = 'all') => {
+    const token = getToken();
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/reviews/admin/export?status=${status}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reviews-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Failed to export reviews');
+    }
   };
 
   return (
@@ -351,14 +429,17 @@ export const ReviewProvider = ({ children }) => {
       uploadReviewMedia,
       addReview,
       markHelpful,
+      deleteReview,
+      deleteOwnReview,
       fetchPendingReviews,
       fetchAllReviews,
       approveReview,
       rejectReview,
-      deleteReview,
-      deleteOwnReview,
-      getAllPendingReviews,
-      getAllApprovedReviews
+      bulkApproveReviews,
+      bulkRejectReviews,
+      getReviewStats,
+      exportReviews,
+      clearError: () => setError(null)
     }}>
       {children}
     </ReviewContext.Provider>
