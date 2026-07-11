@@ -30,11 +30,11 @@ const reviewSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Title cannot exceed 100 characters']
   },
+  // ✅ COMMENT - OPTIONAL now (Rating only reviews ke liye)
   comment: {
     type: String,
-    required: [true, 'Comment is required'],
+    default: '',
     trim: true,
-    minlength: [10, 'Comment must be at least 10 characters'],
     maxlength: [2000, 'Comment cannot exceed 2000 characters']
   },
   images: {
@@ -57,6 +57,7 @@ const reviewSchema = new mongoose.Schema({
       message: 'Maximum 5 videos allowed'
     }
   },
+  // ✅ STATUS - Rating only auto-approved
   status: {
     type: String,
     enum: {
@@ -69,6 +70,12 @@ const reviewSchema = new mongoose.Schema({
   isVerifiedPurchase: {
     type: Boolean,
     default: false
+  },
+  // ✅ NEW: Rating only flag
+  isRatingOnly: {
+    type: Boolean,
+    default: false,
+    index: true
   },
   helpful: {
     type: Number,
@@ -92,13 +99,13 @@ const reviewSchema = new mongoose.Schema({
   rejectedAt: {
     type: Date
   },
-  // ✅ Extra fields for e-commerce
+  // Extra fields for e-commerce
   isRecommended: {
     type: Boolean,
     default: null
   },
   reviewSummary: {
-    type: String,  // Future AI summary ke liye
+    type: String,
     default: ''
   }
 }, {
@@ -110,6 +117,7 @@ reviewSchema.index({ productId: 1, status: 1, helpful: -1 });
 reviewSchema.index({ userId: 1, productId: 1 }, { unique: true });
 reviewSchema.index({ status: 1, createdAt: -1 });
 reviewSchema.index({ createdAt: -1 });
+reviewSchema.index({ productId: 1, isRatingOnly: 1, status: 1 });
 
 // ✅ Calculate average rating for a product
 reviewSchema.statics.getAverageRating = async function(productId) {
@@ -137,6 +145,54 @@ reviewSchema.statics.getRatingDistribution = async function(productId) {
     distribution[item._id] = item.count;
   });
   return distribution;
+};
+
+// ✅ Get rating counts for a product
+reviewSchema.statics.getRatingCounts = async function(productId) {
+  const result = await this.aggregate([
+    { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
+    { $group: { _id: '$rating', count: { $sum: 1 } } }
+  ]);
+  
+  const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  result.forEach(item => {
+    counts[item._id] = item.count;
+  });
+  return counts;
+};
+
+// ✅ Get review stats (with rating only count)
+reviewSchema.statics.getReviewStats = async function(productId) {
+  const [avgResult, counts, ratingOnlyCount, commentCount] = await Promise.all([
+    this.aggregate([
+      { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
+      { $group: { _id: null, avgRating: { $avg: '$rating' }, count: { $sum: 1 } } }
+    ]),
+    this.aggregate([
+      { $match: { productId: new mongoose.Types.ObjectId(productId), status: 'approved' } },
+      { $group: { _id: '$rating', count: { $sum: 1 } } }
+    ]),
+    this.countDocuments({ productId, status: 'approved', isRatingOnly: true }),
+    this.countDocuments({ 
+      productId, 
+      status: 'approved', 
+      isRatingOnly: false,
+      comment: { $ne: '' } 
+    })
+  ]);
+  
+  const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  counts.forEach(item => {
+    distribution[item._id] = item.count;
+  });
+  
+  return {
+    averageRating: avgResult[0]?.avgRating || 0,
+    totalReviews: avgResult[0]?.count || 0,
+    ratingDistribution: distribution,
+    ratingOnlyCount,
+    reviewWithCommentCount: commentCount
+  };
 };
 
 const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
