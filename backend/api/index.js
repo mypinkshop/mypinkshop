@@ -3654,7 +3654,7 @@ app.get('/api/sitemap.xml', async (req, res) => {
 // At the end of server.js, add:
 
 // ✅ Start review reminder cron job
-require('./cron/reviewReminder');
+require('../cron/reviewReminder');
 
 console.log('🔄 Review reminder cron job started');
 
