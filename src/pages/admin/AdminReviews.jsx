@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
+import { useReviews } from '../context/ReviewContext';
 
 function AdminReviews() {
   const navigate = useNavigate();
+  const { exportReviews } = useReviews();
   
   const [activeTab, setActiveTab] = useState('pending');
   const [reviews, setReviews] = useState([]);
@@ -24,11 +26,14 @@ function AdminReviews() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [filterVerified, setFilterVerified] = useState('all');
+  const [filterType, setFilterType] = useState('all'); // ✅ NEW: Rating Only / With Comment
   const [sortBy, setSortBy] = useState('newest');
   const [selectedReviews, setSelectedReviews] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [stats, setStats] = useState(null);
+  const [showStats, setShowStats] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
   const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
@@ -62,7 +67,8 @@ function AdminReviews() {
         setTotalReviews(data.length);
         setTotalPages(1);
       } else {
-        const response = await fetch(`${API_URL}/api/reviews/admin/all?status=${activeTab}&page=${currentPage}&limit=20`, {
+        // ✅ Pass type filter
+        const response = await fetch(`${API_URL}/api/reviews/admin/all?status=${activeTab}&page=${currentPage}&limit=20&type=${filterType}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         data = await response.json();
@@ -77,13 +83,31 @@ function AdminReviews() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, currentPage, navigate]);
+  }, [activeTab, currentPage, filterType, navigate]);
 
   useEffect(() => {
     loadReviews();
   }, [loadReviews]);
 
-  // ✅ Get unique brands and categories from reviews
+  // Load stats
+  const loadStats = async () => {
+    const token = getToken();
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/reviews/admin/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Stats error:', error);
+    }
+  };
+
+  // ✅ Get unique brands and categories
   const uniqueBrands = [...new Set(reviews
     .map(r => r.productId?.brand)
     .filter(Boolean))].sort();
@@ -157,6 +181,14 @@ function AdminReviews() {
       return false;
     }
     if (filterVerified === 'unverified' && review.isVerifiedPurchase) {
+      return false;
+    }
+    
+    // ✅ Type filter (Rating Only / With Comment)
+    if (filterType === 'rating_only' && !review.isRatingOnly) {
+      return false;
+    }
+    if (filterType === 'with_comment' && review.isRatingOnly) {
       return false;
     }
     
@@ -399,6 +431,7 @@ function AdminReviews() {
     setFilterCategory('all');
     setFilterDateRange('all');
     setFilterVerified('all');
+    setFilterType('all');
     setSortBy('newest');
     setCurrentPage(1);
     setSelectedReviews([]);
@@ -408,6 +441,7 @@ function AdminReviews() {
   const pendingCount = reviews.filter(r => r.status === 'pending').length;
   const approvedCount = reviews.filter(r => r.status === 'approved').length;
   const rejectedCount = reviews.filter(r => r.status === 'rejected').length;
+  const ratingOnlyCount = reviews.filter(r => r.isRatingOnly === true).length;
   const avgRating = approvedCount > 0 
     ? (reviews.filter(r => r.status === 'approved').reduce((sum, r) => sum + r.rating, 0) / approvedCount).toFixed(1)
     : '0';
@@ -438,22 +472,41 @@ function AdminReviews() {
               <h1 className="text-xl font-semibold text-gray-800">📝 Review Management</h1>
               <p className="text-sm text-gray-500">Manage customer reviews and ratings</p>
             </div>
-            <div className="relative w-full sm:w-64">
-              <input 
-                type="text" 
-                placeholder="Search by customer, product, brand..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
-              />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Export Button */}
+              <button 
+                onClick={() => exportReviews(activeTab)}
+                className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition"
+              >
+                📊 Export CSV
+              </button>
+              
+              {/* Stats Button */}
+              <button 
+                onClick={() => { loadStats(); setShowStats(!showStats); }}
+                className="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm hover:bg-purple-600 transition"
+              >
+                📈 Stats
+              </button>
+              
+              {/* Search */}
+              <div className="relative w-full sm:w-64">
+                <input 
+                  type="text" 
+                  placeholder="Search by customer, product..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="p-4 sm:p-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
             <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-yellow-500">
               <p className="text-xs text-gray-500">Pending</p>
               <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
@@ -467,108 +520,105 @@ function AdminReviews() {
               <p className="text-2xl font-bold text-red-600">{rejectedCount}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-purple-500">
+              <p className="text-xs text-gray-500">⭐ Quick Ratings</p>
+              <p className="text-2xl font-bold text-purple-600">{ratingOnlyCount}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-pink-500">
               <p className="text-xs text-gray-500">Avg Rating</p>
-              <p className="text-2xl font-bold text-purple-600">{avgRating} ★</p>
+              <p className="text-2xl font-bold text-pink-600">{avgRating} ★</p>
             </div>
           </div>
 
-          {/* ✅ Filters - Complete with Brand, Category, Date, Verified, Sort */}
+          {/* Filters */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
             <div className="flex flex-wrap gap-3 items-center">
               {/* Rating Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Rating:</span>
-                <select 
-                  value={filterRating}
-                  onChange={(e) => setFilterRating(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                >
-                  <option value="all">All Ratings</option>
-                  <option value="5">5 ★</option>
-                  <option value="4">4 ★</option>
-                  <option value="3">3 ★</option>
-                  <option value="2">2 ★</option>
-                  <option value="1">1 ★</option>
-                </select>
-              </div>
+              <select 
+                value={filterRating}
+                onChange={(e) => setFilterRating(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+              >
+                <option value="all">All Ratings</option>
+                <option value="5">5 ★</option>
+                <option value="4">4 ★</option>
+                <option value="3">3 ★</option>
+                <option value="2">2 ★</option>
+                <option value="1">1 ★</option>
+              </select>
+
+              {/* ✅ Type Filter (NEW) */}
+              <select 
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+              >
+                <option value="all">All Types</option>
+                <option value="rating_only">⭐ Quick Ratings</option>
+                <option value="with_comment">📝 With Comments</option>
+              </select>
 
               {/* Brand Filter */}
               {uniqueBrands.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Brand:</span>
-                  <select 
-                    value={filterBrand} 
-                    onChange={(e) => setFilterBrand(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                  >
-                    <option value="all">All Brands</option>
-                    {uniqueBrands.map(brand => (
-                      <option key={brand} value={brand}>{brand}</option>
-                    ))}
-                  </select>
-                </div>
+                <select 
+                  value={filterBrand} 
+                  onChange={(e) => setFilterBrand(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                >
+                  <option value="all">All Brands</option>
+                  {uniqueBrands.map(brand => (
+                    <option key={brand} value={brand}>{brand}</option>
+                  ))}
+                </select>
               )}
 
               {/* Category Filter */}
               {uniqueCategories.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Category:</span>
-                  <select 
-                    value={filterCategory} 
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                  >
-                    <option value="all">All Categories</option>
-                    {uniqueCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
+                <select 
+                  value={filterCategory} 
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                >
+                  <option value="all">All Categories</option>
+                  {uniqueCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
               )}
 
               {/* Date Range Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Date:</span>
-                <select 
-                  value={filterDateRange} 
-                  onChange={(e) => setFilterDateRange(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                </select>
-              </div>
+              <select 
+                value={filterDateRange} 
+                onChange={(e) => setFilterDateRange(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+              >
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
 
               {/* Verified Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Verified:</span>
-                <select 
-                  value={filterVerified} 
-                  onChange={(e) => setFilterVerified(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                >
-                  <option value="all">All</option>
-                  <option value="verified">✅ Verified Only</option>
-                  <option value="unverified">❌ Unverified Only</option>
-                </select>
-              </div>
+              <select 
+                value={filterVerified} 
+                onChange={(e) => setFilterVerified(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+              >
+                <option value="all">All</option>
+                <option value="verified">✅ Verified Only</option>
+                <option value="unverified">❌ Unverified Only</option>
+              </select>
 
               {/* Sort By */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Sort:</span>
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="highest">⭐ Highest Rating</option>
-                  <option value="lowest">⭐ Lowest Rating</option>
-                </select>
-              </div>
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="highest">⭐ Highest Rating</option>
+                <option value="lowest">⭐ Lowest Rating</option>
+              </select>
 
               {/* Bulk Actions */}
               {selectedReviews.length > 0 && (
@@ -591,7 +641,7 @@ function AdminReviews() {
 
               {/* Clear All Filters */}
               {(searchTerm || filterRating !== 'all' || filterBrand !== 'all' || filterCategory !== 'all' || 
-                filterDateRange !== 'all' || filterVerified !== 'all' || sortBy !== 'newest') && (
+                filterDateRange !== 'all' || filterVerified !== 'all' || filterType !== 'all' || sortBy !== 'newest') && (
                 <button onClick={clearFilters} className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition">
                   Clear All ✕
                 </button>
@@ -644,6 +694,7 @@ function AdminReviews() {
                     <th className="px-4 py-3 text-left">Product / Customer</th>
                     <th className="px-4 py-3 text-center">Rating</th>
                     <th className="px-4 py-3 text-left">Review</th>
+                    <th className="px-4 py-3 text-center">Type</th>
                     <th className="px-4 py-3 text-center">Date</th>
                     {activeTab === 'approved' && <th className="px-4 py-3 text-center">Helpful</th>}
                     <th className="px-4 py-3 text-center">Actions</th>
@@ -652,12 +703,9 @@ function AdminReviews() {
                 <tbody className="divide-y">
                   {sortedReviews.length === 0 ? (
                     <tr>
-                      <td colSpan={activeTab === 'approved' ? 7 : 6} className="px-4 py-12 text-center text-gray-400">
+                      <td colSpan={activeTab === 'approved' ? 8 : 7} className="px-4 py-12 text-center text-gray-400">
                         <div className="text-5xl mb-3">⭐</div>
                         <p>No {activeTab} reviews found</p>
-                        {(searchTerm || filterRating !== 'all' || filterBrand !== 'all' || filterCategory !== 'all') && (
-                          <button onClick={clearFilters} className="mt-2 text-pink-500 text-sm hover:underline">Clear filters</button>
-                        )}
                       </td>
                     </tr>
                   ) : (
@@ -685,10 +733,25 @@ function AdminReviews() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-800 text-sm">{review.title || 'No title'}</p>
-                          <p className="text-gray-500 text-xs line-clamp-2 max-w-[250px] mt-0.5">{review.comment}</p>
+                          <p className="font-semibold text-gray-800 text-sm">
+                            {review.title || (review.isRatingOnly ? '⭐ Quick Rating' : 'No title')}
+                          </p>
+                          <p className="text-gray-500 text-xs line-clamp-2 max-w-[250px] mt-0.5">
+                            {review.isRatingOnly ? '(Rating only - no comment)' : review.comment}
+                          </p>
                           {review.images?.length > 0 && (
                             <span className="text-xs text-blue-500 mt-1 inline-flex items-center gap-1">📸 {review.images.length} images</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {review.isRatingOnly ? (
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                              ⭐ Quick Rating
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                              📝 Written Review
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center text-gray-500 text-xs">
@@ -824,6 +887,20 @@ function AdminReviews() {
               <button onClick={() => setShowDetails(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
             <div className="p-5 space-y-4">
+              {/* Type Badge */}
+              <div>
+                <p className="text-xs text-gray-500">Type</p>
+                {selectedReview.isRatingOnly ? (
+                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium inline-block">
+                    ⭐ Quick Rating
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium inline-block">
+                    📝 Written Review
+                  </span>
+                )}
+              </div>
+              
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-xs text-gray-500">Product</p>
                 <p className="font-medium">{selectedReview.productId?.name || 'Unknown Product'}</p>
@@ -852,10 +929,17 @@ function AdminReviews() {
                   <p className="font-medium">{selectedReview.title}</p>
                 </div>
               )}
-              <div>
-                <p className="text-xs text-gray-500">Review</p>
-                <p className="text-gray-600 text-sm">{selectedReview.comment}</p>
-              </div>
+              {!selectedReview.isRatingOnly && selectedReview.comment && (
+                <div>
+                  <p className="text-xs text-gray-500">Review</p>
+                  <p className="text-gray-600 text-sm">{selectedReview.comment}</p>
+                </div>
+              )}
+              {selectedReview.isRatingOnly && (
+                <div className="bg-purple-50 p-3 rounded-lg">
+                  <p className="text-sm text-purple-700">⭐ Quick Rating - No comment provided</p>
+                </div>
+              )}
               {selectedReview.images?.length > 0 && (
                 <div>
                   <p className="text-xs text-gray-500 mb-2">Images ({selectedReview.images.length})</p>
@@ -873,7 +957,7 @@ function AdminReviews() {
                 </div>
               )}
               <div className="flex gap-3 pt-4 border-t">
-                {selectedReview.status === 'pending' ? (
+                {selectedReview.status === 'pending' && !selectedReview.isRatingOnly ? (
                   <>
                     <button 
                       onClick={() => { openActionModal(selectedReview._id, 'approve'); setShowDetails(false); }} 
@@ -899,6 +983,83 @@ function AdminReviews() {
                 <button onClick={() => setShowDetails(false)} className="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50">Close</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Modal */}
+      {showStats && stats && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowStats(false)}>
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">📈 Review Analytics</h3>
+              <button onClick={() => setShowStats(false)} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-gray-50 p-4 rounded-lg text-center">
+                <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
+                <p className="text-xs text-gray-500">Total Reviews</p>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                <p className="text-xs text-gray-500">Pending</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg text-center">
+                <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+                <p className="text-xs text-gray-500">Approved</p>
+              </div>
+              <div className="bg-red-50 p-4 rounded-lg text-center">
+                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+                <p className="text-xs text-gray-500">Rejected</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-purple-50 p-4 rounded-lg text-center">
+                <p className="text-2xl font-bold text-purple-600">{stats.ratingOnlyCount || 0}</p>
+                <p className="text-xs text-gray-500">⭐ Quick Ratings</p>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg text-center">
+                <p className="text-2xl font-bold text-blue-600">{stats.reviewWithCommentCount || 0}</p>
+                <p className="text-xs text-gray-500">📝 Written Reviews</p>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">Rating Distribution</h4>
+              <div className="space-y-2">
+                {[5,4,3,2,1].map(star => {
+                  const count = stats.ratingDistribution?.[star] || 0;
+                  const total = stats.approved || 1;
+                  const percentage = total > 0 ? (count / total) * 100 : 0;
+                  return (
+                    <div key={star} className="flex items-center gap-3">
+                      <span className="text-sm w-8">{star} ★</span>
+                      <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${percentage}%` }} />
+                      </div>
+                      <span className="text-sm text-gray-500 w-12 text-right">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {stats.monthlyTrends && stats.monthlyTrends.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-semibold mb-2">Monthly Trends</h4>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {stats.monthlyTrends.slice(-6).map((item, idx) => (
+                    <div key={idx} className="bg-gray-50 p-3 rounded-lg text-center min-w-[80px]">
+                      <p className="text-sm font-bold text-gray-800">{item.count}</p>
+                      <p className="text-xs text-gray-500">{item.month}</p>
+                      <p className="text-xs text-yellow-600">{item.avgRating} ★</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
