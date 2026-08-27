@@ -145,6 +145,7 @@ function Checkout() {
     });
   };
 
+  // ✅ FIXED: Address save logic - ab duplicate nahi banega
   const saveNewAddress = () => {
     const newAddress = {
       id: Date.now(),
@@ -155,9 +156,19 @@ function Checkout() {
       state: formData.state,
       pincode: formData.pincode,
     };
-    const updatedAddresses = [...savedAddresses, newAddress];
-    setSavedAddresses(updatedAddresses);
-    localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
+    
+    // Check if address already exists (same pincode + same fullName + same address)
+    const duplicate = savedAddresses.find(addr => 
+      addr.pincode === newAddress.pincode && 
+      addr.fullName === newAddress.fullName && 
+      addr.address === newAddress.address
+    );
+    
+    if (!duplicate) {
+      const updatedAddresses = [...savedAddresses, newAddress];
+      setSavedAddresses(updatedAddresses);
+      localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
+    }
   };
 
   // 🔥 REAL COUPON API - Admin panel se create kiya hua coupon validate karega
@@ -187,7 +198,6 @@ function Checkout() {
         setCouponDiscount(data.coupon.discountAmount);
         setCouponApplied(true);
         setCouponMessage({ type: 'success', text: `✓ Coupon applied! You saved ₹${data.coupon.discountAmount}` });
-        // Clear any previous message after 3 seconds
         setTimeout(() => setCouponMessage(null), 3000);
       } else {
         setCouponDiscount(0);
@@ -211,6 +221,7 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
+  // ✅ FIXED: Backend API call karne wala correct placeOrder
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       alert('Please fill all address fields');
@@ -228,42 +239,62 @@ function Checkout() {
       saveNewAddress();
     }
 
-    const newOrderId = 'MPS' + Date.now();
-    setOrderId(newOrderId);
-    
-    const order = {
-      id: newOrderId,
-      date: new Date().toISOString(),
-      items: cart.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        size: item.size || null,
-        color: item.color || null,
-        image: item.image || null
-      })),
-      subtotal: subtotal,
-      discount: discount,
-      couponCode: couponApplied ? couponCode : null,
-      deliveryCharges: deliveryCharges,
-      tax: tax,
-      total: total,
-      deliveryMethod: deliveryMethod,
-      paymentMethod: paymentMethod,
-      shippingAddress: formData,
-      estimatedDelivery: shippingInfo.estimatedDelivery,
-      status: 'pending',
-    };
+    // 🔥 Backend API call karein
+    try {
+      const orderData = {
+        items: cart.map(item => ({
+          productId: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image || null,
+          variationName: item.size || null,
+          variationSecondary: item.color || null,
+          vendorId: item.vendorId || null
+        })),
+        total: total,
+        address: {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          addressLine1: formData.address,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.pincode,
+          country: formData.country || 'India'
+        },
+        paymentMethod: paymentMethod || 'cod'
+      };
 
-    const existingOrders = JSON.parse(localStorage.getItem('adminOrdersList') || '[]');
-    existingOrders.unshift(order);
-    localStorage.setItem('adminOrdersList', JSON.stringify(existingOrders));
+      const response = await fetch(`${API_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(orderData)
+      });
 
-    clearCart();
-    setOrderPlaced(true);
-    setIsPlacingOrder(false);
-    window.scrollTo(0, 0);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to place order');
+      }
+
+      // ✅ Order ID backend se milega
+      const newOrderId = data.order?._id || 'MPS' + Date.now();
+      setOrderId(newOrderId);
+
+      // ✅ Cart clear karein
+      clearCart();
+      setOrderPlaced(true);
+      window.scrollTo(0, 0);
+      
+    } catch (error) {
+      console.error('❌ Error placing order:', error);
+      alert('Failed to place order. Please try again.');
+    } finally {
+      setIsPlacingOrder(false);
+    }
   };
 
   const deliveryOptions = [
