@@ -61,7 +61,8 @@ router.post('/', protect, async (req, res) => {
 
     const order = new Order({
       orderNumber,
-      userId: req.user._id, // ✅ Yahan 'buyerId' ki jagah 'userId' use karein
+      buyerId: req.user._id, // ✅ BOTH buyerId AUR userId yahan set karo!
+      userId: req.user._id,  // ✅ Yahan bhi userId!
       buyerName: req.user.name || address?.fullName || 'Customer',
       buyerEmail: req.user.email,
       buyerPhone: req.user.phone || address?.phone || '',
