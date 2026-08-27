@@ -31,7 +31,7 @@ const orderSchema = new mongoose.Schema({
   buyerName: { type: String, default: 'Customer' },
   buyerEmail: { type: String },
   buyerPhone: { type: String },
-  buyerAddress: { type: mongoose.Schema.Types.Mixed, default: {} },
+  buyerAddress: { type: mongoose.Schema.Types.Mixed, default: {} }, // ✅ Ye Mixed hai!
   
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
   vendorName: { type: String, default: 'Vendor' },
@@ -59,7 +59,6 @@ const orderSchema = new mongoose.Schema({
   cancelledAt: { type: Date },
   deliveredAt: { type: Date },
   
-  // ✅ Yahan 'shipping' mein koi geospatial index NAHI hai!
   shipping: {
     awb: { type: String },
     carrier: { type: String }
