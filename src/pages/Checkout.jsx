@@ -325,9 +325,9 @@ function Checkout() {
 
   if (orderPlaced) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 py-12">
         <div className="max-w-2xl mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <div className="bg-white rounded-2xl shadow-xl border border-pink-100 p-8 text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="text-4xl text-green-600">✓</span>
             </div>
@@ -335,22 +335,22 @@ function Checkout() {
             <p className="text-gray-500 mb-4">Order ID: <span className="font-semibold text-pink-600">{orderId}</span></p>
             <p className="text-gray-600 mb-6">Your order has been confirmed. You will receive a confirmation email shortly.</p>
             {shippingInfo.estimatedDelivery && (
-              <div className="bg-green-50 rounded-lg p-4 mb-6 text-left">
+              <div className="bg-green-50 rounded-xl p-4 mb-6 text-left">
                 <p className="font-semibold text-green-800 mb-1">📦 Delivery Estimate</p>
                 <p className="text-green-700 text-sm">{getDeliveryDateDisplay()}</p>
               </div>
             )}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+            <div className="bg-pink-50 rounded-xl p-4 mb-6 text-left">
               <p className="font-semibold mb-2 text-gray-800">Order Summary</p>
               <p className="text-sm text-gray-600">Total Amount: <span className="font-bold">₹{total}</span></p>
               <p className="text-sm text-gray-600">Payment Method: {paymentOptions.find(m => m.id === paymentMethod)?.name}</p>
               <p className="text-sm text-gray-600">Delivery to: {formData.address}, {formData.city}</p>
             </div>
             <div className="flex gap-4 justify-center flex-wrap">
-              <Link to="/my-orders" className="bg-pink-600 text-white px-6 py-2.5 rounded font-medium hover:bg-pink-700 transition">
+              <Link to="/my-orders" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2.5 rounded-full font-medium hover:shadow-lg transition">
                 View Orders
               </Link>
-              <Link to="/shop" className="border border-pink-600 text-pink-600 px-6 py-2.5 rounded font-medium hover:bg-pink-50 transition">
+              <Link to="/shop" className="border border-pink-600 text-pink-600 px-6 py-2.5 rounded-full font-medium hover:bg-pink-50 transition">
                 Continue Shopping
               </Link>
             </div>
@@ -361,22 +361,22 @@ function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       
       {/* 🔥 OFFER BANNER */}
       <OfferBanner />
 
       {/* Top Bar */}
-      <div className="bg-gray-900 text-white py-2 text-center text-sm">
+      <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2 text-center text-sm">
         Free Shipping on ₹{shippingInfo.freeShippingThreshold}+ | Secure Checkout | 100% Safe Shopping
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-pink-600 rounded flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-lg sm:text-xl">M</span>
               </div>
               <div className="hidden sm:block">
@@ -400,7 +400,7 @@ function Checkout() {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Progress Steps */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
               <div className="flex items-center justify-between">
                 {[
                   { step: 1, label: 'Address' },
@@ -409,7 +409,7 @@ function Checkout() {
                 ].map((s) => (
                   <div key={s.step} className="flex-1 text-center">
                     <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-lg font-medium ${
-                      step >= s.step ? 'bg-pink-600 text-white' : 'bg-gray-200 text-gray-500'
+                      step >= s.step ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white' : 'bg-gray-200 text-gray-500'
                     }`}>
                       {s.step}
                     </div>
@@ -423,7 +423,7 @@ function Checkout() {
 
             {/* Step 1 — Address */}
             {step === 1 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Shipping Address</h2>
                 
                 {savedAddresses.length > 0 && (
@@ -431,7 +431,7 @@ function Checkout() {
                     <p className="text-sm font-medium text-gray-700 mb-2">Saved Addresses</p>
                     <div className="space-y-2">
                       {savedAddresses.map(addr => (
-                        <label key={addr.id} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition ${
+                        <label key={addr.id} className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition ${
                           selectedAddress === addr.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
                         }`}>
                           <input
@@ -573,7 +573,7 @@ function Checkout() {
                       alert('Please fill all required address fields');
                     }
                   }}
-                  className="mt-6 w-full bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition"
+                  className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-lg font-medium hover:shadow-lg transition"
                 >
                   Continue to Delivery →
                 </button>
@@ -582,7 +582,7 @@ function Checkout() {
 
             {/* Step 2 — Delivery */}
             {step === 2 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Delivery Options</h2>
                 
                 {shippingInfo.estimatedDelivery && (
@@ -601,7 +601,7 @@ function Checkout() {
                     return (
                       <label
                         key={option.id}
-                        className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition ${
+                        className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition ${
                           deliveryMethod === option.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
                         }`}
                       >
@@ -639,7 +639,7 @@ function Checkout() {
                   <button onClick={() => setStep(1)} className="flex-1 border border-gray-300 text-gray-600 py-3 rounded-lg font-medium hover:bg-gray-50 transition">
                     ← Back
                   </button>
-                  <button onClick={() => setStep(3)} className="flex-1 bg-pink-600 text-white py-3 rounded-lg font-medium hover:bg-pink-700 transition">
+                  <button onClick={() => setStep(3)} className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-lg font-medium hover:shadow-lg transition">
                     Continue to Payment →
                   </button>
                 </div>
@@ -648,13 +648,13 @@ function Checkout() {
 
             {/* Step 3 — Payment */}
             {step === 3 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h2>
                 <div className="space-y-3">
                   {paymentOptions.map(option => (
                     <label
                       key={option.id}
-                      className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer transition ${
+                      className={`flex items-center gap-4 p-4 border rounded-xl cursor-pointer transition ${
                         paymentMethod === option.id ? 'border-pink-600 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
                       }`}
                     >
@@ -680,7 +680,7 @@ function Checkout() {
                   <button
                     onClick={placeOrder}
                     disabled={isPlacingOrder || !shippingInfo.deliverable}
-                    className="flex-1 bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 transition disabled:opacity-50"
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50"
                   >
                     {isPlacingOrder ? (
                       <span className="flex items-center justify-center gap-2">
@@ -698,20 +698,20 @@ function Checkout() {
 
           {/* Right Column — Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
+            <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6 sticky top-24">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
               
               <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
                 {cart.map(item => (
-                  <div key={item.id} className="flex gap-3 pb-3 border-b border-gray-100">
+                  <div key={item.id} className="flex gap-3 pb-3 border-b border-pink-50">
                     {item.image ? (
                       <img 
                         src={item.image} 
                         alt={item.name} 
-                        className="w-14 h-14 rounded-lg object-cover border border-gray-200"
+                        className="w-14 h-14 rounded-lg object-cover border border-pink-100"
                       />
                     ) : (
-                      <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-2xl text-gray-400">
+                      <div className="w-14 h-14 bg-pink-50 rounded-lg flex items-center justify-center text-2xl text-pink-400">
                         🛍️
                       </div>
                     )}
@@ -734,7 +734,7 @@ function Checkout() {
                     placeholder="Coupon code"
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-pink-500 uppercase"
+                    className="flex-1 px-3 py-2 border border-pink-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 uppercase"
                     disabled={couponApplied}
                   />
                   {couponApplied ? (
@@ -748,7 +748,7 @@ function Checkout() {
                     <button
                       onClick={applyCoupon}
                       disabled={applyingCoupon || !couponCode.trim()}
-                      className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                      className="px-4 py-2 bg-pink-100 text-pink-600 rounded-lg text-sm font-medium hover:bg-pink-200 transition disabled:opacity-50"
                     >
                       {applyingCoupon ? 'Applying...' : 'Apply'}
                     </button>
@@ -765,7 +765,7 @@ function Checkout() {
               </div>
 
               {/* Price Details */}
-              <div className="space-y-2 text-sm border-t border-gray-200 pt-4">
+              <div className="space-y-2 text-sm border-t border-pink-100 pt-4">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Subtotal</span>
                   <span className="text-gray-800">₹{subtotal}</span>
@@ -786,7 +786,7 @@ function Checkout() {
                   <span className="text-gray-500">Tax (18% GST)</span>
                   <span className="text-gray-800">₹{tax}</span>
                 </div>
-                <div className="flex justify-between pt-3 border-t border-gray-200">
+                <div className="flex justify-between pt-3 border-t border-pink-100">
                   <span className="font-bold text-gray-800">Total</span>
                   <span className="font-bold text-pink-600 text-lg">₹{total}</span>
                 </div>
@@ -794,7 +794,7 @@ function Checkout() {
 
               {/* Delivery Address Preview */}
               {formData.address && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <div className="mt-4 p-3 bg-pink-50 rounded-lg">
                   <p className="text-xs font-semibold text-gray-600 mb-1">Delivery Address</p>
                   <p className="text-xs text-gray-600">{formData.fullName}, {formData.phone}</p>
                   <p className="text-xs text-gray-500">{formData.address}, {formData.city} - {formData.pincode}</p>
