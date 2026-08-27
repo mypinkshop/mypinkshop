@@ -9,14 +9,18 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = await User.findById(decoded.id).select('-password');
-      next();
-    } catch (error) {
-      res.status(401).json({ message: 'Not authorized, token failed' });
-    }
-  }
+      
+      // Safety check: Agar user exist nahi karta
+      if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized, user not found' });
+      }
 
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+      return next(); // IMPORTANT: 'return' use karna zaroori hai
+    } catch (error) {
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  } else {
+    return res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
 
