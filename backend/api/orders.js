@@ -12,7 +12,8 @@ router.get('/user', protect, async (req, res) => {
 
     console.log('📦 Fetching orders for user ID:', req.user._id);
 
-    const orders = await Order.find({ buyerId: req.user._id }).sort({ createdAt: -1 });
+    // ✅ Yahan 'buyerId' ki jagah 'userId' use karein
+    const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
 
     console.log(`✅ Found ${orders.length} orders`);
     res.json(orders);
@@ -29,7 +30,8 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(401).json({ success: false, message: 'User not authenticated' });
     }
 
-    const order = await Order.findOne({ _id: req.params.id, buyerId: req.user._id });
+    // ✅ Yahan bhi 'buyerId' ki jagah 'userId' use karein
+    const order = await Order.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
@@ -59,7 +61,7 @@ router.post('/', protect, async (req, res) => {
 
     const order = new Order({
       orderNumber,
-      buyerId: req.user._id,
+      userId: req.user._id, // ✅ Yahan 'buyerId' ki jagah 'userId' use karein
       buyerName: req.user.name || address?.fullName || 'Customer',
       buyerEmail: req.user.email,
       buyerPhone: req.user.phone || address?.phone || '',
@@ -103,7 +105,7 @@ router.patch('/:id/cancel', protect, async (req, res) => {
       return res.status(401).json({ success: false, message: 'User not authenticated' });
     }
 
-    const order = await Order.findOne({ _id: req.params.id, buyerId: req.user._id });
+    const order = await Order.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
