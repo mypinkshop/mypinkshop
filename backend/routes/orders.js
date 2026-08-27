@@ -3,7 +3,7 @@ const router = express.Router();
 const Order = require('../models/Order');
 const { protect } = require('../middleware/auth');
 
-// ✅ GET /api/orders/user
+// ✅ MUST BE FIRST! /user route ko sabse pehle likhein
 router.get('/user', protect, async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
@@ -22,14 +22,18 @@ router.get('/user', protect, async (req, res) => {
   }
 });
 
-// ✅ GET /api/orders/:id
+// ✅ THEN :id route aayega
 router.get('/:id', protect, async (req, res) => {
   try {
-    if (!req.user || !req.user._id) return res.status(401).json({ success: false, message: 'User not authenticated' });
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
 
     const order = await Order.findOne({ _id: req.params.id, buyerId: req.user._id });
 
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
 
     res.json(order);
   } catch (error) {
@@ -41,11 +45,15 @@ router.get('/:id', protect, async (req, res) => {
 // ✅ POST /api/orders
 router.post('/', protect, async (req, res) => {
   try {
-    if (!req.user || !req.user._id) return res.status(401).json({ success: false, message: 'User not authenticated' });
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
 
     const { items, total, address, paymentMethod, shippingAddress, buyerAddress } = req.body;
 
-    if (!items || items.length === 0) return res.status(400).json({ success: false, message: 'No items in order' });
+    if (!items || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'No items in order' });
+    }
 
     const orderNumber = `MPS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
@@ -91,13 +99,21 @@ router.post('/', protect, async (req, res) => {
 // ✅ PATCH /api/orders/:id/cancel
 router.patch('/:id/cancel', protect, async (req, res) => {
   try {
-    if (!req.user || !req.user._id) return res.status(401).json({ success: false, message: 'User not authenticated' });
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
 
     const order = await Order.findOne({ _id: req.params.id, buyerId: req.user._id });
 
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
-    if (order.status === 'delivered') return res.status(400).json({ success: false, message: 'Cannot cancel delivered order' });
-    if (order.status === 'cancelled') return res.status(400).json({ success: false, message: 'Order already cancelled' });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    if (order.status === 'delivered') {
+      return res.status(400).json({ success: false, message: 'Cannot cancel delivered order' });
+    }
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Order already cancelled' });
+    }
 
     order.status = 'cancelled';
     order.cancelledAt = new Date();
@@ -113,19 +129,27 @@ router.patch('/:id/cancel', protect, async (req, res) => {
 // ✅ PATCH /api/orders/:id/status
 router.patch('/:id/status', protect, async (req, res) => {
   try {
-    if (!req.user || !req.user._id) return res.status(401).json({ success: false, message: 'User not authenticated' });
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'User not authenticated' });
+    }
 
     const { status } = req.body;
     const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
-    if (!validStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' });
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
 
     const order = await Order.findById(req.params.id);
 
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
 
     order.status = status;
-    if (status === 'delivered') order.deliveredAt = new Date();
+    if (status === 'delivered') {
+      order.deliveredAt = new Date();
+    }
 
     await order.save();
 
