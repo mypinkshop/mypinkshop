@@ -10,6 +10,14 @@ const { protect } = require('../middleware/auth');
 // ============================================
 router.get('/user', protect, async (req, res) => {
   try {
+    // Safety check agar req.user undefined hai
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
     console.log('📦 Fetching orders for user:', req.user.id);
     
     const orders = await Order.find({ buyerId: req.user.id })
@@ -31,6 +39,13 @@ router.get('/user', protect, async (req, res) => {
 // ============================================
 router.get('/:id', protect, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
     const order = await Order.findOne({ 
       _id: req.params.id, 
       buyerId: req.user.id 
@@ -58,6 +73,13 @@ router.get('/:id', protect, async (req, res) => {
 // ============================================
 router.post('/', protect, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
     const { 
       items, 
       total, 
@@ -129,6 +151,13 @@ router.post('/', protect, async (req, res) => {
 // ============================================
 router.patch('/:id/cancel', protect, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
     const order = await Order.findOne({ 
       _id: req.params.id, 
       buyerId: req.user.id 
@@ -179,6 +208,13 @@ router.patch('/:id/cancel', protect, async (req, res) => {
 // ============================================
 router.patch('/:id/status', protect, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not authenticated' 
+      });
+    }
+
     const { status } = req.body;
     const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
     
