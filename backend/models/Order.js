@@ -59,6 +59,7 @@ const orderSchema = new mongoose.Schema({
   cancelledAt: { type: Date },
   deliveredAt: { type: Date },
   
+  // ✅ Yahan 'shipping' mein koi geospatial index NAHI hai!
   shipping: {
     awb: { type: String },
     carrier: { type: String }
