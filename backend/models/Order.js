@@ -14,13 +14,20 @@ const orderItemSchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, unique: true },
   
-  // ⚠️ Yahan 'index: true' hata diya hai duplicate warning ke liye
+  // ✅ buyerId ABHI BHI REQUIRED HAI!
   buyerId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
     required: true 
   },
   
+  // ✅ Lekin userId bhi add kar diya hai (optional)
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    default: null 
+  },
+
   buyerName: { type: String, default: 'Customer' },
   buyerEmail: { type: String },
   buyerPhone: { type: String },
@@ -49,7 +56,6 @@ const orderSchema = new mongoose.Schema({
   
   items: [orderItemSchema],
   
-  // ⚠️ 'isNew' naam ki property hata di hai kyunki yeh Mongoose reserved word hai
   cancelledAt: { type: Date },
   deliveredAt: { type: Date },
   
@@ -59,7 +65,6 @@ const orderSchema = new mongoose.Schema({
   }
 }, { 
   timestamps: true,
-  // Agar isko disable karna hai warning ke liye:
   suppressReservedKeysWarning: true 
 });
 
