@@ -18,6 +18,7 @@ function MyOrders() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewEligibility, setReviewEligibility] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -110,6 +111,17 @@ function MyOrders() {
       case 'pending': return 'Processing';
       case 'cancelled': return 'Cancelled';
       default: return status || 'Processing';
+    }
+  };
+
+  const getStatusBg = (status) => {
+    switch(status) {
+      case 'delivered': return 'bg-green-100';
+      case 'shipped': return 'bg-blue-100';
+      case 'confirmed': return 'bg-purple-100';
+      case 'pending': return 'bg-yellow-100';
+      case 'cancelled': return 'bg-red-100';
+      default: return 'bg-gray-100';
     }
   };
 
@@ -233,6 +245,13 @@ function MyOrders() {
     const completedCount = tracking.filter(t => t.completed).length;
     return (completedCount / tracking.length) * 100;
   };
+
+  const filterOrders = () => {
+    if (filterStatus === 'all') return orders;
+    return orders.filter(order => order.status === filterStatus);
+  };
+
+  const filteredOrders = filterOrders();
 
   // SEO Schema
   const generateBreadcrumbSchema = () => ({
@@ -360,12 +379,34 @@ function MyOrders() {
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">My Orders</h1>
-          <p className="text-gray-500 mb-6">Track and manage your orders</p>
+          {/* Header */}
+          <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">My Orders</h1>
+              <p className="text-gray-500 text-sm">Track and manage your orders</p>
+            </div>
+            
+            {/* Filters */}
+            <div className="flex gap-2 flex-wrap">
+              {['all', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map(status => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(status)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                    filterStatus === status 
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
+                      : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300'
+                  }`}
+                >
+                  {status === 'all' ? 'All' : getStatusText(status)}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          {orders.length === 0 ? (
+          {filteredOrders.length === 0 ? (
             // Empty Orders
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100 shadow-sm">
               <div className="text-6xl mb-4">📦</div>
               <h2 className="text-xl font-semibold text-gray-800 mb-2">No orders yet</h2>
               <p className="text-gray-500 mb-6">Looks like you haven't placed any orders.</p>
@@ -375,8 +416,8 @@ function MyOrders() {
             </div>
           ) : (
             <div className="space-y-6">
-              {orders.map((order) => (
-                <div key={order._id} className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden hover:shadow-md transition shadow-sm">
+              {filteredOrders.map((order) => (
+                <div key={order._id} className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden hover:shadow-xl transition-all duration-300 shadow-sm">
                   
                   {/* Order Header */}
                   <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 sm:px-6 py-4 border-b border-pink-100 flex flex-wrap justify-between items-center gap-3">
@@ -391,7 +432,7 @@ function MyOrders() {
                         <p className="text-xs text-gray-500">Total Amount</p>
                         <p className="text-lg font-bold text-pink-600">₹{order.total?.toLocaleString()}</p>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)} bg-white/50`}>
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)}`}>
                         {getStatusText(order.status)}
                       </div>
                     </div>
@@ -412,7 +453,7 @@ function MyOrders() {
                             <img 
                               src={item.image} 
                               alt={item.name} 
-                              className="w-14 h-14 rounded-xl object-cover border border-pink-100 bg-white"
+                              className="w-16 h-16 rounded-xl object-cover border border-pink-100 bg-white"
                               loading="lazy"
                               decoding="async"
                               width="56"
@@ -420,7 +461,7 @@ function MyOrders() {
                               style={{ aspectRatio: '1/1' }}
                             />
                           ) : (
-                            <div className="w-14 h-14 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl">
+                            <div className="w-16 h-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl">
                               🛍️
                             </div>
                           )}
@@ -485,7 +526,7 @@ function MyOrders() {
 
         {/* Tracking Modal */}
         {showTracking && selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
               <div className="sticky top-0 bg-white p-4 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">Track Order #{selectedOrder._id?.slice(-8)}</h3>
