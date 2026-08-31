@@ -19,7 +19,8 @@
     "axios": "^1.7.2",
     "cheerio": "^1.0.0-rc.12",
     "nodemailer": "^6.9.7",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "@phonepe-pg/pg-sdk-node": "^2.0.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
