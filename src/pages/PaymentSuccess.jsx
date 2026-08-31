@@ -5,7 +5,9 @@ import toast from 'react-hot-toast';
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const merchantOrderId = searchParams.get('merchantOrderId'); // PhonePe se aaya hua Order ID
+  
+  // ✅ PhonePe kabhi-kabhi 'orderId' bhi bhejta hai, isliye dono check karo
+  const merchantOrderId = searchParams.get('merchantOrderId') || searchParams.get('orderId');
 
   const API_URL = 'https://api.mypinkshop.com'; // Backend URL
 
@@ -22,18 +24,48 @@ const PaymentSuccess = () => {
       }
 
       try {
+        // Step 1: Backend se payment status check karo
         const response = await fetch(`${API_URL}/api/payments/status/${merchantOrderId}`);
         const data = await response.json();
+        console.log("🔍 Payment Status Response:", data);
 
         if (data.data && data.data.state === 'COMPLETED') {
-          setOrderData(data.data); // Payment Data Save karo
-          setShowConfetti(true); // Confetti dikhao
+          
+          // Step 2: Order create karo (data localStorage se)
+          const cartItems = JSON.parse(localStorage.getItem('cart') || '[]');
+          const total = JSON.parse(localStorage.getItem('orderTotal') || '0');
+          const address = JSON.parse(localStorage.getItem('checkoutAddress') || '{}');
+
+          const orderResponse = await fetch(`${API_URL}/api/orders`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              items: cartItems,
+              total: total,
+              address: address,
+              paymentMethod: 'upi',
+              paymentStatus: 'completed'
+            })
+          });
+
+          const orderResult = await orderResponse.json();
+          console.log("🔍 Order Created Successfully:", orderResult);
+
+          // Step 3: Cart clear karo
+          localStorage.removeItem('cart');
+          localStorage.removeItem('orderTotal');
+          localStorage.removeItem('checkoutAddress');
+
+          setOrderData(data.data);
+          setShowConfetti(true);
           toast.success('Payment Successful! 🎉');
         } else if (data.data && data.data.state === 'FAILED') {
           toast.error('Payment Failed!');
           navigate('/cart');
         } else {
-          // Pending state
           toast.loading('Payment pending...');
         }
       } catch (error) {
@@ -48,7 +80,7 @@ const PaymentSuccess = () => {
     verifyPayment();
   }, [merchantOrderId]);
 
-  // 🎉 Simple Confetti Logic
+  // Confetti Logic
   useEffect(() => {
     if (showConfetti) {
       const timer = setTimeout(() => setShowConfetti(false), 5000);
@@ -56,10 +88,21 @@ const PaymentSuccess = () => {
     }
   }, [showConfetti]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500 text-lg">Processing Payment...</p>
+          <p className="text-gray-400 text-sm mt-1">Please wait while we verify your payment</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative overflow-hidden">
       
-      {/* Confetti Effect (CSS based) */}
       {showConfetti && (
         <div className="absolute inset-0 pointer-events-none z-10">
           {[...Array(20)].map((_, i) => (
@@ -80,7 +123,6 @@ const PaymentSuccess = () => {
       <div className="max-w-4xl mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-pink-100 overflow-hidden">
           
-          {/* Success Header */}
           <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-8 text-center">
             <div className="w-20 h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
               <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -91,7 +133,6 @@ const PaymentSuccess = () => {
             <p className="text-pink-100 mt-2 text-sm">Thank you for shopping with us. Your order is confirmed.</p>
           </div>
 
-          {/* Order Details */}
           <div className="p-8">
             <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-6">
               <div className="text-left">
@@ -104,33 +145,24 @@ const PaymentSuccess = () => {
               </div>
             </div>
 
-            {/* Fake Order Summary (Jab tak backend se actual order nahi milta) */}
             <div className="bg-gray-50 rounded-xl p-6 mb-6">
               <h3 className="font-semibold text-gray-700 mb-4">Order Summary</h3>
               
-              {isLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Total Paid</span>
+                  <span className="text-xl font-bold text-gray-900">₹{orderData?.amount ? (orderData.amount / 100).toLocaleString() : '1,373'}</span>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Yahan aap apna actual order data backend se fetch karke show kar sakte hain. Abhi placeholder hai */}
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Total Paid</span>
-                    <span className="text-xl font-bold text-gray-900">₹{orderData?.amount ? (orderData.amount / 100).toLocaleString() : '1,373'}</span>
-                  </div>
-                  
-                  <div className="border-t border-gray-200 pt-3">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500">Payment Status</span>
-                      <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">Completed</span>
-                    </div>
+                
+                <div className="border-t border-gray-200 pt-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Payment Status</span>
+                    <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">Completed</span>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
               <Link 
                 to="/profile?tab=orders" 
