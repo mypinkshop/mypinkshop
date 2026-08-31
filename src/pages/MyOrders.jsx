@@ -7,6 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useReviews } from '../context/ReviewContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function MyOrders() {
   const [orders, setOrders] = useState([]);
@@ -34,9 +35,8 @@ function MyOrders() {
   const { canUserReview, addReview, uploadReviewMedia, fetchProductReviews } = useReviews();
   const navigate = useNavigate();
 
-  const API_URL = 'https://api.mypinkshop.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Handle search
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -94,12 +94,12 @@ function MyOrders() {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case 'delivered': return 'text-green-600';
-      case 'shipped': return 'text-blue-600';
-      case 'confirmed': return 'text-purple-600';
-      case 'pending': return 'text-yellow-600';
-      case 'cancelled': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'delivered': return 'text-emerald-500';
+      case 'shipped': return 'text-blue-500';
+      case 'confirmed': return 'text-purple-500';
+      case 'pending': return 'text-amber-500';
+      case 'cancelled': return 'text-rose-500';
+      default: return 'text-gray-500';
     }
   };
 
@@ -116,12 +116,23 @@ function MyOrders() {
 
   const getStatusBg = (status) => {
     switch(status) {
-      case 'delivered': return 'bg-green-100';
-      case 'shipped': return 'bg-blue-100';
-      case 'confirmed': return 'bg-purple-100';
-      case 'pending': return 'bg-yellow-100';
-      case 'cancelled': return 'bg-red-100';
-      default: return 'bg-gray-100';
+      case 'delivered': return 'bg-emerald-100/60';
+      case 'shipped': return 'bg-blue-100/60';
+      case 'confirmed': return 'bg-purple-100/60';
+      case 'pending': return 'bg-amber-100/60';
+      case 'cancelled': return 'bg-rose-100/60';
+      default: return 'bg-gray-100/60';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch(status) {
+      case 'delivered': return '✅';
+      case 'shipped': return '🚚';
+      case 'confirmed': return '📋';
+      case 'pending': return '⏳';
+      case 'cancelled': return '❌';
+      default: return '📦';
     }
   };
 
@@ -138,14 +149,14 @@ function MyOrders() {
       });
       
       if (response.ok) {
-        alert('Order cancelled successfully!');
+        toast.success('Order cancelled successfully!');
         fetchOrders();
       } else {
-        alert('Failed to cancel order');
+        toast.error('Failed to cancel order');
       }
     } catch (error) {
       console.error('Error cancelling order:', error);
-      alert('Failed to cancel order');
+      toast.error('Failed to cancel order');
     }
   };
 
@@ -159,7 +170,7 @@ function MyOrders() {
         image: item.image
       });
     });
-    alert('Items added to cart!');
+    toast.success('Items added to cart!');
     navigate('/cart');
   };
 
@@ -181,7 +192,7 @@ function MyOrders() {
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (images.length + files.length > 5) {
-      alert('Maximum 5 images allowed');
+      toast.error('Maximum 5 images allowed');
       return;
     }
     
@@ -190,7 +201,7 @@ function MyOrders() {
       const uploadedUrls = await uploadReviewMedia(files);
       setImages(prev => [...prev, ...uploadedUrls]);
     } catch (error) {
-      alert('Failed to upload images: ' + error.message);
+      toast.error('Failed to upload images: ' + error.message);
     } finally {
       setUploadingImages(false);
     }
@@ -202,11 +213,11 @@ function MyOrders() {
 
   const handleSubmitReview = async () => {
     if (rating === 0) {
-      alert('Please select a rating');
+      toast.error('Please select a rating');
       return;
     }
     if (!comment.trim()) {
-      alert('Please write your review');
+      toast.error('Please write your review');
       return;
     }
     
@@ -224,17 +235,17 @@ function MyOrders() {
       );
       
       if (result.success) {
-        alert('✅ Review submitted! Awaiting admin approval.');
+        toast.success('✅ Review submitted! Awaiting admin approval.');
         setShowReviewModal(false);
         setSelectedProduct(null);
         setSelectedOrderForReview(null);
         fetchOrders();
         await fetchProductReviews(selectedProduct.productId);
       } else {
-        alert(result.message);
+        toast.error(result.message);
       }
     } catch (error) {
-      alert('Failed to submit review: ' + error.message);
+      toast.error('Failed to submit review: ' + error.message);
     } finally {
       setSubmitting(false);
     }
@@ -252,31 +263,22 @@ function MyOrders() {
   };
 
   const filteredOrders = filterOrders();
+  const orderCount = filteredOrders.length;
 
-  // SEO Schema
-  const generateBreadcrumbSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mypinkshop.com" },
-      { "@type": "ListItem", "position": 2, "name": "My Orders", "item": "https://www.mypinkshop.com/my-orders" }
-    ]
-  });
-
-  const generateOrganizationSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "MyPinkShop",
-    "url": "https://www.mypinkshop.com",
-    "logo": "https://www.mypinkshop.com/logo.png"
-  });
+  // Stats
+  const totalOrders = orders.length;
+  const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
+  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50/30 via-white to-rose-50/30 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading your orders...</p>
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 border-4 border-pink-200 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="text-gray-400 font-medium">Loading your orders...</p>
         </div>
       </div>
     );
@@ -286,33 +288,20 @@ function MyOrders() {
     <>
       <Helmet>
         <title>My Orders - MyPinkShop | Track & Manage Your Orders</title>
-        <meta name="description" content="View and manage your orders at MyPinkShop. Track delivery status, cancel orders, reorder items, and download invoices. Login to access your order history." />
-        <meta name="keywords" content="my orders, order tracking, order history, track order, cancel order, reorder, mypinkshop orders" />
+        <meta name="description" content="View and manage your orders at MyPinkShop. Track delivery status, cancel orders, reorder items, and download invoices." />
         <link rel="canonical" href="https://www.mypinkshop.com/my-orders" />
-        <meta property="og:title" content="My Orders - MyPinkShop" />
-        <meta property="og:description" content="Track and manage your orders. View order status, cancel orders, and reorder items." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com/my-orders" />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-orders.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="My Orders - MyPinkShop" />
-        <meta name="twitter:description" content="Track and manage your orders easily." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-orders.jpg" />
-        <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
-        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50/20 via-white to-rose-50/20">
         
-        {/* Dynamic Offer Banner */}
         <OfferBanner />
 
-        {/* Premium Header */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+        {/* Glass Header */}
+        <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-200/50 group-hover:scale-105 transition-transform">
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
@@ -329,7 +318,7 @@ function MyOrders() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-white/60 backdrop-blur-sm border border-white/30 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition-all text-sm sm:text-base"
                   />
                   <button 
                     onClick={handleSearch}
@@ -368,34 +357,58 @@ function MyOrders() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
+        {/* Breadcrumb - Glass */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-            <span className="text-gray-400">/</span>
+            <Link to="/" className="text-gray-400 hover:text-pink-500 transition">Home</Link>
+            <span className="text-gray-300">/</span>
             <span className="text-pink-600 font-medium">My Orders</span>
           </div>
         </div>
 
+        {/* Stats Cards - Glass */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+              <p className="text-xs text-gray-400 font-medium">Total Orders</p>
+              <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
+            </div>
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+              <p className="text-xs text-gray-400 font-medium">Delivered</p>
+              <p className="text-2xl font-bold text-emerald-600">{deliveredOrders}</p>
+            </div>
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+              <p className="text-xs text-gray-400 font-medium">In Progress</p>
+              <p className="text-2xl font-bold text-amber-600">{pendingOrders}</p>
+            </div>
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+              <p className="text-xs text-gray-400 font-medium">Total Spent</p>
+              <p className="text-2xl font-bold text-pink-600">
+                ₹{orders.reduce((acc, o) => acc + (o.total || 0), 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Header */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-12">
+          
+          {/* Header with Filters - Glass */}
           <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">My Orders</h1>
-              <p className="text-gray-500 text-sm">Track and manage your orders</p>
+              <p className="text-gray-400 text-sm">{orderCount} {orderCount === 1 ? 'order' : 'orders'}</p>
             </div>
             
-            {/* Filters */}
             <div className="flex gap-2 flex-wrap">
               {['all', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map(status => (
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     filterStatus === status 
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                      : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-200/50' 
+                      : 'bg-white/40 backdrop-blur-sm border border-white/30 text-gray-600 hover:border-pink-300 hover:bg-white/60'
                   }`}
                 >
                   {status === 'all' ? 'All' : getStatusText(status)}
@@ -405,40 +418,41 @@ function MyOrders() {
           </div>
 
           {filteredOrders.length === 0 ? (
-            // Empty Orders
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 text-center border border-pink-100 shadow-sm">
-              <div className="text-6xl mb-4">📦</div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">No orders yet</h2>
-              <p className="text-gray-500 mb-6">Looks like you haven't placed any orders.</p>
-              <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+            // Empty Orders - Glass
+            <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-12 text-center border border-white/30 shadow-sm">
+              <div className="text-7xl mb-4">📦</div>
+              <h2 className="text-2xl font-semibold text-gray-800 mb-2">No orders yet</h2>
+              <p className="text-gray-400 mb-6">Looks like you haven't placed any orders.</p>
+              <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-pink-200/50 transition-all transform hover:-translate-y-0.5">
                 Start Shopping →
               </Link>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-5">
               {filteredOrders.map((order) => (
-                <div key={order._id} className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden hover:shadow-xl transition-all duration-300 shadow-sm">
+                <div key={order._id} className="bg-white/40 backdrop-blur-xl rounded-3xl border border-white/30 overflow-hidden hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300 shadow-sm">
                   
-                  {/* Order Header */}
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 sm:px-6 py-4 border-b border-pink-100 flex flex-wrap justify-between items-center gap-3">
+                  {/* Order Header - Glass */}
+                  <div className="bg-gradient-to-r from-pink-50/30 to-rose-50/30 backdrop-blur-sm px-4 sm:px-6 py-4 border-b border-white/30 flex flex-wrap justify-between items-center gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-800">Order #{order._id?.slice(-8)}</p>
-                      <p className="text-xs text-gray-500">
-                        Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      <p className="text-xs text-gray-400">
+                        {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-xs text-gray-500">Total Amount</p>
+                        <p className="text-xs text-gray-400">Total</p>
                         <p className="text-lg font-bold text-pink-600">₹{order.total?.toLocaleString()}</p>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)}`}>
+                      <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)} flex items-center gap-1.5`}>
+                        <span>{getStatusIcon(order.status)}</span>
                         {getStatusText(order.status)}
                       </div>
                     </div>
                   </div>
 
-                  {/* Order Items */}
+                  {/* Order Items - Glass */}
                   <div className="px-4 sm:px-6 py-4">
                     {order.items && order.items.map((item, idx) => {
                       const eligibilityKey = `${order._id}_${item.productId}`;
@@ -448,26 +462,23 @@ function MyOrders() {
                       const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
                       
                       return (
-                        <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
-                          {item.image ? (
-                            <img 
-                              src={item.image} 
-                              alt={item.name} 
-                              className="w-16 h-16 rounded-xl object-cover border border-pink-100 bg-white"
-                              loading="lazy"
-                              decoding="async"
-                              width="56"
-                              height="56"
-                              style={{ aspectRatio: '1/1' }}
-                            />
-                          ) : (
-                            <div className="w-16 h-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl">
-                              🛍️
-                            </div>
-                          )}
+                        <div key={idx} className="flex items-center gap-4 py-3 border-b border-white/20 last:border-0">
+                          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm border border-white/30 flex-shrink-0">
+                            {item.image ? (
+                              <img 
+                                src={item.image} 
+                                alt={item.name} 
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
+                            )}
+                          </div>
                           <div className="flex-1">
                             <h4 className="font-semibold text-gray-800">{item.name}</h4>
-                            <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                            <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
                             {item.variationName && (
                               <p className="text-xs text-gray-400">Option: {item.variationName} {item.variationSecondary ? `- ${item.variationSecondary}` : ''}</p>
                             )}
@@ -480,12 +491,12 @@ function MyOrders() {
                               canReview ? (
                                 <button
                                   onClick={() => handleWriteReview(order, item)}
-                                  className="mt-2 px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs hover:shadow-md transition"
+                                  className="mt-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-xs hover:shadow-lg hover:shadow-pink-200/50 transition"
                                 >
-                                  ✍️ Write Review
+                                  ✍️ Review
                                 </button>
                               ) : alreadyReviewed ? (
-                                <span className="mt-2 inline-block text-green-600 text-xs flex items-center gap-1">✓ Reviewed</span>
+                                <span className="mt-2 inline-block text-emerald-500 text-xs flex items-center gap-1">✓ Reviewed</span>
                               ) : null
                             )}
                           </div>
@@ -494,25 +505,31 @@ function MyOrders() {
                     })}
                   </div>
 
-                  {/* Order Actions */}
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 sm:px-6 py-4 border-t border-pink-100 flex flex-wrap gap-3 justify-end">
+                  {/* Order Actions - Glass */}
+                  <div className="bg-gradient-to-r from-pink-50/20 to-rose-50/20 backdrop-blur-sm px-4 sm:px-6 py-4 border-t border-white/30 flex flex-wrap gap-3 justify-end">
                     <button 
                       onClick={() => handleTrackOrder(order)}
-                      className="px-4 py-2 text-pink-600 border border-pink-200 rounded-xl hover:bg-pink-50 transition text-sm font-medium"
+                      className="px-4 py-2 text-pink-600 border border-pink-200/50 rounded-xl hover:bg-pink-50/50 transition text-sm font-medium backdrop-blur-sm"
                     >
-                      📍 Track Order
+                      📍 Track
                     </button>
                     {order.status === 'pending' && (
-                      <button onClick={() => cancelOrder(order._id)} className="px-4 py-2 text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition text-sm font-medium">
-                        ❌ Cancel Order
+                      <button 
+                        onClick={() => cancelOrder(order._id)} 
+                        className="px-4 py-2 text-rose-600 border border-rose-200/50 rounded-xl hover:bg-rose-50/50 transition text-sm font-medium backdrop-blur-sm"
+                      >
+                        ❌ Cancel
                       </button>
                     )}
                     {order.status === 'delivered' && (
                       <>
-                        <button className="px-4 py-2 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition text-sm font-medium">
-                          📄 Download Invoice
+                        <button className="px-4 py-2 text-gray-600 border border-gray-200/50 rounded-xl hover:bg-gray-50/50 transition text-sm font-medium backdrop-blur-sm">
+                          📄 Invoice
                         </button>
-                        <button onClick={() => reorder(order)} className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-md transition text-sm font-medium">
+                        <button 
+                          onClick={() => reorder(order)} 
+                          className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg hover:shadow-pink-200/50 transition text-sm font-medium"
+                        >
                           🛒 Buy Again
                         </button>
                       </>
@@ -524,31 +541,32 @@ function MyOrders() {
           )}
         </div>
 
-        {/* Tracking Modal */}
+        {/* Tracking Modal - Glass */}
         {showTracking && selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
-              <div className="sticky top-0 bg-white p-4 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-800">Track Order #{selectedOrder._id?.slice(-8)}</h3>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-md">
+            <div className="bg-white/80 backdrop-blur-xl rounded-3xl max-w-md w-full max-h-[80vh] overflow-y-auto border border-white/30 shadow-2xl">
+              <div className="sticky top-0 bg-white/80 backdrop-blur-xl p-4 border-b border-white/30 rounded-t-3xl flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-800">📍 Track Order #{selectedOrder._id?.slice(-8)}</h3>
                 <button onClick={() => setShowTracking(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
               </div>
               <div className="p-6">
                 <div className="mb-6">
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-200/50 rounded-full overflow-hidden backdrop-blur-sm">
                     <div 
                       className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500"
                       style={{ width: `${getProgressWidth(selectedOrder.tracking)}%` }}
                     ></div>
                   </div>
+                  <p className="text-xs text-gray-400 text-right mt-1">{Math.round(getProgressWidth(selectedOrder.tracking))}% complete</p>
                 </div>
                 
                 <div className="space-y-4">
                   {selectedOrder.tracking && selectedOrder.tracking.map((step, idx) => (
                     <div key={idx} className="flex gap-3">
                       <div className="relative">
-                        <div className={`w-4 h-4 rounded-full mt-1 ${step.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                        <div className={`w-4 h-4 rounded-full mt-1 ${step.completed ? 'bg-emerald-500 shadow-lg shadow-emerald-200/50' : 'bg-gray-300'}`}></div>
                         {idx < selectedOrder.tracking.length - 1 && (
-                          <div className={`absolute top-5 left-1.5 w-0.5 h-8 ${step.completed && selectedOrder.tracking[idx+1]?.completed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                          <div className={`absolute top-5 left-1.5 w-0.5 h-8 ${step.completed && selectedOrder.tracking[idx+1]?.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
                         )}
                       </div>
                       <div className="flex-1 pb-4">
@@ -559,41 +577,37 @@ function MyOrders() {
                   ))}
                 </div>
 
-                <div className="mt-6 p-4 bg-pink-50 rounded-xl">
-                  <p className="text-sm font-semibold text-gray-600 mb-1">Delivery Address</p>
+                <div className="mt-6 p-4 bg-pink-50/60 backdrop-blur-sm rounded-2xl border border-pink-100/30">
+                  <p className="text-sm font-semibold text-gray-600 mb-1">📍 Delivery Address</p>
                   <p className="text-sm text-gray-600">{selectedOrder.shippingAddress || selectedOrder.address}</p>
-                  <p className="text-xs text-gray-500 mt-2">Payment: {selectedOrder.paymentMethod}</p>
+                  <p className="text-xs text-gray-400 mt-2">Payment: {selectedOrder.paymentMethod}</p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* REVIEW MODAL */}
+        {/* REVIEW MODAL - Glass */}
         {showReviewModal && selectedProduct && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowReviewModal(false)}>
-            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="sticky top-0 bg-white border-b border-pink-100 p-4 rounded-t-2xl flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-800">Write a Review</h3>
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowReviewModal(false)}>
+            <div className="bg-white/80 backdrop-blur-xl rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-white/30 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-white/30 p-4 rounded-t-3xl flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-800">✍️ Write a Review</h3>
                 <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
               </div>
               
               <div className="p-5 space-y-4">
-                <div className="flex gap-3 pb-3 border-b border-pink-100">
-                  {selectedProduct.image ? (
-                    <img 
-                      src={selectedProduct.image} 
-                      alt={selectedProduct.name}
-                      className="w-16 h-16 rounded-xl object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-2xl">🛍️</div>
-                  )}
+                <div className="flex gap-3 pb-3 border-b border-white/30">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm border border-white/30">
+                    {selectedProduct.image ? (
+                      <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
+                    )}
+                  </div>
                   <div>
                     <p className="font-medium text-gray-800">{selectedProduct.name}</p>
-                    <p className="text-xs text-gray-500">Order #{selectedOrderForReview?._id?.slice(-8)}</p>
+                    <p className="text-xs text-gray-400">Order #{selectedOrderForReview?._id?.slice(-8)}</p>
                   </div>
                 </div>
                 
@@ -606,7 +620,7 @@ function MyOrders() {
                         onMouseEnter={() => setHoverRating(star)}
                         onMouseLeave={() => setHoverRating(0)}
                         onClick={() => setRating(star)}
-                        className="text-3xl focus:outline-none"
+                        className="text-3xl focus:outline-none transition-transform hover:scale-110"
                       >
                         <span className={star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-300'}>★</span>
                       </button>
@@ -615,13 +629,13 @@ function MyOrders() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Review Title (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Review Title</label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Summarize your experience"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                    className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition"
                     maxLength="100"
                   />
                 </div>
@@ -633,30 +647,30 @@ function MyOrders() {
                     onChange={(e) => setComment(e.target.value)}
                     rows="4"
                     placeholder="Share your experience with this product"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                    className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Add Photos (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Add Photos</label>
                   <div className="flex flex-wrap gap-3 mb-3">
                     {images.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-pink-100">
+                      <div key={idx} className="relative w-20 h-20 rounded-2xl overflow-hidden border border-white/30 bg-white/50">
                         <img src={img} alt={`Review ${idx}`} className="w-full h-full object-cover" />
-                        <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs">✕</button>
+                        <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg">✕</button>
                       </div>
                     ))}
                   </div>
                   <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="reviewImageUpload" />
-                  <label htmlFor="reviewImageUpload" className="inline-block px-4 py-2.5 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition text-sm">
+                  <label htmlFor="reviewImageUpload" className="inline-block px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl cursor-pointer hover:bg-white/70 transition text-sm">
                     {uploadingImages ? '📤 Uploading...' : '📸 Upload Images'}
                   </label>
                   <p className="text-xs text-gray-400 mt-1">Max 5 images, up to 5MB each</p>
                 </div>
                 
-                <div className="p-3 bg-green-50 rounded-xl">
-                  <p className="text-sm text-green-700 flex items-center gap-2">
-                    <span>✓</span> Your review will be marked as "Verified Purchase"
+                <div className="p-3 bg-emerald-50/60 backdrop-blur-sm rounded-2xl border border-emerald-100/30">
+                  <p className="text-sm text-emerald-700 flex items-center gap-2">
+                    <span>✓</span> Verified Purchase
                   </p>
                 </div>
                 
@@ -664,13 +678,13 @@ function MyOrders() {
                   <button
                     onClick={handleSubmitReview}
                     disabled={submitting}
-                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl hover:shadow-md transition disabled:opacity-50 font-medium"
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl hover:shadow-lg hover:shadow-pink-200/50 transition disabled:opacity-50 font-medium"
                   >
                     {submitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                   <button
                     onClick={() => setShowReviewModal(false)}
-                    className="flex-1 border border-gray-200 py-2.5 rounded-xl hover:bg-gray-50 transition"
+                    className="flex-1 bg-white/50 backdrop-blur-sm border border-white/30 py-2.5 rounded-xl hover:bg-white/70 transition"
                   >
                     Cancel
                   </button>
@@ -680,18 +694,18 @@ function MyOrders() {
           </div>
         )}
 
-        {/* Footer */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+        {/* Footer - Glass */}
+        <footer className="bg-white/40 backdrop-blur-xl border-t border-white/30 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-200/50">
                     <span className="text-white font-bold text-sm">M</span>
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+                <p className="text-sm text-gray-400">Luxury beauty and fashion for the modern woman.</p>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Shop</h4>
@@ -722,9 +736,9 @@ function MyOrders() {
                 </ul>
               </div>
             </div>
-            <div className="text-center pt-8 border-t border-gray-800">
-              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            <div className="text-center pt-8 border-t border-white/20">
+              <p className="text-sm text-gray-400">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-500 mt-2">Made with 💖 for the girlies</p>
             </div>
           </div>
         </footer>
