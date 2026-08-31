@@ -28,10 +28,6 @@ function Profile() {
     phone: '',
     gender: '',
     dob: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
     createdAt: ''
   });
   
@@ -70,7 +66,6 @@ function Profile() {
     isDefault: false
   });
 
-  // 🔥 UPI Options
   const [upiOptions, setUpiOptions] = useState([]);
   const [showUpiModal, setShowUpiModal] = useState(false);
   const [upiForm, setUpiForm] = useState({
@@ -194,10 +189,6 @@ function Profile() {
           phone: data.phone || '',
           gender: data.gender || '',
           dob: data.dob || '',
-          address: data.address || '',
-          city: data.city || '',
-          state: data.state || '',
-          pincode: data.pincode || '',
           createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
         });
         if (data.profileImage) {
@@ -231,20 +222,17 @@ function Profile() {
   const fetchOrders = async () => {
     setOrdersLoading(true);
     try {
-      // ✅ FIX: SAHI API ENDPOINT
       const response = await fetch(`${API_URL}/api/orders/user`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.ok) {
         const data = await response.json();
-        // Check if data is array or has orders property
         const ordersData = Array.isArray(data) ? data : (data.orders || data.order || []);
         const sortedOrders = ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOrders(sortedOrders);
         console.log('✅ Orders fetched:', sortedOrders.length);
       } else {
-        // Fallback: try /api/orders/my-orders
         const fallbackRes = await fetch(`${API_URL}/api/orders/my-orders`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -254,13 +242,10 @@ function Profile() {
           const sortedOrders = ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setOrders(sortedOrders);
           console.log('✅ Orders fetched (fallback):', sortedOrders.length);
-        } else {
-          console.error('Failed to fetch orders from both endpoints');
         }
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
-      toast.error('Failed to load orders');
     } finally {
       setOrdersLoading(false);
     }
@@ -300,7 +285,6 @@ function Profile() {
     }
   };
 
-  // 🔥 FETCH UPI OPTIONS
   const fetchUpiOptions = async () => {
     try {
       const response = await fetch(`${API_URL}/api/users/upi`, {
@@ -327,17 +311,18 @@ function Profile() {
         body: JSON.stringify({ [field]: value })
       });
       
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         setUserData(prev => ({ ...prev, [field]: data[field] || value }));
         setEditingField(null);
-        toast.success('Updated! ✨');
+        toast.success(`${field} updated! ✨`);
         fetchUserData();
       } else {
-        toast.error('Update failed');
+        toast.error(data.error || 'Update failed');
       }
     } catch (error) {
-      toast.error('Error updating');
+      toast.error('Error updating field');
     }
   };
 
@@ -550,7 +535,7 @@ function Profile() {
     }
   };
 
-  // 🔥 UPI FUNCTIONS
+  // ========== UPI FUNCTIONS ==========
   const handleAddUpi = async () => {
     if (!upiForm.upiId || !upiForm.upiId.includes('@')) {
       toast.error('Enter valid UPI ID (example@upi)');
@@ -624,6 +609,21 @@ function Profile() {
   const getInitials = (name) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  // ✅ FIX 1: MPS- Format Order ID
+  const getOrderIdDisplay = (order) => {
+    if (!order) return 'N/A';
+    
+    if (order.orderId && order.orderId.startsWith('MPS-')) {
+      return order.orderId;
+    }
+    
+    if (order._id) {
+      return order._id.slice(-12).toUpperCase();
+    }
+    
+    return 'N/A';
   };
 
   // ========== TABS ==========
@@ -783,7 +783,7 @@ function Profile() {
             ))}
           </div>
 
-          {/* ========== ORDERS TAB ========== */}
+          {/* ========== ORDERS TAB - FIXED ========== */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
@@ -818,7 +818,8 @@ function Profile() {
                     <div key={order._id} className="p-4 hover:bg-gray-50 transition">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-800">Order #{order._id?.slice(-8) || order.id}</p>
+                          {/* ✅ FIX 2: MPS- Order ID */}
+                          <p className="font-medium text-gray-800">Order #{getOrderIdDisplay(order)}</p>
                           <p className="text-sm text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
                           <p className="text-sm text-gray-400">{order.items?.length || 0} items</p>
                         </div>
@@ -833,9 +834,10 @@ function Profile() {
                         <button onClick={() => handleReorder(order)} className="text-sm text-pink-600 hover:underline">
                           Reorder
                         </button>
-                        {(order.status === 'pending' || order.status === 'confirmed') && (
+                        {/* ✅ FIX 3: Cancel sirf pending/confirmed me dikhe */}
+                        {['pending', 'confirmed'].includes(order.status?.toLowerCase()) && (
                           <button onClick={() => cancelOrder(order._id)} className="text-sm text-rose-600 hover:underline">
-                            Cancel
+                            Cancel Order
                           </button>
                         )}
                       </div>
@@ -908,14 +910,13 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PROFILE TAB - EXPANDED ========== */}
+          {/* ========== PROFILE TAB ========== */}
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-800">Profile Details</h3>
               </div>
               <div className="divide-y divide-gray-50">
-                {/* Name */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Full Name</p>
@@ -932,7 +933,6 @@ function Profile() {
                   )}
                 </div>
 
-                {/* Email */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Email</p>
@@ -949,7 +949,6 @@ function Profile() {
                   )}
                 </div>
 
-                {/* Phone */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Phone</p>
@@ -966,7 +965,6 @@ function Profile() {
                   )}
                 </div>
 
-                {/* Gender */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Gender</p>
@@ -988,7 +986,6 @@ function Profile() {
                   )}
                 </div>
 
-                {/* Date of Birth */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Date of Birth</p>
@@ -1092,7 +1089,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PAYMENTS TAB - Cards + UPI ========== */}
+          {/* ========== PAYMENTS TAB ========== */}
           {activeTab === 'payments' && (
             <div className="space-y-4">
               {/* Cards Section */}
@@ -1127,7 +1124,7 @@ function Profile() {
                 )}
               </div>
 
-              {/* 🔥 UPI Section */}
+              {/* UPI Section */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                   <h3 className="font-semibold text-gray-800">UPI IDs</h3>
@@ -1237,7 +1234,7 @@ function Profile() {
           </div>
         )}
 
-        {/* 🔥 UPI Modal */}
+        {/* UPI Modal */}
         {showUpiModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl max-w-md w-full p-6">
