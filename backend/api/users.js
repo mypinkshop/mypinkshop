@@ -22,7 +22,7 @@ const addressSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// ✅ Card Schema - NEW
+// Card Schema
 const cardSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   last4: { type: String, required: true },
@@ -33,7 +33,15 @@ const cardSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-// ✅ Login History Schema - NEW
+// ✅ UPI Schema - NEW
+const upiSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  upiId: { type: String, required: true },
+  isDefault: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
+// Login History Schema
 const loginHistorySchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   ip: { type: String, default: '' },
@@ -45,6 +53,7 @@ const loginHistorySchema = new mongoose.Schema({
 
 const Address = mongoose.models.Address || mongoose.model('Address', addressSchema);
 const Card = mongoose.models.Card || mongoose.model('Card', cardSchema);
+const Upi = mongoose.models.Upi || mongoose.model('Upi', upiSchema);
 const LoginHistory = mongoose.models.LoginHistory || mongoose.model('LoginHistory', loginHistorySchema);
 
 // Auth Middleware
@@ -219,7 +228,7 @@ router.patch('/addresses/:id/default', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== CARDS ROUTES (NEW) ==========
+// ========== CARDS ROUTES ==========
 
 // Get all cards
 router.get('/cards', authMiddleware, async (req, res) => {
@@ -277,7 +286,71 @@ router.patch('/cards/:id/default', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== LOGIN HISTORY ROUTES (NEW) ==========
+// ========== UPI ROUTES (NEW) ==========
+
+// Get all UPI IDs
+router.get('/upi', authMiddleware, async (req, res) => {
+  try {
+    const upiList = await Upi.find({ userId: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
+    res.json({ upi: upiList });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add UPI ID
+router.post('/upi', authMiddleware, async (req, res) => {
+  try {
+    const { upiId, isDefault } = req.body;
+    
+    if (!upiId || !upiId.includes('@')) {
+      return res.status(400).json({ error: 'Invalid UPI ID format' });
+    }
+    
+    const existing = await Upi.findOne({ userId: req.user.id, upiId });
+    if (existing) {
+      return res.status(400).json({ error: 'UPI ID already exists' });
+    }
+    
+    if (isDefault) {
+      await Upi.updateMany({ userId: req.user.id }, { isDefault: false });
+    }
+    
+    const upi = new Upi({
+      userId: req.user.id,
+      upiId,
+      isDefault: isDefault || false
+    });
+    
+    await upi.save();
+    res.status(201).json({ success: true, upi });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete UPI ID
+router.delete('/upi/:id', authMiddleware, async (req, res) => {
+  try {
+    await Upi.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Set default UPI
+router.patch('/upi/:id/default', authMiddleware, async (req, res) => {
+  try {
+    await Upi.updateMany({ userId: req.user.id }, { isDefault: false });
+    await Upi.updateOne({ _id: req.params.id, userId: req.user.id }, { isDefault: true });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== LOGIN HISTORY ROUTES ==========
 
 // Get login history
 router.get('/login-history', authMiddleware, async (req, res) => {
@@ -292,7 +365,6 @@ router.get('/login-history', authMiddleware, async (req, res) => {
 // Save login (call this from login endpoint)
 const saveLoginHistory = async (userId, ip, userAgent) => {
   try {
-    // Parse user agent to get device and browser
     let device = 'Unknown';
     let browser = 'Unknown';
     
@@ -337,6 +409,7 @@ router.delete('/account', authMiddleware, async (req, res) => {
     await User.findByIdAndDelete(req.user.id);
     await Address.deleteMany({ userId: req.user.id });
     await Card.deleteMany({ userId: req.user.id });
+    await Upi.deleteMany({ userId: req.user.id });
     await LoginHistory.deleteMany({ userId: req.user.id });
     res.json({ success: true, message: 'Account deleted successfully' });
   } catch (error) {
