@@ -94,12 +94,12 @@ function MyOrders() {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case 'delivered': return 'text-emerald-500';
-      case 'shipped': return 'text-blue-500';
-      case 'confirmed': return 'text-purple-500';
-      case 'pending': return 'text-amber-500';
-      case 'cancelled': return 'text-rose-500';
-      default: return 'text-gray-500';
+      case 'delivered': return 'text-emerald-600';
+      case 'shipped': return 'text-blue-600';
+      case 'confirmed': return 'text-purple-600';
+      case 'pending': return 'text-amber-600';
+      case 'cancelled': return 'text-rose-600';
+      default: return 'text-gray-600';
     }
   };
 
@@ -116,12 +116,12 @@ function MyOrders() {
 
   const getStatusBg = (status) => {
     switch(status) {
-      case 'delivered': return 'bg-emerald-100';
-      case 'shipped': return 'bg-blue-100';
-      case 'confirmed': return 'bg-purple-100';
-      case 'pending': return 'bg-amber-100';
-      case 'cancelled': return 'bg-rose-100';
-      default: return 'bg-gray-100';
+      case 'delivered': return 'bg-emerald-50';
+      case 'shipped': return 'bg-blue-50';
+      case 'confirmed': return 'bg-purple-50';
+      case 'pending': return 'bg-amber-50';
+      case 'cancelled': return 'bg-rose-50';
+      default: return 'bg-gray-50';
     }
   };
 
@@ -270,6 +270,11 @@ function MyOrders() {
   const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length;
 
+  // Generate Amazon-style Order ID
+  const getOrderIdDisplay = (id) => {
+    return id?.slice(-12).toUpperCase() || 'N/A';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -366,7 +371,7 @@ function MyOrders() {
           </div>
         </div>
 
-        {/* Stats Cards - Pink Gradient */}
+        {/* Stats Cards */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-gradient-to-br from-pink-100 to-pink-200/50 rounded-2xl p-4 border border-pink-200/50 shadow-sm">
@@ -422,137 +427,155 @@ function MyOrders() {
             </div>
           ) : (
             <div className="space-y-6">
-              {filteredOrders.map((order, index) => (
-                <div key={order._id}>
-                  {/* Order Card */}
-                  <div className="bg-white rounded-2xl border border-pink-100 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300">
-                    
-                    {/* 🔥 Order Header - FULL PINK GRADIENT (Table style) */}
-                    <div className="bg-gradient-to-r from-pink-500 via-pink-400 to-rose-500 px-4 sm:px-6 py-3.5 flex flex-wrap justify-between items-center gap-3">
-                      <div className="flex items-center gap-4">
-                        <span className="text-white/80 text-sm font-medium">Order</span>
-                        <span className="text-white font-mono font-bold text-sm bg-white/20 px-3 py-1 rounded-full">
-                          #{order._id?.slice(-8)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-white/70 text-xs">Total</p>
-                          <p className="text-white font-bold text-base">₹{order.total?.toLocaleString()}</p>
+              {filteredOrders.map((order, index) => {
+                const canCancel = order.status === 'pending' || order.status === 'confirmed';
+                const isShipped = order.status === 'shipped' || order.status === 'delivered';
+                
+                return (
+                  <div key={order._id}>
+                    {/* Order Card - Amazon Style */}
+                    <div className="bg-white rounded-2xl border border-pink-100 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300">
+                      
+                      {/* 🔥 Amazon Style Header - Light Pink */}
+                      <div className="bg-pink-50/80 px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3 border-b border-pink-100">
+                        <div className="flex items-center gap-6 flex-wrap">
+                          <div>
+                            <span className="text-xs text-gray-400 font-medium">ORDER ID</span>
+                            <p className="text-sm font-mono font-bold text-gray-800 tracking-wide">
+                              {getOrderIdDisplay(order._id)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-400 font-medium">ORDER DATE</span>
+                            <p className="text-sm font-medium text-gray-700">
+                              {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-gray-400 font-medium">TOTAL</span>
+                            <p className="text-sm font-bold text-pink-600">₹{order.total?.toLocaleString()}</p>
+                          </div>
                         </div>
                         <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)} flex items-center gap-1.5`}>
                           <span>{getStatusIcon(order.status)}</span>
                           {getStatusText(order.status)}
                         </div>
                       </div>
-                    </div>
 
-                    {/* Order Date */}
-                    <div className="px-4 sm:px-6 py-2 bg-pink-50/30 border-b border-pink-50">
-                      <p className="text-xs text-gray-400">
-                        📅 {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </p>
-                    </div>
-
-                    {/* Order Items */}
-                    <div className="px-4 sm:px-6 py-4">
-                      {order.items && order.items.map((item, idx) => {
-                        const eligibilityKey = `${order._id}_${item.productId}`;
-                        const canReview = reviewEligibility[eligibilityKey]?.canReview && 
-                                          !reviewEligibility[eligibilityKey]?.alreadyReviewed &&
-                                          order.status === 'delivered';
-                        const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
-                        
-                        return (
-                          <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100 flex-shrink-0">
-                              {item.image ? (
-                                <img 
-                                  src={item.image} 
-                                  alt={item.name} 
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
-                              )}
+                      {/* Order Items */}
+                      <div className="px-4 sm:px-6 py-4">
+                        {order.items && order.items.map((item, idx) => {
+                          const eligibilityKey = `${order._id}_${item.productId}`;
+                          const canReview = reviewEligibility[eligibilityKey]?.canReview && 
+                                            !reviewEligibility[eligibilityKey]?.alreadyReviewed &&
+                                            order.status === 'delivered';
+                          const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
+                          
+                          return (
+                            <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
+                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100 flex-shrink-0">
+                                {item.image ? (
+                                  <img 
+                                    src={item.image} 
+                                    alt={item.name} 
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-800 text-sm line-clamp-1">{item.name}</h4>
+                                <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
+                                {item.variationName && (
+                                  <p className="text-xs text-gray-400">Option: {item.variationName} {item.variationSecondary ? `- ${item.variationSecondary}` : ''}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gray-800">₹{item.price * item.quantity}</p>
+                                <p className="text-xs text-gray-400">₹{item.price} each</p>
+                                
+                                {order.status === 'delivered' && (
+                                  canReview ? (
+                                    <button
+                                      onClick={() => handleWriteReview(order, item)}
+                                      className="mt-2 px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs hover:shadow-md transition"
+                                    >
+                                      ✍️ Review
+                                    </button>
+                                  ) : alreadyReviewed ? (
+                                    <span className="mt-2 inline-block text-emerald-500 text-xs flex items-center gap-1">✓ Reviewed</span>
+                                  ) : null
+                                )}
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-800 text-sm line-clamp-1">{item.name}</h4>
-                              <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
-                              {item.variationName && (
-                                <p className="text-xs text-gray-400">Option: {item.variationName} {item.variationSecondary ? `- ${item.variationSecondary}` : ''}</p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold text-gray-800">₹{item.price * item.quantity}</p>
-                              <p className="text-xs text-gray-400">₹{item.price} each</p>
-                              
-                              {order.status === 'delivered' && (
-                                canReview ? (
-                                  <button
-                                    onClick={() => handleWriteReview(order, item)}
-                                    className="mt-2 px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs hover:shadow-md transition"
-                                  >
-                                    ✍️ Review
-                                  </button>
-                                ) : alreadyReviewed ? (
-                                  <span className="mt-2 inline-block text-emerald-500 text-xs flex items-center gap-1">✓ Reviewed</span>
-                                ) : null
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Order Actions */}
-                    <div className="bg-pink-50/30 px-4 sm:px-6 py-3 border-t border-pink-100 flex flex-wrap gap-3 justify-end">
-                      <button 
-                        onClick={() => handleTrackOrder(order)}
-                        className="px-4 py-1.5 text-pink-600 border border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-medium"
-                      >
-                        📍 Track
-                      </button>
-                      {order.status === 'pending' && (
-                        <button 
-                          onClick={() => cancelOrder(order._id)} 
-                          className="px-4 py-1.5 text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-medium"
-                        >
-                          ❌ Cancel
-                        </button>
-                      )}
-                      {order.status === 'delivered' && (
-                        <>
-                          <button className="px-4 py-1.5 text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50 transition text-sm font-medium">
-                            📄 Invoice
-                          </button>
-                          <button 
-                            onClick={() => reorder(order)} 
-                            className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-md transition text-sm font-medium"
-                          >
-                            🛒 Buy Again
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 🔥 SEPARATOR LINE - Sexy Pink Gradient Line between orders */}
-                  {index < filteredOrders.length - 1 && (
-                    <div className="flex items-center gap-4 py-2">
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-pink-300 to-transparent"></div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-pink-300 text-xs">✦</span>
-                        <span className="text-pink-300 text-xs">✦</span>
-                        <span className="text-pink-300 text-xs">✦</span>
+                          );
+                        })}
                       </div>
-                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-pink-300 to-transparent"></div>
+
+                      {/* Order Actions - Amazon Style */}
+                      <div className="bg-gray-50/50 px-4 sm:px-6 py-3 border-t border-gray-100 flex flex-wrap gap-3 justify-between items-center">
+                        <div className="flex flex-wrap gap-3">
+                          <button 
+                            onClick={() => handleTrackOrder(order)}
+                            className="px-4 py-1.5 text-pink-600 border border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-medium"
+                          >
+                            📍 Track Order
+                          </button>
+                          {order.status === 'delivered' && (
+                            <>
+                              <button className="px-4 py-1.5 text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50 transition text-sm font-medium">
+                                📄 Download Invoice
+                              </button>
+                              <button 
+                                onClick={() => reorder(order)} 
+                                className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-md transition text-sm font-medium"
+                              >
+                                🛒 Buy Again
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* 🔥 Cancel Button - Only if not shipped */}
+                        {canCancel && (
+                          <button 
+                            onClick={() => cancelOrder(order._id)} 
+                            className="px-4 py-1.5 text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-medium"
+                          >
+                            ❌ Cancel Order
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 🔥 Cancellation Policy Note - Only for non-shipped orders */}
+                      {canCancel && (
+                        <div className="px-4 sm:px-6 py-2 bg-amber-50/50 border-t border-amber-100/50">
+                          <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                            <span>ℹ️</span> 
+                            Cancellation is available only before shipping. Once shipped, order cannot be cancelled.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Separator Line */}
+                    {index < filteredOrders.length - 1 && (
+                      <div className="flex items-center gap-4 py-3">
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-pink-200 to-transparent"></div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-pink-300 text-xs">✦</span>
+                          <span className="text-pink-300 text-xs">✦</span>
+                          <span className="text-pink-300 text-xs">✦</span>
+                        </div>
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-pink-200 to-transparent"></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
