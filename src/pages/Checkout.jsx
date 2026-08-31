@@ -35,11 +35,7 @@ function Checkout() {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  
-  // ✅ FIX: orderTotal state - Total save karne ke liye
   const [orderTotal, setOrderTotal] = useState(0);
-  
-  // Edit mode states
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -60,7 +56,15 @@ function Checkout() {
   const deliveryCharges = shippingInfo.shippingCharge;
   const total = subtotal - discount + tax + deliveryCharges;
 
-  // Load shipping settings
+  // ✅ Nykaa Style Order ID Generator
+  const generateOrderId = () => {
+    const prefix = 'MPS';
+    const part1 = Math.floor(Math.random() * 900000000 + 100000000).toString();
+    const part2 = Math.floor(Math.random() * 9000000 + 1000000).toString();
+    const part3 = Math.floor(Math.random() * 9 + 1).toString();
+    return `${prefix}-${part1}-${part2}-${part3}`;
+  };
+
   useEffect(() => {
     const loadShippingSettings = async () => {
       try {
@@ -80,7 +84,6 @@ function Checkout() {
     loadShippingSettings();
   }, []);
 
-  // Check delivery when pincode changes
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -140,22 +143,37 @@ function Checkout() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // ✅ Toggle address selection - click anywhere on card
   const handleAddressSelect = (address) => {
-    setSelectedAddress(address.id);
-    setFormData({
-      ...formData,
-      fullName: address.fullName,
-      phone: address.phone,
-      address: address.address,
-      city: address.city,
-      state: address.state,
-      pincode: address.pincode,
-    });
-    setIsEditing(false);
-    setEditingAddressId(null);
+    if (selectedAddress === address.id) {
+      // If already selected, unselect it
+      setSelectedAddress(null);
+      setFormData({
+        ...formData,
+        fullName: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+      });
+    } else {
+      // Select new address
+      setSelectedAddress(address.id);
+      setFormData({
+        ...formData,
+        fullName: address.fullName,
+        phone: address.phone,
+        address: address.address,
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+      });
+      setIsEditing(false);
+      setEditingAddressId(null);
+    }
   };
 
-  // EDIT Address
   const handleEditAddress = (address) => {
     setEditingAddressId(address.id);
     setIsEditing(true);
@@ -171,7 +189,6 @@ function Checkout() {
     setSelectedAddress(null);
   };
 
-  // SAVE Edited Address
   const saveEditedAddress = () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all fields');
@@ -201,7 +218,6 @@ function Checkout() {
     toast.success('Address updated successfully!');
   };
 
-  // DELETE Address
   const handleDeleteAddress = (addressId) => {
     if (!confirm('Are you sure you want to delete this address?')) return;
     
@@ -224,7 +240,6 @@ function Checkout() {
     toast.success('Address deleted successfully!');
   };
 
-  // CANCEL Edit
   const cancelEdit = () => {
     setEditingAddressId(null);
     setIsEditing(false);
@@ -240,7 +255,6 @@ function Checkout() {
     setSelectedAddress(null);
   };
 
-  // Duplicate address check
   const saveNewAddress = () => {
     const newAddress = {
       id: Date.now(),
@@ -320,7 +334,7 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
-  // ✅ FIXED: placeOrder function - total save karega
+  // ✅ placeOrder with Nykaa Style Order ID
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all address fields');
@@ -334,7 +348,6 @@ function Checkout() {
 
     setIsPlacingOrder(true);
 
-    // ✅ FIX: Total save karo before clearing cart
     const finalTotal = total;
     setOrderTotal(finalTotal);
 
@@ -382,10 +395,10 @@ function Checkout() {
         throw new Error(data.message || 'Failed to place order');
       }
 
-      const newOrderId = data.order?._id || 'MPS' + Date.now();
+      // ✅ Nykaa Style Order ID
+      const newOrderId = data.order?._id || generateOrderId();
       setOrderId(newOrderId);
       
-      // ✅ Cart clear karo
       clearCart();
       setOrderPlaced(true);
       window.scrollTo(0, 0);
@@ -424,7 +437,6 @@ function Checkout() {
     return 'Delivery available';
   };
 
-  // ✅ FIXED: Order Placed UI - orderTotal use karega
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 py-12">
@@ -434,7 +446,7 @@ function Checkout() {
               <span className="text-5xl text-green-600">✓</span>
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Order Placed! 🎉</h1>
-            <p className="text-gray-500 mb-2">Order ID: <span className="font-semibold text-pink-600">{orderId}</span></p>
+            <p className="text-gray-500 mb-2">Order ID: <span className="font-semibold text-pink-600 font-mono">{orderId}</span></p>
             <p className="text-gray-600 mb-6">Your order has been confirmed. You will receive a confirmation email shortly.</p>
             
             {shippingInfo.estimatedDelivery && (
@@ -446,7 +458,6 @@ function Checkout() {
             
             <div className="bg-pink-50 rounded-xl p-4 mb-6 text-left">
               <p className="font-semibold mb-2 text-gray-800">Order Summary</p>
-              {/* ✅ FIX: orderTotal use kar raha hai, cartTotal nahi */}
               <p className="text-sm text-gray-600">Total Amount: <span className="font-bold text-pink-600">₹{orderTotal}</span></p>
               <p className="text-sm text-gray-600">Payment Method: {paymentOptions.find(m => m.id === paymentMethod)?.name}</p>
               <p className="text-sm text-gray-600">Delivery to: {formData.address}, {formData.city}</p>
@@ -471,9 +482,7 @@ function Checkout() {
       
       <OfferBanner />
 
-      <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-2.5 text-center text-sm font-medium">
-        🚚 Free Shipping on ₹{shippingInfo.freeShippingThreshold}+ &nbsp;|&nbsp; 🔒 Secure Checkout &nbsp;|&nbsp; 💯 100% Safe Shopping
-      </div>
+      {/* 🔥 TOP BAR REMOVED - Free Shipping, Secure Checkout hataya */}
 
       <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -503,7 +512,7 @@ function Checkout() {
           
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Progress Steps */}
+            {/* 🔥 3 Steps - Clean Design */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between relative">
                 <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
@@ -551,23 +560,27 @@ function Checkout() {
                     <p className="text-sm font-medium text-gray-700 mb-3">📌 Saved Addresses</p>
                     <div className="grid grid-cols-1 gap-3">
                       {savedAddresses.map(addr => (
-                        <div key={addr.id} className={`p-4 border-2 rounded-xl transition-all ${
-                          selectedAddress === addr.id ? 'border-pink-500 bg-pink-50 shadow-md' : 'border-gray-200 hover:border-pink-200'
-                        }`}>
+                        <div 
+                          key={addr.id} 
+                          onClick={() => handleAddressSelect(addr)}
+                          className={`p-4 border-2 rounded-xl transition-all cursor-pointer ${
+                            selectedAddress === addr.id ? 'border-pink-500 bg-pink-50 shadow-md' : 'border-gray-200 hover:border-pink-200'
+                          }`}
+                        >
                           <div className="flex items-start gap-3">
                             <input
                               type="radio"
                               name="savedAddress"
                               checked={selectedAddress === addr.id}
-                              onChange={() => handleAddressSelect(addr)}
-                              className="mt-1 w-4 h-4 text-pink-600 accent-pink-500 flex-shrink-0"
+                              onChange={() => {}}
+                              className="mt-1 w-4 h-4 text-pink-600 accent-pink-500 flex-shrink-0 pointer-events-none"
                             />
-                            <div className="flex-1">
+                            <div className="flex-1 pointer-events-none">
                               <p className="font-semibold text-gray-800">{addr.fullName}</p>
                               <p className="text-sm text-gray-500">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
                               <p className="text-sm text-gray-500">📞 {addr.phone}</p>
                             </div>
-                            <div className="flex gap-1.5 flex-shrink-0">
+                            <div className="flex gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => handleEditAddress(addr)}
                                 className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
@@ -589,9 +602,8 @@ function Checkout() {
                             </div>
                           </div>
                           
-                          {/* Edit Mode */}
                           {editingAddressId === addr.id && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
                               <p className="text-xs text-blue-600 font-medium mb-2">✏️ Editing this address...</p>
                               <div className="flex gap-2">
                                 <button
@@ -610,9 +622,8 @@ function Checkout() {
                             </div>
                           )}
                           
-                          {/* Continue Button - Right Below Selected Address */}
                           {selectedAddress === addr.id && !editingAddressId && (
-                            <div className="mt-3 pt-3 border-t border-pink-200">
+                            <div className="mt-3 pt-3 border-t border-pink-200" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => {
                                   if (!shippingInfo.deliverable) {
@@ -758,7 +769,6 @@ function Checkout() {
                   </div>
                 </div>
                 
-                {/* Continue Button - Jab koi address select nahi hai */}
                 {!selectedAddress && (
                   <button
                     onClick={() => {
@@ -784,6 +794,19 @@ function Checkout() {
             {/* STEP 2 - Delivery */}
             {step === 2 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                {/* 🔥 BACK BUTTON - Top Left */}
+                <div className="flex items-center justify-between mb-6">
+                  <button 
+                    onClick={() => setStep(1)} 
+                    className="flex items-center gap-2 text-gray-500 hover:text-pink-600 transition font-medium text-sm"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back to Address
+                  </button>
+                </div>
+                
                 <div className="flex items-center gap-3 mb-6">
                   <span className="text-2xl">🚚</span>
                   <div>
@@ -849,12 +872,6 @@ function Checkout() {
                 
                 <div className="flex gap-4 mt-6">
                   <button 
-                    onClick={() => setStep(1)} 
-                    className="flex-1 border-2 border-gray-200 text-gray-600 py-3.5 rounded-xl font-medium hover:bg-gray-50 transition"
-                  >
-                    ← Back
-                  </button>
-                  <button 
                     onClick={() => setStep(3)} 
                     className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-semibold hover:shadow-lg hover:shadow-pink-200 transition-all"
                   >
@@ -867,6 +884,19 @@ function Checkout() {
             {/* STEP 3 - Payment */}
             {step === 3 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                {/* 🔥 BACK BUTTON - Top Left */}
+                <div className="flex items-center justify-between mb-6">
+                  <button 
+                    onClick={() => setStep(2)} 
+                    className="flex items-center gap-2 text-gray-500 hover:text-pink-600 transition font-medium text-sm"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back to Delivery
+                  </button>
+                </div>
+                
                 <div className="flex items-center gap-3 mb-6">
                   <span className="text-2xl">💳</span>
                   <div>
@@ -902,12 +932,6 @@ function Checkout() {
                 </div>
                 
                 <div className="flex gap-4 mt-6">
-                  <button 
-                    onClick={() => setStep(2)} 
-                    className="flex-1 border-2 border-gray-200 text-gray-600 py-3.5 rounded-xl font-medium hover:bg-gray-50 transition"
-                  >
-                    ← Back
-                  </button>
                   <button
                     onClick={placeOrder}
                     disabled={isPlacingOrder || !shippingInfo.deliverable}
