@@ -35,6 +35,10 @@ function Checkout() {
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   
+  // 🔥 Edit mode states
+  const [editingAddressId, setEditingAddressId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  
   const [shippingInfo, setShippingInfo] = useState({
     deliverable: true,
     estimatedDelivery: null,
@@ -143,8 +147,96 @@ function Checkout() {
       state: address.state,
       pincode: address.pincode,
     });
+    setIsEditing(false);
+    setEditingAddressId(null);
   };
 
+  // 🔥 EDIT Address
+  const handleEditAddress = (address) => {
+    setEditingAddressId(address.id);
+    setIsEditing(true);
+    setFormData({
+      ...formData,
+      fullName: address.fullName,
+      phone: address.phone,
+      address: address.address,
+      city: address.city,
+      state: address.state,
+      pincode: address.pincode,
+    });
+    setSelectedAddress(null);
+  };
+
+  // 🔥 SAVE Edited Address
+  const saveEditedAddress = () => {
+    if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    const updatedAddresses = savedAddresses.map(addr => {
+      if (addr.id === editingAddressId) {
+        return {
+          ...addr,
+          fullName: formData.fullName,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.pincode,
+        };
+      }
+      return addr;
+    });
+
+    setSavedAddresses(updatedAddresses);
+    localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
+    setEditingAddressId(null);
+    setIsEditing(false);
+    setSelectedAddress(null);
+    toast.success('Address updated successfully!');
+  };
+
+  // 🔥 DELETE Address
+  const handleDeleteAddress = (addressId) => {
+    if (!confirm('Are you sure you want to delete this address?')) return;
+    
+    const updatedAddresses = savedAddresses.filter(addr => addr.id !== addressId);
+    setSavedAddresses(updatedAddresses);
+    localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
+    
+    if (selectedAddress === addressId) {
+      setSelectedAddress(null);
+      setFormData({
+        ...formData,
+        fullName: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+      });
+    }
+    toast.success('Address deleted successfully!');
+  };
+
+  // 🔥 CANCEL Edit
+  const cancelEdit = () => {
+    setEditingAddressId(null);
+    setIsEditing(false);
+    setFormData({
+      ...formData,
+      fullName: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    });
+    setSelectedAddress(null);
+  };
+
+  // ✅ FIXED: Duplicate address check
   const saveNewAddress = () => {
     const newAddress = {
       id: Date.now(),
@@ -156,16 +248,24 @@ function Checkout() {
       pincode: formData.pincode,
     };
     
+    // 🔥 Strict duplicate check - same pincode, same address, same name, same phone
     const duplicate = savedAddresses.find(addr => 
       addr.pincode === newAddress.pincode && 
-      addr.fullName === newAddress.fullName && 
-      addr.address === newAddress.address
+      addr.fullName.toLowerCase() === newAddress.fullName.toLowerCase() && 
+      addr.address.toLowerCase() === newAddress.address.toLowerCase() &&
+      addr.city.toLowerCase() === newAddress.city.toLowerCase() &&
+      addr.phone === newAddress.phone
     );
     
     if (!duplicate) {
       const updatedAddresses = [...savedAddresses, newAddress];
       setSavedAddresses(updatedAddresses);
       localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
+      toast.success('Address saved successfully!');
+      return true;
+    } else {
+      toast.error('This address already exists in your saved addresses!');
+      return false;
     }
   };
 
@@ -230,7 +330,7 @@ function Checkout() {
 
     setIsPlacingOrder(true);
 
-    if (formData.saveAddress) {
+    if (formData.saveAddress && !isEditing) {
       saveNewAddress();
     }
 
@@ -356,12 +456,10 @@ function Checkout() {
       
       <OfferBanner />
 
-      {/* 🔥 Top Bar */}
       <div className="bg-gradient-to-r from-pink-600 to-rose-600 text-white py-2.5 text-center text-sm font-medium">
         🚚 Free Shipping on ₹{shippingInfo.freeShippingThreshold}+ &nbsp;|&nbsp; 🔒 Secure Checkout &nbsp;|&nbsp; 💯 100% Safe Shopping
       </div>
 
-      {/* 🔥 Header */}
       <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
@@ -388,13 +486,11 @@ function Checkout() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* 🔥 LEFT COLUMN */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* 🔥 Progress Steps - Better Design */}
+            {/* Progress Steps */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between relative">
-                {/* Line connector */}
                 <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
                   <div className={`h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-500 ${
                     step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'
@@ -424,7 +520,7 @@ function Checkout() {
               </div>
             </div>
 
-            {/* 🔥 STEP 1 - Address */}
+            {/* STEP 1 - Address with Edit/Delete */}
             {step === 1 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -440,22 +536,64 @@ function Checkout() {
                     <p className="text-sm font-medium text-gray-700 mb-3">📌 Saved Addresses</p>
                     <div className="grid grid-cols-1 gap-3">
                       {savedAddresses.map(addr => (
-                        <label key={addr.id} className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        <div key={addr.id} className={`p-4 border-2 rounded-xl transition-all ${
                           selectedAddress === addr.id ? 'border-pink-500 bg-pink-50 shadow-md' : 'border-gray-200 hover:border-pink-200'
                         }`}>
-                          <input
-                            type="radio"
-                            name="savedAddress"
-                            checked={selectedAddress === addr.id}
-                            onChange={() => handleAddressSelect(addr)}
-                            className="mt-1 w-4 h-4 text-pink-600 accent-pink-500"
-                          />
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-800">{addr.fullName}</p>
-                            <p className="text-sm text-gray-500">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
-                            <p className="text-sm text-gray-500">📞 {addr.phone}</p>
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="radio"
+                              name="savedAddress"
+                              checked={selectedAddress === addr.id}
+                              onChange={() => handleAddressSelect(addr)}
+                              className="mt-1 w-4 h-4 text-pink-600 accent-pink-500 flex-shrink-0"
+                            />
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-800">{addr.fullName}</p>
+                              <p className="text-sm text-gray-500">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
+                              <p className="text-sm text-gray-500">📞 {addr.phone}</p>
+                            </div>
+                            {/* 🔥 Edit & Delete Buttons */}
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => handleEditAddress(addr)}
+                                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                                title="Edit Address"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAddress(addr.id)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                title="Delete Address"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
-                        </label>
+                          {editingAddressId === addr.id && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs text-blue-600 font-medium mb-2">✏️ Editing this address...</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={saveEditedAddress}
+                                  className="px-4 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition"
+                                >
+                                  Save Changes
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="px-4 py-1.5 bg-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-300 transition"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                     <div className="relative my-5">
@@ -602,7 +740,7 @@ function Checkout() {
               </div>
             )}
 
-            {/* 🔥 STEP 2 - Delivery */}
+            {/* STEP 2 - Delivery */}
             {step === 2 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -685,7 +823,7 @@ function Checkout() {
               </div>
             )}
 
-            {/* 🔥 STEP 3 - Payment */}
+            {/* STEP 3 - Payment */}
             {step === 3 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -748,7 +886,7 @@ function Checkout() {
             )}
           </div>
 
-          {/* 🔥 RIGHT COLUMN - Order Summary (Better Design) */}
+          {/* RIGHT COLUMN - Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
@@ -759,7 +897,6 @@ function Checkout() {
                 </span>
               </div>
               
-              {/* Cart Items */}
               <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
                 {cart.map(item => (
                   <div key={item.id} className="flex gap-3 pb-3 border-b border-gray-100">
@@ -783,7 +920,6 @@ function Checkout() {
                 ))}
               </div>
 
-              {/* Coupon Section */}
               <div className="mb-4">
                 <div className="flex gap-2">
                   <input
@@ -828,7 +964,6 @@ function Checkout() {
                 )}
               </div>
 
-              {/* Price Details */}
               <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Subtotal</span>
@@ -856,7 +991,6 @@ function Checkout() {
                 </div>
               </div>
 
-              {/* Delivery Address Preview */}
               {formData.address && (
                 <div className="mt-4 p-3 bg-pink-50 rounded-xl border border-pink-100">
                   <p className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
@@ -871,7 +1005,6 @@ function Checkout() {
                 </div>
               )}
 
-              {/* 🔒 Security Badge */}
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
                   <span className="flex items-center gap-1">🔒 Secure</span>
