@@ -191,12 +191,18 @@ function Profile() {
           dob: data.dob || '',
           createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
         });
+        
+        // ✅ PROFILE IMAGE FIX: Agar image path relative hai toh API_URL prefix lagao
         if (data.profileImage) {
-          setProfileImage(data.profileImage);
-          sessionStorage.setItem('user_profile_image', data.profileImage);
-          localStorage.setItem('profileImage', data.profileImage);
+          let imgUrl = data.profileImage;
+          if (imgUrl.startsWith('/')) {
+            imgUrl = `${API_URL}${imgUrl}`;
+          }
+          setProfileImage(imgUrl);
+          sessionStorage.setItem('user_profile_image', imgUrl);
+          localStorage.setItem('profileImage', imgUrl);
           if (updateUserProfile) {
-            updateUserProfile({ profileImage: data.profileImage });
+            updateUserProfile({ profileImage: imgUrl });
           }
         }
       }
@@ -229,11 +235,9 @@ function Profile() {
       if (response.ok) {
         const data = await response.json();
         const ordersData = Array.isArray(data) ? data : (data.orders || data.order || []);
-        // ✅ FILTER: Cancelled orders ko hatao
         const filteredOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'cancelled');
         const sortedOrders = filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOrders(sortedOrders);
-        console.log('✅ Orders fetched:', sortedOrders.length);
       } else {
         const fallbackRes = await fetch(`${API_URL}/api/orders/my-orders`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -244,7 +248,6 @@ function Profile() {
           const filteredOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'cancelled');
           const sortedOrders = filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setOrders(sortedOrders);
-          console.log('✅ Orders fetched (fallback):', sortedOrders.length);
         }
       }
     } catch (error) {
@@ -629,6 +632,13 @@ function Profile() {
     return 'N/A';
   };
 
+  // ✅ IMAGE URL FIX FUNCTION
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    return `${API_URL}${url}`;
+  };
+
   // ========== TABS ==========
   const tabs = [
     { id: 'orders', label: '📦 Orders' },
@@ -740,7 +750,7 @@ function Profile() {
               <div className="relative">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-2xl text-white overflow-hidden">
                   {profileImage ? (
-                    <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={getImageUrl(profileImage)} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <span className="font-bold text-xl">{getInitials(userData.name)}</span>
                   )}
@@ -848,28 +858,39 @@ function Profile() {
                         </span>
                       </div>
 
-                      {/* Card Body: Product Items */}
+                      {/* Card Body: Product Items (Clickable) */}
                       <div className="px-5 py-4 border-b border-gray-50">
                         {order.items && order.items.length > 0 ? (
                           <div className="space-y-3">
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="flex items-start gap-4">
-                                <div className="w-14 h-14 rounded-lg border border-gray-100 p-1 bg-white shrink-0">
-                                  {item.image ? (
-                                    <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
-                                  ) : (
-                                    <div className="w-full h-full bg-pink-50 rounded flex items-center justify-center text-lg">🛍️</div>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-800 line-clamp-2 leading-snug">{item.name}</p>
-                                  <div className="flex justify-between items-center mt-1">
-                                    <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
-                                    <p className="text-sm font-semibold text-gray-700">₹{item.price?.toLocaleString()}</p>
+                            {order.items.map((item, idx) => {
+                              // ✅ Product ID nikaalne ka safe logic (Object ya String dono handle karega)
+                              const productId = item.productId?._id || item.productId || item.id;
+                              
+                              return (
+                                <Link 
+                                  key={idx} 
+                                  to={productId ? `/product/${productId}` : '#'}
+                                  className="flex items-start gap-4 group"
+                                >
+                                  <div className="w-14 h-14 rounded-lg border border-gray-100 p-1 bg-white shrink-0 overflow-hidden">
+                                    {item.image ? (
+                                      <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
+                                    ) : (
+                                      <div className="w-full h-full bg-pink-50 rounded flex items-center justify-center text-lg">🛍️</div>
+                                    )}
                                   </div>
-                                </div>
-                              </div>
-                            ))}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 line-clamp-2 leading-snug group-hover:text-pink-600 transition">
+                                      {item.name}
+                                    </p>
+                                    <div className="flex justify-between items-center mt-1">
+                                      <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
+                                      <p className="text-sm font-semibold text-gray-700">₹{item.price?.toLocaleString()}</p>
+                                    </div>
+                                  </div>
+                                </Link>
+                              );
+                            })}
                           </div>
                         ) : (
                           <p className="text-sm text-gray-400">No items found</p>
@@ -1078,7 +1099,7 @@ function Profile() {
                   {wishlist.slice(0, 5).map(product => (
                     <div key={product.id} className="p-4 flex items-center gap-4">
                       <Link to={`/product/${product.id}`}>
-                        <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
+                        <img src={getImageUrl(product.image)} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
                       </Link>
                       <div className="flex-1">
                         <Link to={`/product/${product.id}`} className="font-medium text-gray-800 hover:text-pink-500">
