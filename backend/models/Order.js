@@ -1,5 +1,14 @@
 const mongoose = require('mongoose');
 
+// ✅ Nykaa Style Order ID Generator
+const generateOrderId = () => {
+  const prefix = 'MPS';
+  const part1 = Math.floor(Math.random() * 900000000 + 100000000).toString();
+  const part2 = Math.floor(Math.random() * 9000000 + 1000000).toString();
+  const part3 = Math.floor(Math.random() * 9 + 1).toString();
+  return `${prefix}-${part1}-${part2}-${part3}`;
+};
+
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   name: { type: String, required: true },
@@ -12,16 +21,27 @@ const orderItemSchema = new mongoose.Schema({
 });
 
 const orderSchema = new mongoose.Schema({
-  orderNumber: { type: String, required: true, unique: true },
+  // ✅ Nykaa Style Order ID
+  orderId: { 
+    type: String, 
+    required: true, 
+    unique: true,
+    default: generateOrderId
+  },
   
-  // ✅ buyerId ABHI BHI REQUIRED HAI!
+  // ✅ Backward compatibility ke liye
+  orderNumber: { 
+    type: String, 
+    unique: true,
+    sparse: true
+  },
+  
   buyerId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
     required: true 
   },
   
-  // ✅ Lekin userId bhi add kar diya hai (optional)
   userId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
@@ -31,7 +51,7 @@ const orderSchema = new mongoose.Schema({
   buyerName: { type: String, default: 'Customer' },
   buyerEmail: { type: String },
   buyerPhone: { type: String },
-  buyerAddress: { type: mongoose.Schema.Types.Mixed, default: {} }, // ✅ Ye Mixed hai!
+  buyerAddress: { type: mongoose.Schema.Types.Mixed, default: {} },
   
   vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
   vendorName: { type: String, default: 'Vendor' },
@@ -68,8 +88,9 @@ const orderSchema = new mongoose.Schema({
   suppressReservedKeysWarning: true 
 });
 
-// Sirf ek hi baar index banane ke liye:
+// ✅ Indexes
 orderSchema.index({ buyerId: 1, createdAt: -1 });
+orderSchema.index({ orderId: 1 });
 orderSchema.index({ orderNumber: 1 });
 
 const Order = mongoose.model('Order', orderSchema);
