@@ -786,15 +786,19 @@ function Profile() {
             ))}
           </div>
 
-          {/* ========== ORDERS TAB - PROFESSIONAL ========== */}
+          {/* ========== ORDERS TAB - PROFESSIONAL (New Design) ========== */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
-                <h3 className="font-semibold text-gray-800">Your Orders ({orders.filter(o => o.status?.toLowerCase() !== 'cancelled').length})</h3>
+              
+              {/* Header with Filter */}
+              <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-[#fffafb]">
+                <h3 className="font-semibold text-gray-800 text-lg">
+                  My Orders ({filteredOrders.length})
+                </h3>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
+                  className="px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:border-pink-500 bg-white shadow-sm cursor-pointer"
                 >
                   <option value="all">All Orders</option>
                   <option value="pending">Processing</option>
@@ -804,64 +808,96 @@ function Profile() {
                 </select>
               </div>
               
+              {/* Loading / Empty State */}
               {ordersLoading ? (
-                <div className="p-8 text-center">
-                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading orders...</p>
+                <div className="p-10 text-center">
+                  <div className="w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-400 mt-3">Loading orders...</p>
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="p-8 text-center">
+                <div className="p-10 text-center">
                   <p className="text-gray-400">No orders found</p>
-                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
+                  <Link to="/shop" className="inline-block mt-4 bg-pink-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">Start Shopping →</Link>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-50">
+                /* Orders List */
+                <div className="p-4 sm:p-6 space-y-4">
                   {filteredOrders.map(order => (
-                    <div key={order._id} className="p-4 hover:bg-gray-50 transition">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-medium text-gray-800">Order #{getOrderIdDisplay(order)}</p>
-                          <p className="text-sm text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
-                          <p className="text-sm text-gray-400">{order.items?.length || 0} items</p>
+                    <div key={order._id} className="border border-pink-100 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition">
+                      
+                      {/* Card Header: ID, Date, Total, Status */}
+                      <div className="flex justify-between items-center px-5 py-4 bg-[#fffafb] border-b border-pink-50">
+                        <div className="flex flex-wrap gap-4 sm:gap-8">
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order ID</p>
+                            <p className="text-sm font-bold text-gray-700 mt-1">#{getOrderIdDisplay(order)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Date</p>
+                            <p className="text-sm font-semibold text-gray-600 mt-1">
+                              {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</p>
+                            <p className="text-sm font-bold text-gray-700 mt-1">₹{order.total?.toLocaleString()}</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-gray-800">₹{order.total?.toLocaleString()}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(order.status)}`}>
-                            {getStatusText(order.status)}
-                          </span>
-                        </div>
+                        <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${getStatusColor(order.status)}`}>
+                          {getStatusText(order.status)}
+                        </span>
                       </div>
-                      
-                      {/* ✅ Order Items with Image & Name - Professional */}
-                      {order.items && order.items.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-3">
-                          {order.items.slice(0, 3).map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-100">
-                              {item.image ? (
-                                <img src={item.image} alt={item.name} className="w-8 h-8 rounded object-cover" />
-                              ) : (
-                                <div className="w-8 h-8 bg-pink-100 rounded flex items-center justify-center text-sm">🛍️</div>
-                              )}
-                              <span className="text-xs text-gray-600 truncate max-w-[100px]">{item.name}</span>
-                              <span className="text-xs text-gray-400">×{item.quantity}</span>
-                            </div>
-                          ))}
-                          {order.items.length > 3 && (
-                            <span className="text-xs text-gray-400 flex items-center">+{order.items.length - 3} more</span>
-                          )}
-                        </div>
-                      )}
-                      
-                      <div className="flex gap-4 mt-3">
-                        <button onClick={() => handleReorder(order)} className="text-sm text-pink-600 hover:underline">
-                          Reorder
+
+                      {/* Card Body: Product Items */}
+                      <div className="px-5 py-4 border-b border-gray-50">
+                        {order.items && order.items.length > 0 ? (
+                          <div className="space-y-3">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="flex items-start gap-4">
+                                <div className="w-14 h-14 rounded-lg border border-gray-100 p-1 bg-white shrink-0">
+                                  {item.image ? (
+                                    <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
+                                  ) : (
+                                    <div className="w-full h-full bg-pink-50 rounded flex items-center justify-center text-lg">🛍️</div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 line-clamp-2 leading-snug">{item.name}</p>
+                                  <div className="flex justify-between items-center mt-1">
+                                    <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
+                                    <p className="text-sm font-semibold text-gray-700">₹{item.price?.toLocaleString()}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400">No items found</p>
+                        )}
+                      </div>
+
+                      {/* Card Footer: Action Buttons */}
+                      <div className="px-5 py-3 flex items-center justify-between">
+                        <button 
+                          onClick={() => navigate(`/order-tracking/${order._id}`)} 
+                          className="text-sm font-semibold text-gray-700 hover:text-pink-600 transition flex items-center gap-1.5"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          Track Order
                         </button>
+                        
+                        {/* Cancel Button - Sirf pending/confirmed par dikhega */}
                         {['pending', 'confirmed'].includes(order.status?.toLowerCase()) && (
-                          <button onClick={() => cancelOrder(order._id)} className="text-sm text-rose-600 hover:underline">
+                          <button 
+                            onClick={() => cancelOrder(order._id)} 
+                            className="text-sm font-semibold text-rose-600 bg-rose-50 px-4 py-2 rounded-full hover:bg-rose-100 transition flex items-center gap-1.5"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             Cancel Order
                           </button>
                         )}
                       </div>
+
                     </div>
                   ))}
                 </div>
