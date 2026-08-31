@@ -143,10 +143,8 @@ function Checkout() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ✅ Toggle address selection - click anywhere on card
   const handleAddressSelect = (address) => {
     if (selectedAddress === address.id) {
-      // If already selected, unselect it
       setSelectedAddress(null);
       setFormData({
         ...formData,
@@ -158,7 +156,6 @@ function Checkout() {
         pincode: '',
       });
     } else {
-      // Select new address
       setSelectedAddress(address.id);
       setFormData({
         ...formData,
@@ -334,7 +331,7 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
-  // ✅ placeOrder with Nykaa Style Order ID
+  // ✅ FIXED: placeOrder with Nykaa Style Order ID
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all address fields');
@@ -395,8 +392,8 @@ function Checkout() {
         throw new Error(data.message || 'Failed to place order');
       }
 
-      // ✅ Nykaa Style Order ID
-      const newOrderId = data.order?._id || generateOrderId();
+      // ✅ FIX: Pehle orderId, fir _id, fir generate
+      const newOrderId = data.order?.orderId || data.order?._id || generateOrderId();
       setOrderId(newOrderId);
       
       clearCart();
@@ -482,8 +479,6 @@ function Checkout() {
       
       <OfferBanner />
 
-      {/* 🔥 TOP BAR REMOVED - Free Shipping, Secure Checkout hataya */}
-
       <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
@@ -512,7 +507,7 @@ function Checkout() {
           
           <div className="lg:col-span-2 space-y-6">
             
-            {/* 🔥 3 Steps - Clean Design */}
+            {/* 3 Steps */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between relative">
                 <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
@@ -794,7 +789,6 @@ function Checkout() {
             {/* STEP 2 - Delivery */}
             {step === 2 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                {/* 🔥 BACK BUTTON - Top Left */}
                 <div className="flex items-center justify-between mb-6">
                   <button 
                     onClick={() => setStep(1)} 
@@ -884,7 +878,6 @@ function Checkout() {
             {/* STEP 3 - Payment */}
             {step === 3 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                {/* 🔥 BACK BUTTON - Top Left */}
                 <div className="flex items-center justify-between mb-6">
                   <button 
                     onClick={() => setStep(2)} 
