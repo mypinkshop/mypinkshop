@@ -35,7 +35,7 @@ function AdminOrders() {
       setError('');
 
       // 1. Load all orders
-      const ordersRes = await fetch(`${API_URL}/api/orders`, {
+      const ordersRes = await fetch(`${API_URL}/api/orders/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
