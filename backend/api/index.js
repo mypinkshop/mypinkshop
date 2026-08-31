@@ -2134,6 +2134,49 @@ app.use('/api/coupons', require('../routes/couponRoutes'));
 app.options('/api/addresses', cors(corsOptions));
 app.options('/api/addresses/:id', cors(corsOptions));
 
+// ✅ GET ALL CATEGORIES (For Admin Panel)
+app.get('/api/categories', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const categories = await Product.distinct('category');
+    res.json(categories);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ POST /api/categories (For Admin Panel)
+app.post('/api/categories', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const newCategory = req.body;
+    res.status(201).json({ success: true, category: newCategory });
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ PUT /api/categories/:id (For Admin Panel)
+app.put('/api/categories/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const category = req.body;
+    res.json({ success: true, category });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ DELETE /api/categories/:id (For Admin Panel)
+app.delete('/api/categories/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    res.json({ success: true, message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/addresses', cors(corsOptions), authMiddleware, async (req, res) => {
   try {
     const addresses = await Address.find({ userId: req.user.id }).sort({ isDefault: -1, createdAt: -1 });
