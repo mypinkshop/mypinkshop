@@ -116,12 +116,12 @@ function MyOrders() {
 
   const getStatusBg = (status) => {
     switch(status) {
-      case 'delivered': return 'bg-emerald-100/60';
-      case 'shipped': return 'bg-blue-100/60';
-      case 'confirmed': return 'bg-purple-100/60';
-      case 'pending': return 'bg-amber-100/60';
-      case 'cancelled': return 'bg-rose-100/60';
-      default: return 'bg-gray-100/60';
+      case 'delivered': return 'bg-emerald-100';
+      case 'shipped': return 'bg-blue-100';
+      case 'confirmed': return 'bg-purple-100';
+      case 'pending': return 'bg-amber-100';
+      case 'cancelled': return 'bg-rose-100';
+      default: return 'bg-gray-100';
     }
   };
 
@@ -272,7 +272,7 @@ function MyOrders() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50/30 via-white to-rose-50/30 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-16 h-16 mx-auto mb-4">
             <div className="absolute inset-0 border-4 border-pink-200 rounded-full"></div>
@@ -292,16 +292,16 @@ function MyOrders() {
         <link rel="canonical" href="https://www.mypinkshop.com/my-orders" />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50/20 via-white to-rose-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
         <OfferBanner />
 
-        {/* Glass Header */}
-        <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-sm">
+        {/* Header */}
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-200/50 group-hover:scale-105 transition-transform">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
@@ -318,7 +318,7 @@ function MyOrders() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-white/60 backdrop-blur-sm border border-white/30 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition-all text-sm sm:text-base"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
                   <button 
                     onClick={handleSearch}
@@ -357,35 +357,29 @@ function MyOrders() {
           </div>
         </header>
 
-        {/* Breadcrumb - Glass */}
+        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-400 hover:text-pink-500 transition">Home</Link>
-            <span className="text-gray-300">/</span>
+            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+            <span className="text-gray-400">/</span>
             <span className="text-pink-600 font-medium">My Orders</span>
           </div>
         </div>
 
-        {/* Stats Cards - Glass */}
+        {/* Stats Cards - Pink Gradient */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
-              <p className="text-xs text-gray-400 font-medium">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-800">{totalOrders}</p>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-gradient-to-br from-pink-100 to-pink-200/50 rounded-2xl p-4 border border-pink-200/50 shadow-sm">
+              <p className="text-xs text-pink-600/70 font-medium">Total Orders</p>
+              <p className="text-2xl font-bold text-pink-700">{totalOrders}</p>
             </div>
-            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
-              <p className="text-xs text-gray-400 font-medium">Delivered</p>
-              <p className="text-2xl font-bold text-emerald-600">{deliveredOrders}</p>
+            <div className="bg-gradient-to-br from-emerald-100 to-emerald-200/50 rounded-2xl p-4 border border-emerald-200/50 shadow-sm">
+              <p className="text-xs text-emerald-600/70 font-medium">Delivered</p>
+              <p className="text-2xl font-bold text-emerald-700">{deliveredOrders}</p>
             </div>
-            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
-              <p className="text-xs text-gray-400 font-medium">In Progress</p>
-              <p className="text-2xl font-bold text-amber-600">{pendingOrders}</p>
-            </div>
-            <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
-              <p className="text-xs text-gray-400 font-medium">Total Spent</p>
-              <p className="text-2xl font-bold text-pink-600">
-                ₹{orders.reduce((acc, o) => acc + (o.total || 0), 0).toLocaleString()}
-              </p>
+            <div className="bg-gradient-to-br from-amber-100 to-amber-200/50 rounded-2xl p-4 border border-amber-200/50 shadow-sm">
+              <p className="text-xs text-amber-600/70 font-medium">In Progress</p>
+              <p className="text-2xl font-bold text-amber-700">{pendingOrders}</p>
             </div>
           </div>
         </div>
@@ -393,11 +387,11 @@ function MyOrders() {
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-12">
           
-          {/* Header with Filters - Glass */}
+          {/* Header with Filters */}
           <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">My Orders</h1>
-              <p className="text-gray-400 text-sm">{orderCount} {orderCount === 1 ? 'order' : 'orders'}</p>
+              <p className="text-gray-500 text-sm">{orderCount} {orderCount === 1 ? 'order' : 'orders'}</p>
             </div>
             
             <div className="flex gap-2 flex-wrap">
@@ -407,8 +401,8 @@ function MyOrders() {
                   onClick={() => setFilterStatus(status)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     filterStatus === status 
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-200/50' 
-                      : 'bg-white/40 backdrop-blur-sm border border-white/30 text-gray-600 hover:border-pink-300 hover:bg-white/60'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-200/50' 
+                      : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300 hover:bg-pink-50'
                   }`}
                 >
                   {status === 'all' ? 'All' : getStatusText(status)}
@@ -418,8 +412,7 @@ function MyOrders() {
           </div>
 
           {filteredOrders.length === 0 ? (
-            // Empty Orders - Glass
-            <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-12 text-center border border-white/30 shadow-sm">
+            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 text-center border border-pink-100 shadow-sm">
               <div className="text-7xl mb-4">📦</div>
               <h2 className="text-2xl font-semibold text-gray-800 mb-2">No orders yet</h2>
               <p className="text-gray-400 mb-6">Looks like you haven't placed any orders.</p>
@@ -428,130 +421,153 @@ function MyOrders() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-5">
-              {filteredOrders.map((order) => (
-                <div key={order._id} className="bg-white/40 backdrop-blur-xl rounded-3xl border border-white/30 overflow-hidden hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300 shadow-sm">
-                  
-                  {/* Order Header - Glass */}
-                  <div className="bg-gradient-to-r from-pink-50/30 to-rose-50/30 backdrop-blur-sm px-4 sm:px-6 py-4 border-b border-white/30 flex flex-wrap justify-between items-center gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">Order #{order._id?.slice(-8)}</p>
+            <div className="space-y-6">
+              {filteredOrders.map((order, index) => (
+                <div key={order._id}>
+                  {/* Order Card */}
+                  <div className="bg-white rounded-2xl border border-pink-100 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300">
+                    
+                    {/* 🔥 Order Header - FULL PINK GRADIENT (Table style) */}
+                    <div className="bg-gradient-to-r from-pink-500 via-pink-400 to-rose-500 px-4 sm:px-6 py-3.5 flex flex-wrap justify-between items-center gap-3">
+                      <div className="flex items-center gap-4">
+                        <span className="text-white/80 text-sm font-medium">Order</span>
+                        <span className="text-white font-mono font-bold text-sm bg-white/20 px-3 py-1 rounded-full">
+                          #{order._id?.slice(-8)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-white/70 text-xs">Total</p>
+                          <p className="text-white font-bold text-base">₹{order.total?.toLocaleString()}</p>
+                        </div>
+                        <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)} flex items-center gap-1.5`}>
+                          <span>{getStatusIcon(order.status)}</span>
+                          {getStatusText(order.status)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Order Date */}
+                    <div className="px-4 sm:px-6 py-2 bg-pink-50/30 border-b border-pink-50">
                       <p className="text-xs text-gray-400">
-                        {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        📅 {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-xs text-gray-400">Total</p>
-                        <p className="text-lg font-bold text-pink-600">₹{order.total?.toLocaleString()}</p>
-                      </div>
-                      <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)} flex items-center gap-1.5`}>
-                        <span>{getStatusIcon(order.status)}</span>
-                        {getStatusText(order.status)}
-                      </div>
+
+                    {/* Order Items */}
+                    <div className="px-4 sm:px-6 py-4">
+                      {order.items && order.items.map((item, idx) => {
+                        const eligibilityKey = `${order._id}_${item.productId}`;
+                        const canReview = reviewEligibility[eligibilityKey]?.canReview && 
+                                          !reviewEligibility[eligibilityKey]?.alreadyReviewed &&
+                                          order.status === 'delivered';
+                        const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
+                        
+                        return (
+                          <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
+                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100 flex-shrink-0">
+                              {item.image ? (
+                                <img 
+                                  src={item.image} 
+                                  alt={item.name} 
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-800 text-sm line-clamp-1">{item.name}</h4>
+                              <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
+                              {item.variationName && (
+                                <p className="text-xs text-gray-400">Option: {item.variationName} {item.variationSecondary ? `- ${item.variationSecondary}` : ''}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-gray-800">₹{item.price * item.quantity}</p>
+                              <p className="text-xs text-gray-400">₹{item.price} each</p>
+                              
+                              {order.status === 'delivered' && (
+                                canReview ? (
+                                  <button
+                                    onClick={() => handleWriteReview(order, item)}
+                                    className="mt-2 px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs hover:shadow-md transition"
+                                  >
+                                    ✍️ Review
+                                  </button>
+                                ) : alreadyReviewed ? (
+                                  <span className="mt-2 inline-block text-emerald-500 text-xs flex items-center gap-1">✓ Reviewed</span>
+                                ) : null
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Order Actions */}
+                    <div className="bg-pink-50/30 px-4 sm:px-6 py-3 border-t border-pink-100 flex flex-wrap gap-3 justify-end">
+                      <button 
+                        onClick={() => handleTrackOrder(order)}
+                        className="px-4 py-1.5 text-pink-600 border border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-medium"
+                      >
+                        📍 Track
+                      </button>
+                      {order.status === 'pending' && (
+                        <button 
+                          onClick={() => cancelOrder(order._id)} 
+                          className="px-4 py-1.5 text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-medium"
+                        >
+                          ❌ Cancel
+                        </button>
+                      )}
+                      {order.status === 'delivered' && (
+                        <>
+                          <button className="px-4 py-1.5 text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50 transition text-sm font-medium">
+                            📄 Invoice
+                          </button>
+                          <button 
+                            onClick={() => reorder(order)} 
+                            className="px-4 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-md transition text-sm font-medium"
+                          >
+                            🛒 Buy Again
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Order Items - Glass */}
-                  <div className="px-4 sm:px-6 py-4">
-                    {order.items && order.items.map((item, idx) => {
-                      const eligibilityKey = `${order._id}_${item.productId}`;
-                      const canReview = reviewEligibility[eligibilityKey]?.canReview && 
-                                        !reviewEligibility[eligibilityKey]?.alreadyReviewed &&
-                                        order.status === 'delivered';
-                      const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
-                      
-                      return (
-                        <div key={idx} className="flex items-center gap-4 py-3 border-b border-white/20 last:border-0">
-                          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm border border-white/30 flex-shrink-0">
-                            {item.image ? (
-                              <img 
-                                src={item.image} 
-                                alt={item.name} 
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-800">{item.name}</h4>
-                            <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
-                            {item.variationName && (
-                              <p className="text-xs text-gray-400">Option: {item.variationName} {item.variationSecondary ? `- ${item.variationSecondary}` : ''}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-800">₹{item.price * item.quantity}</p>
-                            <p className="text-xs text-gray-400">₹{item.price} each</p>
-                            
-                            {order.status === 'delivered' && (
-                              canReview ? (
-                                <button
-                                  onClick={() => handleWriteReview(order, item)}
-                                  className="mt-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-xs hover:shadow-lg hover:shadow-pink-200/50 transition"
-                                >
-                                  ✍️ Review
-                                </button>
-                              ) : alreadyReviewed ? (
-                                <span className="mt-2 inline-block text-emerald-500 text-xs flex items-center gap-1">✓ Reviewed</span>
-                              ) : null
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Order Actions - Glass */}
-                  <div className="bg-gradient-to-r from-pink-50/20 to-rose-50/20 backdrop-blur-sm px-4 sm:px-6 py-4 border-t border-white/30 flex flex-wrap gap-3 justify-end">
-                    <button 
-                      onClick={() => handleTrackOrder(order)}
-                      className="px-4 py-2 text-pink-600 border border-pink-200/50 rounded-xl hover:bg-pink-50/50 transition text-sm font-medium backdrop-blur-sm"
-                    >
-                      📍 Track
-                    </button>
-                    {order.status === 'pending' && (
-                      <button 
-                        onClick={() => cancelOrder(order._id)} 
-                        className="px-4 py-2 text-rose-600 border border-rose-200/50 rounded-xl hover:bg-rose-50/50 transition text-sm font-medium backdrop-blur-sm"
-                      >
-                        ❌ Cancel
-                      </button>
-                    )}
-                    {order.status === 'delivered' && (
-                      <>
-                        <button className="px-4 py-2 text-gray-600 border border-gray-200/50 rounded-xl hover:bg-gray-50/50 transition text-sm font-medium backdrop-blur-sm">
-                          📄 Invoice
-                        </button>
-                        <button 
-                          onClick={() => reorder(order)} 
-                          className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl hover:shadow-lg hover:shadow-pink-200/50 transition text-sm font-medium"
-                        >
-                          🛒 Buy Again
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {/* 🔥 SEPARATOR LINE - Sexy Pink Gradient Line between orders */}
+                  {index < filteredOrders.length - 1 && (
+                    <div className="flex items-center gap-4 py-2">
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-pink-300 to-transparent"></div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-pink-300 text-xs">✦</span>
+                        <span className="text-pink-300 text-xs">✦</span>
+                        <span className="text-pink-300 text-xs">✦</span>
+                      </div>
+                      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-pink-300 to-transparent"></div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Tracking Modal - Glass */}
+        {/* Tracking Modal */}
         {showTracking && selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-md">
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl max-w-md w-full max-h-[80vh] overflow-y-auto border border-white/30 shadow-2xl">
-              <div className="sticky top-0 bg-white/80 backdrop-blur-xl p-4 border-b border-white/30 rounded-t-3xl flex justify-between items-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white p-4 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">📍 Track Order #{selectedOrder._id?.slice(-8)}</h3>
                 <button onClick={() => setShowTracking(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
               </div>
               <div className="p-6">
                 <div className="mb-6">
-                  <div className="h-2 bg-gray-200/50 rounded-full overflow-hidden backdrop-blur-sm">
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500"
                       style={{ width: `${getProgressWidth(selectedOrder.tracking)}%` }}
@@ -564,7 +580,7 @@ function MyOrders() {
                   {selectedOrder.tracking && selectedOrder.tracking.map((step, idx) => (
                     <div key={idx} className="flex gap-3">
                       <div className="relative">
-                        <div className={`w-4 h-4 rounded-full mt-1 ${step.completed ? 'bg-emerald-500 shadow-lg shadow-emerald-200/50' : 'bg-gray-300'}`}></div>
+                        <div className={`w-4 h-4 rounded-full mt-1 ${step.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
                         {idx < selectedOrder.tracking.length - 1 && (
                           <div className={`absolute top-5 left-1.5 w-0.5 h-8 ${step.completed && selectedOrder.tracking[idx+1]?.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
                         )}
@@ -577,7 +593,7 @@ function MyOrders() {
                   ))}
                 </div>
 
-                <div className="mt-6 p-4 bg-pink-50/60 backdrop-blur-sm rounded-2xl border border-pink-100/30">
+                <div className="mt-6 p-4 bg-pink-50 rounded-xl">
                   <p className="text-sm font-semibold text-gray-600 mb-1">📍 Delivery Address</p>
                   <p className="text-sm text-gray-600">{selectedOrder.shippingAddress || selectedOrder.address}</p>
                   <p className="text-xs text-gray-400 mt-2">Payment: {selectedOrder.paymentMethod}</p>
@@ -587,18 +603,18 @@ function MyOrders() {
           </div>
         )}
 
-        {/* REVIEW MODAL - Glass */}
+        {/* REVIEW MODAL */}
         {showReviewModal && selectedProduct && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowReviewModal(false)}>
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-white/30 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-white/30 p-4 rounded-t-3xl flex justify-between items-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowReviewModal(false)}>
+            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white border-b border-pink-100 p-4 rounded-t-2xl flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">✍️ Write a Review</h3>
                 <button onClick={() => setShowReviewModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
               </div>
               
               <div className="p-5 space-y-4">
-                <div className="flex gap-3 pb-3 border-b border-white/30">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/50 backdrop-blur-sm border border-white/30">
+                <div className="flex gap-3 pb-3 border-b border-pink-100">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100">
                     {selectedProduct.image ? (
                       <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
                     ) : (
@@ -620,7 +636,7 @@ function MyOrders() {
                         onMouseEnter={() => setHoverRating(star)}
                         onMouseLeave={() => setHoverRating(0)}
                         onClick={() => setRating(star)}
-                        className="text-3xl focus:outline-none transition-transform hover:scale-110"
+                        className="text-3xl focus:outline-none"
                       >
                         <span className={star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-300'}>★</span>
                       </button>
@@ -635,7 +651,7 @@ function MyOrders() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Summarize your experience"
-                    className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                     maxLength="100"
                   />
                 </div>
@@ -647,7 +663,7 @@ function MyOrders() {
                     onChange={(e) => setComment(e.target.value)}
                     rows="4"
                     placeholder="Share your experience with this product"
-                    className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                   />
                 </div>
                 
@@ -655,20 +671,20 @@ function MyOrders() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Add Photos</label>
                   <div className="flex flex-wrap gap-3 mb-3">
                     {images.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-2xl overflow-hidden border border-white/30 bg-white/50">
+                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-pink-100">
                         <img src={img} alt={`Review ${idx}`} className="w-full h-full object-cover" />
-                        <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg">✕</button>
+                        <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs">✕</button>
                       </div>
                     ))}
                   </div>
                   <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="reviewImageUpload" />
-                  <label htmlFor="reviewImageUpload" className="inline-block px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl cursor-pointer hover:bg-white/70 transition text-sm">
+                  <label htmlFor="reviewImageUpload" className="inline-block px-4 py-2.5 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition text-sm">
                     {uploadingImages ? '📤 Uploading...' : '📸 Upload Images'}
                   </label>
                   <p className="text-xs text-gray-400 mt-1">Max 5 images, up to 5MB each</p>
                 </div>
                 
-                <div className="p-3 bg-emerald-50/60 backdrop-blur-sm rounded-2xl border border-emerald-100/30">
+                <div className="p-3 bg-emerald-50 rounded-xl">
                   <p className="text-sm text-emerald-700 flex items-center gap-2">
                     <span>✓</span> Verified Purchase
                   </p>
@@ -678,13 +694,13 @@ function MyOrders() {
                   <button
                     onClick={handleSubmitReview}
                     disabled={submitting}
-                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl hover:shadow-lg hover:shadow-pink-200/50 transition disabled:opacity-50 font-medium"
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl hover:shadow-md transition disabled:opacity-50 font-medium"
                   >
                     {submitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                   <button
                     onClick={() => setShowReviewModal(false)}
-                    className="flex-1 bg-white/50 backdrop-blur-sm border border-white/30 py-2.5 rounded-xl hover:bg-white/70 transition"
+                    className="flex-1 border border-gray-200 py-2.5 rounded-xl hover:bg-gray-50 transition"
                   >
                     Cancel
                   </button>
@@ -694,18 +710,18 @@ function MyOrders() {
           </div>
         )}
 
-        {/* Footer - Glass */}
-        <footer className="bg-white/40 backdrop-blur-xl border-t border-white/30 text-gray-400 py-12 mt-8">
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-200/50">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">M</span>
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-sm text-gray-400">Luxury beauty and fashion for the modern woman.</p>
+                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Shop</h4>
@@ -736,9 +752,9 @@ function MyOrders() {
                 </ul>
               </div>
             </div>
-            <div className="text-center pt-8 border-t border-white/20">
-              <p className="text-sm text-gray-400">© 2026 MyPinkShop. All rights reserved.</p>
-              <p className="text-xs text-gray-500 mt-2">Made with 💖 for the girlies</p>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
             </div>
           </div>
         </footer>
