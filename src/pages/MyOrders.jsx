@@ -57,14 +57,14 @@ function MyOrders() {
     fetchOrders();
   }, [user, navigate]);
 
-  // 🔥 Auto-remove cancelled orders after 30 minutes
+  // Auto-remove cancelled orders after 30 minutes
   useEffect(() => {
     const checkAndRemoveCancelled = () => {
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
       let hasChanges = false;
       
       const updatedOrders = orders.filter(order => {
-        if (order.status === 'cancelled') {
+        if (order.status === 'cancelled' || order.status === 'failed') {
           const cancelledTime = new Date(order.updatedAt || order.cancelledAt).getTime();
           if (cancelledTime < thirtyMinutesAgo) {
             hasChanges = true;
@@ -79,7 +79,7 @@ function MyOrders() {
       }
     };
     
-    const interval = setInterval(checkAndRemoveCancelled, 60000); // Check every minute
+    const interval = setInterval(checkAndRemoveCancelled, 60000);
     return () => clearInterval(interval);
   }, [orders]);
 
@@ -94,10 +94,10 @@ function MyOrders() {
       
       const data = await response.json();
       
-      // 🔥 Filter out cancelled orders older than 30 minutes
+      // Filter out cancelled/failed orders older than 30 minutes
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
       const filteredData = data.filter(order => {
-        if (order.status === 'cancelled') {
+        if (order.status === 'cancelled' || order.status === 'failed') {
           const cancelledTime = new Date(order.updatedAt || order.cancelledAt).getTime();
           return cancelledTime >= thirtyMinutesAgo;
         }
@@ -136,6 +136,7 @@ function MyOrders() {
       case 'confirmed': return 'text-purple-600';
       case 'pending': return 'text-amber-600';
       case 'cancelled': return 'text-rose-600';
+      case 'failed': return 'text-rose-600';
       default: return 'text-gray-600';
     }
   };
@@ -147,6 +148,7 @@ function MyOrders() {
       case 'confirmed': return 'Confirmed';
       case 'pending': return 'Processing';
       case 'cancelled': return 'Cancelled';
+      case 'failed': return 'Payment Failed';
       default: return status || 'Processing';
     }
   };
@@ -158,6 +160,7 @@ function MyOrders() {
       case 'confirmed': return 'bg-purple-50';
       case 'pending': return 'bg-amber-50';
       case 'cancelled': return 'bg-rose-50';
+      case 'failed': return 'bg-rose-50';
       default: return 'bg-gray-50';
     }
   };
@@ -169,6 +172,7 @@ function MyOrders() {
       case 'confirmed': return '📋';
       case 'pending': return '⏳';
       case 'cancelled': return '❌';
+      case 'failed': return '💔';
       default: return '📦';
     }
   };
@@ -305,12 +309,25 @@ function MyOrders() {
   // Stats
   const totalOrders = orders.length;
   const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
-  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length;
-  const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
+  const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed' || o.status === 'shipped').length;
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled' || o.status === 'failed').length;
 
   // Generate Amazon-style Order ID
   const getOrderIdDisplay = (id) => {
     return id?.slice(-12).toUpperCase() || 'N/A';
+  };
+
+  // 🔥 Stats Click Handlers
+  const handleStatClick = (status) => {
+    if (status === 'all') {
+      setFilterStatus('all');
+    } else if (status === 'delivered') {
+      setFilterStatus('delivered');
+    } else if (status === 'pending') {
+      setFilterStatus('pending');
+    } else if (status === 'cancelled') {
+      setFilterStatus('cancelled');
+    }
   };
 
   if (loading) {
@@ -409,25 +426,60 @@ function MyOrders() {
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* 🔥 Stats Cards - Clickable */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-pink-100 to-pink-200/50 rounded-2xl p-4 border border-pink-200/50 shadow-sm">
-              <p className="text-xs text-pink-600/70 font-medium">Total Orders</p>
-              <p className="text-2xl font-bold text-pink-700">{totalOrders}</p>
-            </div>
-            <div className="bg-gradient-to-br from-emerald-100 to-emerald-200/50 rounded-2xl p-4 border border-emerald-200/50 shadow-sm">
-              <p className="text-xs text-emerald-600/70 font-medium">Delivered</p>
-              <p className="text-2xl font-bold text-emerald-700">{deliveredOrders}</p>
-            </div>
-            <div className="bg-gradient-to-br from-amber-100 to-amber-200/50 rounded-2xl p-4 border border-amber-200/50 shadow-sm">
-              <p className="text-xs text-amber-600/70 font-medium">In Progress</p>
-              <p className="text-2xl font-bold text-amber-700">{pendingOrders}</p>
-            </div>
-            <div className="bg-gradient-to-br from-rose-100 to-rose-200/50 rounded-2xl p-4 border border-rose-200/50 shadow-sm">
-              <p className="text-xs text-rose-600/70 font-medium">Cancelled</p>
-              <p className="text-2xl font-bold text-rose-700">{cancelledOrders}</p>
-            </div>
+            <button
+              onClick={() => handleStatClick('all')}
+              className={`text-left transition-all transform hover:scale-105 ${
+                filterStatus === 'all' ? 'ring-2 ring-pink-500 ring-offset-2' : ''
+              }`}
+            >
+              <div className="bg-gradient-to-br from-pink-100 to-pink-200/50 rounded-2xl p-4 border border-pink-200/50 shadow-sm hover:shadow-md">
+                <p className="text-xs text-pink-600/70 font-medium">Total Orders</p>
+                <p className="text-2xl font-bold text-pink-700">{totalOrders}</p>
+                <p className="text-xs text-pink-400/70 mt-1">Click to view all</p>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleStatClick('delivered')}
+              className={`text-left transition-all transform hover:scale-105 ${
+                filterStatus === 'delivered' ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
+              }`}
+            >
+              <div className="bg-gradient-to-br from-emerald-100 to-emerald-200/50 rounded-2xl p-4 border border-emerald-200/50 shadow-sm hover:shadow-md">
+                <p className="text-xs text-emerald-600/70 font-medium">Delivered</p>
+                <p className="text-2xl font-bold text-emerald-700">{deliveredOrders}</p>
+                <p className="text-xs text-emerald-400/70 mt-1">Click to view</p>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleStatClick('pending')}
+              className={`text-left transition-all transform hover:scale-105 ${
+                filterStatus === 'pending' || filterStatus === 'confirmed' || filterStatus === 'shipped' ? 'ring-2 ring-amber-500 ring-offset-2' : ''
+              }`}
+            >
+              <div className="bg-gradient-to-br from-amber-100 to-amber-200/50 rounded-2xl p-4 border border-amber-200/50 shadow-sm hover:shadow-md">
+                <p className="text-xs text-amber-600/70 font-medium">In Progress</p>
+                <p className="text-2xl font-bold text-amber-700">{pendingOrders}</p>
+                <p className="text-xs text-amber-400/70 mt-1">Click to view</p>
+              </div>
+            </button>
+            
+            <button
+              onClick={() => handleStatClick('cancelled')}
+              className={`text-left transition-all transform hover:scale-105 ${
+                filterStatus === 'cancelled' || filterStatus === 'failed' ? 'ring-2 ring-rose-500 ring-offset-2' : ''
+              }`}
+            >
+              <div className="bg-gradient-to-br from-rose-100 to-rose-200/50 rounded-2xl p-4 border border-rose-200/50 shadow-sm hover:shadow-md">
+                <p className="text-xs text-rose-600/70 font-medium">Cancelled / Failed</p>
+                <p className="text-2xl font-bold text-rose-700">{cancelledOrders}</p>
+                <p className="text-xs text-rose-400/70 mt-1">Click to view</p>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -438,7 +490,10 @@ function MyOrders() {
           <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">My Orders</h1>
-              <p className="text-gray-500 text-sm">{orderCount} {orderCount === 1 ? 'order' : 'orders'}</p>
+              <p className="text-gray-500 text-sm">
+                {orderCount} {orderCount === 1 ? 'order' : 'orders'} 
+                {filterStatus !== 'all' && ` • Filtered: ${getStatusText(filterStatus)}`}
+              </p>
             </div>
             
             <div className="flex gap-2 flex-wrap">
@@ -461,8 +516,12 @@ function MyOrders() {
           {filteredOrders.length === 0 ? (
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 text-center border border-pink-100 shadow-sm">
               <div className="text-7xl mb-4">📦</div>
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">No orders yet</h2>
-              <p className="text-gray-400 mb-6">Looks like you haven't placed any orders.</p>
+              <h2 className="text-2xl font-semibold text-gray-800 mb-2">No orders found</h2>
+              <p className="text-gray-400 mb-6">
+                {filterStatus !== 'all' 
+                  ? `You don't have any ${getStatusText(filterStatus)} orders.` 
+                  : 'Looks like you haven\'t placed any orders.'}
+              </p>
               <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg hover:shadow-pink-200/50 transition-all transform hover:-translate-y-0.5">
                 Start Shopping →
               </Link>
@@ -470,20 +529,23 @@ function MyOrders() {
           ) : (
             <div className="space-y-6">
               {filteredOrders.map((order, index) => {
-                const canCancel = order.status === 'pending' || order.status === 'confirmed';
-                const isShipped = order.status === 'shipped' || order.status === 'delivered';
-                const isCancelled = order.status === 'cancelled';
+                const canCancel = (order.status === 'pending' || order.status === 'confirmed') && order.paymentStatus !== 'failed';
+                const isCancelled = order.status === 'cancelled' || order.status === 'failed';
+                const isDelivered = order.status === 'delivered';
+                const isShipped = order.status === 'shipped';
                 
                 return (
                   <div key={order._id}>
                     {/* Order Card - Amazon Style */}
                     <div className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300 ${
-                      isCancelled ? 'border-rose-200 opacity-70' : 'border-pink-100'
+                      isCancelled ? 'border-rose-200 opacity-70' : isDelivered ? 'border-emerald-200' : 'border-pink-100'
                     }`}>
                       
-                      {/* Header - Light Pink */}
+                      {/* Header */}
                       <div className={`px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3 border-b ${
-                        isCancelled ? 'bg-rose-50/80 border-rose-100' : 'bg-pink-50/80 border-pink-100'
+                        isCancelled ? 'bg-rose-50/80 border-rose-100' : 
+                        isDelivered ? 'bg-emerald-50/80 border-emerald-100' : 
+                        'bg-pink-50/80 border-pink-100'
                       }`}>
                         <div className="flex items-center gap-6 flex-wrap">
                           <div>
@@ -502,6 +564,11 @@ function MyOrders() {
                             <span className="text-xs text-gray-400 font-medium">TOTAL</span>
                             <p className="text-sm font-bold text-pink-600">₹{order.total?.toLocaleString()}</p>
                           </div>
+                          {order.paymentStatus === 'failed' && (
+                            <div className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full text-xs font-medium">
+                              Payment Failed
+                            </div>
+                          )}
                         </div>
                         <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${getStatusBg(order.status)} ${getStatusColor(order.status)} flex items-center gap-1.5`}>
                           <span>{getStatusIcon(order.status)}</span>
@@ -509,7 +576,7 @@ function MyOrders() {
                         </div>
                       </div>
 
-                      {/* Order Items - 🔥 Product Clickable */}
+                      {/* Order Items - Product Clickable */}
                       <div className="px-4 sm:px-6 py-4">
                         {order.items && order.items.map((item, idx) => {
                           const eligibilityKey = `${order._id}_${item.productId}`;
@@ -520,7 +587,6 @@ function MyOrders() {
                           
                           return (
                             <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
-                              {/* 🔥 Product Image - Clickable */}
                               <Link 
                                 to={`/product/${item.productId}`}
                                 className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100 flex-shrink-0 hover:shadow-md transition hover:scale-105"
@@ -538,7 +604,6 @@ function MyOrders() {
                                 )}
                               </Link>
                               <div className="flex-1">
-                                {/* 🔥 Product Name - Clickable */}
                                 <Link 
                                   to={`/product/${item.productId}`}
                                   className="font-semibold text-gray-800 text-sm hover:text-pink-600 hover:underline transition line-clamp-1"
@@ -554,7 +619,7 @@ function MyOrders() {
                                 <p className="font-semibold text-gray-800">₹{item.price * item.quantity}</p>
                                 <p className="text-xs text-gray-400">₹{item.price} each</p>
                                 
-                                {order.status === 'delivered' && (
+                                {isDelivered && (
                                   canReview ? (
                                     <button
                                       onClick={() => handleWriteReview(order, item)}
@@ -574,7 +639,9 @@ function MyOrders() {
 
                       {/* Order Actions */}
                       <div className={`px-4 sm:px-6 py-3 border-t flex flex-wrap gap-3 justify-between items-center ${
-                        isCancelled ? 'bg-rose-50/30 border-rose-100' : 'bg-gray-50/50 border-gray-100'
+                        isCancelled ? 'bg-rose-50/30 border-rose-100' : 
+                        isDelivered ? 'bg-emerald-50/30 border-emerald-100' : 
+                        'bg-gray-50/50 border-gray-100'
                       }`}>
                         <div className="flex flex-wrap gap-3">
                           <button 
@@ -583,7 +650,7 @@ function MyOrders() {
                           >
                             📍 Track Order
                           </button>
-                          {order.status === 'delivered' && (
+                          {isDelivered && (
                             <>
                               <button className="px-4 py-1.5 text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50 transition text-sm font-medium">
                                 📄 Download Invoice
@@ -598,7 +665,7 @@ function MyOrders() {
                           )}
                         </div>
                         
-                        {/* Cancel Button - Only if not shipped and not cancelled */}
+                        {/* Cancel Button - Only if not shipped, not cancelled, not failed */}
                         {canCancel && !isCancelled && (
                           <button 
                             onClick={() => cancelOrder(order._id)} 
@@ -609,7 +676,7 @@ function MyOrders() {
                         )}
                       </div>
 
-                      {/* Cancellation Policy Note - Only for non-shipped orders */}
+                      {/* Cancellation Policy Note */}
                       {canCancel && !isCancelled && (
                         <div className="px-4 sm:px-6 py-2 bg-amber-50/50 border-t border-amber-100/50">
                           <p className="text-xs text-amber-600 flex items-center gap-1.5">
@@ -619,12 +686,12 @@ function MyOrders() {
                         </div>
                       )}
                       
-                      {/* 🔥 Cancelled order note - shows when cancelled */}
+                      {/* Cancelled/Failed order note */}
                       {isCancelled && (
                         <div className="px-4 sm:px-6 py-2 bg-rose-50/80 border-t border-rose-100">
                           <p className="text-xs text-rose-600 flex items-center gap-1.5">
                             <span>⏰</span> 
-                            This order was cancelled and will be removed after 30 minutes.
+                            This order was {order.status === 'failed' ? 'payment failed' : 'cancelled'} and will be removed after 30 minutes.
                           </p>
                         </div>
                       )}
