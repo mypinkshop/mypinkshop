@@ -13,7 +13,7 @@ function Profile() {
   const { user, logout, token, updateUserProfile } = useAuth();
   const { addToCart, cartCount } = useCart();
   const { wishlistCount, wishlist, removeFromWishlist } = useWishlist();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('orders');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -51,16 +51,27 @@ function Profile() {
   const [filterStatus, setFilterStatus] = useState('all');
   
   const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   
-  const [stats, setStats] = useState({
-    totalOrders: 0,
-    totalSpent: 0,
-    wishlistCount: 0,
-    reviewCount: 0
+  const [savedCards, setSavedCards] = useState([]);
+  const [cardsLoading, setCardsLoading] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [cardForm, setCardForm] = useState({
+    last4: '',
+    cardType: '',
+    expiryMonth: '',
+    expiryYear: '',
+    isDefault: false
   });
+
+  const [showPasswordEdit, setShowPasswordEdit] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
+  // ========== SEARCH ==========
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -73,7 +84,7 @@ function Profile() {
     }
   };
 
-  // Profile Image Upload
+  // ========== PROFILE IMAGE ==========
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -128,7 +139,7 @@ function Profile() {
     }
   };
 
-  // Fetch Data
+  // ========== FETCH DATA ==========
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
@@ -149,7 +160,7 @@ function Profile() {
       fetchAddresses(),
       fetchOrders(),
       fetchReviews(),
-      fetchStats()
+      fetchSavedCards()
     ]);
     setLoading(false);
   };
@@ -215,6 +226,7 @@ function Profile() {
   };
 
   const fetchReviews = async () => {
+    setReviewsLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/reviews/my-reviews`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -225,35 +237,29 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
-  const fetchStats = async () => {
+  const fetchSavedCards = async () => {
+    setCardsLoading(true);
     try {
-      const [ordersRes, wishlistRes, reviewsRes] = await Promise.all([
-        fetch(`${API_URL}/api/orders/my-orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_URL}/api/wishlist`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_URL}/api/reviews/my-reviews`, { headers: { 'Authorization': `Bearer ${token}` } })
-      ]);
-      
-      const ordersData = await ordersRes.json();
-      const wishlistData = await wishlistRes.json();
-      const reviewsData = await reviewsRes.json();
-      
-      const totalSpent = (ordersData.orders || []).reduce((sum, o) => sum + (o.total || 0), 0);
-      
-      setStats({
-        totalOrders: (ordersData.orders || []).length,
-        totalSpent: totalSpent,
-        wishlistCount: (wishlistData.wishlist || []).length,
-        reviewCount: (reviewsData.reviews || []).length
+      const response = await fetch(`${API_URL}/api/users/cards`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (response.ok) {
+        const data = await response.json();
+        setSavedCards(data.cards || []);
+      }
     } catch (error) {
-      console.error('Failed to fetch stats:', error);
+      console.error('Failed to fetch cards:', error);
+    } finally {
+      setCardsLoading(false);
     }
   };
 
-  // Update Profile Field
+  // ========== UPDATE FUNCTIONS ==========
   const handleFieldUpdate = async (field, value) => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -279,7 +285,42 @@ function Profile() {
     }
   };
 
-  // Address Functions
+  const handlePasswordUpdate = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      
+      if (response.ok) {
+        toast.success('Password changed! 🔒');
+        setShowPasswordEdit(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Current password is incorrect');
+      }
+    } catch (error) {
+      toast.error('Error changing password');
+    }
+  };
+
+  // ========== ADDRESS FUNCTIONS ==========
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
     
@@ -364,7 +405,7 @@ function Profile() {
     }
   };
 
-  // Order Functions
+  // ========== ORDER FUNCTIONS ==========
   const handleReorder = async (order) => {
     try {
       for (const item of order.items) {
@@ -399,6 +440,61 @@ function Profile() {
     }
   };
 
+  // ========== CARD FUNCTIONS ==========
+  const handleAddCard = async () => {
+    if (!cardForm.last4 || cardForm.last4.length !== 4) {
+      toast.error('Enter last 4 digits');
+      return;
+    }
+    if (!cardForm.expiryMonth || cardForm.expiryMonth.length !== 2) {
+      toast.error('Enter expiry month (MM)');
+      return;
+    }
+    if (!cardForm.expiryYear || cardForm.expiryYear.length !== 4) {
+      toast.error('Enter expiry year (YYYY)');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/cards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(cardForm)
+      });
+      
+      if (response.ok) {
+        toast.success('Card saved! 💳');
+        setShowCardModal(false);
+        setCardForm({ last4: '', cardType: '', expiryMonth: '', expiryYear: '', isDefault: false });
+        fetchSavedCards();
+      } else {
+        toast.error('Failed to save card');
+      }
+    } catch (error) {
+      toast.error('Error saving card');
+    }
+  };
+
+  const handleDeleteCard = async (cardId) => {
+    if (!confirm('Delete this card?')) return;
+    try {
+      const response = await fetch(`${API_URL}/api/users/cards/${cardId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        toast.success('Card deleted!');
+        fetchSavedCards();
+      }
+    } catch (error) {
+      toast.error('Error deleting card');
+    }
+  };
+
+  // ========== UI HELPERS ==========
   const getStatusColor = (status) => {
     const colors = {
       delivered: 'text-emerald-600 bg-emerald-50',
@@ -428,11 +524,15 @@ function Profile() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // ========== TABS ==========
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'orders', label: 'Orders' },
-    { id: 'addresses', label: 'Addresses' },
-    { id: 'profile', label: 'Profile' }
+    { id: 'orders', label: '📦 Orders' },
+    { id: 'addresses', label: '📍 Addresses' },
+    { id: 'profile', label: '👤 Profile' },
+    { id: 'wishlist', label: '❤️ Wishlist' },
+    { id: 'reviews', label: '⭐ Reviews' },
+    { id: 'payments', label: '💳 Payments' },
+    { id: 'security', label: '🔐 Security' }
   ];
 
   if (!user || loading) {
@@ -527,33 +627,33 @@ function Profile() {
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           
-          {/* Profile Header - Clean Card */}
+          {/* Profile Header - Nykaa/Amazon Style */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-3xl text-white overflow-hidden">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-2xl text-white overflow-hidden">
                   {profileImage ? (
                     <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <span className="font-bold">{getInitials(userData.name)}</span>
                   )}
                 </div>
-                <label className="absolute bottom-0 right-0 w-7 h-7 bg-white rounded-full shadow-md flex items-center justify-center cursor-pointer hover:bg-gray-50 border border-gray-200">
+                <label className="absolute bottom-0 right-0 w-6 h-6 bg-white rounded-full shadow flex items-center justify-center cursor-pointer hover:bg-gray-50 border border-gray-200">
                   <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" />
-                  <span className="text-pink-500 text-xs">📷</span>
+                  <span className="text-pink-500 text-[10px]">📷</span>
                 </label>
                 {uploadingImage && (
                   <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 )}
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-800">{userData.name || 'User'}</h2>
+                <h2 className="text-lg font-bold text-gray-800">{userData.name || 'User'}</h2>
                 <p className="text-sm text-gray-500">{userData.email}</p>
-                <p className="text-xs text-gray-400 mt-1">Member since {userData.createdAt}</p>
+                <p className="text-xs text-gray-400">Member since {userData.createdAt}</p>
               </div>
               <button 
                 onClick={logout}
@@ -564,36 +664,16 @@ function Profile() {
             </div>
           </div>
 
-          {/* Stats - Clean Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold text-pink-600">{stats.totalOrders}</p>
-              <p className="text-xs text-gray-500">Orders</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold text-emerald-600">₹{stats.totalSpent.toLocaleString()}</p>
-              <p className="text-xs text-gray-500">Spent</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold text-rose-600">{stats.wishlistCount}</p>
-              <p className="text-xs text-gray-500">Wishlist</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold text-amber-600">{stats.reviewCount}</p>
-              <p className="text-xs text-gray-500">Reviews</p>
-            </div>
-          </div>
-
-          {/* Tabs - Simple */}
-          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 p-1 mb-6 shadow-sm">
+          {/* Tabs - Nykaa Style Horizontal Scroll */}
+          <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-hide">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition ${
+                className={`px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                   activeTab === tab.id 
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm' 
-                    : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
+                    : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300'
                 }`}
               >
                 {tab.label}
@@ -601,50 +681,17 @@ function Profile() {
             ))}
           </div>
 
-          {/* ========== OVERVIEW ========== */}
-          {activeTab === 'overview' && (
-            <div className="space-y-4">
-              {/* Recent Orders */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-semibold text-gray-800">Recent Orders</h3>
-                  <button onClick={() => setActiveTab('orders')} className="text-pink-600 text-sm hover:underline">View All</button>
-                </div>
-                {orders.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400">No orders yet</div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {orders.slice(0, 3).map(order => (
-                      <div key={order._id} className="p-4 flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-800">#{order._id?.slice(-8)}</p>
-                          <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-gray-800">₹{order.total?.toLocaleString()}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(order.status)}`}>
-                            {getStatusText(order.status)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ========== ORDERS ========== */}
+          {/* ========== ORDERS TAB ========== */}
           {activeTab === 'orders' && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
-                <h3 className="font-semibold text-gray-800">All Orders</h3>
+                <h3 className="font-semibold text-gray-800">Your Orders</h3>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500 bg-white"
                 >
-                  <option value="all">All</option>
+                  <option value="all">All Orders</option>
                   <option value="pending">Processing</option>
                   <option value="confirmed">Confirmed</option>
                   <option value="shipped">Shipped</option>
@@ -656,19 +703,20 @@ function Profile() {
               {ordersLoading ? (
                 <div className="p-8 text-center">
                   <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading...</p>
+                  <p className="text-gray-400 mt-2">Loading orders...</p>
                 </div>
               ) : filteredOrders.length === 0 ? (
                 <div className="p-8 text-center">
                   <p className="text-gray-400">No orders found</p>
+                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-50">
                   {filteredOrders.map(order => (
-                    <div key={order._id} className="p-4">
+                    <div key={order._id} className="p-4 hover:bg-gray-50 transition">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-800">#{order._id?.slice(-8)}</p>
+                          <p className="font-medium text-gray-800">Order #{order._id?.slice(-8)}</p>
                           <p className="text-sm text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
                           <p className="text-sm text-gray-400">{order.items?.length || 0} items</p>
                         </div>
@@ -696,9 +744,9 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== ADDRESSES ========== */}
+          {/* ========== ADDRESSES TAB ========== */}
           {activeTab === 'addresses' && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-800">Saved Addresses</h3>
                 <button
@@ -727,7 +775,7 @@ function Profile() {
               ) : (
                 <div className="p-4 space-y-3">
                   {addresses.map(addr => (
-                    <div key={addr._id} className="border border-gray-100 rounded-xl p-4">
+                    <div key={addr._id} className="border border-gray-100 rounded-xl p-4 hover:shadow-sm transition">
                       <div className="flex justify-between items-start">
                         <div>
                           {addr.isDefault && (
@@ -758,14 +806,13 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PROFILE ========== */}
+          {/* ========== PROFILE TAB ========== */}
           {activeTab === 'profile' && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-800">Profile Details</h3>
               </div>
               <div className="divide-y divide-gray-50">
-                {/* Name */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Full Name</p>
@@ -782,7 +829,6 @@ function Profile() {
                   )}
                 </div>
 
-                {/* Email */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Email</p>
@@ -799,7 +845,6 @@ function Profile() {
                   )}
                 </div>
 
-                {/* Phone */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Phone</p>
@@ -819,6 +864,150 @@ function Profile() {
             </div>
           )}
 
+          {/* ========== WISHLIST TAB ========== */}
+          {activeTab === 'wishlist' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800">My Wishlist ({wishlist?.length || 0})</h3>
+              </div>
+              {!wishlist || wishlist.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-gray-400">Your wishlist is empty</p>
+                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {wishlist.slice(0, 5).map(product => (
+                    <div key={product.id} className="p-4 flex items-center gap-4">
+                      <Link to={`/product/${product.id}`}>
+                        <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
+                      </Link>
+                      <div className="flex-1">
+                        <Link to={`/product/${product.id}`} className="font-medium text-gray-800 hover:text-pink-500">
+                          {product.name}
+                        </Link>
+                        <p className="text-pink-600 font-bold">₹{product.price}</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          removeFromWishlist(product.id);
+                          toast.success('Removed from wishlist');
+                        }} 
+                        className="text-rose-500 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {wishlist.length > 5 && (
+                    <div className="p-3 text-center">
+                      <Link to="/wishlist" className="text-pink-600 text-sm hover:underline">View all {wishlist.length} items →</Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========== REVIEWS TAB ========== */}
+          {activeTab === 'reviews' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800">My Reviews</h3>
+              </div>
+              {reviewsLoading ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Loading reviews...</p>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-gray-400">No reviews yet</p>
+                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Shop and review →</Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {reviews.map(review => (
+                    <div key={review._id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <Link to={`/product/${review.productId?._id}`} className="font-medium text-gray-800 hover:text-pink-500">
+                            {review.productId?.name}
+                          </Link>
+                          <div className="flex text-yellow-400 text-sm mt-1">
+                            {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">{new Date(review.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========== PAYMENTS TAB ========== */}
+          {activeTab === 'payments' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800">Saved Payment Methods</h3>
+                <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add Card</button>
+              </div>
+              {cardsLoading ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Loading cards...</p>
+                </div>
+              ) : savedCards.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-gray-400">No saved cards</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {savedCards.map(card => (
+                    <div key={card._id} className="p-4 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">💳</span>
+                        <div>
+                          <p className="font-medium">•••• {card.last4}</p>
+                          <p className="text-xs text-gray-500">Expires {card.expiryMonth}/{card.expiryYear}</p>
+                          {card.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteCard(card._id)} className="text-rose-500 text-sm">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========== SECURITY TAB ========== */}
+          {activeTab === 'security' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800">Security Settings</h3>
+              </div>
+              <div className="p-4">
+                {showPasswordEdit ? (
+                  <div className="space-y-3">
+                    <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
+                    <input type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
+                    <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
+                    <div className="flex gap-2">
+                      <button onClick={handlePasswordUpdate} className="bg-pink-500 text-white px-4 py-2 rounded-xl text-sm hover:shadow-lg transition">Save</button>
+                      <button onClick={() => setShowPasswordEdit(false)} className="bg-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 transition">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline">Change Password</button>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Address Modal */}
@@ -830,64 +1019,14 @@ function Profile() {
                 <button onClick={() => setShowAddressModal(false)} className="text-gray-400 text-2xl">&times;</button>
               </div>
               <form onSubmit={handleAddressSubmit} className="p-5 space-y-3">
-                <input 
-                  type="text" 
-                  placeholder="Full Name *" 
-                  value={addressForm.fullName} 
-                  onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  required 
-                />
-                <input 
-                  type="tel" 
-                  placeholder="Mobile Number *" 
-                  value={addressForm.phone} 
-                  onChange={(e) => setAddressForm({...addressForm, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10)})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  required 
-                  maxLength="10"
-                />
-                <input 
-                  type="text" 
-                  placeholder="Pincode *" 
-                  value={addressForm.pincode} 
-                  onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6)})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  required 
-                  maxLength="6"
-                />
-                <input 
-                  type="text" 
-                  placeholder="Address Line 1 *" 
-                  value={addressForm.addressLine1} 
-                  onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  required 
-                />
-                <input 
-                  type="text" 
-                  placeholder="Address Line 2 (Optional)" 
-                  value={addressForm.addressLine2} 
-                  onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                />
+                <input type="text" placeholder="Full Name *" value={addressForm.fullName} onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
+                <input type="tel" placeholder="Mobile Number *" value={addressForm.phone} onChange={(e) => setAddressForm({...addressForm, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required maxLength="10" />
+                <input type="text" placeholder="Pincode *" value={addressForm.pincode} onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required maxLength="6" />
+                <input type="text" placeholder="Address Line 1 *" value={addressForm.addressLine1} onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
+                <input type="text" placeholder="Address Line 2 (Optional)" value={addressForm.addressLine2} onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" />
                 <div className="grid grid-cols-2 gap-3">
-                  <input 
-                    type="text" 
-                    placeholder="City *" 
-                    value={addressForm.city} 
-                    onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} 
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                    required 
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="State *" 
-                    value={addressForm.state} 
-                    onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} 
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                    required 
-                  />
+                  <input type="text" placeholder="City *" value={addressForm.city} onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
+                  <input type="text" placeholder="State *" value={addressForm.state} onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                   <input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({...addressForm, isDefault: e.target.checked})} /> Set as default
@@ -896,6 +1035,33 @@ function Profile() {
                   {editingAddress ? 'Update Address' : 'Add Address'}
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Card Modal */}
+        {showCardModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold mb-4">Add New Card</h3>
+              <select value={cardForm.cardType} onChange={(e) => setCardForm({...cardForm, cardType: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none">
+                <option value="">Select Card Type</option>
+                <option value="visa">Visa</option>
+                <option value="mastercard">Mastercard</option>
+                <option value="rupay">RuPay</option>
+              </select>
+              <input type="text" placeholder="Last 4 digits *" maxLength="4" value={cardForm.last4} onChange={(e) => setCardForm({...cardForm, last4: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <input type="text" placeholder="Expiry Month (MM)" maxLength="2" value={cardForm.expiryMonth} onChange={(e) => setCardForm({...cardForm, expiryMonth: e.target.value.replace(/[^0-9]/g, '').slice(0, 2)})} className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" />
+                <input type="text" placeholder="Expiry Year (YYYY)" maxLength="4" value={cardForm.expiryYear} onChange={(e) => setCardForm({...cardForm, expiryYear: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" />
+              </div>
+              <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm">
+                <input type="checkbox" checked={cardForm.isDefault} onChange={(e) => setCardForm({...cardForm, isDefault: e.target.checked})} /> Set as default
+              </label>
+              <div className="flex gap-3">
+                <button onClick={handleAddCard} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save Card</button>
+                <button onClick={() => setShowCardModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
+              </div>
             </div>
           </div>
         )}
