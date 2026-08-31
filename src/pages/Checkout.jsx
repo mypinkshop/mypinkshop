@@ -7,7 +7,7 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
 function Checkout() {
-  const { cart, cartTotal, clearCart } = useCart();
+  const { cart, cartTotal, clearCart, removeFromCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -53,13 +53,11 @@ function Checkout() {
   const subtotal = cartTotal();
   const discount = couponDiscount;
   
-  // ✅ GST SPLIT: Listing price = Base Price (100%) + GST (18%)
-  // Base Price = Subtotal / 1.18
-  // GST = Subtotal - Base Price
+  // ✅ EXCLUDING GST: Subtotal = Base Price (GST nikal ke)
   const basePrice = Math.round(subtotal / 1.18); 
   const gstAmount = subtotal - basePrice; 
   
-  // ✅ Delivery Charge: 499+ FREE, warna ₹49
+  // ✅ Delivery: 499+ FREE, warna ₹49
   let deliveryCharges = shippingInfo.shippingCharge;
   if (deliveryCharges === 0 || deliveryCharges === null || deliveryCharges === undefined) {
     deliveryCharges = subtotal >= 499 ? 0 : 49;
@@ -67,7 +65,7 @@ function Checkout() {
     deliveryCharges = 0;
   }
   
-  // ✅ Total = Base Price + GST + Delivery (NO extra GST)
+  // ✅ Total = Base Price + GST + Delivery
   const total = basePrice + gstAmount + deliveryCharges;
 
   const generateOrderId = () => {
@@ -1002,7 +1000,7 @@ function Checkout() {
                 </span>
               </div>
               
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
+                            <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
                 {cart.map(item => (
                   <div key={item.id} className="flex gap-3 pb-3 border-b border-gray-100">
                     <div className="w-14 h-14 bg-pink-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-pink-100">
@@ -1015,12 +1013,40 @@ function Checkout() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-gray-800 truncate">{item.name}</p>
                       <p className="text-xs text-gray-400">
-                        Qty: {item.quantity}
                         {item.size && ` • ${item.size}`}
                         {item.color && ` • ${item.color}`}
                       </p>
-                      <p className="text-sm font-semibold text-pink-600">₹{item.price * item.quantity}</p>
+                      
+                      {/* ✅ QTY INCREASE / DECREASE BUTTONS */}
+                      <div className="flex items-center gap-2 mt-1">
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="w-6 h-6 bg-gray-100 rounded text-gray-600 font-bold hover:bg-gray-200"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-medium text-gray-700">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-6 h-6 bg-pink-100 rounded text-pink-600 font-bold hover:bg-pink-200"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <p className="text-sm font-semibold text-pink-600 mt-1">₹{item.price * item.quantity}</p>
                     </div>
+
+                    {/* ✅ REMOVE BUTTON */}
+                    <button
+                      onClick={() => {
+                        removeFromCart(item.id);
+                        toast.success('Item removed from cart');
+                      }}
+                      className="text-red-500 hover:text-red-700 font-medium text-xs self-start mt-1"
+                    >
+                      ✕ Remove
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1071,8 +1097,8 @@ function Checkout() {
 
               <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Subtotal (Incl. GST)</span>
-                  <span className="font-medium text-gray-800">₹{subtotal}</span>
+                  <span className="text-gray-500">Subtotal (Excl. GST)</span>
+                  <span className="font-medium text-gray-800">₹{basePrice}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
