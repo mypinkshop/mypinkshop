@@ -12,7 +12,6 @@ router.get('/user', protect, async (req, res) => {
 
     console.log('📦 Fetching orders for user ID:', req.user._id);
 
-    // ✅ Yahan 'buyerId' ki jagah 'userId' use karein
     const orders = await Order.find({ userId: req.user._id }).sort({ createdAt: -1 });
 
     console.log(`✅ Found ${orders.length} orders`);
@@ -23,6 +22,28 @@ router.get('/user', protect, async (req, res) => {
   }
 });
 
+// ✅ GET ALL ORDERS (For Admin Panel)
+router.get('/all', protect, async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('❌ Error fetching all orders:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch orders' });
+  }
+});
+
+// ✅ GET ALL RETURNS (For Admin Panel)
+router.get('/returns/all', protect, async (req, res) => {
+  try {
+    const orders = await Order.find({ returnRequested: true }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('❌ Error fetching returns:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch returns' });
+  }
+});
+
 // ✅ THEN :id route aayega
 router.get('/:id', protect, async (req, res) => {
   try {
@@ -30,7 +51,6 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(401).json({ success: false, message: 'User not authenticated' });
     }
 
-    // ✅ Yahan bhi 'buyerId' ki jagah 'userId' use karein
     const order = await Order.findOne({ _id: req.params.id, userId: req.user._id });
 
     if (!order) {
@@ -61,8 +81,8 @@ router.post('/', protect, async (req, res) => {
 
     const order = new Order({
       orderNumber,
-      buyerId: req.user._id, // ✅ BOTH buyerId AUR userId yahan set karo!
-      userId: req.user._id,  // ✅ Yahan bhi userId!
+      buyerId: req.user._id,
+      userId: req.user._id,
       buyerName: req.user.name || address?.fullName || 'Customer',
       buyerEmail: req.user.email,
       buyerPhone: req.user.phone || address?.phone || '',
