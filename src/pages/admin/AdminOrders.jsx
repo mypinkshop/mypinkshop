@@ -17,8 +17,8 @@ function AdminOrders() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [processingId, setProcessingId] = useState(null);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
-
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
