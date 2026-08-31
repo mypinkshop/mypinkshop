@@ -29,7 +29,37 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
-  // ✅ NEW: Email Verification Fields
+  
+  // ✅ PROFILE FIELDS (ADDED)
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other', ''],
+    default: '',
+  },
+  dob: {
+    type: String,
+    default: '',
+  },
+  profileImage: {
+    type: String,
+    default: '',
+  },
+  
+  // ✅ ADDRESS FIELDS (ADDED)
+  city: {
+    type: String,
+    default: '',
+  },
+  state: {
+    type: String,
+    default: '',
+  },
+  pincode: {
+    type: String,
+    default: '',
+  },
+  
+  // ✅ Email Verification Fields
   isEmailVerified: {
     type: Boolean,
     default: false,
@@ -41,7 +71,8 @@ const userSchema = new mongoose.Schema({
   emailVerificationExpires: {
     type: Date,
   },
-  // ✅ NEW: Forgot Password Fields
+  
+  // ✅ Forgot Password Fields
   resetPasswordToken: {
     type: String,
     default: '',
@@ -49,6 +80,7 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: {
     type: Date,
   },
+  
   // Vendor specific fields
   brandName: {
     type: String,
@@ -79,15 +111,16 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+}, { timestamps: true });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Compare password method
