@@ -30,6 +30,9 @@ const ShippingInfo = lazy(() => import('./pages/ShippingInfo'));
 const ReturnsPolicy = lazy(() => import('./pages/ReturnsPolicy'));
 const FAQs = lazy(() => import('./pages/FAQs'));
 
+// ✅ IMPORTANT: PAYMENT SUCCESS PAGE (Ye line add ki gayi hai)
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
+
 // ✅ CATEGORY PAGES - Lazy Loaded
 const SkincarePage = lazy(() => import('./pages/SkincarePage'));
 const MakeupPage = lazy(() => import('./pages/MakeupPage'));
