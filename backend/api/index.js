@@ -7,6 +7,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const multer = require('multer');
 const AWS = require('aws-sdk');
+const notificationRoutes = require('../routes/notificationRoutes');
+const paymentRoutes = require('./payment');
 
 // ========== ROUTES IMPORTS ==========
 const otpRoutes = require('./otp');
