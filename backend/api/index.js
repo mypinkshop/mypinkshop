@@ -15,6 +15,7 @@ const userRoutes = require('./users');
 const orderRoutes = require('./orders');
 const reviewRoutes = require('./reviews');
 const notificationRoutes = require('../routes/notificationRoutes');
+const paymentRoutes = require('./payment');
 
 // ========== MODEL IMPORTS ==========
 const User = require('../models/User');
@@ -2122,6 +2123,7 @@ app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/api/wallet', require('../routes/walletRoutes'));
