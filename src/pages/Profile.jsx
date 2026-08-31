@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate }react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -229,7 +229,9 @@ function Profile() {
       if (response.ok) {
         const data = await response.json();
         const ordersData = Array.isArray(data) ? data : (data.orders || data.order || []);
-        const sortedOrders = ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // ✅ FILTER: Cancelled orders ko hatao
+        const filteredOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'cancelled');
+        const sortedOrders = filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOrders(sortedOrders);
         console.log('✅ Orders fetched:', sortedOrders.length);
       } else {
@@ -239,7 +241,8 @@ function Profile() {
         if (fallbackRes.ok) {
           const data = await fallbackRes.json();
           const ordersData = Array.isArray(data) ? data : (data.orders || data.order || []);
-          const sortedOrders = ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          const filteredOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'cancelled');
+          const sortedOrders = filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           setOrders(sortedOrders);
           console.log('✅ Orders fetched (fallback):', sortedOrders.length);
         }
@@ -607,11 +610,11 @@ function Profile() {
   };
 
   const getInitials = (name) => {
-    if (!name) return 'U';
+    if (!name) return '👤';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // ✅ FIX 1: MPS- Format Order ID
+  // ✅ MPS- Format Order ID
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
     
@@ -648,9 +651,9 @@ function Profile() {
     );
   }
 
-  // Filter orders
+  // Filter orders - Cancelled ko hatao
   const filteredOrders = filterStatus === 'all' 
-    ? orders 
+    ? orders.filter(o => o.status?.toLowerCase() !== 'cancelled')
     : orders.filter(o => o.status?.toLowerCase() === filterStatus);
 
   return (
@@ -739,7 +742,7 @@ function Profile() {
                   {profileImage ? (
                     <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="font-bold">{getInitials(userData.name)}</span>
+                    <span className="font-bold text-xl">{getInitials(userData.name)}</span>
                   )}
                 </div>
                 <label className="absolute bottom-0 right-0 w-6 h-6 bg-white rounded-full shadow flex items-center justify-center cursor-pointer hover:bg-gray-50 border border-gray-200">
@@ -783,11 +786,11 @@ function Profile() {
             ))}
           </div>
 
-          {/* ========== ORDERS TAB - FIXED ========== */}
+          {/* ========== ORDERS TAB - PROFESSIONAL ========== */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
-                <h3 className="font-semibold text-gray-800">Your Orders ({orders.length})</h3>
+                <h3 className="font-semibold text-gray-800">Your Orders ({orders.filter(o => o.status?.toLowerCase() !== 'cancelled').length})</h3>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
@@ -798,7 +801,6 @@ function Profile() {
                   <option value="confirmed">Confirmed</option>
                   <option value="shipped">Shipped</option>
                   <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
               
@@ -818,7 +820,6 @@ function Profile() {
                     <div key={order._id} className="p-4 hover:bg-gray-50 transition">
                       <div className="flex justify-between items-start">
                         <div>
-                          {/* ✅ FIX 2: MPS- Order ID */}
                           <p className="font-medium text-gray-800">Order #{getOrderIdDisplay(order)}</p>
                           <p className="text-sm text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
                           <p className="text-sm text-gray-400">{order.items?.length || 0} items</p>
@@ -830,11 +831,31 @@ function Profile() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-4 mt-2">
+                      
+                      {/* ✅ Order Items with Image & Name - Professional */}
+                      {order.items && order.items.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          {order.items.slice(0, 3).map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-100">
+                              {item.image ? (
+                                <img src={item.image} alt={item.name} className="w-8 h-8 rounded object-cover" />
+                              ) : (
+                                <div className="w-8 h-8 bg-pink-100 rounded flex items-center justify-center text-sm">🛍️</div>
+                              )}
+                              <span className="text-xs text-gray-600 truncate max-w-[100px]">{item.name}</span>
+                              <span className="text-xs text-gray-400">×{item.quantity}</span>
+                            </div>
+                          ))}
+                          {order.items.length > 3 && (
+                            <span className="text-xs text-gray-400 flex items-center">+{order.items.length - 3} more</span>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex gap-4 mt-3">
                         <button onClick={() => handleReorder(order)} className="text-sm text-pink-600 hover:underline">
                           Reorder
                         </button>
-                        {/* ✅ FIX 3: Cancel sirf pending/confirmed me dikhe */}
                         {['pending', 'confirmed'].includes(order.status?.toLowerCase()) && (
                           <button onClick={() => cancelOrder(order._id)} className="text-sm text-rose-600 hover:underline">
                             Cancel Order
@@ -1092,7 +1113,6 @@ function Profile() {
           {/* ========== PAYMENTS TAB ========== */}
           {activeTab === 'payments' && (
             <div className="space-y-4">
-              {/* Cards Section */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                   <h3 className="font-semibold text-gray-800">Saved Cards</h3>
@@ -1124,7 +1144,6 @@ function Profile() {
                 )}
               </div>
 
-              {/* UPI Section */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
                   <h3 className="font-semibold text-gray-800">UPI IDs</h3>
