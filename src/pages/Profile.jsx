@@ -10,19 +10,17 @@ import toast from 'react-hot-toast';
 
 function Profile() {
   const navigate = useNavigate();
-  const { user, logout, token, updateUserProfile } = useAuth(); // ✅ Add updateUserProfile
+  const { user, logout, token, updateUserProfile } = useAuth();
   const { addToCart, cartCount } = useCart();
   const { wishlistCount, wishlist, removeFromWishlist } = useWishlist();
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // ✅ Profile Image - SessionStorage se load karo
+  // Profile Image
   const [profileImage, setProfileImage] = useState(() => {
     return sessionStorage.getItem('user_profile_image') || null;
   });
-  const [profileImagePreview, setProfileImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   
   // User Data
@@ -34,24 +32,13 @@ function Profile() {
     dob: '',
     emailVerified: false,
     phoneVerified: false,
-    createdAt: ''
+    createdAt: '',
+    profileImage: null
   });
   
   // Edit States
-  const [showNameEdit, setShowNameEdit] = useState(false);
-  const [showEmailEdit, setShowEmailEdit] = useState(false);
-  const [showPhoneEdit, setShowPhoneEdit] = useState(false);
-  const [showPasswordEdit, setShowPasswordEdit] = useState(false);
-  const [showGenderEdit, setShowGenderEdit] = useState(false);
-  const [showDobEdit, setShowDobEdit] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newGender, setNewGender] = useState('');
-  const [newDob, setNewDob] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
   
   // Addresses
   const [addresses, setAddresses] = useState([]);
@@ -76,55 +63,20 @@ function Profile() {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchOrder, setSearchOrder] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [showReturnModal, setShowReturnModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [returnReason, setReturnReason] = useState('');
-  const [returnComment, setReturnComment] = useState('');
   
   // Reviews
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [showDeleteReviewModal, setShowDeleteReviewModal] = useState(false);
-  const [reviewToDelete, setReviewToDelete] = useState(null);
   
-  // Saved Cards
-  const [savedCards, setSavedCards] = useState([]);
-  const [cardsLoading, setCardsLoading] = useState(false);
-  const [showCardModal, setShowCardModal] = useState(false);
-  const [cardForm, setCardForm] = useState({
-    last4: '',
-    cardType: '',
-    expiryMonth: '',
-    expiryYear: '',
-    isDefault: false
+  // Stats
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalSpent: 0,
+    wishlistCount: 0,
+    reviewCount: 0
   });
-  
-  // Login History
-  const [loginHistory, setLoginHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  
-  // Delete Account Modal
-  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  
-  const API_URL = 'https://api.mypinkshop.com';
 
-  // ========== VALIDATION FUNCTIONS ==========
-  const validateEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-  const validatePhone = (phone) => {
-    return /^[0-9]{10}$/.test(phone);
-  };
-
-  const validatePincode = (pincode) => {
-    return /^[0-9]{6}$/.test(pincode);
-  };
-
-  const validatePassword = (password) => {
-    return password.length >= 6;
-  };
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   // ========== HANDLE SEARCH ==========
   const handleSearch = () => {
@@ -139,7 +91,7 @@ function Profile() {
     }
   };
 
-  // ========== PROFILE IMAGE UPLOAD ========== ✅ FIXED
+  // ========== PROFILE IMAGE UPLOAD ==========
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -154,7 +106,6 @@ function Profile() {
       return;
     }
     
-    setProfileImagePreview(URL.createObjectURL(file));
     setUploadingImage(true);
     
     const formData = new FormData();
@@ -173,7 +124,6 @@ function Profile() {
       if (data.success) {
         const imageUrl = data.url;
         
-        // ✅ Save to backend
         const updateResponse = await fetch(`${API_URL}/api/users/profile`, {
           method: 'PUT',
           headers: {
@@ -187,21 +137,15 @@ function Profile() {
           throw new Error('Failed to update profile image');
         }
         
-        // ✅ Save to state
         setProfileImage(imageUrl);
-        
-        // ✅ Save to sessionStorage
         sessionStorage.setItem('user_profile_image', imageUrl);
-        
-        // ✅ Save to localStorage (for Avatar component)
         localStorage.setItem('profileImage', imageUrl);
         
-        // ✅ CRITICAL: Update AuthContext user object
         if (updateUserProfile) {
           updateUserProfile({ profileImage: imageUrl });
         }
         
-        toast.success('Profile picture updated successfully!');
+        toast.success('Profile picture updated! ✨');
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -218,15 +162,9 @@ function Profile() {
       return;
     }
     
-    fetchUserData();
-    fetchAddresses();
-    fetchOrders();
-    fetchReviews();
-    fetchSavedCards();
-    fetchLoginHistory();
+    fetchAllData();
   }, [user, token, navigate]);
 
-  // ✅ Profile Image - SessionStorage se load on mount
   useEffect(() => {
     const savedImage = sessionStorage.getItem('user_profile_image');
     if (savedImage) {
@@ -234,7 +172,18 @@ function Profile() {
     }
   }, []);
 
-  // Fetch user profile
+  const fetchAllData = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchUserData(),
+      fetchAddresses(),
+      fetchOrders(),
+      fetchReviews(),
+      fetchStats()
+    ]);
+    setLoading(false);
+  };
+
   const fetchUserData = async () => {
     if (!token) return;
     
@@ -259,38 +208,25 @@ function Profile() {
           dob: data.dob || '',
           emailVerified: data.emailVerified || false,
           phoneVerified: data.phoneVerified || false,
-          createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+          createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
+          profileImage: data.profileImage || null
         });
         
-        // ✅ Save profile image
         if (data.profileImage) {
           setProfileImage(data.profileImage);
           sessionStorage.setItem('user_profile_image', data.profileImage);
           localStorage.setItem('profileImage', data.profileImage);
-          
-          // ✅ Update AuthContext
           if (updateUserProfile) {
             updateUserProfile({ profileImage: data.profileImage });
           }
         }
-        
-        setNewName(data.name || '');
-        setNewEmail(data.email || '');
-        setNewPhone(data.phone || '');
-        setNewGender(data.gender || '');
-        setNewDob(data.dob || '');
-        setApiError(false);
       }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
-      setApiError(true);
       toast.error('Failed to load profile data');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Fetch addresses
   const fetchAddresses = async () => {
     if (!token) return;
     setAddressLoading(true);
@@ -306,13 +242,11 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch addresses:', error);
-      toast.error('Failed to load addresses');
     } finally {
       setAddressLoading(false);
     }
   };
 
-  // Fetch orders
   const fetchOrders = async () => {
     if (!token) return;
     setOrdersLoading(true);
@@ -330,13 +264,11 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
-      toast.error('Failed to load orders');
     } finally {
       setOrdersLoading(false);
     }
   };
 
-  // Fetch reviews
   const fetchReviews = async () => {
     if (!token) return;
     setReviewsLoading(true);
@@ -352,53 +284,35 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch reviews:', error);
-      toast.error('Failed to load reviews');
     } finally {
       setReviewsLoading(false);
     }
   };
 
-  // Fetch saved cards
-  const fetchSavedCards = async () => {
+  const fetchStats = async () => {
     if (!token) return;
-    setCardsLoading(true);
     
     try {
-      const response = await fetch(`${API_URL}/api/users/cards`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const [ordersRes, wishlistRes, reviewsRes] = await Promise.all([
+        fetch(`${API_URL}/api/orders/my-orders`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/api/wishlist`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/api/reviews/my-reviews`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
       
-      if (response.ok) {
-        const data = await response.json();
-        setSavedCards(data.cards || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch cards:', error);
-      toast.error('Failed to load cards');
-    } finally {
-      setCardsLoading(false);
-    }
-  };
-
-  // Fetch login history
-  const fetchLoginHistory = async () => {
-    if (!token) return;
-    setHistoryLoading(true);
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/login-history`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const ordersData = await ordersRes.json();
+      const wishlistData = await wishlistRes.json();
+      const reviewsData = await reviewsRes.json();
       
-      if (response.ok) {
-        const data = await response.json();
-        setLoginHistory(data.history || []);
-      }
+      const totalSpent = (ordersData.orders || []).reduce((sum, o) => sum + (o.total || 0), 0);
+      
+      setStats({
+        totalOrders: (ordersData.orders || []).length,
+        totalSpent: totalSpent,
+        wishlistCount: (wishlistData.wishlist || []).length,
+        reviewCount: (reviewsData.reviews || []).length
+      });
     } catch (error) {
-      console.error('Failed to fetch login history:', error);
-      toast.error('Failed to load login history');
-    } finally {
-      setHistoryLoading(false);
+      console.error('Failed to fetch stats:', error);
     }
   };
 
@@ -420,14 +334,7 @@ function Profile() {
   }, [searchOrder, filterStatus, orders]);
 
   // ========== UPDATE FUNCTIONS ==========
-  
-  // Update name
-  const handleNameUpdate = async () => {
-    if (!newName.trim()) {
-      toast.error('Name cannot be empty');
-      return;
-    }
-    
+  const handleFieldUpdate = async (field, value) => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
         method: 'PUT',
@@ -435,264 +342,25 @@ function Profile() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ name: newName })
+        body: JSON.stringify({ [field]: value })
       });
       
       if (response.ok) {
         const data = await response.json();
-        setUserData(prev => ({ ...prev, name: data.name }));
-        setShowNameEdit(false);
-        toast.success('Name updated successfully!');
-      }
-    } catch (error) {
-      toast.error('Error updating name');
-    }
-  };
-
-  // Update email
-  const handleEmailUpdate = async () => {
-    if (!validateEmail(newEmail)) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ email: newEmail })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(prev => ({ ...prev, email: data.email, emailVerified: false }));
-        setShowEmailEdit(false);
-        toast.success('Email updated successfully!');
+        setUserData(prev => ({ ...prev, [field]: data[field] || value }));
+        setEditingField(null);
+        toast.success(`${field.charAt(0).toUpperCase() + field.slice(1)} updated! ✨`);
+        fetchUserData();
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Email already in use or invalid');
+        toast.error(error.error || 'Update failed');
       }
     } catch (error) {
-      toast.error('Error updating email');
-    }
-  };
-
-  // Update phone
-  const handlePhoneUpdate = async () => {
-    if (!validatePhone(newPhone)) {
-      toast.error('Please enter a valid 10-digit mobile number');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ phone: newPhone })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(prev => ({ ...prev, phone: data.phone, phoneVerified: false }));
-        setShowPhoneEdit(false);
-        toast.success('Phone number updated successfully!');
-      }
-    } catch (error) {
-      toast.error('Error updating phone');
-    }
-  };
-
-  // Update gender
-  const handleGenderUpdate = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ gender: newGender })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(prev => ({ ...prev, gender: data.gender }));
-        setShowGenderEdit(false);
-        toast.success('Gender updated successfully!');
-      }
-    } catch (error) {
-      toast.error('Error updating gender');
-    }
-  };
-
-  // Update date of birth
-  const handleDobUpdate = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ dob: newDob })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(prev => ({ ...prev, dob: data.dob }));
-        setShowDobEdit(false);
-        toast.success('Date of birth updated successfully!');
-      }
-    } catch (error) {
-      toast.error('Error updating date of birth');
-    }
-  };
-
-  // Change password
-  const handlePasswordUpdate = async () => {
-    if (!validatePassword(newPassword)) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ currentPassword, newPassword })
-      });
-      
-      if (response.ok) {
-        toast.success('Password changed successfully!');
-        setShowPasswordEdit(false);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Current password is incorrect');
-      }
-    } catch (error) {
-      toast.error('Error changing password');
-    }
-  };
-
-  // ========== ORDER FUNCTIONS ==========
-  
-  const handleReorder = async (order) => {
-    try {
-      for (const item of order.items) {
-        addToCart({
-          id: item.productId || item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity || 1,
-          image: item.image,
-          stock: item.stock
-        });
-      }
-      toast.success('Items added to cart!');
-      navigate('/cart');
-    } catch (error) {
-      toast.error('Error adding items to cart');
-    }
-  };
-
-  // Download invoice
-  const handleDownloadInvoice = (order) => {
-    const invoiceHTML = `
-      <html>
-        <head><title>Invoice #${order._id}</title></head>
-        <body>
-          <h1>MyPinkShop Invoice</h1>
-          <p>Order ID: ${order._id}</p>
-          <p>Date: ${new Date(order.createdAt).toLocaleDateString()}</p>
-          <table border="1">
-            <tr><th>Product</th><th>Quantity</th><th>Price</th><th>Total</th></tr>
-            ${order.items.map(item => `<tr><td>${item.name}</td><td>${item.quantity}</td><td>₹${item.price}</td><td>₹${item.price * item.quantity}</td></tr>`).join('')}
-          </table>
-          <h3>Total: ₹${order.total}</h3>
-        </body>
-      </html>
-    `;
-    const blob = new Blob([invoiceHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `invoice_${order._id}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Invoice downloaded!');
-  };
-
-  // Request return
-  const handleReturnRequest = async () => {
-    if (!returnReason) {
-      toast.error('Please select a reason for return');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/orders/${selectedOrder._id}/return`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ reason: returnReason, comment: returnComment })
-      });
-      
-      if (response.ok) {
-        toast.success('Return request submitted successfully!');
-        setShowReturnModal(false);
-        setReturnReason('');
-        setReturnComment('');
-        fetchOrders();
-      } else {
-        toast.error('Failed to submit return request');
-      }
-    } catch (error) {
-      toast.error('Error submitting return request');
-    }
-  };
-
-  // Cancel order
-  const cancelOrder = async (orderId) => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
-    
-    try {
-      const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        toast.success('Order cancelled successfully');
-        fetchOrders();
-      } else {
-        toast.error('Failed to cancel order');
-      }
-    } catch (error) {
-      toast.error('Error cancelling order');
+      toast.error('Error updating field');
     }
   };
 
   // ========== ADDRESS FUNCTIONS ==========
-  
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
     
@@ -700,11 +368,11 @@ function Profile() {
       toast.error('Please enter full name');
       return;
     }
-    if (!validatePhone(addressForm.phone)) {
+    if (!/^[0-9]{10}$/.test(addressForm.phone)) {
       toast.error('Please enter a valid 10-digit phone number');
       return;
     }
-    if (!validatePincode(addressForm.pincode)) {
+    if (!/^[0-9]{6}$/.test(addressForm.pincode)) {
       toast.error('Please enter a valid 6-digit pincode');
       return;
     }
@@ -737,7 +405,7 @@ function Profile() {
       });
       
       if (response.ok) {
-        toast.success(editingAddress ? 'Address updated successfully!' : 'Address added successfully!');
+        toast.success(editingAddress ? 'Address updated! ✨' : 'Address added! ✨');
         fetchAddresses();
         setShowAddressModal(false);
         setEditingAddress(null);
@@ -761,7 +429,7 @@ function Profile() {
   };
 
   const deleteAddress = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this address?')) return;
+    if (!window.confirm('Delete this address?')) return;
     
     try {
       const response = await fetch(`${API_URL}/api/users/addresses/${id}`, {
@@ -770,7 +438,7 @@ function Profile() {
       });
       
       if (response.ok) {
-        toast.success('Address deleted successfully!');
+        toast.success('Address deleted!');
         fetchAddresses();
       } else {
         toast.error('Failed to delete address');
@@ -798,123 +466,56 @@ function Profile() {
     }
   };
 
-  // ========== REVIEW FUNCTIONS ==========
-  
-  const handleDeleteReview = async () => {
+  // ========== ORDER FUNCTIONS ==========
+  const handleReorder = async (order) => {
     try {
-      const response = await fetch(`${API_URL}/api/reviews/${reviewToDelete}`, {
-        method: 'DELETE',
+      for (const item of order.items) {
+        addToCart({
+          id: item.productId || item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity || 1,
+          image: item.image,
+          stock: item.stock
+        });
+      }
+      toast.success('Items added to cart! 🛒');
+      navigate('/cart');
+    } catch (error) {
+      toast.error('Error adding items to cart');
+    }
+  };
+
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm('Cancel this order?')) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
+        method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (response.ok) {
-        toast.success('Review deleted successfully!');
-        setShowDeleteReviewModal(false);
-        fetchReviews();
+        toast.success('Order cancelled!');
+        fetchOrders();
       } else {
-        toast.error('Failed to delete review');
+        toast.error('Failed to cancel order');
       }
     } catch (error) {
-      toast.error('Error deleting review');
-    }
-  };
-
-  // ========== CARD FUNCTIONS ==========
-  
-  const handleAddCard = async () => {
-    if (!cardForm.last4 || cardForm.last4.length !== 4) {
-      toast.error('Please enter last 4 digits');
-      return;
-    }
-    if (!cardForm.expiryMonth || cardForm.expiryMonth.length !== 2) {
-      toast.error('Please enter valid expiry month (MM)');
-      return;
-    }
-    if (!cardForm.expiryYear || cardForm.expiryYear.length !== 4) {
-      toast.error('Please enter valid expiry year (YYYY)');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/cards`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(cardForm)
-      });
-      
-      if (response.ok) {
-        toast.success('Card saved successfully!');
-        setShowCardModal(false);
-        setCardForm({ last4: '', cardType: '', expiryMonth: '', expiryYear: '', isDefault: false });
-        fetchSavedCards();
-      } else {
-        toast.error('Failed to save card');
-      }
-    } catch (error) {
-      toast.error('Error saving card');
-    }
-  };
-
-  const handleDeleteCard = async (cardId) => {
-    if (!window.confirm('Are you sure you want to delete this card?')) return;
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/cards/${cardId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        toast.success('Card deleted successfully!');
-        fetchSavedCards();
-      } else {
-        toast.error('Failed to delete card');
-      }
-    } catch (error) {
-      toast.error('Error deleting card');
-    }
-  };
-
-  // ========== ACCOUNT FUNCTIONS ==========
-  
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'DELETE') {
-      toast.error('Please type DELETE to confirm');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/account`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        toast.success('Account deleted successfully!');
-        logout();
-        navigate('/');
-      } else {
-        toast.error('Failed to delete account');
-      }
-    } catch (error) {
-      toast.error('Error deleting account');
+      toast.error('Error cancelling order');
     }
   };
 
   // ========== UI HELPERS ==========
-  
   const getStatusColor = (status) => {
     switch(status?.toLowerCase()) {
-      case 'delivered': return 'text-green-600';
-      case 'shipped': return 'text-blue-600';
-      case 'confirmed': return 'text-blue-600';
-      case 'processing': return 'text-yellow-600';
-      case 'pending': return 'text-yellow-600';
-      case 'cancelled': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'delivered': return 'text-emerald-600 bg-emerald-50';
+      case 'shipped': return 'text-blue-600 bg-blue-50';
+      case 'confirmed': return 'text-purple-600 bg-purple-50';
+      case 'processing': return 'text-amber-600 bg-amber-50';
+      case 'pending': return 'text-amber-600 bg-amber-50';
+      case 'cancelled': return 'text-rose-600 bg-rose-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
   };
 
@@ -930,24 +531,29 @@ function Profile() {
     }
   };
 
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
   const tabs = [
-    { id: 'orders', label: '📦 Orders', icon: '📦' },
-    { id: 'addresses', label: '📍 Addresses', icon: '📍' },
-    { id: 'profile', label: '👤 Profile', icon: '👤' },
-    { id: 'security', label: '🔐 Security', icon: '🔐' },
-    { id: 'reviews', label: '⭐ My Reviews', icon: '⭐' },
-    { id: 'wishlist', label: '❤️ Wishlist', icon: '❤️' },
-    { id: 'payments', label: '💳 Payment Methods', icon: '💳' },
-    { id: 'history', label: '🕐 Login History', icon: '🕐' },
-    { id: 'support', label: '💬 Support', icon: '💬' }
+    { id: 'overview', label: 'Overview', icon: '📊' },
+    { id: 'orders', label: 'Orders', icon: '📦' },
+    { id: 'addresses', label: 'Addresses', icon: '📍' },
+    { id: 'profile', label: 'Profile', icon: '👤' },
+    { id: 'wishlist', label: 'Wishlist', icon: '❤️' },
+    { id: 'reviews', label: 'Reviews', icon: '⭐' }
   ];
 
   if (!user || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50/30 via-white to-rose-50/30 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading...</p>
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 border-4 border-pink-200 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="text-gray-400 font-medium">Loading your profile...</p>
         </div>
       </div>
     );
@@ -956,21 +562,21 @@ function Profile() {
   return (
     <>
       <Helmet>
-        <title>My Account - MyPinkShop | Profile, Orders & Addresses</title>
-        <meta name="description" content="Manage your MyPinkShop account. View orders, manage addresses, update profile information, and track deliveries." />
+        <title>My Account - MyPinkShop | Profile & Orders</title>
+        <meta name="description" content="Manage your MyPinkShop account. View orders, manage addresses, and update profile." />
         <link rel="canonical" href="https://www.mypinkshop.com/profile" />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50/20 via-white to-rose-50/20">
         
         <OfferBanner />
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+        {/* Glass Header */}
+        <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-200/50 group-hover:scale-105 transition-transform">
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
@@ -987,7 +593,7 @@ function Profile() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-white/60 backdrop-blur-sm border border-white/30 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition-all text-sm sm:text-base"
                   />
                   <button 
                     onClick={handleSearch}
@@ -1000,12 +606,12 @@ function Profile() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                   {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
-                </button>
+                </Link>
                 
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1023,571 +629,437 @@ function Profile() {
         {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-            <span className="text-gray-400">/</span>
+            <Link to="/" className="text-gray-400 hover:text-pink-500 transition">Home</Link>
+            <span className="text-gray-300">/</span>
             <span className="text-pink-600 font-medium">My Account</span>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Your Account</h1>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Left Sidebar */}
-            <div className="md:col-span-1">
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
-                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100">
-                  <h2 className="font-semibold text-gray-800">Account Menu</h2>
+          
+          {/* Profile Header - Glass */}
+          <div className="bg-white/40 backdrop-blur-xl rounded-3xl p-6 border border-white/30 shadow-sm mb-8">
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-4xl text-white overflow-hidden shadow-lg shadow-pink-200/50">
+                  {profileImage ? (
+                    <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-bold text-2xl">{getInitials(userData.name)}</span>
+                  )}
                 </div>
-                <div className="divide-y divide-pink-50">
-                  {tabs.map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full text-left px-4 py-3 hover:bg-pink-50/50 transition ${
-                        activeTab === tab.id ? 'text-pink-600 font-medium bg-pink-50/80' : 'text-gray-600'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                <label className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center cursor-pointer hover:bg-gray-100 transition border border-pink-100">
+                  <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" />
+                  <span className="text-pink-500 text-sm">📷</span>
+                </label>
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+              <div className="text-center md:text-left">
+                <h2 className="text-2xl font-bold text-gray-800">{userData.name || 'User'}</h2>
+                <p className="text-gray-400">{userData.email}</p>
+                <div className="flex flex-wrap gap-3 mt-2 justify-center md:justify-start">
+                  <span className="text-xs bg-white/50 backdrop-blur-sm px-3 py-1 rounded-full text-gray-600 border border-white/30">
+                    📦 {stats.totalOrders} Orders
+                  </span>
+                  <span className="text-xs bg-white/50 backdrop-blur-sm px-3 py-1 rounded-full text-gray-600 border border-white/30">
+                    ❤️ {stats.wishlistCount} Wishlist
+                  </span>
+                  <span className="text-xs bg-white/50 backdrop-blur-sm px-3 py-1 rounded-full text-gray-600 border border-white/30">
+                    ⭐ {stats.reviewCount} Reviews
+                  </span>
+                  <span className="text-xs bg-white/50 backdrop-blur-sm px-3 py-1 rounded-full text-gray-600 border border-white/30">
+                    💰 ₹{stats.totalSpent.toLocaleString()} Spent
+                  </span>
                 </div>
               </div>
+              <div className="md:ml-auto">
+                <button 
+                  onClick={logout}
+                  className="px-4 py-2 text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50/50 transition text-sm font-medium backdrop-blur-sm"
+                >
+                  Logout →
+                </button>
+              </div>
             </div>
+          </div>
 
-            {/* Right Content */}
-            <div className="md:col-span-3">
-              
-              {/* ========== ORDERS TAB ========== */}
-              {activeTab === 'orders' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">Your Orders</h2>
-                  </div>
-                  <div className="p-4 border-b border-pink-100">
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex-1 min-w-[200px]">
-                        <input
-                          type="text"
-                          placeholder="Search orders by ID..."
-                          value={searchOrder}
-                          onChange={(e) => setSearchOrder(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 transition"
-                        />
-                      </div>
-                      <select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 bg-white"
-                      >
-                        <option value="all">All Orders</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="shipped">Shipped</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="pending">Processing</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  {ordersLoading ? (
-                    <div className="p-8 text-center">
-                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-gray-500 mt-2">Loading orders...</p>
-                    </div>
-                  ) : filteredOrders.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="text-6xl mb-4">📦</div>
-                      <p className="text-gray-500">No orders found</p>
-                      <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-pink-50">
-                      {filteredOrders.map(order => (
-                        <div key={order._id || order.id} className="p-4 hover:bg-pink-50/30 transition">
-                          <div className="flex flex-wrap justify-between items-start gap-3">
-                            <div>
-                              <p className="font-semibold text-gray-800">#{order._id?.slice(-8) || order.id}</p>
-                              <p className="text-sm text-gray-500">Ordered on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                              <p className="text-sm text-gray-500 mt-1">{order.items?.length || 0} items</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-bold text-gray-800">₹{order.total?.toLocaleString()}</p>
-                              <p className={`text-sm font-medium ${getStatusColor(order.status)}`}>
-                                {getStatusText(order.status)}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            <Link to={`/track-order/${order._id || order.id}`} className="text-sm text-pink-600 hover:underline">
-                              Track Order →
-                            </Link>
-                            
-                            {order.status === 'delivered' && (
-                              <>
-                                <button onClick={() => handleReorder(order)} className="text-sm text-green-600 hover:underline">
-                                  Reorder
-                                </button>
-                                <button onClick={() => handleDownloadInvoice(order)} className="text-sm text-blue-600 hover:underline">
-                                  Download Invoice
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setSelectedOrder(order);
-                                    setShowReturnModal(true);
-                                  }} 
-                                  className="text-sm text-orange-600 hover:underline"
-                                >
-                                  Return
-                                </button>
-                              </>
-                            )}
-                            
-                            {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') && (
-                              <button onClick={() => cancelOrder(order._id || order.id)} className="text-sm text-red-600 hover:underline">
-                                Cancel Order
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+          {/* Tabs - Glass */}
+          <div className="flex flex-wrap gap-2 mb-8">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                  activeTab === tab.id 
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-200/50' 
+                    : 'bg-white/40 backdrop-blur-sm border border-white/30 text-gray-600 hover:border-pink-300 hover:bg-white/60'
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ========== OVERVIEW TAB ========== */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+                  <p className="text-xs text-gray-400 font-medium">Total Orders</p>
+                  <p className="text-2xl font-bold text-pink-600">{stats.totalOrders}</p>
                 </div>
-              )}
+                <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+                  <p className="text-xs text-gray-400 font-medium">Total Spent</p>
+                  <p className="text-2xl font-bold text-emerald-600">₹{stats.totalSpent.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+                  <p className="text-xs text-gray-400 font-medium">Wishlist</p>
+                  <p className="text-2xl font-bold text-rose-600">{stats.wishlistCount}</p>
+                </div>
+                <div className="bg-white/40 backdrop-blur-xl rounded-2xl p-4 border border-white/30 shadow-sm">
+                  <p className="text-xs text-gray-400 font-medium">Reviews</p>
+                  <p className="text-2xl font-bold text-amber-600">{stats.reviewCount}</p>
+                </div>
+              </div>
 
-              {/* ========== ADDRESSES TAB ========== */}
-              {activeTab === 'addresses' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
-                    <h2 className="font-semibold text-gray-800">Your Addresses</h2>
-                    <button
-                      onClick={() => {
-                        setEditingAddress(null);
-                        setAddressForm({ 
-                          fullName: userData.name || '', 
-                          phone: userData.phone || '', 
-                          pincode: '', 
-                          addressLine1: '', 
-                          addressLine2: '', 
-                          city: '', 
-                          state: '', 
-                          isDefault: addresses.length === 0,
-                          addressType: 'home'
-                        });
-                        setShowAddressModal(true);
-                      }}
-                      className="text-pink-600 text-sm hover:underline"
-                    >
-                      + Add New Address
-                    </button>
+              {/* Recent Orders */}
+              <div className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/30 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/30 flex justify-between items-center">
+                  <h3 className="font-semibold text-gray-800">Recent Orders</h3>
+                  <button onClick={() => setActiveTab('orders')} className="text-pink-600 text-sm hover:underline">View All →</button>
+                </div>
+                {orders.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <p className="text-gray-400">No orders yet</p>
                   </div>
-                  
-                  {addressLoading ? (
-                    <div className="p-8 text-center">
-                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-gray-500 mt-2">Loading addresses...</p>
-                    </div>
-                  ) : addresses.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="text-6xl mb-4">📍</div>
-                      <p className="text-gray-500">No addresses saved</p>
-                      <button onClick={() => setShowAddressModal(true)} className="mt-3 text-pink-600 hover:underline">
-                        Add your first address →
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {addresses.map(addr => (
-                        <div key={addr._id} className="border border-pink-100 rounded-xl p-4 hover:shadow-md transition bg-white">
-                          {addr.isDefault && (
-                            <span className="text-xs bg-gradient-to-r from-pink-500 to-rose-500 text-white px-2 py-0.5 rounded-full mb-2 inline-block">
-                              Default
-                            </span>
-                          )}
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mb-2 ml-2 inline-block">
-                            {addr.addressType === 'home' ? '🏠 Home' : addr.addressType === 'work' ? '💼 Work' : '📍 Other'}
+                ) : (
+                  <div className="divide-y divide-white/20">
+                    {orders.slice(0, 3).map(order => (
+                      <div key={order._id} className="p-4 flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-gray-800">#{order._id?.slice(-8)}</p>
+                          <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-gray-800">₹{order.total?.toLocaleString()}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(order.status)}`}>
+                            {getStatusText(order.status)}
                           </span>
-                          <p className="font-semibold text-gray-800 mt-2">{addr.fullName}</p>
-                          <p className="text-sm text-gray-600 mt-1">{addr.addressLine1}</p>
-                          {addr.addressLine2 && <p className="text-sm text-gray-600">{addr.addressLine2}</p>}
-                          <p className="text-sm text-gray-600">{addr.city}, {addr.state} - {addr.pincode}</p>
-                          <p className="text-sm text-gray-500 mt-1">📞 {addr.phone}</p>
-                          <div className="flex gap-4 mt-3">
-                            <button onClick={() => {
-                              setEditingAddress(addr);
-                              setAddressForm(addr);
-                              setShowAddressModal(true);
-                            }} className="text-sm text-pink-600 hover:underline">Edit</button>
-                            <button onClick={() => deleteAddress(addr._id)} className="text-sm text-red-600 hover:underline">Delete</button>
-                            {!addr.isDefault && (
-                              <button onClick={() => setDefaultAddress(addr._id)} className="text-sm text-gray-600 hover:underline">Set as Default</button>
-                            )}
-                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ========== PROFILE TAB ========== */}
-              {activeTab === 'profile' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">Profile Information</h2>
-                  </div>
-                  <div className="divide-y divide-pink-50">
-                    {/* Profile Picture */}
-                    <div className="p-4 flex flex-col items-center">
-                      <div className="relative">
-                        <div className="w-24 h-24 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-4xl text-white overflow-hidden">
-                          {profileImage ? (
-                            <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
-                          ) : (
-                            <span>{userData.name?.charAt(0) || 'U'}</span>
-                          )}
-                        </div>
-                        <label className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center cursor-pointer hover:bg-gray-100">
-                          <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" />
-                          <span className="text-pink-500 text-sm">📷</span>
-                        </label>
                       </div>
-                      {uploadingImage && <p className="text-xs text-gray-400 mt-2">Uploading...</p>}
-                      <p className="text-xs text-gray-400 mt-2">Click camera icon to change profile picture</p>
-                    </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-                    {/* Name */}
-                    <div className="p-4 flex flex-wrap justify-between items-center gap-3">
-                      <div><p className="text-sm text-gray-500">Full Name</p><p className="font-medium text-gray-800">{userData.name}</p></div>
-                      {showNameEdit ? (
-                        <div className="flex gap-2">
-                          <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
-                          <button onClick={handleNameUpdate} className="text-green-600 text-sm">Save</button>
-                          <button onClick={() => setShowNameEdit(false)} className="text-gray-500 text-sm">Cancel</button>
+          {/* ========== ORDERS TAB ========== */}
+          {activeTab === 'orders' && (
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/30 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/30 flex flex-wrap justify-between items-center gap-3">
+                <h3 className="font-semibold text-gray-800">Your Orders</h3>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search by ID..."
+                    value={searchOrder}
+                    onChange={(e) => setSearchOrder(e.target.value)}
+                    className="px-3 py-1.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl text-sm focus:outline-none focus:border-pink-500"
+                  />
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-3 py-1.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl text-sm focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="all">All</option>
+                    <option value="pending">Processing</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+              
+              {ordersLoading ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Loading orders...</p>
+                </div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="text-6xl mb-4">📦</div>
+                  <p className="text-gray-400">No orders found</p>
+                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-white/20">
+                  {filteredOrders.map(order => (
+                    <div key={order._id} className="p-4 hover:bg-white/20 transition">
+                      <div className="flex flex-wrap justify-between items-start gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-800">#{order._id?.slice(-8)}</p>
+                          <p className="text-sm text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
+                          <p className="text-sm text-gray-400 mt-1">{order.items?.length || 0} items</p>
                         </div>
-                      ) : (
-                        <button onClick={() => setShowNameEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>
-                      )}
-                    </div>
-
-                    {/* Email */}
-                    <div className="p-4 flex flex-wrap justify-between items-center gap-3">
-                      <div><p className="text-sm text-gray-500">Email Address</p><p className="font-medium text-gray-800">{userData.email}</p>{!userData.emailVerified && <p className="text-xs text-yellow-600">Not verified</p>}</div>
-                      <div className="flex gap-3">
-                        {!userData.emailVerified && <button onClick={() => toast.success(`Verification link sent to ${userData.email}`)} className="text-blue-600 text-sm hover:underline">Verify</button>}
-                        {showEmailEdit ? (
-                          <div className="flex gap-2">
-                            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
-                            <button onClick={handleEmailUpdate} className="text-green-600 text-sm">Save</button>
-                            <button onClick={() => setShowEmailEdit(false)} className="text-gray-500 text-sm">Cancel</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setShowEmailEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>
+                        <div className="text-right">
+                          <p className="font-bold text-gray-800">₹{order.total?.toLocaleString()}</p>
+                          <span className={`text-xs px-3 py-1 rounded-full ${getStatusColor(order.status)}`}>
+                            {getStatusText(order.status)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-3 mt-3">
+                        <button onClick={() => handleReorder(order)} className="text-sm text-pink-600 hover:underline">
+                          Reorder
+                        </button>
+                        {(order.status === 'pending' || order.status === 'confirmed') && (
+                          <button onClick={() => cancelOrder(order._id)} className="text-sm text-rose-600 hover:underline">
+                            Cancel
+                          </button>
                         )}
                       </div>
                     </div>
-
-                    {/* Phone */}
-                    <div className="p-4 flex flex-wrap justify-between items-center gap-3">
-                      <div><p className="text-sm text-gray-500">Mobile Number</p><p className="font-medium text-gray-800">{userData.phone || 'Not added'}</p></div>
-                      {showPhoneEdit ? (
-                        <div className="flex gap-2">
-                          <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="10-digit mobile" maxLength="10" className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
-                          <button onClick={handlePhoneUpdate} className="text-green-600 text-sm">Save</button>
-                          <button onClick={() => setShowPhoneEdit(false)} className="text-gray-500 text-sm">Cancel</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setShowPhoneEdit(true)} className="text-pink-600 text-sm hover:underline">Add/Update</button>
-                      )}
-                    </div>
-
-                    {/* Gender */}
-                    <div className="p-4 flex flex-wrap justify-between items-center gap-3">
-                      <div><p className="text-sm text-gray-500">Gender</p><p className="font-medium text-gray-800">{userData.gender || 'Not specified'}</p></div>
-                      {showGenderEdit ? (
-                        <div className="flex gap-2">
-                          <select value={newGender} onChange={(e) => setNewGender(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-1 text-sm">
-                            <option value="">Select</option>
-                            <option value="female">Female</option>
-                            <option value="male">Male</option>
-                            <option value="other">Other</option>
-                          </select>
-                          <button onClick={handleGenderUpdate} className="text-green-600 text-sm">Save</button>
-                          <button onClick={() => setShowGenderEdit(false)} className="text-gray-500 text-sm">Cancel</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setShowGenderEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>
-                      )}
-                    </div>
-
-                    {/* Date of Birth */}
-                    <div className="p-4 flex flex-wrap justify-between items-center gap-3">
-                      <div><p className="text-sm text-gray-500">Date of Birth</p><p className="font-medium text-gray-800">{userData.dob || 'Not specified'}</p></div>
-                      {showDobEdit ? (
-                        <div className="flex gap-2">
-                          <input type="date" value={newDob} onChange={(e) => setNewDob(e.target.value)} className="border border-gray-200 rounded-xl px-3 py-1 text-sm" />
-                          <button onClick={handleDobUpdate} className="text-green-600 text-sm">Save</button>
-                          <button onClick={() => setShowDobEdit(false)} className="text-gray-500 text-sm">Cancel</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setShowDobEdit(true)} className="text-pink-600 text-sm hover:underline">Edit</button>
-                      )}
-                    </div>
-
-                    {/* Member Since */}
-                    <div className="p-4">
-                      <p className="text-sm text-gray-500">Member Since</p>
-                      <p className="font-medium text-gray-800">{userData.createdAt}</p>
-                    </div>
-
-                    {/* Delete Account */}
-                    <div className="p-4">
-                      <button onClick={() => setShowDeleteAccountModal(true)} className="text-red-600 text-sm hover:underline flex items-center gap-1">
-                        🗑️ Delete Account
-                      </button>
-                      <p className="text-xs text-gray-400 mt-1">This action is permanent and cannot be undone</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               )}
-
-              {/* ========== SECURITY TAB ========== */}
-              {activeTab === 'security' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">Security Settings</h2>
-                  </div>
-                  <div className="p-4">
-                    <div className="mb-4">
-                      <p className="font-medium text-gray-800 mb-2">Change Password</p>
-                      {showPasswordEdit ? (
-                        <div className="space-y-3">
-                          <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
-                          <input type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
-                          <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
-                          <div className="flex gap-2">
-                            <button onClick={handlePasswordUpdate} className="bg-green-500 text-white px-4 py-2 rounded-xl text-sm">Save</button>
-                            <button onClick={() => setShowPasswordEdit(false)} className="bg-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm">Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline">Change Password</button>
-                      )}
-                    </div>
-                    <div className="pt-4 border-t border-pink-100">
-                      <p className="text-sm text-gray-500">Two-Factor Authentication</p>
-                      <p className="text-sm text-gray-600 mb-2">Add an extra layer of security to your account</p>
-                      <button className="text-pink-600 text-sm hover:underline">Setup 2FA →</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ========== REVIEWS TAB ========== */}
-              {activeTab === 'reviews' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">My Reviews</h2>
-                  </div>
-                  
-                  {reviewsLoading ? (
-                    <div className="p-8 text-center">
-                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-gray-500 mt-2">Loading reviews...</p>
-                    </div>
-                  ) : reviews.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="text-6xl mb-4">⭐</div>
-                      <p className="text-gray-500">No reviews yet</p>
-                      <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Shop and review products →</Link>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-pink-50">
-                      {reviews.map(review => (
-                        <div key={review._id} className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <Link to={`/product/${review.productId?._id}`} className="font-semibold text-gray-800 hover:text-pink-500">{review.productId?.name}</Link>
-                              <div className="flex text-yellow-400 text-sm mt-1">
-                                {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
-                              </div>
-                              <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
-                              {review.images?.length > 0 && (
-                                <div className="flex gap-2 mt-2">
-                                  {review.images.map((img, idx) => (
-                                    <img key={idx} src={img} alt="Review" className="w-16 h-16 object-cover rounded" />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <button onClick={() => { setReviewToDelete(review._id); setShowDeleteReviewModal(true); }} className="text-red-500 text-sm">Delete</button>
-                          </div>
-                          <p className="text-xs text-gray-400 mt-2">Reviewed on {new Date(review.createdAt).toLocaleDateString()}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ========== WISHLIST TAB ========== */}
-              {activeTab === 'wishlist' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">My Wishlist ({wishlist?.length || 0})</h2>
-                  </div>
-                  {!wishlist || wishlist.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="text-6xl mb-4">🤍</div>
-                      <p className="text-gray-500">Your wishlist is empty</p>
-                      <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-pink-50">
-                      {wishlist.slice(0, 10).map(product => (
-                        <div key={product.id} className="p-4 flex gap-4">
-                          <Link to={`/product/${product.id}`}>
-                            <img src={product.image} alt={product.name} className="w-20 h-20 object-cover rounded" />
-                          </Link>
-                          <div className="flex-1">
-                            <Link to={`/product/${product.id}`}><h3 className="font-semibold text-gray-800 hover:text-pink-500">{product.name}</h3></Link>
-                            <p className="text-pink-600 font-bold mt-1">₹{product.price}</p>
-                            <div className="flex gap-3 mt-2">
-                              <button 
-                                onClick={() => { 
-                                  addToCart(product); 
-                                  removeFromWishlist(product.id); 
-                                  toast.success('Moved to cart!');
-                                }} 
-                                className="text-sm bg-pink-500 text-white px-3 py-1 rounded"
-                              >
-                                Move to Cart
-                              </button>
-                              <button 
-                                onClick={() => {
-                                  removeFromWishlist(product.id);
-                                  toast.success('Removed from wishlist');
-                                }} 
-                                className="text-sm text-red-500"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {wishlist.length > 10 && (
-                        <div className="p-4 text-center">
-                          <Link to="/wishlist" className="text-pink-600 hover:underline">View all {wishlist.length} items →</Link>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ========== PAYMENTS TAB ========== */}
-              {activeTab === 'payments' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
-                    <h2 className="font-semibold text-gray-800">Saved Payment Methods</h2>
-                    <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add New Card</button>
-                  </div>
-                  
-                  {cardsLoading ? (
-                    <div className="p-8 text-center">
-                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-gray-500 mt-2">Loading cards...</p>
-                    </div>
-                  ) : savedCards.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="text-6xl mb-4">💳</div>
-                      <p className="text-gray-500">No saved payment methods</p>
-                      <button onClick={() => setShowCardModal(true)} className="mt-3 text-pink-600 hover:underline">Add your first card →</button>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-pink-50">
-                      {savedCards.map(card => (
-                        <div key={card._id} className="p-4 flex justify-between items-center">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl">{card.cardType === 'visa' ? '💳' : card.cardType === 'mastercard' ? '💳' : '💳'}</span>
-                            <div>
-                              <p className="font-medium">•••• {card.last4}</p>
-                              <p className="text-xs text-gray-500">Expires {card.expiryMonth}/{card.expiryYear}</p>
-                            </div>
-                            {card.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
-                          </div>
-                          <button onClick={() => handleDeleteCard(card._id)} className="text-red-500 text-sm">Remove</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ========== LOGIN HISTORY TAB ========== */}
-              {activeTab === 'history' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">Login History</h2>
-                  </div>
-                  
-                  {historyLoading ? (
-                    <div className="p-8 text-center">
-                      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-gray-500 mt-2">Loading history...</p>
-                    </div>
-                  ) : loginHistory.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <div className="text-6xl mb-4">🕐</div>
-                      <p className="text-gray-500">No login history available</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-pink-50">
-                      {loginHistory.map((log, idx) => (
-                        <div key={idx} className="p-4">
-                          <p className="font-medium">{new Date(log.time).toLocaleString()}</p>
-                          <p className="text-sm text-gray-500">IP: {log.ip} • {log.device || 'Unknown device'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ========== SUPPORT TAB ========== */}
-              {activeTab === 'support' && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 shadow-sm">
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 rounded-t-2xl">
-                    <h2 className="font-semibold text-gray-800">Support</h2>
-                  </div>
-                  <div className="p-6 text-center">
-                    <div className="text-6xl mb-4">💬</div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2">Need Help?</h3>
-                    <p className="text-gray-500 mb-4">Our support team is here to assist you</p>
-                    <Link to="/contact" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">
-                      Contact Support →
-                    </Link>
-                    <div className="mt-6 pt-6 border-t border-pink-100">
-                      <p className="text-sm text-gray-500">Email: support@mypinkshop.com</p>
-                      <p className="text-sm text-gray-500">Phone: +91 1800-123-4567</p>
-                      <p className="text-sm text-gray-500">Hours: Mon-Sat, 10 AM - 7 PM</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
             </div>
-          </div>
+          )}
+
+          {/* ========== ADDRESSES TAB ========== */}
+          {activeTab === 'addresses' && (
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/30 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/30 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800">Your Addresses</h3>
+                <button
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setAddressForm({ 
+                      fullName: userData.name || '', 
+                      phone: userData.phone || '', 
+                      pincode: '', 
+                      addressLine1: '', 
+                      addressLine2: '', 
+                      city: '', 
+                      state: '', 
+                      isDefault: addresses.length === 0,
+                      addressType: 'home'
+                    });
+                    setShowAddressModal(true);
+                  }}
+                  className="text-pink-600 text-sm hover:underline"
+                >
+                  + Add New
+                </button>
+              </div>
+              
+              {addressLoading ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Loading addresses...</p>
+                </div>
+              ) : addresses.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="text-6xl mb-4">📍</div>
+                  <p className="text-gray-400">No addresses saved</p>
+                </div>
+              ) : (
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {addresses.map(addr => (
+                    <div key={addr._id} className="bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/30 hover:shadow-md transition">
+                      {addr.isDefault && (
+                        <span className="text-xs bg-gradient-to-r from-pink-500 to-rose-500 text-white px-2 py-0.5 rounded-full mb-2 inline-block">
+                          Default
+                        </span>
+                      )}
+                      <span className="text-xs bg-gray-100/50 text-gray-600 px-2 py-0.5 rounded-full mb-2 ml-2 inline-block">
+                        {addr.addressType === 'home' ? '🏠 Home' : addr.addressType === 'work' ? '💼 Work' : '📍 Other'}
+                      </span>
+                      <p className="font-semibold text-gray-800 mt-2">{addr.fullName}</p>
+                      <p className="text-sm text-gray-600">{addr.addressLine1}</p>
+                      {addr.addressLine2 && <p className="text-sm text-gray-600">{addr.addressLine2}</p>}
+                      <p className="text-sm text-gray-600">{addr.city}, {addr.state} - {addr.pincode}</p>
+                      <p className="text-sm text-gray-500 mt-1">📞 {addr.phone}</p>
+                      <div className="flex gap-4 mt-3">
+                        <button onClick={() => {
+                          setEditingAddress(addr);
+                          setAddressForm(addr);
+                          setShowAddressModal(true);
+                        }} className="text-sm text-pink-600 hover:underline">Edit</button>
+                        <button onClick={() => deleteAddress(addr._id)} className="text-sm text-rose-600 hover:underline">Delete</button>
+                        {!addr.isDefault && (
+                          <button onClick={() => setDefaultAddress(addr._id)} className="text-sm text-gray-500 hover:underline">Set Default</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========== PROFILE TAB ========== */}
+          {activeTab === 'profile' && (
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/30 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/30">
+                <h3 className="font-semibold text-gray-800">Profile Information</h3>
+              </div>
+              <div className="divide-y divide-white/20">
+                {/* Name */}
+                <div className="p-4 flex flex-wrap justify-between items-center gap-3">
+                  <div>
+                    <p className="text-xs text-gray-400">Full Name</p>
+                    <p className="font-medium text-gray-800">{userData.name}</p>
+                  </div>
+                  {editingField === 'name' ? (
+                    <div className="flex gap-2">
+                      <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-white/30 rounded-xl px-3 py-1 text-sm bg-white/50" />
+                      <button onClick={() => handleFieldUpdate('name', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setEditingField('name'); setEditValue(userData.name); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div className="p-4 flex flex-wrap justify-between items-center gap-3">
+                  <div>
+                    <p className="text-xs text-gray-400">Email</p>
+                    <p className="font-medium text-gray-800">{userData.email}</p>
+                    {!userData.emailVerified && <p className="text-xs text-amber-500">Not verified</p>}
+                  </div>
+                  {editingField === 'email' ? (
+                    <div className="flex gap-2">
+                      <input type="email" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-white/30 rounded-xl px-3 py-1 text-sm bg-white/50" />
+                      <button onClick={() => handleFieldUpdate('email', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setEditingField('email'); setEditValue(userData.email); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                  )}
+                </div>
+
+                {/* Phone */}
+                <div className="p-4 flex flex-wrap justify-between items-center gap-3">
+                  <div>
+                    <p className="text-xs text-gray-400">Phone</p>
+                    <p className="font-medium text-gray-800">{userData.phone || 'Not added'}</p>
+                  </div>
+                  {editingField === 'phone' ? (
+                    <div className="flex gap-2">
+                      <input type="tel" value={editValue} onChange={(e) => setEditValue(e.target.value)} maxLength="10" className="border border-white/30 rounded-xl px-3 py-1 text-sm bg-white/50" />
+                      <button onClick={() => handleFieldUpdate('phone', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setEditingField('phone'); setEditValue(userData.phone || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                  )}
+                </div>
+
+                {/* Member Since */}
+                <div className="p-4">
+                  <p className="text-xs text-gray-400">Member Since</p>
+                  <p className="font-medium text-gray-800">{userData.createdAt}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========== WISHLIST TAB ========== */}
+          {activeTab === 'wishlist' && (
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/30 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/30">
+                <h3 className="font-semibold text-gray-800">My Wishlist ({wishlist?.length || 0})</h3>
+              </div>
+              {!wishlist || wishlist.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="text-6xl mb-4">🤍</div>
+                  <p className="text-gray-400">Your wishlist is empty</p>
+                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-white/20">
+                  {wishlist.map(product => (
+                    <div key={product.id} className="p-4 flex gap-4 items-center">
+                      <Link to={`/product/${product.id}`}>
+                        <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-xl" />
+                      </Link>
+                      <div className="flex-1">
+                        <Link to={`/product/${product.id}`} className="font-semibold text-gray-800 hover:text-pink-500">
+                          {product.name}
+                        </Link>
+                        <p className="text-pink-600 font-bold mt-1">₹{product.price}</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          removeFromWishlist(product.id);
+                          toast.success('Removed from wishlist');
+                        }} 
+                        className="text-rose-500 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========== REVIEWS TAB ========== */}
+          {activeTab === 'reviews' && (
+            <div className="bg-white/40 backdrop-blur-xl rounded-2xl border border-white/30 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/30">
+                <h3 className="font-semibold text-gray-800">My Reviews</h3>
+              </div>
+              
+              {reviewsLoading ? (
+                <div className="p-8 text-center">
+                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Loading reviews...</p>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="text-6xl mb-4">⭐</div>
+                  <p className="text-gray-400">No reviews yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-white/20">
+                  {reviews.map(review => (
+                    <div key={review._id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <Link to={`/product/${review.productId?._id}`} className="font-semibold text-gray-800 hover:text-pink-500">
+                            {review.productId?.name}
+                          </Link>
+                          <div className="flex text-yellow-400 text-sm mt-1">
+                            {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">{new Date(review.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
 
-        {/* Address Modal */}
+        {/* Address Modal - Glass */}
         {showAddressModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddressModal(false)}>
-            <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="border-b border-pink-100 p-4 flex justify-between items-center sticky top-0 bg-white">
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowAddressModal(false)}>
+            <div className="bg-white/80 backdrop-blur-xl rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-white/30 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="border-b border-white/30 p-4 flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-xl rounded-t-3xl">
                 <h3 className="text-lg font-semibold">{editingAddress ? 'Edit Address' : 'Add New Address'}</h3>
                 <button onClick={() => setShowAddressModal(false)} className="text-gray-400 text-2xl">&times;</button>
               </div>
@@ -1597,7 +1069,7 @@ function Profile() {
                   placeholder="Full Name *" 
                   value={addressForm.fullName} 
                   onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                   required 
                 />
                 <input 
@@ -1605,7 +1077,7 @@ function Profile() {
                   placeholder="Mobile Number (10 digits) *" 
                   value={addressForm.phone} 
                   onChange={(e) => setAddressForm({...addressForm, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10)})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                   required 
                   maxLength="10"
                 />
@@ -1614,7 +1086,7 @@ function Profile() {
                   placeholder="Pincode (6 digits) *" 
                   value={addressForm.pincode} 
                   onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6)})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                   required 
                   maxLength="6"
                 />
@@ -1623,7 +1095,7 @@ function Profile() {
                   placeholder="Address Line 1 *" 
                   value={addressForm.addressLine1} 
                   onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                   required 
                 />
                 <input 
@@ -1631,7 +1103,7 @@ function Profile() {
                   placeholder="Address Line 2 (Optional)" 
                   value={addressForm.addressLine2} 
                   onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                  className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <input 
@@ -1639,7 +1111,7 @@ function Profile() {
                     placeholder="City *" 
                     value={addressForm.city} 
                     onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} 
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                    className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                     required 
                   />
                   <input 
@@ -1647,25 +1119,25 @@ function Profile() {
                     placeholder="State *" 
                     value={addressForm.state} 
                     onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} 
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+                    className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200/50 transition" 
                     required 
                   />
                 </div>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
                     <input type="radio" name="addressType" checked={addressForm.addressType === 'home'} onChange={() => setAddressForm({...addressForm, addressType: 'home'})} /> 🏠 Home
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
                     <input type="radio" name="addressType" checked={addressForm.addressType === 'work'} onChange={() => setAddressForm({...addressForm, addressType: 'work'})} /> 💼 Work
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
                     <input type="radio" name="addressType" checked={addressForm.addressType === 'other'} onChange={() => setAddressForm({...addressForm, addressType: 'other'})} /> 📍 Other
                   </label>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({...addressForm, isDefault: e.target.checked})} /> Make this my default address
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({...addressForm, isDefault: e.target.checked})} /> Make default
                 </label>
-                <button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl font-medium hover:shadow-lg transition">
+                <button type="submit" className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl font-medium hover:shadow-lg hover:shadow-pink-200/50 transition">
                   {editingAddress ? 'Update Address' : 'Add Address'}
                 </button>
               </form>
@@ -1673,140 +1145,18 @@ function Profile() {
           </div>
         )}
 
-        {/* Return Modal */}
-        {showReturnModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold mb-4">Request Return</h3>
-              <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none">
-                <option value="">Select reason</option>
-                <option value="damaged">Product damaged</option>
-                <option value="wrong">Wrong product received</option>
-                <option value="size">Size issue</option>
-                <option value="quality">Quality issue</option>
-                <option value="other">Other</option>
-              </select>
-              <textarea 
-                placeholder="Additional comments (optional)" 
-                value={returnComment} 
-                onChange={(e) => setReturnComment(e.target.value)} 
-                rows="3" 
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none mb-4"
-              ></textarea>
-              <div className="flex gap-3">
-                <button onClick={handleReturnRequest} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Submit Request</button>
-                <button onClick={() => { setShowReturnModal(false); setReturnReason(''); setReturnComment(''); }} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Review Modal */}
-        {showDeleteReviewModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center">
-              <div className="text-5xl mb-4">⚠️</div>
-              <h3 className="text-lg font-semibold mb-2">Delete Review?</h3>
-              <p className="text-gray-500 mb-4">This action cannot be undone</p>
-              <div className="flex gap-3">
-                <button onClick={handleDeleteReview} className="flex-1 bg-red-500 text-white py-2 rounded-xl hover:bg-red-600 transition">Delete</button>
-                <button onClick={() => setShowDeleteReviewModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Card Modal */}
-        {showCardModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold mb-4">Add New Card</h3>
-              <select value={cardForm.cardType} onChange={(e) => setCardForm({...cardForm, cardType: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none">
-                <option value="">Select Card Type</option>
-                <option value="visa">Visa</option>
-                <option value="mastercard">Mastercard</option>
-                <option value="rupay">RuPay</option>
-                <option value="amex">American Express</option>
-              </select>
-              <input 
-                type="text" 
-                placeholder="Last 4 digits *" 
-                maxLength="4" 
-                value={cardForm.last4} 
-                onChange={(e) => setCardForm({...cardForm, last4: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} 
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                required 
-              />
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <input 
-                  type="text" 
-                  placeholder="Expiry Month (MM) *" 
-                  maxLength="2" 
-                  value={cardForm.expiryMonth} 
-                  onChange={(e) => setCardForm({...cardForm, expiryMonth: e.target.value.replace(/[^0-9]/g, '').slice(0, 2)})} 
-                  className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  required 
-                />
-                <input 
-                  type="text" 
-                  placeholder="Expiry Year (YYYY) *" 
-                  maxLength="4" 
-                  value={cardForm.expiryYear} 
-                  onChange={(e) => setCardForm({...cardForm, expiryYear: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} 
-                  className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  required 
-                />
-              </div>
-              <label className="flex items-center gap-2 mb-4 cursor-pointer">
-                <input type="checkbox" checked={cardForm.isDefault} onChange={(e) => setCardForm({...cardForm, isDefault: e.target.checked})} /> Set as default payment method
-              </label>
-              <div className="flex gap-3">
-                <button onClick={handleAddCard} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save Card</button>
-                <button onClick={() => setShowCardModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Account Modal */}
-        {showDeleteAccountModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6">
-              <div className="text-center mb-4">
-                <div className="text-6xl mb-3">⚠️</div>
-                <h3 className="text-xl font-bold text-gray-800">Delete Account</h3>
-                <p className="text-gray-500 text-sm mt-2">This action is permanent. All your data will be erased.</p>
-              </div>
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">Type <strong className="text-red-600">DELETE</strong> to confirm</p>
-                <input 
-                  type="text" 
-                  value={deleteConfirmText} 
-                  onChange={(e) => setDeleteConfirmText(e.target.value)} 
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-center focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-                  placeholder="DELETE" 
-                />
-              </div>
-              <div className="flex gap-3">
-                <button onClick={handleDeleteAccount} className="flex-1 bg-red-500 text-white py-2 rounded-xl hover:bg-red-600 transition">Delete Account</button>
-                <button onClick={() => { setShowDeleteAccountModal(false); setDeleteConfirmText(''); }} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+        {/* Footer - Glass */}
+        <footer className="bg-white/40 backdrop-blur-xl border-t border-white/30 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-200/50">
                     <span className="text-white font-bold text-sm">M</span>
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+                <p className="text-sm text-gray-400">Luxury beauty and fashion for the modern woman.</p>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Shop</h4>
@@ -1837,9 +1187,9 @@ function Profile() {
                 </ul>
               </div>
             </div>
-            <div className="text-center pt-8 border-t border-gray-800">
-              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            <div className="text-center pt-8 border-t border-white/20">
+              <p className="text-sm text-gray-400">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-500 mt-2">Made with 💖 for the girlies</p>
             </div>
           </div>
         </footer>
