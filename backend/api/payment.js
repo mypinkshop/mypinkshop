@@ -1,7 +1,7 @@
 // backend/api/payment.js
 const express = require('express');
 const router = express.Router();
-const { StandardCheckoutClient, Env } = require('@phonepe-pg/pg-sdk-node');
+const { StandardCheckoutClient, Env, StandardCheckoutPayRequest } = require('@phonepe-pg/pg-sdk-node');
 
 // PhonePe Client Initialize karo
 const client = StandardCheckoutClient.getInstance(
@@ -18,7 +18,8 @@ router.post('/initiate', async (req, res) => {
     const { randomUUID } = require('crypto');
 
     const merchantOrderId = randomUUID();
-    const redirectUrl = `${req.protocol}://${req.get('host')}/payment-success`; // Frontend ka success page
+    // ✅ FIX: Redirect URL ko hardcode karo (Frontend ka actual URL)
+    const redirectUrl = "https://mypinkshop.com/payment-success"; 
 
     // Amount ko paise mein convert karo (₹1 = 100 paise)
     const request = StandardCheckoutPayRequest.builder()
