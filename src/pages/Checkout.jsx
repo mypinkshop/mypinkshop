@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function Checkout() {
   const { cart, cartTotal, clearCart } = useCart();
@@ -35,7 +36,7 @@ function Checkout() {
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   
-  // 🔥 Edit mode states
+  // Edit mode states
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -151,7 +152,7 @@ function Checkout() {
     setEditingAddressId(null);
   };
 
-  // 🔥 EDIT Address
+  // EDIT Address
   const handleEditAddress = (address) => {
     setEditingAddressId(address.id);
     setIsEditing(true);
@@ -167,10 +168,10 @@ function Checkout() {
     setSelectedAddress(null);
   };
 
-  // 🔥 SAVE Edited Address
+  // SAVE Edited Address
   const saveEditedAddress = () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
-      alert('Please fill all fields');
+      toast.error('Please fill all fields');
       return;
     }
 
@@ -197,7 +198,7 @@ function Checkout() {
     toast.success('Address updated successfully!');
   };
 
-  // 🔥 DELETE Address
+  // DELETE Address
   const handleDeleteAddress = (addressId) => {
     if (!confirm('Are you sure you want to delete this address?')) return;
     
@@ -220,7 +221,7 @@ function Checkout() {
     toast.success('Address deleted successfully!');
   };
 
-  // 🔥 CANCEL Edit
+  // CANCEL Edit
   const cancelEdit = () => {
     setEditingAddressId(null);
     setIsEditing(false);
@@ -236,7 +237,7 @@ function Checkout() {
     setSelectedAddress(null);
   };
 
-  // ✅ FIXED: Duplicate address check
+  // Duplicate address check
   const saveNewAddress = () => {
     const newAddress = {
       id: Date.now(),
@@ -248,7 +249,6 @@ function Checkout() {
       pincode: formData.pincode,
     };
     
-    // 🔥 Strict duplicate check - same pincode, same address, same name, same phone
     const duplicate = savedAddresses.find(addr => 
       addr.pincode === newAddress.pincode && 
       addr.fullName.toLowerCase() === newAddress.fullName.toLowerCase() && 
@@ -264,14 +264,14 @@ function Checkout() {
       toast.success('Address saved successfully!');
       return true;
     } else {
-      toast.error('This address already exists in your saved addresses!');
+      toast.error('This address already exists!');
       return false;
     }
   };
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
-      alert('Please enter a coupon code');
+      toast.error('Please enter a coupon code');
       return;
     }
     
@@ -319,12 +319,12 @@ function Checkout() {
 
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
-      alert('Please fill all address fields');
+      toast.error('Please fill all address fields');
       return;
     }
     
     if (!shippingInfo.deliverable) {
-      alert('Sorry, delivery is not available at this pincode');
+      toast.error('Sorry, delivery is not available at this pincode');
       return;
     }
 
@@ -382,7 +382,7 @@ function Checkout() {
       
     } catch (error) {
       console.error('❌ Error placing order:', error);
-      alert('Failed to place order. Please try again.');
+      toast.error('Failed to place order. Please try again.');
     } finally {
       setIsPlacingOrder(false);
     }
@@ -520,7 +520,7 @@ function Checkout() {
               </div>
             </div>
 
-            {/* STEP 1 - Address with Edit/Delete */}
+            {/* STEP 1 - Address */}
             {step === 1 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -552,7 +552,6 @@ function Checkout() {
                               <p className="text-sm text-gray-500">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
                               <p className="text-sm text-gray-500">📞 {addr.phone}</p>
                             </div>
-                            {/* 🔥 Edit & Delete Buttons */}
                             <div className="flex gap-1.5 flex-shrink-0">
                               <button
                                 onClick={() => handleEditAddress(addr)}
@@ -574,6 +573,8 @@ function Checkout() {
                               </button>
                             </div>
                           </div>
+                          
+                          {/* 🔥 Edit Mode */}
                           {editingAddressId === addr.id && (
                             <div className="mt-3 pt-3 border-t border-gray-200">
                               <p className="text-xs text-blue-600 font-medium mb-2">✏️ Editing this address...</p>
@@ -591,6 +592,28 @@ function Checkout() {
                                   Cancel
                                 </button>
                               </div>
+                            </div>
+                          )}
+                          
+                          {/* 🔥 Continue Button - Right Below Selected Address */}
+                          {selectedAddress === addr.id && !editingAddressId && (
+                            <div className="mt-3 pt-3 border-t border-pink-200">
+                              <button
+                                onClick={() => {
+                                  if (!shippingInfo.deliverable) {
+                                    toast.error('Sorry, delivery is not available at this pincode');
+                                    return;
+                                  }
+                                  setStep(2);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-pink-200 transition-all"
+                              >
+                                Continue to Delivery 🚚 →
+                              </button>
+                              <p className="text-xs text-gray-400 text-center mt-1.5">
+                                ✓ Address selected. Click to proceed.
+                              </p>
                             </div>
                           )}
                         </div>
@@ -720,23 +743,26 @@ function Checkout() {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => {
-                    if (formData.fullName && formData.phone && formData.address && formData.city && formData.pincode) {
-                      if (!shippingInfo.deliverable) {
-                        alert('Sorry, delivery is not available at this pincode');
-                        return;
+                {/* 🔥 Continue Button - Jab koi address select nahi hai */}
+                {!selectedAddress && (
+                  <button
+                    onClick={() => {
+                      if (formData.fullName && formData.phone && formData.address && formData.city && formData.pincode) {
+                        if (!shippingInfo.deliverable) {
+                          toast.error('Sorry, delivery is not available at this pincode');
+                          return;
+                        }
+                        setStep(2);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      } else {
+                        toast.error('Please fill all required address fields');
                       }
-                      setStep(2);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    } else {
-                      alert('Please fill all required address fields');
-                    }
-                  }}
-                  className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-semibold hover:shadow-lg hover:shadow-pink-200 transition-all"
-                >
-                  Continue to Delivery 🚚 →
-                </button>
+                    }}
+                    className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-semibold hover:shadow-lg hover:shadow-pink-200 transition-all"
+                  >
+                    Continue to Delivery 🚚 →
+                  </button>
+                )}
               </div>
             )}
 
