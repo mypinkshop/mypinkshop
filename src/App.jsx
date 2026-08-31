@@ -130,6 +130,7 @@ function App() {
                   <Route path="/shipping" element={<ShippingInfo />} />
                   <Route path="/returns" element={<ReturnsPolicy />} />
                   <Route path="/faqs" element={<FAQs />} />
+                  <Route path="/payment-success" element={<PaymentSuccess />} />
 
                   {/* ============ CATEGORY PAGES ============ */}
                   <Route path="/skincare" element={<SkincarePage />} />
