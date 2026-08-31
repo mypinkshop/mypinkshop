@@ -52,9 +52,23 @@ function Checkout() {
 
   const subtotal = cartTotal();
   const discount = couponDiscount;
-  const tax = Math.round((subtotal - discount) * 0.05);
-  const deliveryCharges = shippingInfo.shippingCharge;
-  const total = subtotal - discount + tax + deliveryCharges;
+  
+  // ✅ GST SPLIT: Listing price = Base Price (100%) + GST (18%)
+  // Base Price = Subtotal / 1.18
+  // GST = Subtotal - Base Price
+  const basePrice = Math.round(subtotal / 1.18); 
+  const gstAmount = subtotal - basePrice; 
+  
+  // ✅ Delivery Charge: 499+ FREE, warna ₹49
+  let deliveryCharges = shippingInfo.shippingCharge;
+  if (deliveryCharges === 0 || deliveryCharges === null || deliveryCharges === undefined) {
+    deliveryCharges = subtotal >= 499 ? 0 : 49;
+  } else if (subtotal >= 499) {
+    deliveryCharges = 0;
+  }
+  
+  // ✅ Total = Base Price + GST + Delivery (NO extra GST)
+  const total = basePrice + gstAmount + deliveryCharges;
 
   const generateOrderId = () => {
     const prefix = 'MPS';
@@ -1057,7 +1071,7 @@ function Checkout() {
 
               <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Subtotal</span>
+                  <span className="text-gray-500">Subtotal (Incl. GST)</span>
                   <span className="font-medium text-gray-800">₹{subtotal}</span>
                 </div>
                 {discount > 0 && (
@@ -1073,8 +1087,8 @@ function Checkout() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Tax (GST)</span>
-                  <span className="font-medium text-gray-800">₹{tax}</span>
+                  <span className="text-gray-500">GST (18%)</span>
+                  <span className="font-medium text-gray-800">₹{gstAmount}</span>
                 </div>
                 <div className="flex justify-between pt-3 border-t border-gray-200">
                   <span className="font-bold text-gray-800 text-base">Total</span>
