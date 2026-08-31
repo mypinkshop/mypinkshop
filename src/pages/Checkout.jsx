@@ -43,7 +43,7 @@ function Checkout() {
     deliverable: true,
     estimatedDelivery: null,
     shippingCharge: 0,
-    freeShippingThreshold: 999,
+    freeShippingThreshold: 499,
     cutOffTime: '16:00',
     checking: false
   });
