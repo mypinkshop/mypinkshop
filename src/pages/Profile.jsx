@@ -26,6 +26,12 @@ function Profile() {
     name: '',
     email: '',
     phone: '',
+    gender: '',
+    dob: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
     createdAt: ''
   });
   
@@ -61,6 +67,14 @@ function Profile() {
     cardType: '',
     expiryMonth: '',
     expiryYear: '',
+    isDefault: false
+  });
+
+  // 🔥 UPI Options
+  const [upiOptions, setUpiOptions] = useState([]);
+  const [showUpiModal, setShowUpiModal] = useState(false);
+  const [upiForm, setUpiForm] = useState({
+    upiId: '',
     isDefault: false
   });
 
@@ -160,7 +174,8 @@ function Profile() {
       fetchAddresses(),
       fetchOrders(),
       fetchReviews(),
-      fetchSavedCards()
+      fetchSavedCards(),
+      fetchUpiOptions()
     ]);
     setLoading(false);
   };
@@ -177,6 +192,12 @@ function Profile() {
           name: data.name || '',
           email: data.email || '',
           phone: data.phone || '',
+          gender: data.gender || '',
+          dob: data.dob || '',
+          address: data.address || '',
+          city: data.city || '',
+          state: data.state || '',
+          pincode: data.pincode || '',
           createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
         });
         if (data.profileImage) {
@@ -210,16 +231,36 @@ function Profile() {
   const fetchOrders = async () => {
     setOrdersLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/orders/my-orders`, {
+      // ✅ FIX: SAHI API ENDPOINT
+      const response = await fetch(`${API_URL}/api/orders/user`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
       if (response.ok) {
         const data = await response.json();
-        const sortedOrders = (data.orders || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Check if data is array or has orders property
+        const ordersData = Array.isArray(data) ? data : (data.orders || data.order || []);
+        const sortedOrders = ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOrders(sortedOrders);
+        console.log('✅ Orders fetched:', sortedOrders.length);
+      } else {
+        // Fallback: try /api/orders/my-orders
+        const fallbackRes = await fetch(`${API_URL}/api/orders/my-orders`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (fallbackRes.ok) {
+          const data = await fallbackRes.json();
+          const ordersData = Array.isArray(data) ? data : (data.orders || data.order || []);
+          const sortedOrders = ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setOrders(sortedOrders);
+          console.log('✅ Orders fetched (fallback):', sortedOrders.length);
+        } else {
+          console.error('Failed to fetch orders from both endpoints');
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch orders:', error);
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to load orders');
     } finally {
       setOrdersLoading(false);
     }
@@ -256,6 +297,21 @@ function Profile() {
       console.error('Failed to fetch cards:', error);
     } finally {
       setCardsLoading(false);
+    }
+  };
+
+  // 🔥 FETCH UPI OPTIONS
+  const fetchUpiOptions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/users/upi`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUpiOptions(data.upi || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch UPI:', error);
     }
   };
 
@@ -494,6 +550,52 @@ function Profile() {
     }
   };
 
+  // 🔥 UPI FUNCTIONS
+  const handleAddUpi = async () => {
+    if (!upiForm.upiId || !upiForm.upiId.includes('@')) {
+      toast.error('Enter valid UPI ID (example@upi)');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/upi`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(upiForm)
+      });
+      
+      if (response.ok) {
+        toast.success('UPI added! 📱');
+        setShowUpiModal(false);
+        setUpiForm({ upiId: '', isDefault: false });
+        fetchUpiOptions();
+      } else {
+        toast.error('Failed to add UPI');
+      }
+    } catch (error) {
+      toast.error('Error adding UPI');
+    }
+  };
+
+  const handleDeleteUpi = async (upiId) => {
+    if (!confirm('Delete this UPI?')) return;
+    try {
+      const response = await fetch(`${API_URL}/api/users/upi/${upiId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        toast.success('UPI deleted!');
+        fetchUpiOptions();
+      }
+    } catch (error) {
+      toast.error('Error deleting UPI');
+    }
+  };
+
   // ========== UI HELPERS ==========
   const getStatusColor = (status) => {
     const colors = {
@@ -629,7 +731,7 @@ function Profile() {
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           
-          {/* Profile Header - Nykaa/Amazon Style */}
+          {/* Profile Header */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -664,7 +766,7 @@ function Profile() {
             </div>
           </div>
 
-          {/* Tabs - Nykaa Style Horizontal Scroll */}
+          {/* Tabs */}
           <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-hide">
             {tabs.map(tab => (
               <button
@@ -685,7 +787,7 @@ function Profile() {
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
-                <h3 className="font-semibold text-gray-800">Your Orders</h3>
+                <h3 className="font-semibold text-gray-800">Your Orders ({orders.length})</h3>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
@@ -716,7 +818,7 @@ function Profile() {
                     <div key={order._id} className="p-4 hover:bg-gray-50 transition">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-800">Order #{order._id?.slice(-8)}</p>
+                          <p className="font-medium text-gray-800">Order #{order._id?.slice(-8) || order.id}</p>
                           <p className="text-sm text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
                           <p className="text-sm text-gray-400">{order.items?.length || 0} items</p>
                         </div>
@@ -806,13 +908,14 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PROFILE TAB ========== */}
+          {/* ========== PROFILE TAB - EXPANDED ========== */}
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-800">Profile Details</h3>
               </div>
               <div className="divide-y divide-gray-50">
+                {/* Name */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Full Name</p>
@@ -829,6 +932,7 @@ function Profile() {
                   )}
                 </div>
 
+                {/* Email */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Email</p>
@@ -845,6 +949,7 @@ function Profile() {
                   )}
                 </div>
 
+                {/* Phone */}
                 <div className="p-4 flex justify-between items-center">
                   <div>
                     <p className="text-xs text-gray-400">Phone</p>
@@ -858,6 +963,45 @@ function Profile() {
                     </div>
                   ) : (
                     <button onClick={() => { setEditingField('phone'); setEditValue(userData.phone || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                  )}
+                </div>
+
+                {/* Gender */}
+                <div className="p-4 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-gray-400">Gender</p>
+                    <p className="font-medium text-gray-800">{userData.gender || 'Not specified'}</p>
+                  </div>
+                  {editingField === 'gender' ? (
+                    <div className="flex gap-2">
+                      <select value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm">
+                        <option value="">Select</option>
+                        <option value="Female">Female</option>
+                        <option value="Male">Male</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <button onClick={() => handleFieldUpdate('gender', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setEditingField('gender'); setEditValue(userData.gender || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                  )}
+                </div>
+
+                {/* Date of Birth */}
+                <div className="p-4 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-gray-400">Date of Birth</p>
+                    <p className="font-medium text-gray-800">{userData.dob || 'Not specified'}</p>
+                  </div>
+                  {editingField === 'dob' ? (
+                    <div className="flex gap-2">
+                      <input type="date" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm" />
+                      <button onClick={() => handleFieldUpdate('dob', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setEditingField('dob'); setEditValue(userData.dob || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
                   )}
                 </div>
               </div>
@@ -948,39 +1092,66 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PAYMENTS TAB ========== */}
+          {/* ========== PAYMENTS TAB - Cards + UPI ========== */}
           {activeTab === 'payments' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="font-semibold text-gray-800">Saved Payment Methods</h3>
-                <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add Card</button>
-              </div>
-              {cardsLoading ? (
-                <div className="p-8 text-center">
-                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading cards...</p>
+            <div className="space-y-4">
+              {/* Cards Section */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                  <h3 className="font-semibold text-gray-800">Saved Cards</h3>
+                  <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add Card</button>
                 </div>
-              ) : savedCards.length === 0 ? (
-                <div className="p-8 text-center">
-                  <p className="text-gray-400">No saved cards</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {savedCards.map(card => (
-                    <div key={card._id} className="p-4 flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">💳</span>
-                        <div>
-                          <p className="font-medium">•••• {card.last4}</p>
-                          <p className="text-xs text-gray-500">Expires {card.expiryMonth}/{card.expiryYear}</p>
-                          {card.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
+                {cardsLoading ? (
+                  <div className="p-8 text-center">
+                    <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-gray-400 mt-2">Loading cards...</p>
+                  </div>
+                ) : savedCards.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400">No saved cards</div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {savedCards.map(card => (
+                      <div key={card._id} className="p-4 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">💳</span>
+                          <div>
+                            <p className="font-medium">•••• {card.last4}</p>
+                            <p className="text-xs text-gray-500">Expires {card.expiryMonth}/{card.expiryYear}</p>
+                            {card.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
+                          </div>
                         </div>
+                        <button onClick={() => handleDeleteCard(card._id)} className="text-rose-500 text-sm">Remove</button>
                       </div>
-                      <button onClick={() => handleDeleteCard(card._id)} className="text-rose-500 text-sm">Remove</button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 🔥 UPI Section */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                  <h3 className="font-semibold text-gray-800">UPI IDs</h3>
+                  <button onClick={() => setShowUpiModal(true)} className="text-pink-600 text-sm hover:underline">+ Add UPI</button>
                 </div>
-              )}
+                {upiOptions.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400">No UPI IDs saved</div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {upiOptions.map(upi => (
+                      <div key={upi._id} className="p-4 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">📱</span>
+                          <div>
+                            <p className="font-medium">{upi.upiId}</p>
+                            {upi.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => handleDeleteUpi(upi._id)} className="text-rose-500 text-sm">Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1061,6 +1232,30 @@ function Profile() {
               <div className="flex gap-3">
                 <button onClick={handleAddCard} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save Card</button>
                 <button onClick={() => setShowCardModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🔥 UPI Modal */}
+        {showUpiModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold mb-4">Add UPI ID</h3>
+              <input 
+                type="text" 
+                placeholder="example@upi" 
+                value={upiForm.upiId} 
+                onChange={(e) => setUpiForm({...upiForm, upiId: e.target.value})} 
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
+              />
+              <p className="text-xs text-gray-400 mb-3">Enter your UPI ID (e.g., name@upi, name@paytm, etc.)</p>
+              <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm">
+                <input type="checkbox" checked={upiForm.isDefault} onChange={(e) => setUpiForm({...upiForm, isDefault: e.target.checked})} /> Set as default
+              </label>
+              <div className="flex gap-3">
+                <button onClick={handleAddUpi} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save UPI</button>
+                <button onClick={() => setShowUpiModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
               </div>
             </div>
           </div>
