@@ -331,7 +331,30 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
-  // ✅ FIXED: placeOrder with Nykaa Style Order ID
+  // ✅ NAYA FUNCTION: PhonePe Payment Initiate
+  const handlePhonePePayment = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/payments/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: total })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Redirect to PhonePe Checkout Page
+        window.location.href = data.redirectUrl;
+      } else {
+        toast.error('Payment initiation failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('PhonePe Payment Error:', error);
+      toast.error('Something went wrong. Please try again.');
+    }
+  };
+
+  // ✅ MODIFIED: placeOrder with PhonePe Integration
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all address fields');
@@ -352,6 +375,14 @@ function Checkout() {
       saveNewAddress();
     }
 
+    // 🔥 AGAR USER NE UPI (PhonePe) SELECT KIYA HAI, TOH PEHLE PAYMENT
+    if (paymentMethod === 'upi') {
+      await handlePhonePePayment();
+      setIsPlacingOrder(false);
+      return;
+    }
+
+    // 🛒 NORMAL ORDER (COD ya baaki)
     try {
       const orderData = {
         items: cart.map(item => ({
@@ -416,7 +447,7 @@ function Checkout() {
   const paymentOptions = [
     { id: 'cod', name: 'Cash on Delivery', icon: '💵', description: 'Pay when you receive' },
     { id: 'card', name: 'Credit/Debit Card', icon: '💳', description: 'Visa, Mastercard, RuPay' },
-    { id: 'upi', name: 'UPI', icon: '📱', description: 'Google Pay, PhonePe, Paytm' },
+    { id: 'upi', name: 'PhonePe / UPI', icon: '📱', description: 'PhonePe, Google Pay, Paytm' },
     { id: 'netbanking', name: 'Net Banking', icon: '🏦', description: 'All major banks' },
   ];
 
