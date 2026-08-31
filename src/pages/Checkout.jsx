@@ -7,7 +7,8 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
 function Checkout() {
-  const { cart, cartTotal, clearCart, removeFromCart } = useCart();
+  // ✅ FIX: updateQuantity bhi import kiya
+  const { cart, cartTotal, clearCart, removeFromCart, updateQuantity } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -1000,7 +1001,7 @@ function Checkout() {
                 </span>
               </div>
               
-                            <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
                 {cart.map(item => (
                   <div key={item.id} className="flex gap-3 pb-3 border-b border-gray-100">
                     <div className="w-14 h-14 bg-pink-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-pink-100">
