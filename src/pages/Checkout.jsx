@@ -56,7 +56,6 @@ function Checkout() {
   const deliveryCharges = shippingInfo.shippingCharge;
   const total = subtotal - discount + tax + deliveryCharges;
 
-  // ✅ Nykaa Style Order ID Generator
   const generateOrderId = () => {
     const prefix = 'MPS';
     const part1 = Math.floor(Math.random() * 900000000 + 100000000).toString();
@@ -331,9 +330,21 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
-  // ✅ NAYA FUNCTION: PhonePe Payment Initiate
+  // ✅ PhonePe Payment Initiate + Data Save
   const handlePhonePePayment = async () => {
     try {
+      // ✅ Data ko localStorage mein save karo (PaymentSuccess.jsx ko order banane ke liye chahiye)
+      localStorage.setItem('cart', JSON.stringify(cart));
+      localStorage.setItem('orderTotal', JSON.stringify(total));
+      localStorage.setItem('checkoutAddress', JSON.stringify({
+        fullName: formData.fullName,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        pincode: formData.pincode
+      }));
+
       const response = await fetch(`${API_URL}/api/payments/initiate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -343,8 +354,7 @@ function Checkout() {
       const data = await response.json();
 
       if (data.success) {
-        // Redirect to PhonePe Checkout Page
-        window.location.href = data.redirectUrl;
+        window.location.href = data.redirectUrl; // Redirect to PhonePe
       } else {
         toast.error('Payment initiation failed. Please try again.');
       }
@@ -354,7 +364,7 @@ function Checkout() {
     }
   };
 
-  // ✅ MODIFIED: placeOrder with PhonePe Integration
+  // ✅ Place Order (COD ya baaki methods)
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all address fields');
@@ -375,14 +385,14 @@ function Checkout() {
       saveNewAddress();
     }
 
-    // 🔥 AGAR USER NE UPI (PhonePe) SELECT KIYA HAI, TOH PEHLE PAYMENT
+    // 🔥 Agar UPI select kiya hai, toh PhonePe pe redirect karo
     if (paymentMethod === 'upi') {
       await handlePhonePePayment();
       setIsPlacingOrder(false);
       return;
     }
 
-    // 🛒 NORMAL ORDER (COD ya baaki)
+    // 🛒 Normal Order (COD)
     try {
       const orderData = {
         items: cart.map(item => ({
@@ -423,7 +433,6 @@ function Checkout() {
         throw new Error(data.message || 'Failed to place order');
       }
 
-      // ✅ FIX: Pehle orderId, fir _id, fir generate
       const newOrderId = data.order?.orderId || data.order?._id || generateOrderId();
       setOrderId(newOrderId);
       
@@ -507,7 +516,6 @@ function Checkout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      
       <OfferBanner />
 
       <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
@@ -537,8 +545,6 @@ function Checkout() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           <div className="lg:col-span-2 space-y-6">
-            
-            {/* 3 Steps */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between relative">
                 <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
@@ -570,7 +576,6 @@ function Checkout() {
               </div>
             </div>
 
-            {/* STEP 1 - Address */}
             {step === 1 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-6">
@@ -817,7 +822,6 @@ function Checkout() {
               </div>
             )}
 
-            {/* STEP 2 - Delivery */}
             {step === 2 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-6">
@@ -906,7 +910,6 @@ function Checkout() {
               </div>
             )}
 
-            {/* STEP 3 - Payment */}
             {step === 3 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-6">
@@ -975,7 +978,6 @@ function Checkout() {
             )}
           </div>
 
-          {/* RIGHT COLUMN - Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
