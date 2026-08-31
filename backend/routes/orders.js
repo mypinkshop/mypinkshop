@@ -23,6 +23,33 @@ router.get('/user', protect, async (req, res) => {
   }
 });
 
+// ✅ GET ALL ORDERS (For Admin Panel) - YEH ROUTE ADD KIYA HAI
+router.get('/all', protect, async (req, res) => {
+  try {
+    // ✅ userId populate karo (Customer name/email ke liye)
+    // ✅ vendorId populate karo (Brand name ke liye)
+    const orders = await Order.find()
+      .populate('userId', 'name email') 
+      .populate('vendorId', 'name brandName') 
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('❌ Error fetching all orders:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch orders' });
+  }
+});
+
+// ✅ GET ALL RETURNS (For Admin Panel) - YEH ROUTE ADD KIYA HAI
+router.get('/returns/all', protect, async (req, res) => {
+  try {
+    const orders = await Order.find({ returnRequested: true }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('❌ Error fetching returns:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch returns' });
+  }
+});
+
 // ✅ THEN :id route aayega
 router.get('/:id', protect, async (req, res) => {
   try {
@@ -67,8 +94,11 @@ router.post('/', protect, async (req, res) => {
       buyerEmail: req.user.email,
       buyerPhone: req.user.phone || address?.phone || '',
       buyerAddress: buyerAddress || shippingAddress || address || {},
+      
+      // ✅ FIX: Brand Name 'Vendor' ki jagah actual brand ya 'N/A' set karo
       vendorId: items[0]?.vendorId || null,
-      vendorName: items[0]?.vendorName || 'Vendor',
+      vendorName: items[0]?.vendorName || items[0]?.brand || 'N/A',
+      
       productId: items[0]?.productId,
       productName: items[0]?.name,
       quantity: items.reduce((sum, item) => sum + item.quantity, 0),
@@ -86,7 +116,8 @@ router.post('/', protect, async (req, res) => {
         image: item.image,
         variationName: item.variationName,
         variationSecondary: item.variationSecondary,
-        vendorId: item.vendorId || null
+        vendorId: item.vendorId || null,
+        vendorName: item.vendorName || item.brand || 'N/A' // ✅ Brand naam yahan bhi
       }))
     });
 
