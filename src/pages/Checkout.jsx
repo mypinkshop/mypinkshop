@@ -36,6 +36,9 @@ function Checkout() {
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   
+  // ✅ FIX: orderTotal state - Total save karne ke liye
+  const [orderTotal, setOrderTotal] = useState(0);
+  
   // Edit mode states
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -317,6 +320,7 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
+  // ✅ FIXED: placeOrder function - total save karega
   const placeOrder = async () => {
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all address fields');
@@ -329,6 +333,10 @@ function Checkout() {
     }
 
     setIsPlacingOrder(true);
+
+    // ✅ FIX: Total save karo before clearing cart
+    const finalTotal = total;
+    setOrderTotal(finalTotal);
 
     if (formData.saveAddress && !isEditing) {
       saveNewAddress();
@@ -346,7 +354,7 @@ function Checkout() {
           variationSecondary: item.color || null,
           vendorId: item.vendorId || null
         })),
-        total: total,
+        total: finalTotal,
         address: {
           fullName: formData.fullName,
           phone: formData.phone,
@@ -376,6 +384,8 @@ function Checkout() {
 
       const newOrderId = data.order?._id || 'MPS' + Date.now();
       setOrderId(newOrderId);
+      
+      // ✅ Cart clear karo
       clearCart();
       setOrderPlaced(true);
       window.scrollTo(0, 0);
@@ -414,6 +424,7 @@ function Checkout() {
     return 'Delivery available';
   };
 
+  // ✅ FIXED: Order Placed UI - orderTotal use karega
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 py-12">
@@ -425,18 +436,22 @@ function Checkout() {
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Order Placed! 🎉</h1>
             <p className="text-gray-500 mb-2">Order ID: <span className="font-semibold text-pink-600">{orderId}</span></p>
             <p className="text-gray-600 mb-6">Your order has been confirmed. You will receive a confirmation email shortly.</p>
+            
             {shippingInfo.estimatedDelivery && (
               <div className="bg-green-50 rounded-xl p-4 mb-6 text-left">
                 <p className="font-semibold text-green-800 mb-1">📦 Delivery Estimate</p>
                 <p className="text-green-700 text-sm">{getDeliveryDateDisplay()}</p>
               </div>
             )}
+            
             <div className="bg-pink-50 rounded-xl p-4 mb-6 text-left">
               <p className="font-semibold mb-2 text-gray-800">Order Summary</p>
-              <p className="text-sm text-gray-600">Total Amount: <span className="font-bold">₹{total}</span></p>
+              {/* ✅ FIX: orderTotal use kar raha hai, cartTotal nahi */}
+              <p className="text-sm text-gray-600">Total Amount: <span className="font-bold text-pink-600">₹{orderTotal}</span></p>
               <p className="text-sm text-gray-600">Payment Method: {paymentOptions.find(m => m.id === paymentMethod)?.name}</p>
               <p className="text-sm text-gray-600">Delivery to: {formData.address}, {formData.city}</p>
             </div>
+            
             <div className="flex gap-4 justify-center flex-wrap">
               <Link to="/my-orders" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-3 rounded-full font-medium hover:shadow-lg transition">
                 View Orders
@@ -574,7 +589,7 @@ function Checkout() {
                             </div>
                           </div>
                           
-                          {/* 🔥 Edit Mode */}
+                          {/* Edit Mode */}
                           {editingAddressId === addr.id && (
                             <div className="mt-3 pt-3 border-t border-gray-200">
                               <p className="text-xs text-blue-600 font-medium mb-2">✏️ Editing this address...</p>
@@ -595,7 +610,7 @@ function Checkout() {
                             </div>
                           )}
                           
-                          {/* 🔥 Continue Button - Right Below Selected Address */}
+                          {/* Continue Button - Right Below Selected Address */}
                           {selectedAddress === addr.id && !editingAddressId && (
                             <div className="mt-3 pt-3 border-t border-pink-200">
                               <button
@@ -743,7 +758,7 @@ function Checkout() {
                   </div>
                 </div>
                 
-                {/* 🔥 Continue Button - Jab koi address select nahi hai */}
+                {/* Continue Button - Jab koi address select nahi hai */}
                 {!selectedAddress && (
                   <button
                     onClick={() => {
