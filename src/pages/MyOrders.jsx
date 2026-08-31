@@ -57,6 +57,32 @@ function MyOrders() {
     fetchOrders();
   }, [user, navigate]);
 
+  // 🔥 Auto-remove cancelled orders after 30 minutes
+  useEffect(() => {
+    const checkAndRemoveCancelled = () => {
+      const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+      let hasChanges = false;
+      
+      const updatedOrders = orders.filter(order => {
+        if (order.status === 'cancelled') {
+          const cancelledTime = new Date(order.updatedAt || order.cancelledAt).getTime();
+          if (cancelledTime < thirtyMinutesAgo) {
+            hasChanges = true;
+            return false;
+          }
+        }
+        return true;
+      });
+      
+      if (hasChanges) {
+        setOrders(updatedOrders);
+      }
+    };
+    
+    const interval = setInterval(checkAndRemoveCancelled, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [orders]);
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -67,9 +93,20 @@ function MyOrders() {
       if (!response.ok) throw new Error('Failed to fetch orders');
       
       const data = await response.json();
-      setOrders(data);
       
-      for (const order of data) {
+      // 🔥 Filter out cancelled orders older than 30 minutes
+      const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+      const filteredData = data.filter(order => {
+        if (order.status === 'cancelled') {
+          const cancelledTime = new Date(order.updatedAt || order.cancelledAt).getTime();
+          return cancelledTime >= thirtyMinutesAgo;
+        }
+        return true;
+      });
+      
+      setOrders(filteredData);
+      
+      for (const order of filteredData) {
         if (order.status === 'delivered') {
           for (const item of order.items) {
             try {
@@ -269,6 +306,7 @@ function MyOrders() {
   const totalOrders = orders.length;
   const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length;
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
 
   // Generate Amazon-style Order ID
   const getOrderIdDisplay = (id) => {
@@ -373,7 +411,7 @@ function MyOrders() {
 
         {/* Stats Cards */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-gradient-to-br from-pink-100 to-pink-200/50 rounded-2xl p-4 border border-pink-200/50 shadow-sm">
               <p className="text-xs text-pink-600/70 font-medium">Total Orders</p>
               <p className="text-2xl font-bold text-pink-700">{totalOrders}</p>
@@ -385,6 +423,10 @@ function MyOrders() {
             <div className="bg-gradient-to-br from-amber-100 to-amber-200/50 rounded-2xl p-4 border border-amber-200/50 shadow-sm">
               <p className="text-xs text-amber-600/70 font-medium">In Progress</p>
               <p className="text-2xl font-bold text-amber-700">{pendingOrders}</p>
+            </div>
+            <div className="bg-gradient-to-br from-rose-100 to-rose-200/50 rounded-2xl p-4 border border-rose-200/50 shadow-sm">
+              <p className="text-xs text-rose-600/70 font-medium">Cancelled</p>
+              <p className="text-2xl font-bold text-rose-700">{cancelledOrders}</p>
             </div>
           </div>
         </div>
@@ -430,14 +472,19 @@ function MyOrders() {
               {filteredOrders.map((order, index) => {
                 const canCancel = order.status === 'pending' || order.status === 'confirmed';
                 const isShipped = order.status === 'shipped' || order.status === 'delivered';
+                const isCancelled = order.status === 'cancelled';
                 
                 return (
                   <div key={order._id}>
                     {/* Order Card - Amazon Style */}
-                    <div className="bg-white rounded-2xl border border-pink-100 overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300">
+                    <div className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300 ${
+                      isCancelled ? 'border-rose-200 opacity-70' : 'border-pink-100'
+                    }`}>
                       
-                      {/* 🔥 Amazon Style Header - Light Pink */}
-                      <div className="bg-pink-50/80 px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3 border-b border-pink-100">
+                      {/* Header - Light Pink */}
+                      <div className={`px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3 border-b ${
+                        isCancelled ? 'bg-rose-50/80 border-rose-100' : 'bg-pink-50/80 border-pink-100'
+                      }`}>
                         <div className="flex items-center gap-6 flex-wrap">
                           <div>
                             <span className="text-xs text-gray-400 font-medium">ORDER ID</span>
@@ -462,7 +509,7 @@ function MyOrders() {
                         </div>
                       </div>
 
-                      {/* Order Items */}
+                      {/* Order Items - 🔥 Product Clickable */}
                       <div className="px-4 sm:px-6 py-4">
                         {order.items && order.items.map((item, idx) => {
                           const eligibilityKey = `${order._id}_${item.productId}`;
@@ -473,7 +520,11 @@ function MyOrders() {
                           
                           return (
                             <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100 flex-shrink-0">
+                              {/* 🔥 Product Image - Clickable */}
+                              <Link 
+                                to={`/product/${item.productId}`}
+                                className="w-16 h-16 rounded-xl overflow-hidden bg-pink-50 border border-pink-100 flex-shrink-0 hover:shadow-md transition hover:scale-105"
+                              >
                                 {item.image ? (
                                   <img 
                                     src={item.image} 
@@ -485,9 +536,15 @@ function MyOrders() {
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
                                 )}
-                              </div>
+                              </Link>
                               <div className="flex-1">
-                                <h4 className="font-semibold text-gray-800 text-sm line-clamp-1">{item.name}</h4>
+                                {/* 🔥 Product Name - Clickable */}
+                                <Link 
+                                  to={`/product/${item.productId}`}
+                                  className="font-semibold text-gray-800 text-sm hover:text-pink-600 hover:underline transition line-clamp-1"
+                                >
+                                  {item.name}
+                                </Link>
                                 <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
                                 {item.variationName && (
                                   <p className="text-xs text-gray-400">Option: {item.variationName} {item.variationSecondary ? `- ${item.variationSecondary}` : ''}</p>
@@ -515,8 +572,10 @@ function MyOrders() {
                         })}
                       </div>
 
-                      {/* Order Actions - Amazon Style */}
-                      <div className="bg-gray-50/50 px-4 sm:px-6 py-3 border-t border-gray-100 flex flex-wrap gap-3 justify-between items-center">
+                      {/* Order Actions */}
+                      <div className={`px-4 sm:px-6 py-3 border-t flex flex-wrap gap-3 justify-between items-center ${
+                        isCancelled ? 'bg-rose-50/30 border-rose-100' : 'bg-gray-50/50 border-gray-100'
+                      }`}>
                         <div className="flex flex-wrap gap-3">
                           <button 
                             onClick={() => handleTrackOrder(order)}
@@ -539,8 +598,8 @@ function MyOrders() {
                           )}
                         </div>
                         
-                        {/* 🔥 Cancel Button - Only if not shipped */}
-                        {canCancel && (
+                        {/* Cancel Button - Only if not shipped and not cancelled */}
+                        {canCancel && !isCancelled && (
                           <button 
                             onClick={() => cancelOrder(order._id)} 
                             className="px-4 py-1.5 text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-medium"
@@ -550,12 +609,22 @@ function MyOrders() {
                         )}
                       </div>
 
-                      {/* 🔥 Cancellation Policy Note - Only for non-shipped orders */}
-                      {canCancel && (
+                      {/* Cancellation Policy Note - Only for non-shipped orders */}
+                      {canCancel && !isCancelled && (
                         <div className="px-4 sm:px-6 py-2 bg-amber-50/50 border-t border-amber-100/50">
                           <p className="text-xs text-amber-600 flex items-center gap-1.5">
                             <span>ℹ️</span> 
                             Cancellation is available only before shipping. Once shipped, order cannot be cancelled.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* 🔥 Cancelled order note - shows when cancelled */}
+                      {isCancelled && (
+                        <div className="px-4 sm:px-6 py-2 bg-rose-50/80 border-t border-rose-100">
+                          <p className="text-xs text-rose-600 flex items-center gap-1.5">
+                            <span>⏰</span> 
+                            This order was cancelled and will be removed after 30 minutes.
                           </p>
                         </div>
                       )}
