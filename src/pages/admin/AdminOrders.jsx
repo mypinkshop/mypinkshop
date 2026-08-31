@@ -55,7 +55,7 @@ function AdminOrders() {
         toast.error('Failed to load orders');
       }
 
-      const returnsRes = await fetch(`${API_URL}/api/returns/all`, {
+      const returnsRes = await fetch(`${API_URL}/api/orders/returns/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
