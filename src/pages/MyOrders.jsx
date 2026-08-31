@@ -94,7 +94,6 @@ function MyOrders() {
       
       const data = await response.json();
       
-      // Filter out cancelled/failed orders older than 30 minutes
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
       const filteredData = data.filter(order => {
         if (order.status === 'cancelled' || order.status === 'failed') {
@@ -312,12 +311,24 @@ function MyOrders() {
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed' || o.status === 'shipped').length;
   const cancelledOrders = orders.filter(o => o.status === 'cancelled' || o.status === 'failed').length;
 
-  // Generate Amazon-style Order ID
-  const getOrderIdDisplay = (id) => {
-    return id?.slice(-12).toUpperCase() || 'N/A';
+  // ✅ FIXED: Order ID Display - Pehle orderId check karega
+  const getOrderIdDisplay = (order) => {
+    if (!order) return 'N/A';
+    
+    // ✅ Pehle orderId check karo (MPS- format)
+    if (order.orderId) {
+      return order.orderId;
+    }
+    
+    // ✅ Agar _id hai toh slice karo
+    if (order._id) {
+      return order._id.slice(-12).toUpperCase();
+    }
+    
+    return 'N/A';
   };
 
-  // 🔥 Stats Click Handlers
+  // Stats Click Handlers
   const handleStatClick = (status) => {
     if (status === 'all') {
       setFilterStatus('all');
@@ -426,58 +437,74 @@ function MyOrders() {
           </div>
         </div>
 
-        {/* 🔥 Stats Cards - Clickable */}
+        {/* 🔥 Stats Cards - Clickable with rounded corners and dark on active */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-4 gap-4 mb-6">
             <button
               onClick={() => handleStatClick('all')}
-              className={`text-left transition-all transform hover:scale-105 ${
+              className={`text-left transition-all transform hover:scale-105 rounded-2xl overflow-hidden ${
                 filterStatus === 'all' ? 'ring-2 ring-pink-500 ring-offset-2' : ''
               }`}
             >
-              <div className="bg-gradient-to-br from-pink-100 to-pink-200/50 rounded-2xl p-4 border border-pink-200/50 shadow-sm hover:shadow-md">
-                <p className="text-xs text-pink-600/70 font-medium">Total Orders</p>
-                <p className="text-2xl font-bold text-pink-700">{totalOrders}</p>
-                <p className="text-xs text-pink-400/70 mt-1">Click to view all</p>
+              <div className={`rounded-2xl p-4 border shadow-sm hover:shadow-md transition-all ${
+                filterStatus === 'all' 
+                  ? 'bg-gradient-to-br from-pink-600 to-pink-700 border-pink-700 text-white' 
+                  : 'bg-gradient-to-br from-pink-100 to-pink-200/50 border-pink-200/50'
+              }`}>
+                <p className={`text-xs font-medium ${filterStatus === 'all' ? 'text-pink-200' : 'text-pink-600/70'}`}>Total Orders</p>
+                <p className={`text-2xl font-bold ${filterStatus === 'all' ? 'text-white' : 'text-pink-700'}`}>{totalOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'all' ? 'text-pink-200' : 'text-pink-400/70'}`}>Click to view all</p>
               </div>
             </button>
             
             <button
               onClick={() => handleStatClick('delivered')}
-              className={`text-left transition-all transform hover:scale-105 ${
+              className={`text-left transition-all transform hover:scale-105 rounded-2xl overflow-hidden ${
                 filterStatus === 'delivered' ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
               }`}
             >
-              <div className="bg-gradient-to-br from-emerald-100 to-emerald-200/50 rounded-2xl p-4 border border-emerald-200/50 shadow-sm hover:shadow-md">
-                <p className="text-xs text-emerald-600/70 font-medium">Delivered</p>
-                <p className="text-2xl font-bold text-emerald-700">{deliveredOrders}</p>
-                <p className="text-xs text-emerald-400/70 mt-1">Click to view</p>
+              <div className={`rounded-2xl p-4 border shadow-sm hover:shadow-md transition-all ${
+                filterStatus === 'delivered' 
+                  ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-700 text-white' 
+                  : 'bg-gradient-to-br from-emerald-100 to-emerald-200/50 border-emerald-200/50'
+              }`}>
+                <p className={`text-xs font-medium ${filterStatus === 'delivered' ? 'text-emerald-200' : 'text-emerald-600/70'}`}>Delivered</p>
+                <p className={`text-2xl font-bold ${filterStatus === 'delivered' ? 'text-white' : 'text-emerald-700'}`}>{deliveredOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'delivered' ? 'text-emerald-200' : 'text-emerald-400/70'}`}>Click to view</p>
               </div>
             </button>
             
             <button
               onClick={() => handleStatClick('pending')}
-              className={`text-left transition-all transform hover:scale-105 ${
+              className={`text-left transition-all transform hover:scale-105 rounded-2xl overflow-hidden ${
                 filterStatus === 'pending' || filterStatus === 'confirmed' || filterStatus === 'shipped' ? 'ring-2 ring-amber-500 ring-offset-2' : ''
               }`}
             >
-              <div className="bg-gradient-to-br from-amber-100 to-amber-200/50 rounded-2xl p-4 border border-amber-200/50 shadow-sm hover:shadow-md">
-                <p className="text-xs text-amber-600/70 font-medium">In Progress</p>
-                <p className="text-2xl font-bold text-amber-700">{pendingOrders}</p>
-                <p className="text-xs text-amber-400/70 mt-1">Click to view</p>
+              <div className={`rounded-2xl p-4 border shadow-sm hover:shadow-md transition-all ${
+                filterStatus === 'pending' || filterStatus === 'confirmed' || filterStatus === 'shipped'
+                  ? 'bg-gradient-to-br from-amber-600 to-amber-700 border-amber-700 text-white' 
+                  : 'bg-gradient-to-br from-amber-100 to-amber-200/50 border-amber-200/50'
+              }`}>
+                <p className={`text-xs font-medium ${filterStatus === 'pending' || filterStatus === 'confirmed' || filterStatus === 'shipped' ? 'text-amber-200' : 'text-amber-600/70'}`}>In Progress</p>
+                <p className={`text-2xl font-bold ${filterStatus === 'pending' || filterStatus === 'confirmed' || filterStatus === 'shipped' ? 'text-white' : 'text-amber-700'}`}>{pendingOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'pending' || filterStatus === 'confirmed' || filterStatus === 'shipped' ? 'text-amber-200' : 'text-amber-400/70'}`}>Click to view</p>
               </div>
             </button>
             
             <button
               onClick={() => handleStatClick('cancelled')}
-              className={`text-left transition-all transform hover:scale-105 ${
+              className={`text-left transition-all transform hover:scale-105 rounded-2xl overflow-hidden ${
                 filterStatus === 'cancelled' || filterStatus === 'failed' ? 'ring-2 ring-rose-500 ring-offset-2' : ''
               }`}
             >
-              <div className="bg-gradient-to-br from-rose-100 to-rose-200/50 rounded-2xl p-4 border border-rose-200/50 shadow-sm hover:shadow-md">
-                <p className="text-xs text-rose-600/70 font-medium">Cancelled / Failed</p>
-                <p className="text-2xl font-bold text-rose-700">{cancelledOrders}</p>
-                <p className="text-xs text-rose-400/70 mt-1">Click to view</p>
+              <div className={`rounded-2xl p-4 border shadow-sm hover:shadow-md transition-all ${
+                filterStatus === 'cancelled' || filterStatus === 'failed'
+                  ? 'bg-gradient-to-br from-rose-600 to-rose-700 border-rose-700 text-white' 
+                  : 'bg-gradient-to-br from-rose-100 to-rose-200/50 border-rose-200/50'
+              }`}>
+                <p className={`text-xs font-medium ${filterStatus === 'cancelled' || filterStatus === 'failed' ? 'text-rose-200' : 'text-rose-600/70'}`}>Cancelled / Failed</p>
+                <p className={`text-2xl font-bold ${filterStatus === 'cancelled' || filterStatus === 'failed' ? 'text-white' : 'text-rose-700'}`}>{cancelledOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'cancelled' || filterStatus === 'failed' ? 'text-rose-200' : 'text-rose-400/70'}`}>Click to view</p>
               </div>
             </button>
           </div>
@@ -536,7 +563,7 @@ function MyOrders() {
                 
                 return (
                   <div key={order._id}>
-                    {/* Order Card - Amazon Style */}
+                    {/* Order Card */}
                     <div className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-xl hover:shadow-pink-100/30 transition-all duration-300 ${
                       isCancelled ? 'border-rose-200 opacity-70' : isDelivered ? 'border-emerald-200' : 'border-pink-100'
                     }`}>
@@ -551,7 +578,7 @@ function MyOrders() {
                           <div>
                             <span className="text-xs text-gray-400 font-medium">ORDER ID</span>
                             <p className="text-sm font-mono font-bold text-gray-800 tracking-wide">
-                              {getOrderIdDisplay(order._id)}
+                              {getOrderIdDisplay(order)}
                             </p>
                           </div>
                           <div>
@@ -576,7 +603,7 @@ function MyOrders() {
                         </div>
                       </div>
 
-                      {/* Order Items - Product Clickable */}
+                      {/* Order Items */}
                       <div className="px-4 sm:px-6 py-4">
                         {order.items && order.items.map((item, idx) => {
                           const eligibilityKey = `${order._id}_${item.productId}`;
@@ -665,7 +692,6 @@ function MyOrders() {
                           )}
                         </div>
                         
-                        {/* Cancel Button - Only if not shipped, not cancelled, not failed */}
                         {canCancel && !isCancelled && (
                           <button 
                             onClick={() => cancelOrder(order._id)} 
@@ -676,7 +702,6 @@ function MyOrders() {
                         )}
                       </div>
 
-                      {/* Cancellation Policy Note */}
                       {canCancel && !isCancelled && (
                         <div className="px-4 sm:px-6 py-2 bg-amber-50/50 border-t border-amber-100/50">
                           <p className="text-xs text-amber-600 flex items-center gap-1.5">
@@ -686,7 +711,6 @@ function MyOrders() {
                         </div>
                       )}
                       
-                      {/* Cancelled/Failed order note */}
                       {isCancelled && (
                         <div className="px-4 sm:px-6 py-2 bg-rose-50/80 border-t border-rose-100">
                           <p className="text-xs text-rose-600 flex items-center gap-1.5">
