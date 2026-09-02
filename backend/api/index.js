@@ -2123,7 +2123,11 @@ app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { role } = req.query;
     const filter = {};
-    if (role) filter.role = role;
+    if (role === 'customer' || role === 'buyer') {
+      filter.role = { $in: ['customer', 'buyer'] };
+    } else if (role) {
+      filter.role = role;
+    }
 
     const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
     res.json(users);
@@ -2132,7 +2136,6 @@ app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 
 // ========== ROUTES REGISTRATION ==========
