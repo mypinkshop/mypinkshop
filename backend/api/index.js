@@ -2118,18 +2118,10 @@ app.get('/api/vendor/shipping/zones', authMiddleware, vendorMiddleware, async (r
   }
 });
 
-// ✅ GET ALL USERS (For Admin Panel)
+// ✅ GET ALL USERS (For Admin Panel) - Sab Users Dikhao
 app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { role } = req.query;
-    const filter = {};
-    if (role === 'customer' || role === 'buyer') {
-      filter.role = { $in: ['customer', 'buyer'] };
-    } else if (role) {
-      filter.role = role;
-    }
-
-    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
+    const users = await User.find({}).select('-password').sort({ createdAt: -1 });
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
