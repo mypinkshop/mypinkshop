@@ -2118,6 +2118,22 @@ app.get('/api/vendor/shipping/zones', authMiddleware, vendorMiddleware, async (r
   }
 });
 
+// ✅ GET ALL USERS (For Admin Panel)
+app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { role } = req.query;
+    const filter = {};
+    if (role) filter.role = role;
+
+    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // ========== ROUTES REGISTRATION ==========
 app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
@@ -2134,20 +2150,6 @@ app.use('/api/coupons', require('../routes/couponRoutes'));
 app.options('/api/addresses', cors(corsOptions));
 app.options('/api/addresses/:id', cors(corsOptions));
 
-// ✅ GET ALL USERS (For Admin Panel)
-app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    const { role } = req.query;
-    const filter = {};
-    if (role) filter.role = role;
-
-    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
-    res.json(users);
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // ✅ BLOCK USER (For Admin Panel)
 app.patch('/api/users/:id/block', authMiddleware, adminMiddleware, async (req, res) => {
