@@ -307,8 +307,7 @@ function VendorAddProduct() {
   
   const [keyFeature, setKeyFeature] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
-
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   // Auto-generate SKU
   const generateSKU = () => {
     const timestamp = Date.now();
