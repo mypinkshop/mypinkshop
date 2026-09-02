@@ -56,8 +56,18 @@ function AdminPayments() {
 
       if (requestsRes.ok) {
         const data = await requestsRes.json();
-        setPaymentRequests(data || []);
-        calculateStats(data);
+        
+        // ✅ FIX: Agar data array hai, toh use karo
+        if (Array.isArray(data)) {
+          setPaymentRequests(data);
+          calculateStats(data);
+        } else if (data.orders && Array.isArray(data.orders)) {
+          setPaymentRequests(data.orders);
+          calculateStats(data.orders);
+        } else {
+          setPaymentRequests([]);
+          calculateStats([]);
+        }
       }
 
       // 2. Load transaction history
@@ -67,7 +77,15 @@ function AdminPayments() {
 
       if (historyRes.ok) {
         const data = await historyRes.json();
-        setTransactions(data || []);
+        
+        // ✅ FIX: Agar data array hai, toh use karo
+        if (Array.isArray(data)) {
+          setTransactions(data);
+        } else if (data.orders && Array.isArray(data.orders)) {
+          setTransactions(data.orders);
+        } else {
+          setTransactions([]);
+        }
       }
 
     } catch (err) {
