@@ -21,6 +21,7 @@ const paymentRoutes = require('./payment');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
 const Coupon = require('../models/Coupon');
 const Review = require('../models/Review');
 const Wishlist = require('../models/Wishlist');
