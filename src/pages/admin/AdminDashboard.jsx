@@ -115,7 +115,7 @@ function AdminDashboard() {
         fetch(`${API_URL}/api/products`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`${API_URL}/api/orders`, {
+        fetch(`${API_URL}/api/orders/all`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${API_URL}/api/admin/vendors`, {
