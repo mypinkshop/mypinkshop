@@ -19,8 +19,7 @@ function AdminPayments() {
   const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [releaseData, setReleaseData] = useState({ vendorId: '', amount: '' });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
-
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const [stats, setStats] = useState({
     totalPending: 0,
     totalPaid: 0,
