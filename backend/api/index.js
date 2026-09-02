@@ -2134,6 +2134,7 @@ app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 
+
 // ========== ROUTES REGISTRATION ==========
 app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
