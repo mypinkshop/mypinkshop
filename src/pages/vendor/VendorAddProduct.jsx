@@ -11,8 +11,8 @@ const AmazonImporter = ({ onProductImported, setFormData, setImages, setVariatio
   const [loading, setLoading] = useState(false);
   const [importedProducts, setImportedProducts] = useState([]);
 
-  const API_URL = 'https://api.mypinkshop.com';
-  const token = localStorage.getItem('vendorToken');
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  const token = localStorage.getItem('vendorToken') || localStorage.getItem('adminToken'); // ✅ FIX: dono tokens support
 
   const addUrlField = () => {
     if (urls.length < 20) {
@@ -59,7 +59,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setImages, setVariatio
         if (data.success) {
           results.push({ ...data.scraped, originalUrl: url });
         } else {
-          results.push({ error: data.error, originalUrl: url });
+          results.push({ error: data.error || 'Failed to import', originalUrl: url });
         }
       } catch (error) {
         results.push({ error: error.message, originalUrl: url });
@@ -308,6 +308,7 @@ function VendorAddProduct() {
   const [keyFeature, setKeyFeature] = useState('');
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  
   // Auto-generate SKU
   const generateSKU = () => {
     const timestamp = Date.now();
