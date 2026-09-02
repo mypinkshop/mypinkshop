@@ -2138,12 +2138,26 @@ app.options('/api/addresses/:id', cors(corsOptions));
 app.get('/api/categories', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const categories = await Product.distinct('category');
-    res.json(categories);
+    
+    // ✅ Strings ko proper objects mein convert karo
+    const formattedCategories = categories.map((cat, index) => ({
+      _id: index + 1, // Fake ID for now
+      name: cat,
+      slug: cat.toLowerCase().replace(/ /g, '-'),
+      icon: '📁',
+      status: 'active',
+      order: index + 1,
+      description: '',
+      productCount: 0
+    }));
+    
+    res.json(formattedCategories);
   } catch (error) {
     console.error('Error fetching categories:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // ✅ POST /api/categories (For Admin Panel)
 app.post('/api/categories', authMiddleware, adminMiddleware, async (req, res) => {
