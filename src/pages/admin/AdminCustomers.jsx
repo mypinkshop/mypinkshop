@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 
 function AdminCustomers() {
   const [customers, setCustomers] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,7 +25,7 @@ function AdminCustomers() {
   });
   const navigate = useNavigate();
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -59,7 +60,7 @@ function AdminCustomers() {
       if (res.ok) {
         const customersData = data.users || data || [];
         setCustomers(customersData);
-        calculateStats(customersData);
+        calculateStats(customersData, orders);
       } else {
         setError(data.message || 'Failed to load customers');
         toast.error(data.message || 'Failed to load customers');
@@ -75,12 +76,59 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ Calculate stats from customers data
-  const calculateStats = (customersList) => {
+  // ✅ Load orders to calculate customer spending & order counts
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return;
+
+    fetch(`${API_URL}/api/orders/all`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (Array.isArray(data)) {
+        setOrders(data);
+        calculateStats(customers, data);
+      }
+    })
+    .catch(err => console.error('Error loading orders:', err));
+  }, [customers]);
+
+  // ✅ Calculate stats from customers + orders
+  const calculateStats = (customersList, ordersList) => {
     const active = customersList.filter(c => c.status === 'active' || c.status === 'approved').length;
     const blocked = customersList.filter(c => c.status === 'blocked' || c.status === 'suspended').length;
-    const totalOrders = customersList.reduce((sum, c) => sum + (c.orderCount || 0), 0);
-    const totalSpent = customersList.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+    
+    // Calculate total orders & spent for each customer
+    const customerStats = {};
+    ordersList.forEach(order => {
+      const customerId = order.userId?._id || order.buyerId;
+      if (!customerId) return;
+      
+      if (!customerStats[customerId]) {
+        customerStats[customerId] = { orderCount: 0, totalSpent: 0 };
+      }
+      customerStats[customerId].orderCount++;
+      customerStats[customerId].totalSpent += order.total || 0;
+    });
+
+    // Update customers with their stats
+    const updatedCustomers = customersList.map(customer => {
+      const stats = customerStats[customer._id] || customerStats[customer.id] || { orderCount: 0, totalSpent: 0 };
+      return {
+        ...customer,
+        orderCount: stats.orderCount,
+        totalSpent: stats.totalSpent
+      };
+    });
+
+    setCustomers(updatedCustomers);
+
+    const totalOrders = ordersList.length;
+    const totalSpent = ordersList.reduce((sum, order) => sum + (order.total || 0), 0);
 
     setStats({
       totalCustomers: customersList.length,
@@ -358,43 +406,47 @@ function AdminCustomers() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Stats Cards */}
+          {/* Clickable Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            <Link to="/admin/customers" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Total Customers</p>
                 <span className="text-base sm:text-lg">👥</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-gray-800">{stats.totalCustomers}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            </Link>
+
+            <Link to="/admin/customers?filter=active" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Active</p>
                 <span className="text-base sm:text-lg">🟢</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.activeCustomers}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            </Link>
+
+            <Link to="/admin/customers?filter=blocked" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Blocked</p>
                 <span className="text-base sm:text-lg">🔴</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-red-600">{stats.blockedCustomers}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm">
+            </Link>
+
+            <Link to="/admin/orders" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Total Orders</p>
                 <span className="text-base sm:text-lg">📦</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-gray-800">{stats.totalOrders}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm col-span-2 sm:col-span-1">
+            </Link>
+
+            <Link to="/admin/orders" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition col-span-2 sm:col-span-1">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
                 <p className="text-xs text-gray-500">Total Spent</p>
                 <span className="text-base sm:text-lg">💰</span>
               </div>
               <p className="text-xl sm:text-2xl font-bold text-pink-600">₹{stats.totalSpent.toLocaleString()}</p>
-            </div>
+            </Link>
           </div>
 
           {/* Filter Tabs */}
