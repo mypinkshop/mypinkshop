@@ -27,6 +27,7 @@ function AdminCustomers() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
+  // ✅ SAFE LOAD: Sirf ek baar load karo
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
@@ -34,9 +35,8 @@ function AdminCustomers() {
       return;
     }
     loadCustomers(token);
-  }, [navigate]);
+  }, []); // ✅ Empty array = Sirf ek baar chalega
 
-  // ✅ Load customers from backend
   const loadCustomers = async (token) => {
     try {
       setLoading(true);
@@ -60,7 +60,6 @@ function AdminCustomers() {
       if (res.ok) {
         const customersData = data.users || data || [];
         setCustomers(customersData);
-        calculateStats(customersData, orders);
       } else {
         setError(data.message || 'Failed to load customers');
         toast.error(data.message || 'Failed to load customers');
@@ -76,7 +75,7 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ Load orders to calculate customer spending & order counts
+  // ✅ SAFE ORDERS LOAD: Sirf ek baar orders load karo
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) return;
@@ -95,14 +94,19 @@ function AdminCustomers() {
       }
     })
     .catch(err => console.error('Error loading orders:', err));
-  }, [customers]);
+  }, []); // ✅ Empty array = Sirf ek baar chalega
 
-  // ✅ Calculate stats from customers + orders
+  // ✅ SAFE STATS CALCULATION: Customers ya Orders change hone par chalega
+  useEffect(() => {
+    calculateStats(customers, orders);
+  }, [customers, orders]);
+
   const calculateStats = (customersList, ordersList) => {
+    if (!customersList || !ordersList) return;
+
     const active = customersList.filter(c => c.status === 'active' || c.status === 'approved').length;
     const blocked = customersList.filter(c => c.status === 'blocked' || c.status === 'suspended').length;
     
-    // Calculate total orders & spent for each customer
     const customerStats = {};
     ordersList.forEach(order => {
       const customerId = order.userId?._id || order.buyerId;
@@ -115,7 +119,6 @@ function AdminCustomers() {
       customerStats[customerId].totalSpent += order.total || 0;
     });
 
-    // Update customers with their stats
     const updatedCustomers = customersList.map(customer => {
       const stats = customerStats[customer._id] || customerStats[customer.id] || { orderCount: 0, totalSpent: 0 };
       return {
