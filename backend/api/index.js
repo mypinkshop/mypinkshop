@@ -2146,6 +2146,47 @@ app.use('/api/coupons', require('../routes/couponRoutes'));
 app.options('/api/addresses', cors(corsOptions));
 app.options('/api/addresses/:id', cors(corsOptions));
 
+// ✅ ADMIN: GET PAYMENT REQUESTS
+app.get('/api/admin/payment-requests', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ paymentStatus: 'pending' }).sort({ createdAt: -1 });
+    res.json({ success: true, orders });
+  } catch (error) {
+    console.error('Error fetching payment requests:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ✅ ADMIN: GET TRANSACTION HISTORY
+app.get('/api/admin/transaction-history', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ paymentStatus: 'completed' }).sort({ createdAt: -1 });
+    res.json({ success: true, orders });
+  } catch (error) {
+    console.error('Error fetching transaction history:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ✅ ADMIN: UPDATE PAYMENT STATUS
+app.patch('/api/admin/payment-requests/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    order.paymentStatus = status;
+    await order.save();
+
+    res.json({ success: true, message: `Payment status updated to ${status}`, order });
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 
 // ✅ BLOCK USER (For Admin Panel)
 app.patch('/api/users/:id/block', authMiddleware, adminMiddleware, async (req, res) => {
