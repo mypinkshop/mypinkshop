@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
 
@@ -12,7 +12,6 @@ function AdminCategories() {
   const [formData, setFormData] = useState({ 
     name: '', 
     slug: '', 
-    parentId: null, 
     icon: '📁', 
     status: 'active', 
     order: 0,
@@ -33,7 +32,6 @@ function AdminCategories() {
     loadCategories(token);
   }, [navigate]);
 
-  // ✅ Load categories from backend
   const loadCategories = async (token) => {
     try {
       setLoading(true);
@@ -55,107 +53,32 @@ function AdminCategories() {
       const data = await res.json();
 
       if (res.ok) {
-        // If API returns data, use it, else use local defaults
-        if (data && data.length > 0) {
+        // Agar API se data aaya, toh use karo, warna default rakho
+        if (Array.isArray(data) && data.length > 0) {
           setCategories(data);
         } else {
-          // Fallback to default categories
-          const defaultCategories = getDefaultCategories();
-          setCategories(defaultCategories);
+          setCategories([]);
         }
       } else {
         setError(data.message || 'Failed to load categories');
         toast.error(data.message || 'Failed to load categories');
-        // Use default categories as fallback
-        setCategories(getDefaultCategories());
+        setCategories([]);
       }
     } catch (err) {
       console.error('Error loading categories:', err);
       setError('Network error. Please try again.');
       toast.error('Network error. Please try again.');
-      // Use default categories as fallback
-      setCategories(getDefaultCategories());
+      setCategories([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Default categories
-  const getDefaultCategories = () => {
-    return [
-      { 
-        id: 1, 
-        name: 'Skincare', 
-        slug: 'skincare', 
-        parentId: null, 
-        icon: '🧴', 
-        status: 'active', 
-        order: 1, 
-        productCount: 156, 
-        description: 'Skin care products for glowing skin',
-        children: [
-          { id: 2, name: 'Face Wash', slug: 'face-wash', parentId: 1, icon: '🧼', status: 'active', order: 1, productCount: 34, description: 'Gentle face cleansers' },
-          { id: 3, name: 'Serums', slug: 'serums', parentId: 1, icon: '💧', status: 'active', order: 2, productCount: 28, description: 'Concentrated serums' },
-          { id: 17, name: 'Moisturizers', slug: 'moisturizers', parentId: 1, icon: '🧴', status: 'active', order: 3, productCount: 42, description: 'Hydrating moisturizers' }
-        ]
-      },
-      { 
-        id: 4, 
-        name: 'Makeup', 
-        slug: 'makeup', 
-        parentId: null, 
-        icon: '💄', 
-        status: 'active', 
-        order: 2, 
-        productCount: 234, 
-        description: 'Makeup products',
-        children: [
-          { id: 5, name: 'Lipsticks', slug: 'lipsticks', parentId: 4, icon: '💋', status: 'active', order: 1, productCount: 67, description: 'Matte, glossy, liquid lipsticks' },
-          { id: 6, name: 'Foundation', slug: 'foundation', parentId: 4, icon: '🎨', status: 'active', order: 2, productCount: 45, description: 'Liquid and powder foundations' },
-          { id: 7, name: 'Eyeshadow', slug: 'eyeshadow', parentId: 4, icon: '👁️', status: 'active', order: 3, productCount: 89, description: 'Eyeshadow palettes' }
-        ]
-      },
-      { 
-        id: 8, 
-        name: 'Clothing', 
-        slug: 'clothing', 
-        parentId: null, 
-        icon: '👗', 
-        status: 'active', 
-        order: 3, 
-        productCount: 89, 
-        description: 'Fashion clothing',
-        children: [
-          { id: 9, name: 'Dresses', slug: 'dresses', parentId: 8, icon: '👗', status: 'active', order: 1, productCount: 34, description: 'Party and casual dresses' },
-          { id: 10, name: 'Tops', slug: 'tops', parentId: 8, icon: '👚', status: 'active', order: 2, productCount: 28, description: 'Blouses and tops' }
-        ]
-      },
-      { 
-        id: 11, 
-        name: 'Accessories', 
-        slug: 'accessories', 
-        parentId: null, 
-        icon: '👜', 
-        status: 'active', 
-        order: 4, 
-        productCount: 67, 
-        description: 'Fashion accessories',
-        children: [
-          { id: 12, name: 'Bags', slug: 'bags', parentId: 11, icon: '👜', status: 'active', order: 1, productCount: 23, description: 'Handbags and clutches' },
-          { id: 13, name: 'Jewelry', slug: 'jewelry', parentId: 11, icon: '💍', status: 'active', order: 2, productCount: 34, description: 'Necklaces, earrings, rings' }
-        ]
-      }
-    ];
-  };
-
-  // ✅ Save category to backend
   const saveCategoryToAPI = async (categoryData, isEdit = false) => {
     const token = localStorage.getItem('adminToken');
-    
     const url = isEdit 
       ? `${API_URL}/api/categories/${editingCategory._id || editingCategory.id}`
       : `${API_URL}/api/categories`;
-    
     const method = isEdit ? 'PUT' : 'POST';
 
     const res = await fetch(url, {
@@ -167,7 +90,6 @@ function AdminCategories() {
       body: JSON.stringify({
         name: categoryData.name,
         slug: categoryData.slug,
-        parentId: categoryData.parentId || null,
         icon: categoryData.icon || '📁',
         status: categoryData.status || 'active',
         order: parseInt(categoryData.order) || 0,
@@ -188,10 +110,8 @@ function AdminCategories() {
     return data;
   };
 
-  // ✅ Delete category from backend
   const deleteCategoryFromAPI = async (id) => {
     const token = localStorage.getItem('adminToken');
-    
     const res = await fetch(`${API_URL}/api/categories/${id}`, {
       method: 'DELETE',
       headers: {
@@ -239,7 +159,7 @@ function AdminCategories() {
       await loadCategories(localStorage.getItem('adminToken'));
       setShowModal(false);
       setEditingCategory(null);
-      setFormData({ name: '', slug: '', parentId: null, icon: '📁', status: 'active', order: 0, description: '' });
+      setFormData({ name: '', slug: '', icon: '📁', status: 'active', order: 0, description: '' });
     } catch (err) {
       console.error('Error saving category:', err);
       toast.error(err.message || 'Failed to save category');
@@ -249,7 +169,7 @@ function AdminCategories() {
   };
 
   const deleteCategory = async (id) => {
-    if (!window.confirm('⚠️ Delete this category? All subcategories will also be deleted.')) return;
+    if (!window.confirm('⚠️ Delete this category?')) return;
 
     setProcessingId(id);
     try {
@@ -269,7 +189,6 @@ function AdminCategories() {
     setFormData({
       name: category.name,
       slug: category.slug,
-      parentId: category.parentId || null,
       icon: category.icon || '📁',
       status: category.status || 'active',
       order: category.order || 0,
@@ -294,115 +213,19 @@ function AdminCategories() {
   };
 
   const getCategoryCount = () => {
-    let count = 0;
-    const countRecursive = (cats) => {
-      cats.forEach(cat => {
-        count++;
-        if (cat.children) countRecursive(cat.children);
-      });
-    };
-    countRecursive(categories);
-    return count;
+    return categories.length;
   };
 
   const getActiveCount = () => {
-    let count = 0;
-    const countRecursive = (cats) => {
-      cats.forEach(cat => {
-        if (cat.status === 'active') count++;
-        if (cat.children) countRecursive(cat.children);
-      });
-    };
-    countRecursive(categories);
-    return count;
+    return categories.filter(cat => cat.status === 'active').length;
   };
 
   const filterCategories = (cats, term) => {
     if (!term) return cats;
-    return cats.filter(cat => {
-      const matches = cat.name.toLowerCase().includes(term.toLowerCase());
-      if (cat.children) {
-        cat.children = filterCategories(cat.children, term);
-      }
-      return matches || (cat.children && cat.children.length > 0);
-    });
+    return cats.filter(cat => cat.name.toLowerCase().includes(term.toLowerCase()));
   };
 
-  const filteredCategories = filterCategories([...categories], searchTerm);
-
-  const CategoryRow = ({ category, level = 0 }) => {
-    const [expanded, setExpanded] = useState(true);
-    const hasChildren = category.children && category.children.length > 0;
-    const isProcessing = processingId === category._id || processingId === category.id;
-    
-    return (
-      <div>
-        <div className={`flex items-center justify-between py-3 px-4 hover:bg-pink-50/30 transition border-b border-gray-100`} style={{ paddingLeft: `${20 + level * 30}px` }}>
-          <div className="flex items-center gap-3 flex-1">
-            {hasChildren && (
-              <button onClick={() => setExpanded(!expanded)} className="text-gray-400 hover:text-pink-500 w-6">
-                {expanded ? '▼' : '▶'}
-              </button>
-            )}
-            {!hasChildren && <div className="w-6"></div>}
-            <div className="w-10 h-10 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-xl shadow-sm">
-              {category.icon || '📁'}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-gray-800">{category.name}</p>
-                <p className="text-xs text-gray-400">slug: {category.slug}</p>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                  {category.productCount || 0} products
-                </span>
-                {category.status === 'inactive' && (
-                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>
-                )}
-              </div>
-              {category.description && (
-                <p className="text-xs text-gray-500 mt-0.5">{category.description}</p>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => toggleCategoryStatus(category._id || category.id, category.status)} 
-              disabled={isProcessing}
-              className={`p-1.5 rounded-lg transition ${category.status === 'active' ? 'text-orange-500 hover:bg-orange-50' : 'text-green-500 hover:bg-green-50'} disabled:opacity-50`} 
-              title={category.status === 'active' ? 'Disable' : 'Enable'}
-            >
-              {category.status === 'active' ? '🔒' : '🔓'}
-            </button>
-            <button onClick={() => editCategory(category)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">✏️</button>
-            <button 
-              onClick={() => deleteCategory(category._id || category.id)} 
-              disabled={isProcessing}
-              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50" 
-              title="Delete"
-            >
-              🗑️
-            </button>
-          </div>
-        </div>
-        {hasChildren && expanded && category.children.map(child => (
-          <CategoryRow key={child._id || child.id} category={child} level={level + 1} />
-        ))}
-      </div>
-    );
-  };
-
-  // Flatten categories for parent select
-  const getFlatCategories = (cats, level = 0, result = []) => {
-    cats.forEach(cat => {
-      result.push({ ...cat, level });
-      if (cat.children) {
-        getFlatCategories(cat.children, level + 1, result);
-      }
-    });
-    return result;
-  };
-
-  const flatCategories = getFlatCategories(categories);
+  const filteredCategories = filterCategories(categories, searchTerm);
 
   if (loading) {
     return (
@@ -438,7 +261,7 @@ function AdminCategories() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
             <button 
-              onClick={() => { setEditingCategory(null); setFormData({ name: '', slug: '', parentId: null, icon: '📁', status: 'active', order: 0, description: '' }); setShowModal(true); }} 
+              onClick={() => { setEditingCategory(null); setFormData({ name: '', slug: '', icon: '📁', status: 'active', order: 0, description: '' }); setShowModal(true); }} 
               className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition"
             >
               + Add Category
@@ -500,14 +323,53 @@ function AdminCategories() {
                   <p>No categories found</p>
                 </div>
               ) : (
-                filteredCategories.map(cat => <CategoryRow key={cat._id || cat.id} category={cat} />)
+                filteredCategories.map(cat => (
+                  <div key={cat._id || cat.id} className="flex items-center justify-between py-3 px-4 hover:bg-pink-50/30 transition border-b border-gray-100">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="w-10 h-10 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        {cat.icon || '📁'}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-gray-800">{cat.name}</p>
+                          <p className="text-xs text-gray-400">slug: {cat.slug}</p>
+                          {cat.status === 'inactive' && (
+                            <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>
+                          )}
+                        </div>
+                        {cat.description && (
+                          <p className="text-xs text-gray-500 mt-0.5">{cat.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => toggleCategoryStatus(cat._id || cat.id, cat.status)} 
+                        disabled={processingId === (cat._id || cat.id)}
+                        className={`p-1.5 rounded-lg transition ${cat.status === 'active' ? 'text-orange-500 hover:bg-orange-50' : 'text-green-500 hover:bg-green-50'} disabled:opacity-50`} 
+                        title={cat.status === 'active' ? 'Disable' : 'Enable'}
+                      >
+                        {cat.status === 'active' ? '🔒' : '🔓'}
+                      </button>
+                      <button onClick={() => editCategory(cat)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">✏️</button>
+                      <button 
+                        onClick={() => deleteCategory(cat._id || cat.id)} 
+                        disabled={processingId === (cat._id || cat.id)}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50" 
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
 
           <div className="mt-4 text-center">
             <p className="text-xs text-gray-400">
-              Total {getCategoryCount()} categories • Hierarchical structure
+              Total {getCategoryCount()} categories
             </p>
           </div>
         </div>
@@ -544,23 +406,6 @@ function AdminCategories() {
                   onChange={handleChange} 
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50" 
                 />
-                <p className="text-xs text-gray-400 mt-1">Auto-generated from name</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Parent Category</label>
-                <select 
-                  name="parentId" 
-                  value={formData.parentId || ''} 
-                  onChange={handleChange} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
-                >
-                  <option value="">None (Root Category)</option>
-                  {flatCategories.map(cat => (
-                    <option key={cat._id || cat.id} value={cat._id || cat.id} disabled={editingCategory && (cat._id === editingCategory._id || cat.id === editingCategory.id)}>
-                      {'—'.repeat(cat.level)} {cat.name}
-                    </option>
-                  ))}
-                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -587,17 +432,6 @@ function AdminCategories() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea 
-                  name="description" 
-                  rows="2" 
-                  placeholder="Category description" 
-                  value={formData.description} 
-                  onChange={handleChange} 
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select 
                   name="status" 
@@ -608,6 +442,17 @@ function AdminCategories() {
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea 
+                  name="description" 
+                  rows="2" 
+                  placeholder="Category description" 
+                  value={formData.description} 
+                  onChange={handleChange} 
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500"
+                />
               </div>
               <button 
                 type="submit" 
