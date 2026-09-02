@@ -10,8 +10,11 @@ function AdminSidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  
+  // ✅ Sirf PENDING orders ka count
+  const [pendingOrderCount, setPendingOrderCount] = useState(0);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   // Check screen size
   useEffect(() => {
@@ -26,7 +29,7 @@ function AdminSidebar() {
     return () => window.removeEventListener('resize', checkScreen);
   }, []);
 
-  // Fetch unread notifications count
+  // ✅ Fetch unread notifications count
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
@@ -52,6 +55,33 @@ function AdminSidebar() {
     return () => clearInterval(interval);
   }, [API_URL]);
 
+  // ✅ Sirf PENDING orders ka count fetch karo
+  useEffect(() => {
+    const fetchPendingOrderCount = async () => {
+      try {
+        const token = localStorage.getItem('adminToken');
+        if (!token) return;
+        
+        const response = await fetch(`${API_URL}/api/orders/all`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const allOrders = await response.json();
+          // ✅ SIRF 'pending' status wale orders count karo
+          setPendingOrderCount(allOrders.filter(order => order.status?.toLowerCase() === 'pending').length);
+        }
+      } catch (error) {
+        console.error('Error fetching pending orders:', error);
+      }
+    };
+
+    fetchPendingOrderCount();
+    // Refresh har 30 second mein
+    const interval = setInterval(fetchPendingOrderCount, 30000);
+    return () => clearInterval(interval);
+  }, [API_URL]);
+
   // Complete menu items with all pages
   const menuItems = [
     // Main
@@ -66,7 +96,7 @@ function AdminSidebar() {
     { name: 'Categories', icon: '📁', path: '/admin/categories', badge: null },
     
     // Sales
-    { name: 'Orders', icon: '🛒', path: '/admin/orders', badge: null },
+    { name: 'Orders', icon: '🛒', path: '/admin/orders', badge: pendingOrderCount > 0 ? pendingOrderCount : null }, // ✅ SIRF PENDING COUNT
     { name: 'Customers', icon: '👥', path: '/admin/customers', badge: null },
     { name: 'Payments', icon: '💳', path: '/admin/payments', badge: null },
     
@@ -75,8 +105,8 @@ function AdminSidebar() {
     { name: 'Banners', icon: '🎨', path: '/admin/banners', badge: null },
     { name: 'Coupons', icon: '🎫', path: '/admin/coupons', badge: null },
     { name: 'Homepage', icon: '🏠', path: '/admin/homepage', badge: null },
-    { name: 'Advertising', icon: '📢', path: '/admin/advertising', badge: null },  // ✅ NEW
-    { name: 'Ad Analytics', icon: '📊', path: '/admin/ad-analytics', badge: null }, // ✅ NEW
+    { name: 'Advertising', icon: '📢', path: '/admin/advertising', badge: null },
+    { name: 'Ad Analytics', icon: '📊', path: '/admin/ad-analytics', badge: null },
     
     // Management
     { name: 'Notifications', icon: '🔔', path: '/admin/notifications', badge: unreadNotifications > 0 ? unreadNotifications : null },
@@ -145,7 +175,9 @@ function AdminSidebar() {
                 <>
                   <span className="text-sm font-medium flex-1">{item.name}</span>
                   {item.badge && (
-                    <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse">
+                    <span className={`text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse ${
+                      item.name === 'Orders' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+                    }`}>
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
