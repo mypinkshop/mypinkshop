@@ -2149,6 +2149,73 @@ app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
+// ✅ BLOCK USER (For Admin Panel)
+app.patch('/api/users/:id/block', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.status = 'blocked';
+    user.blockedAt = new Date();
+    await user.save();
+
+    res.json({ success: true, message: 'User blocked successfully', user });
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ✅ UNBLOCK USER (For Admin Panel)
+app.patch('/api/users/:id/unblock', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.status = 'active';
+    await user.save();
+
+    res.json({ success: true, message: 'User unblocked successfully', user });
+  } catch (error) {
+    console.error('Error unblocking user:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ✅ RESET PASSWORD (For Admin Panel)
+app.patch('/api/users/:id/reset-password', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // ✅ Password hash karke save karo (bcrypt use karo)
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully', user });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ✅ DELETE USER (For Admin Panel)
+app.delete('/api/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ✅ GET ALL CATEGORIES (For Admin Panel)
 app.get('/api/categories', authMiddleware, adminMiddleware, async (req, res) => {
   try {
