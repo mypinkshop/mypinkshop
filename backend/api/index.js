@@ -2149,7 +2149,8 @@ app.options('/api/addresses/:id', cors(corsOptions));
 // ✅ ADMIN: GET PAYMENT REQUESTS
 app.get('/api/admin/payment-requests', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const orders = await Order.find({ paymentStatus: 'pending' }).sort({ createdAt: -1 });
+    // 🚨 FIX: Saare orders fetch karo, 'paymentStatus' filter hatao
+    const orders = await Order.find({}).sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (error) {
     console.error('Error fetching payment requests:', error);
@@ -2160,7 +2161,8 @@ app.get('/api/admin/payment-requests', authMiddleware, adminMiddleware, async (r
 // ✅ ADMIN: GET TRANSACTION HISTORY
 app.get('/api/admin/transaction-history', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const orders = await Order.find({ paymentStatus: 'completed' }).sort({ createdAt: -1 });
+    // 🚨 FIX: Saare orders fetch karo
+    const orders = await Order.find({}).sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (error) {
     console.error('Error fetching transaction history:', error);
