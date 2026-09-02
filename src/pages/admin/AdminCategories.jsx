@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
 
@@ -53,7 +53,6 @@ function AdminCategories() {
       const data = await res.json();
 
       if (res.ok) {
-        // Agar API se data aaya, toh use karo, warna default rakho
         if (Array.isArray(data) && data.length > 0) {
           setCategories(data);
         } else {
@@ -274,30 +273,33 @@ function AdminCategories() {
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
-          {/* Stats Cards */}
+          {/* Clickable Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            <Link to="/admin/dashboard" className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Categories</p>
                 <span className="text-lg">📂</span>
               </div>
               <p className="text-2xl font-bold text-gray-800">{getCategoryCount()}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            </Link>
+
+            <Link to="/admin/dashboard" className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Active</p>
                 <span className="text-lg">✅</span>
               </div>
               <p className="text-2xl font-bold text-green-600">{getActiveCount()}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            </Link>
+
+            <Link to="/admin/dashboard" className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Root Categories</p>
                 <span className="text-lg">🏠</span>
               </div>
               <p className="text-2xl font-bold text-gray-800">{categories.length}</p>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm">
+            </Link>
+
+            <Link to="/admin/products" className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Products</p>
                 <span className="text-lg">📦</span>
@@ -305,7 +307,7 @@ function AdminCategories() {
               <p className="text-2xl font-bold text-pink-600">
                 {categories.reduce((sum, cat) => sum + (cat.productCount || 0), 0)}
               </p>
-            </div>
+            </Link>
           </div>
 
           {/* Categories Tree */}
@@ -324,7 +326,11 @@ function AdminCategories() {
                 </div>
               ) : (
                 filteredCategories.map(cat => (
-                  <div key={cat._id || cat.id} className="flex items-center justify-between py-3 px-4 hover:bg-pink-50/30 transition border-b border-gray-100">
+                  <div 
+                    key={cat._id || cat.id} 
+                    className="flex items-center justify-between py-3 px-4 hover:bg-pink-50/30 transition border-b border-gray-100 cursor-pointer"
+                    onClick={() => navigate(`/admin/products?category=${cat.slug || cat.name}`)}
+                  >
                     <div className="flex items-center gap-3 flex-1">
                       <div className="w-10 h-10 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center text-xl shadow-sm">
                         {cat.icon || '📁'}
@@ -332,17 +338,14 @@ function AdminCategories() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-gray-800">{cat.name}</p>
-                          <p className="text-xs text-gray-400">slug: {cat.slug}</p>
                           {cat.status === 'inactive' && (
                             <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>
                           )}
                         </div>
-                        {cat.description && (
-                          <p className="text-xs text-gray-500 mt-0.5">{cat.description}</p>
-                        )}
+                        <p className="text-xs text-gray-400 mt-0.5">{cat.description || ''}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <button 
                         onClick={() => toggleCategoryStatus(cat._id || cat.id, cat.status)} 
                         disabled={processingId === (cat._id || cat.id)}
