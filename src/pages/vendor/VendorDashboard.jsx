@@ -35,7 +35,7 @@ function VendorDashboard() {
       setLoading(true);
       setError('');
       
-      const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
       
       // 1. Fetch Vendor Profile
       const profileRes = await fetch(`${API_URL}/api/vendor/profile`, {
