@@ -1,6 +1,7 @@
 name = "mypinkshop-backend"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
@@ -10,6 +11,3 @@ database_id = "2d736aa4-0c5b-472e-a97b-cdbfab8e63e5"
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "mypinkshop-images"
-
-[vars]
-JWT_SECRET = "YbSNEP0omcxXSjCNQM6hCfnr0zwrpZhZElZgZdONQqI"
