@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
 import { createUser, getUserByEmail, updateUser } from '../db/queries.js';
-import { generateToken, generateRefreshToken, verifyRefreshToken } from '../middleware/auth.js';
+import { generateToken, generateRefreshToken, verifyToken } from '../middleware/auth.js';
 
 const auth = new Hono();
 
@@ -22,8 +22,8 @@ auth.post('/register', async (c) => {
     phone
   });
 
-  const token = generateToken({ id: userId, email, role: 'user' });
-  const refreshToken = generateRefreshToken({ id: userId, email });
+  const token = await generateToken({ id: userId, email, role: 'user' }, c.env.JWT_SECRET);
+  const refreshToken = await generateRefreshToken({ id: userId, email }, c.env.JWT_SECRET);
   await updateUser(c.env, userId, { refresh_token: refreshToken });
   
   return c.json({
@@ -47,8 +47,8 @@ auth.post('/login', async (c) => {
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
-  const token = generateToken({ id: user.id, email: user.email, role: user.role });
-  const refreshToken = generateRefreshToken({ id: user.id, email: user.email });
+  const token = await generateToken({ id: user.id, email: user.email, role: user.role }, c.env.JWT_SECRET);
+  const refreshToken = await generateRefreshToken({ id: user.id, email: user.email }, c.env.JWT_SECRET);
   await updateUser(c.env, user.id, { refresh_token: refreshToken });
   
   return c.json({
@@ -70,18 +70,18 @@ auth.post('/refresh', async (c) => {
     return c.json({ error: 'Refresh token required' }, 400);
   }
 
-  const decoded = verifyRefreshToken(refreshToken, c.env.JWT_SECRET);
-  if (!decoded) {
+  const payload = await verifyToken(refreshToken, c.env.JWT_SECRET);
+  if (!payload) {
     return c.json({ error: 'Invalid refresh token' }, 401);
   }
 
-  const user = await getUserByEmail(c.env, decoded.email);
+  const user = await getUserByEmail(c.env, payload.email);
   if (!user || user.refresh_token !== refreshToken) {
     return c.json({ error: 'Invalid refresh token' }, 401);
   }
 
-  const newToken = generateToken({ id: user.id, email: user.email, role: user.role });
-  const newRefreshToken = generateRefreshToken({ id: user.id, email: user.email });
+  const newToken = await generateToken({ id: user.id, email: user.email, role: user.role }, c.env.JWT_SECRET);
+  const newRefreshToken = await generateRefreshToken({ id: user.id, email: user.email }, c.env.JWT_SECRET);
   await updateUser(c.env, user.id, { refresh_token: newRefreshToken });
 
   return c.json({
@@ -94,9 +94,9 @@ auth.post('/refresh', async (c) => {
 auth.post('/logout', async (c) => {
   const { refreshToken } = await c.req.json();
   if (refreshToken) {
-    const decoded = verifyRefreshToken(refreshToken, c.env.JWT_SECRET);
-    if (decoded) {
-      const user = await getUserByEmail(c.env, decoded.email);
+    const payload = await verifyToken(refreshToken, c.env.JWT_SECRET);
+    if (payload) {
+      const user = await getUserByEmail(c.env, payload.email);
       if (user) {
         await updateUser(c.env, user.id, { refresh_token: null });
       }
