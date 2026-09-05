@@ -164,7 +164,7 @@ export const updateOrderStatus = async (env, id, status) => {
   await env.DB.prepare(`UPDATE orders SET order_status = ? WHERE id = ?`).bind(status, id).run();
 };
 
-export const updatePaymentStatus = async (env, id, status) => {
+export const updateOrderPaymentStatus = async (env, id, status) => {
   await env.DB.prepare(`UPDATE orders SET payment_status = ? WHERE id = ?`).bind(status, id).run();
 };
 
