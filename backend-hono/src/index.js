@@ -17,7 +17,15 @@ const app = new Hono();
 
 app.use('*', logger());
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'https://mypinkshop.vercel.app', 'https://mypinkshop.pages.dev'],
+  // Yahan saare domains add kiye hain
+  origin: [
+    'http://localhost:5173', 
+    'https://mypinkshop.vercel.app', 
+    'https://mypinkshop.pages.dev',
+    'https://mypinkshop.com', 
+    'https://www.mypinkshop.com',
+    'https://mypinkshop.mypinkshop1.workers.dev' // Ye optional hai, testing ke liye add kiya
+  ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
