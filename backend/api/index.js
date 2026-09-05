@@ -57,6 +57,7 @@ const corsOptions = {
     'https://www.mypinkshop.com',
     'https://mypinkshop.com',
     'https://api.mypinkshop.com',
+    'https://mypinkshop.pages.dev',
     'https://mypinkshop.vercel.app',
     'http://localhost:3000',
     'http://localhost:8081',
