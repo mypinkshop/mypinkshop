@@ -24,6 +24,7 @@ app.use('*', cors({
     'https://mypinkshop.pages.dev',
     'https://mypinkshop.com', 
     'https://www.mypinkshop.com',
+    'https://api.mypinkshop.com',
     'https://mypinkshop.mypinkshop1.workers.dev' // Ye optional hai, testing ke liye add kiya
   ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
