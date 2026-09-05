@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler dev src/index.js",
     "deploy": "wrangler deploy --minify src/index.js",
-    "build": "esbuild src/index.js --bundle --outfile=dist/index.js --platform=neutral --format=esm --external:pg --external:better-sqlite3"
+    "build": "esbuild src/index.js --bundle --outfile=dist/index.js --platform=neutral --format=esm --external:pg --external:better-sqlite3 --external:jose --external:bcryptjs --external:uuid"
   },
   "dependencies": {
     "hono": "^4.0.0",
