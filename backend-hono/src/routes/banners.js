@@ -1,65 +1,161 @@
 import { Hono } from 'hono';
+import {
+  createBanner,
+  getBanner,
+  getAllBanners,
+  getActiveBanners,
+  updateBanner,
+  deleteBanner,
+  toggleBannerActive
+} from '../models/Banner.js';
 
 const banners = new Hono();
 
-// GET active hero banner for homepage
-banners.get('/homepage/hero-banner', async (c) => {
+// Helper: Check if user is admin
+const isAdmin = (c) => {
+  const user = c.get('user');
+  return user && user.role === 'admin';
+};
+
+// ========== GET ACTIVE BANNERS (Public) ==========
+banners.get('/active', async (c) => {
   try {
-    // D1 Database se query (SQLite syntax)
-    const { results } = await c.env.DB.prepare(
-      `SELECT * FROM banners 
-       WHERE isActive = 1 AND position = 'hero' 
-       ORDER BY createdAt DESC LIMIT 1`
-    ).all();
-
-    // Agar banner nahi mila toh default banner
-    if (!results || results.length === 0) {
-      return c.json({
-        title: 'Shop t-shirts & polos',
-        subtitle: 'Under ₹399',
-        cashback: '5% cashback with ICICI card*',
-        imageUrl: '/default-banner.jpg',
-        ctaLink: '/shop'
-      });
-    }
-
-    return c.json(results[0]);
+    const { limit = 5 } = c.req.query();
+    const results = await getActiveBanners(c.env.DB, parseInt(limit));
+    return c.json({ success: true, banners: results });
   } catch (error) {
-    console.error("Banner Error:", error);
-    return c.json({ error: error.message }, 500);
+    console.error('Get active banners error:', error);
+    return c.json({ success: false, error: error.message }, 500);
   }
 });
 
-// POST add new banner (admin)
-banners.post('/admin/banners', async (c) => {
+// ========== GET ALL BANNERS (Admin) ==========
+banners.get('/all', async (c) => {
   try {
-    const { title, subtitle, cashback, ctaLink, position } = await c.req.json();
-    // Note: Cloudflare Workers mein file upload ke liye `c.req.parseBody()` use hota hai, 
-    // aur files ko R2 storage mein save karna padta hai. Yahan hum imageUrl ko null maan rahe hain 
-    // ya aap R2 ka URL pass kar sakte ho.
-    const imageUrl = null; // Ya R2 URL yahan daalo
+    if (!isAdmin(c)) {
+      return c.json({ success: false, message: 'Admin access required' }, 403);
+    }
 
-    // D1 Database mein insert (SQLite syntax)
-    const result = await c.env.DB.prepare(
-      `INSERT INTO banners (title, subtitle, cashback, ctaLink, position, imageUrl, isActive) 
-       VALUES (?, ?, ?, ?, ?, ?, 1)`
-    ).bind(title, subtitle, cashback, ctaLink, position, imageUrl).run();
+    const { page = 1, limit = 20 } = c.req.query();
+    const { banners: allBanners, total, currentPage, totalPages } = await getAllBanners(c.env.DB, parseInt(page), parseInt(limit));
 
-    const newBanner = {
-      id: result.meta.last_row_id,
-      title,
-      subtitle,
-      cashback,
-      ctaLink,
-      position,
-      imageUrl,
-      isActive: true
-    };
-
-    return c.json({ success: true, banner: newBanner });
+    return c.json({
+      success: true,
+      banners: allBanners,
+      pagination: {
+        currentPage,
+        totalPages,
+        totalBanners: total,
+        limit: parseInt(limit)
+      }
+    });
   } catch (error) {
-    console.error("Banner Create Error:", error);
-    return c.json({ error: error.message }, 500);
+    console.error('Get all banners error:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// ========== GET SINGLE BANNER (Admin) ==========
+banners.get('/:id', async (c) => {
+  try {
+    if (!isAdmin(c)) {
+      return c.json({ success: false, message: 'Admin access required' }, 403);
+    }
+
+    const banner = await getBanner(c.env.DB, parseInt(c.req.param('id')));
+
+    if (!banner) {
+      return c.json({ success: false, message: 'Banner not found' }, 404);
+    }
+
+    return c.json({ success: true, banner });
+  } catch (error) {
+    console.error('Get banner error:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// ========== CREATE BANNER (Admin) ==========
+banners.post('/', async (c) => {
+  try {
+    if (!isAdmin(c)) {
+      return c.json({ success: false, message: 'Admin access required' }, 403);
+    }
+
+    const data = await c.req.json();
+
+    if (!data.title) {
+      return c.json({ success: false, message: 'Title is required' }, 400);
+    }
+
+    const bannerId = await createBanner(c.env.DB, data);
+    const banner = await getBanner(c.env.DB, bannerId);
+
+    return c.json({ success: true, banner }, 201);
+  } catch (error) {
+    console.error('Create banner error:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// ========== UPDATE BANNER (Admin) ==========
+banners.put('/:id', async (c) => {
+  try {
+    if (!isAdmin(c)) {
+      return c.json({ success: false, message: 'Admin access required' }, 403);
+    }
+
+    const data = await c.req.json();
+    const result = await updateBanner(c.env.DB, parseInt(c.req.param('id')), data);
+
+    if (!result) {
+      return c.json({ success: false, message: 'Banner not found' }, 404);
+    }
+
+    return c.json({ success: true, banner: result });
+  } catch (error) {
+    console.error('Update banner error:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// ========== TOGGLE ACTIVE (Admin) ==========
+banners.patch('/:id/toggle', async (c) => {
+  try {
+    if (!isAdmin(c)) {
+      return c.json({ success: false, message: 'Admin access required' }, 403);
+    }
+
+    const result = await toggleBannerActive(c.env.DB, parseInt(c.req.param('id')));
+
+    if (!result) {
+      return c.json({ success: false, message: 'Banner not found' }, 404);
+    }
+
+    return c.json({ success: true, banner: result });
+  } catch (error) {
+    console.error('Toggle banner error:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// ========== DELETE BANNER (Admin) ==========
+banners.delete('/:id', async (c) => {
+  try {
+    if (!isAdmin(c)) {
+      return c.json({ success: false, message: 'Admin access required' }, 403);
+    }
+
+    const result = await deleteBanner(c.env.DB, parseInt(c.req.param('id')));
+
+    if (!result) {
+      return c.json({ success: false, message: 'Banner not found' }, 404);
+    }
+
+    return c.json({ success: true, message: 'Banner deleted successfully' });
+  } catch (error) {
+    console.error('Delete banner error:', error);
+    return c.json({ success: false, error: error.message }, 500);
   }
 });
 
