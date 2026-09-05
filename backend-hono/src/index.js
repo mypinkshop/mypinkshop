@@ -12,12 +12,17 @@ import cart from './routes/cart.js';
 import admin from './routes/admin.js';
 import vendor from './routes/vendor.js';
 import dashboard from './routes/dashboard.js';
+import offers from './routes/offers.js';
+import coupons from './routes/coupons.js';
+import notifications from './routes/notifications.js';
+import ads from './routes/ads.js';
+import shipping from './routes/shipping.js';
+import wallet from './routes/wallet.js';
 
 const app = new Hono();
 
 app.use('*', logger());
 app.use('*', cors({
-  // Yahan saare domains add kiye hain
   origin: [
     'http://localhost:5173', 
     'https://mypinkshop.vercel.app', 
@@ -25,7 +30,7 @@ app.use('*', cors({
     'https://mypinkshop.com', 
     'https://www.mypinkshop.com',
     'https://api.mypinkshop.com',
-    'https://mypinkshop.mypinkshop1.workers.dev' // Ye optional hai, testing ke liye add kiya
+    'https://mypinkshop.mypinkshop1.workers.dev'
   ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
@@ -42,6 +47,12 @@ app.route('/api/cart', cart);
 app.route('/api/admin', admin);
 app.route('/api/vendor', vendor);
 app.route('/api/dashboard', dashboard);
+app.route('/api/offers', offers);
+app.route('/api/coupons', coupons);
+app.route('/api/notifications', notifications);
+app.route('/api/ads', ads);
+app.route('/api/shipping', shipping);
+app.route('/api/wallet', wallet);
 
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
 
