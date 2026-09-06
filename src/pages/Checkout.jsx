@@ -82,11 +82,12 @@ function Checkout() {
       try {
         const response = await fetch(`${API_URL}/api/shipping/settings`);
         const data = await response.json();
-        if (data.success) {
+                if (data.success || data.data) {
+          const settings = data.data || data.settings || data;
           setShippingInfo(prev => ({
             ...prev,
-            freeShippingThreshold: data.settings.freeShippingThreshold,
-            cutOffTime: data.settings.cutOffTime
+            freeShippingThreshold: settings.freeShippingThreshold || 499,
+            cutOffTime: settings.cutOffTime || '16:00'
           }));
         }
       } catch (error) {
@@ -110,15 +111,16 @@ function Checkout() {
               weight: 0.5
             })
           });
-          const data = await response.json();
+                    const data = await response.json();
+          const deliveryData = data.data || data;
           
-          if (data.success && data.deliverable) {
+          if (deliveryData.success || deliveryData.deliverable) {
             setShippingInfo({
               deliverable: true,
-              estimatedDelivery: data.estimatedDelivery,
-              shippingCharge: data.shippingCharge,
-              freeShippingThreshold: data.freeShippingThreshold,
-              cutOffTime: data.cutOffTime,
+              estimatedDelivery: deliveryData.estimatedDelivery,
+              shippingCharge: deliveryData.shippingCharge,
+              freeShippingThreshold: deliveryData.freeShippingThreshold || 499,
+              cutOffTime: deliveryData.cutOffTime || '16:00',
               checking: false
             });
           } else {
