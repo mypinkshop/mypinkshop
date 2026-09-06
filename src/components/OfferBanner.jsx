@@ -11,10 +11,19 @@ function OfferBanner() {
       try {
         const response = await fetch(`${API_URL}/api/offers/active-offer`);
         const data = await response.json();
-        setOffer(data);
+        
+        // ✅ Safety Check: Agar data aur description dono hain, toh set karo
+        if (data && data.description) {
+          setOffer(data);
+        } else {
+          // Agar API se description nahi mila, toh default offer use karo
+          setOffer({
+            description: 'FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF ON FIRST ORDER'
+          });
+        }
       } catch (error) {
         console.error('Error fetching offer:', error);
-        // Default offer if API fails
+        // ✅ Default offer if API fails
         setOffer({
           description: 'FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF ON FIRST ORDER'
         });
@@ -41,8 +50,10 @@ function OfferBanner() {
 
   if (!offer) return null;
 
-  // Split description into multiple offers for marquee
-  const offers = offer.description.split('•').map(item => item.trim()).filter(item => item);
+  // ✅ Split description into multiple offers for marquee (with safety check)
+  const offers = offer.description 
+    ? offer.description.split('•').map(item => item.trim()).filter(item => item)
+    : [];
 
   return (
     <>
