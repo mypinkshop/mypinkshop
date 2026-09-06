@@ -55,7 +55,7 @@ function AdminSidebar() {
     return () => clearInterval(interval);
   }, [API_URL]);
 
-  // ✅ Sirf PENDING orders ka count fetch karo
+  // ✅ Sirf PENDING orders ka count fetch karo (FIXED)
   useEffect(() => {
     const fetchPendingOrderCount = async () => {
       try {
@@ -67,7 +67,10 @@ function AdminSidebar() {
         });
         
         if (response.ok) {
-          const allOrders = await response.json();
+          const responseData = await response.json();
+          // ✅ FIX: Agar response { success: true, data: [...] } hai, toh data array nikaalo
+          const allOrders = Array.isArray(responseData) ? responseData : (responseData.data || []);
+          
           // ✅ SIRF 'pending' status wale orders count karo
           setPendingOrderCount(allOrders.filter(order => order.status?.toLowerCase() === 'pending').length);
         }
