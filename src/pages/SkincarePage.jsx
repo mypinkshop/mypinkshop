@@ -251,7 +251,7 @@ function SkincarePage() {
         
         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
           const data = JSON.parse(cached);
-          const productsArray = data.products || data;
+          const productsArray = Array.isArray(data) ? data : (data.data || []);
           const skincareProducts = productsArray.filter(p => 
             (p.mainCategory === 'Skincare' || p.category === 'Skincare' || p.category === 'skincare') &&
             p.status === 'active'
@@ -265,7 +265,7 @@ function SkincarePage() {
         if (!response.ok) throw new Error('Failed to load products');
         
         let data = await response.json();
-        const productsArray = data.products || data;
+        const productsArray = Array.isArray(data) ? data : (data.data || []);
         
         sessionStorage.setItem('products_cache', JSON.stringify(data));
         sessionStorage.setItem('products_cache_time', Date.now().toString());
