@@ -57,24 +57,27 @@ function AdminLogin() {
 
       const data = await response.json();
 
-      if (data.token && data.role === 'admin') {
-        localStorage.setItem('adminToken', data.token);
-        localStorage.setItem('adminRole', data.role);
-        localStorage.setItem('adminEmail', data.email);
-        localStorage.setItem('adminName', data.name || 'Admin');
-        localStorage.setItem('adminId', data._id);
+      // ✅ IMPORTANT: Backend se response alag structure mein aa sakta hai, isliye dono handle karo
+      const userData = data.data || data; 
+
+      if (userData.token && userData.role === 'admin') {
+        localStorage.setItem('adminToken', userData.token);
+        localStorage.setItem('adminRole', userData.role);
+        localStorage.setItem('adminEmail', userData.email);
+        localStorage.setItem('adminName', userData.name || 'Admin');
+        localStorage.setItem('adminId', userData._id);
         
         toast.success('✅ Welcome Admin!');
         
         setTimeout(() => {
           navigate('/admin/dashboard');
         }, 300);
-      } else if (data.token && data.role !== 'admin') {
+      } else if (userData.token && userData.role !== 'admin') {
         setError('❌ You do not have admin access. Please login with admin credentials.');
         toast.error('Admin access required');
       } else {
-        setError(data.message || '❌ Invalid email or password.');
-        toast.error(data.message || 'Invalid credentials');
+        setError(userData.message || '❌ Invalid email or password.');
+        toast.error(userData.message || 'Invalid credentials');
       }
     } catch (err) {
       clearTimeout(timeoutId);
