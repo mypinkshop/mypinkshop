@@ -1,63 +1,134 @@
-import { jwtVerify, SignJWT } from 'jose';
+// src/middleware/auth.js (Hono Version)
+import { verify } from 'hono/jwt';
 
-export const generateToken = async (user, secret) => {
-  const secretKey = new TextEncoder().encode(secret);
-  return await new SignJWT({ id: user.id, email: user.email, role: user.role })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('7d')
-    .sign(secretKey);
-};
+// ========== PROTECT MIDDLEWARE ==========
+export const protect = async (c, next) => {
+  let token;
 
-export const generateRefreshToken = async (user, secret) => {
-  const secretKey = new TextEncoder().encode(secret);
-  return await new SignJWT({ id: user.id, email: user.email })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('30d')
-    .sign(secretKey);
-};
-
-export const verifyToken = async (token, secret) => {
-  try {
-    const secretKey = new TextEncoder().encode(secret);
-    const { payload } = await jwtVerify(token, secretKey);
-    return payload;
-  } catch (error) {
-    return null;
-  }
-};
-
-export const authMiddleware = async (c, next) => {
+  // Get token from Authorization header
   const authHeader = c.req.header('Authorization');
-  if (!authHeader) {
-    return c.json({ error: 'No token provided' }, 401);
-  }
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      token = authHeader.split(' ')[1];
+      
+      // Log: Token mila ya nahi
+      console.log('🔑 Auth Check - Token Received:', token ? 'YES' : 'NO');
 
-  const token = authHeader.split(' ')[1];
-  if (!token) {
-    return c.json({ error: 'Invalid token format' }, 401);
-  }
+      // Verify JWT token
+      const decoded = await verify(token, c.env.JWT_SECRET);
+      
+      // Log: JWT verify ho gaya
+      console.log('✅ JWT Verified for ID:', decoded.id);
 
-  const payload = await verifyToken(token, c.env.JWT_SECRET);
-  if (!payload) {
-    return c.json({ error: 'Invalid or expired token' }, 401);
-  }
+      // Fetch user from D1 database
+      const user = await c.env.DB.prepare(
+        'SELECT id, name, email, role, isEmailVerified, isActive FROM users WHERE id = ?'
+      ).bind(decoded.id).first();
+      
+      // Safety check: Agar user exist nahi karta
+      if (!user) {
+        console.log('⚠️ User not found in DB for ID:', decoded.id);
+        return c.json({ message: 'Not authorized, user not found' }, 401);
+      }
 
-  c.set('user', payload);
-  await next();
+      // Check if user is active
+      if (user.isActive === 0) {
+        console.log('⚠️ User account is disabled:', user.email);
+        return c.json({ message: 'Account disabled. Please contact support.' }, 401);
+      }
+
+      console.log('✅ User Authenticated:', user.email);
+      
+      // Set user in context
+      c.set('user', user);
+      
+      return next(); // IMPORTANT: 'return' use karna zaroori hai
+      
+    } catch (error) {
+      // 🔥 Error ko poora log karein taaki Cloudflare logs mein dikhe
+      console.error('❌ CRITICAL AUTH ERROR:', error.message);
+      
+      // Different error messages for different JWT errors
+      if (error.message === 'invalid token' || error.message === 'jwt malformed') {
+        return c.json({ message: 'Invalid token format' }, 401);
+      } else if (error.message === 'jwt expired') {
+        return c.json({ message: 'Token expired. Please login again.' }, 401);
+      } else {
+        return c.json({ message: 'Not authorized, token failed' }, 401);
+      }
+    }
+  } else {
+    console.log('❌ No Token in Headers');
+    return c.json({ message: 'Not authorized, no token' }, 401);
+  }
 };
 
-export const adminOnly = async (c, next) => {
+// ========== ADMIN MIDDLEWARE ==========
+export const adminMiddleware = async (c, next) => {
   const user = c.get('user');
-  if (!user || user.role !== 'admin') {
-    return c.json({ error: 'Admin access required' }, 403);
+  
+  if (user && user.role === 'admin') {
+    await next();
+  } else {
+    return c.json({ message: 'Admin access required' }, 403);
   }
-  await next();
 };
 
-export const vendorOrAdmin = async (c, next) => {
+// ========== VENDOR MIDDLEWARE ==========
+export const vendorMiddleware = async (c, next) => {
   const user = c.get('user');
-  if (!user || (user.role !== 'admin' && user.role !== 'vendor')) {
-    return c.json({ error: 'Vendor or admin access required' }, 403);
+  
+  if (user && (user.role === 'vendor' || user.role === 'admin')) {
+    await next();
+  } else {
+    return c.json({ message: 'Vendor access required' }, 403);
   }
-  await next();
+};
+
+// ========== BUYER MIDDLEWARE ==========
+export const buyerMiddleware = async (c, next) => {
+  const user = c.get('user');
+  
+  if (user && user.role === 'buyer') {
+    await next();
+  } else {
+    return c.json({ message: 'Buyer access required' }, 403);
+  }
+};
+
+// ========== VERIFIED USER MIDDLEWARE ==========
+export const verifiedMiddleware = async (c, next) => {
+  const user = c.get('user');
+  
+  if (user && user.isEmailVerified === 1) {
+    await next();
+  } else {
+    return c.json({ message: 'Please verify your email first' }, 403);
+  }
+};
+
+// ========== OPTIONAL: ROLES BASED MIDDLEWARE ==========
+export const roleMiddleware = (allowedRoles) => {
+  return async (c, next) => {
+    const user = c.get('user');
+    
+    if (user && allowedRoles.includes(user.role)) {
+      await next();
+    } else {
+      return c.json({ 
+        message: `Access denied. Required roles: ${allowedRoles.join(', ')}` 
+      }, 403);
+    }
+  };
+};
+
+// ========== COMBINED MIDDLEWARE ==========
+export const authMiddleware = {
+  protect,
+  admin: adminMiddleware,
+  vendor: vendorMiddleware,
+  buyer: buyerMiddleware,
+  verified: verifiedMiddleware,
+  roles: roleMiddleware
 };
