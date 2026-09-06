@@ -250,7 +250,7 @@ function AccessoriesPage() {
         
         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
           const data = JSON.parse(cached);
-          const productsArray = data.products || data;
+          const productsArray = Array.isArray(data) ? data : (data.data || []);
           const accessoriesProducts = productsArray.filter(p => 
             (p.mainCategory === 'Accessories' || p.category === 'Accessories' || p.category === 'accessories') &&
             p.status === 'active'
@@ -264,7 +264,7 @@ function AccessoriesPage() {
         if (!response.ok) throw new Error('Failed to load products');
         
         let data = await response.json();
-        const productsArray = data.products || data;
+        const productsArray = Array.isArray(data) ? data : (data.data || []);
         
         // Save to cache
         sessionStorage.setItem('products_cache', JSON.stringify(data));
