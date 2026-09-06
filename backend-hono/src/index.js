@@ -5,18 +5,18 @@ import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { secureHeaders } from 'hono/secure-headers';
 
-// Import routes
+// ✅ Exact lowercase names from your GitHub screenshot
 import authRoutes from './routes/auth.js';
-import userRoutes from './routes/users.js';
-import vendorRoutes from './routes/vendors.js';
-import productRoutes from './routes/products.js';
-import orderRoutes from './routes/orders.js';
-import reviewRoutes from './routes/reviews.js';
+import userRoutes from './routes/users.js';           
+import vendorRoutes from './routes/vendors.js';       
+import productRoutes from './routes/products.js';     
+import orderRoutes from './routes/orders.js';         
+import reviewRoutes from './routes/reviews.js';       
 import wishlistRoutes from './routes/wishlist.js';
 import cartRoutes from './routes/cart.js';
 import addressRoutes from './routes/addresses.js';
-import bannerRoutes from './routes/banners.js';
-import offerRoutes from './routes/offers.js';
+import bannerRoutes from './routes/banners.js';       
+import offerRoutes from './routes/offers.js';         
 import couponRoutes from './routes/coupons.js';
 import shippingRoutes from './routes/shipping.js';
 import adminRoutes from './routes/admin.js';
@@ -25,7 +25,7 @@ import walletRoutes from './routes/wallet.js';
 import adRoutes from './routes/ads.js';
 import notificationRoutes from './routes/notifications.js';
 import otpRoutes from './routes/otp.js';
-import paymentRoutes from './routes/payment.js';
+import paymentRoutes from './routes/payments.js';     
 
 const app = new Hono();
 
@@ -62,7 +62,6 @@ app.get('/', (c) => {
 
 app.get('/api/health', async (c) => {
   try {
-    // Check D1 connection
     await c.env.DB.prepare('SELECT 1').run();
     return c.json({
       status: 'ok',
@@ -89,25 +88,16 @@ app.route('/api/wishlist', wishlistRoutes);
 app.route('/api/cart', cartRoutes);
 app.route('/api/addresses', addressRoutes);
 app.route('/api/banners', bannerRoutes);
-app.route('/api/offers', offerRoutes);
+app.route('/api/offers', offerRoutes);    
 app.route('/api/coupons', couponRoutes);
 app.route('/api/shipping', shippingRoutes);
-app.route('/api/upload', uploadRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/dashboard', dashboardRoutes);
 app.route('/api/wallet', walletRoutes);
 app.route('/api/ads', adRoutes);
 app.route('/api/notifications', notificationRoutes);
-app.route('/api/brand-applications', brandApplicationRoutes);
 app.route('/api/otp', otpRoutes);
 app.route('/api/payments', paymentRoutes);
-
-// Sitemap
-app.get('/api/sitemap.xml', async (c) => {
-  const sitemap = await generateSitemap(c.env.DB);
-  c.header('Content-Type', 'application/xml');
-  return c.body(sitemap);
-});
 
 // 404 handler
 app.notFound((c) => {
