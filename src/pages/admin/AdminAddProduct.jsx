@@ -296,6 +296,295 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 };
 
 // ============================================
+// FLIPKART IMPORTER COMPONENT
+// ============================================
+const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
+  const [urls, setUrls] = useState(['']);
+  const [loading, setLoading] = useState(false);
+  const [importedProducts, setImportedProducts] = useState([]);
+
+  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const token = localStorage.getItem('adminToken');
+
+  const garbageWords = [
+    'See more product details', 'Report an issue', 'Product Description',
+    'Flipkart', 'See more', 'Product details', 'Would you like to',
+    'Buy now', 'Add to cart', 'Extra discount', 'Bank offer'
+  ];
+
+  const cleanText = (text) => {
+    if (!text) return '';
+    return text.replace(/【.*?】/g, '').replace(/\s+/g, ' ').trim();
+  };
+
+  const isGarbage = (text) => {
+    if (!text || text.length < 15) return true;
+    for (const word of garbageWords) {
+      if (text.toLowerCase().includes(word.toLowerCase())) return true;
+    }
+    return false;
+  };
+
+  const detectCategoryFromName = (productName) => {
+    const name = productName.toLowerCase();
+    const categoryKeywords = {
+      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
+      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
+      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
+    };
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      for (const keyword of keywords) {
+        if (name.includes(keyword)) return category;
+      }
+    }
+    return 'Skincare';
+  };
+
+  const detectSubCategoryFromName = (productName, category) => {
+    const name = productName.toLowerCase();
+    const subCategoryMap = {
+      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
+      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
+    };
+    const subCats = subCategoryMap[category] || [];
+    for (const sub of subCats) {
+      if (name.includes(sub.toLowerCase())) return sub;
+    }
+    return '';
+  };
+
+  const addUrlField = () => {
+    if (urls.length < 20) {
+      setUrls([...urls, '']);
+    } else {
+      toast.error('Maximum 20 URLs allowed');
+    }
+  };
+
+  const removeUrlField = (index) => {
+    setUrls(urls.filter((_, i) => i !== index));
+  };
+
+  const updateUrl = (index, value) => {
+    const newUrls = [...urls];
+    newUrls[index] = value;
+    setUrls(newUrls);
+  };
+
+  const fetchAllProducts = async () => {
+    const validUrls = urls.filter(url => url.trim());
+    if (validUrls.length === 0) {
+      toast.error('Please enter at least one Flipkart URL');
+      return;
+    }
+
+    setLoading(true);
+    const results = [];
+
+    for (let i = 0; i < validUrls.length; i++) {
+      const url = validUrls[i];
+      try {
+        const response = await fetch(`${API_URL}/api/import/flipkart`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          const detectedCat = detectCategoryFromName(data.scraped.name);
+          const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
+          
+          results.push({ 
+            ...data.scraped, 
+            originalUrl: url,
+            detectedCategory: detectedCat,
+            detectedSubCategory: detectedSub
+          });
+        } else {
+          results.push({ error: data.error, originalUrl: url });
+        }
+      } catch (error) {
+        results.push({ error: error.message, originalUrl: url });
+      }
+    }
+
+    setImportedProducts(results);
+    setLoading(false);
+  };
+
+  const importToForm = (product) => {
+    let descriptionArray = [];
+    
+    if (Array.isArray(product.description)) {
+      descriptionArray = product.description.filter(item => !isGarbage(item));
+    } else if (typeof product.description === 'string') {
+      descriptionArray = product.description
+        .split(/\n|•|\*|\d+\./)
+        .map(item => cleanText(item))
+        .filter(item => !isGarbage(item));
+    }
+    
+    descriptionArray = [...new Set(descriptionArray)].slice(0, 15);
+    
+    const keyFeaturesArray = (Array.isArray(product.keyFeatures) ? product.keyFeatures : [])
+      .filter(item => !isGarbage(item))
+      .slice(0, 10);
+    
+    const slug = product.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    
+    let metaTitle = `${product.name}`;
+    if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
+    metaTitle = `${metaTitle} | MyPinkShop`;
+    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
+    
+    let metaDescription = `Buy ${product.name}`;
+    if (product.brand) metaDescription += ` by ${product.brand}`;
+    metaDescription += ` online at best price. Shop now at MyPinkShop.`;
+    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
+    
+    const autoKeywords = [
+      product.brand,
+      ...keyFeaturesArray.slice(0, 5),
+      product.detectedCategory,
+      product.detectedSubCategory,
+      'online shopping',
+      'best price',
+      'MyPinkShop'
+    ].filter(Boolean);
+    const metaKeywords = [...new Set(autoKeywords)].join(', ');
+    
+    const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
+    const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
+    
+    setFormData(prev => ({
+      ...prev,
+      productName: product.name,
+      brand: product.brand || prev.brand,
+      sellingPrice: product.price,
+      mrp: product.originalPrice || product.price * 1.2,
+      fullDescription: descriptionArray,
+      keyFeatures: keyFeaturesArray,
+      aboutThisItem: descriptionArray,
+      productHighlights: keyFeaturesArray,
+      images: product.images || [],
+      metaTitle: metaTitle,
+      metaDescription: metaDescription,
+      metaKeywords: metaKeywords,
+      slug: slug,
+      category: detectedCategory,
+      subCategory: detectedSubCategory,
+      weight: product.weight || '',
+      ingredients: product.ingredients || '',
+      skinType: product.skinType || 'all',
+      concerns: product.concerns || []
+    }));
+    
+    if (product.images && product.images.length > 0) setImages(product.images);
+    
+    if (product.variations && product.variations.length > 0) {
+      const formattedVariations = product.variations.map((v, idx) => ({
+        id: Date.now() + idx,
+        name: v.name,
+        price: v.price || product.price,
+        mrp: v.mrp || product.originalPrice || product.price * 1.2,
+        stock: v.stock || 10,
+        sku: v.sku || `VAR-${Date.now()}-${idx}`,
+        image: v.image || '',
+        attributes: v.attributes || {}
+      }));
+      setVariations(formattedVariations);
+    }
+    
+    toast.success(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''}`);
+    if (onProductImported) onProductImported();
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border-2 border-yellow-200 p-4 sm:p-5 mb-6 shadow-sm">
+      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-2xl">🛒</span> Import from Flipkart
+        <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full">Multi-URL Support</span>
+      </h3>
+      <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Flipkart product URLs (Up to 20 URLs)</p>
+      
+      <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+        {urls.map((url, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="https://www.flipkart.com/..."
+              value={url}
+              onChange={(e) => updateUrl(idx, e.target.value)}
+              className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 bg-white text-sm"
+            />
+            {urls.length > 1 && (
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex flex-wrap gap-3 mb-4">
+        <button onClick={addUrlField} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-xs sm:text-sm">
+          ➕ Add Another ({urls.length}/20)
+        </button>
+        <button onClick={fetchAllProducts} disabled={loading} className="px-4 sm:px-5 py-1.5 sm:py-2 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition disabled:opacity-50 text-xs sm:text-sm">
+          {loading ? '⏳ Fetching...' : '🔍 Fetch All'}
+        </button>
+      </div>
+      
+      {importedProducts.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Fetched Products ({importedProducts.length})</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {importedProducts.map((product, idx) => (
+              <div key={idx} className={`p-2 sm:p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-sm'}`}>
+                <div className="flex-1 min-w-0">
+                  {product.error ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-red-600 font-medium truncate">❌ Failed: {product.originalUrl}</p>
+                      <p className="text-xs text-red-400">{product.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-gray-800 text-xs sm:text-sm truncate">{product.name}</p>
+                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'} | 🏷️ {product.detectedCategory}</p>
+                    </>
+                  )}
+                </div>
+                {!product.error && (
+                  <button onClick={() => importToForm(product)} className="px-3 sm:px-4 py-1.5 bg-green-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">
+                    📥 Import
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      <div className="mt-3 p-2 sm:p-3 bg-yellow-50 rounded-lg">
+        <p className="text-xs text-yellow-600">💡 Tip: Category, SubCategory, SEO tags auto-detected!</p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // VARIATION SELECT WITH SEARCH AND CUSTOM INPUT
 // ============================================
 const VariationSelectWithSearch = ({ 
@@ -1115,10 +1404,12 @@ function AdminAddProduct() {
           <div className="flex gap-1 sm:gap-2 border-b border-pink-100">
             <button onClick={() => setActiveTab('manual')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'manual' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>✏️ Manual Entry</button>
             <button onClick={() => setActiveTab('import')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'import' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📦 Import from Amazon</button>
+            <button onClick={() => setActiveTab('flipkart')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'flipkart' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🛒 Import from Flipkart</button>
           </div>
         </div>
 
         {activeTab === 'import' && <AmazonImporter onProductImported={() => setActiveTab('manual')} setFormData={setFormData} setVariations={setVariations} setImages={setImages} />}
+        {activeTab === 'flipkart' && <FlipkartImporter onProductImported={() => setActiveTab('manual')} setFormData={setFormData} setVariations={setVariations} setImages={setImages} />}
 
         {activeTab === 'manual' && (
           <>
