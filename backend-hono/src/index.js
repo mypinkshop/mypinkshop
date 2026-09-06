@@ -19,13 +19,11 @@ import bannerRoutes from './routes/banners.js';
 import offerRoutes from './routes/offers.js';
 import couponRoutes from './routes/coupons.js';
 import shippingRoutes from './routes/shipping.js';
-import uploadRoutes from './routes/upload.js';
 import adminRoutes from './routes/admin.js';
 import dashboardRoutes from './routes/dashboard.js';
 import walletRoutes from './routes/wallet.js';
 import adRoutes from './routes/ads.js';
 import notificationRoutes from './routes/notifications.js';
-import brandApplicationRoutes from './routes/brandApplications.js';
 import otpRoutes from './routes/otp.js';
 import paymentRoutes from './routes/payment.js';
 
