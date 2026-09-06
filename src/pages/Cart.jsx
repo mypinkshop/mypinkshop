@@ -47,11 +47,12 @@ function Cart() {
         );
         const data = await response.json();
 
-        if (data.success) {
-          setAvailableCoupons(data.coupons || []);
+                if (data.success || data.data) {
+          const coupons = data.data || data.coupons || [];
+          setAvailableCoupons(coupons);
           
           // ✅ Frontend filter (safety)
-          const eligible = data.coupons.filter(coupon => {
+          const eligible = coupons.filter(coupon => {
             if (!coupon.vendorId) return true; // Admin coupon - always eligible
             return cart.some(item => item.vendorId === coupon.vendorId); // Vendor coupon - only if vendor's products in cart
           });
