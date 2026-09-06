@@ -974,9 +974,11 @@ function AdminAddProduct() {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formDataImg
       });
-      const data = await response.json();
-      if (data.url) {
-        setVariationForm({ ...variationForm, image: data.url });
+            const data = await response.json();
+      // ✅ Fix: data.data.url ya data.url dono handle karo
+      const imageUrl = data.data?.url || data.url;
+      if (imageUrl) {
+        setVariationForm({ ...variationForm, image: imageUrl });
         toast.success('✅ Image uploaded!');
       }
     } catch (error) {
@@ -1026,7 +1028,7 @@ function AdminAddProduct() {
       });
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
-      return data.url;
+     return data.data.url || data.url;
     } catch (error) { throw error; }
   };
 
@@ -1043,9 +1045,11 @@ function AdminAddProduct() {
         toast.error(`${file.name} > 5MB`); 
         continue; 
       }
-      try {
+           try {
         const url = await uploadImageToBackend(file);
-        uploadedUrls.push(url);
+        if (url) {
+          uploadedUrls.push(url);
+        }
       } catch (error) { 
         toast.error(`Failed: ${file.name}`); 
       }
