@@ -131,17 +131,20 @@ function AdminDashboard() {
 
       try {
         const pData = await productsRes.json();
-        productsData = pData?.products || (Array.isArray(pData) ? pData : []);
+        // ✅ FIX: Agar response { success: false } hai, toh empty array return karo
+        productsData = (pData && pData.success !== false && Array.isArray(pData.data)) ? pData.data : (Array.isArray(pData) ? pData : []);
       } catch (e) { console.error('Products parse error:', e); }
 
       try {
         const oData = await ordersRes.json();
-        ordersData = oData?.orders || (Array.isArray(oData) ? oData : []);
+        // ✅ FIX: Agar response { success: false } hai, toh empty array return karo
+        ordersData = (oData && oData.success !== false && Array.isArray(oData.data)) ? oData.data : (Array.isArray(oData) ? oData : []);
       } catch (e) { console.error('Orders parse error:', e); }
 
       try {
         const vData = await vendorsRes.json();
-        vendorsData = vData?.success ? vData.vendors : (Array.isArray(vData) ? vData : []);
+        // ✅ FIX: Agar response { success: false } hai, toh empty array return karo
+        vendorsData = (vData && vData.success !== false && Array.isArray(vData.data)) ? vData.data : (Array.isArray(vData) ? vData : []);
       } catch (e) { console.error('Vendors parse error:', e); }
 
       // ✅ Ensure arrays
