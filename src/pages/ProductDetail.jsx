@@ -117,7 +117,7 @@ function ProductDetail() {
           const data = JSON.parse(cached);
           setProduct(data);
           
-          c          setProduct(productData);
+          setProduct(productData);
           
           const isClothing = productData.mainCategory === 'Clothing' || productData.category === 'Clothing';
           const productImgs = productData.images && productData.images.length > 0 ? productData.images : [];
