@@ -62,8 +62,8 @@ function ProductDetail() {
     setLoadingRelated(true);
     try {
       const response = await fetch(`${API_URL}/api/products?category=${category}&limit=10`);
-      const data = await response.json();
-      let related = Array.isArray(data) ? data : data.products || [];
+            const data = await response.json();
+      let related = Array.isArray(data) ? data : (data.data || []);
       related = related.filter(p => p._id !== id).slice(0, 6);
       setRelatedProducts(related);
     } catch (error) {
@@ -117,8 +117,10 @@ function ProductDetail() {
           const data = JSON.parse(cached);
           setProduct(data);
           
-          const isClothing = data.mainCategory === 'Clothing' || data.category === 'Clothing';
-          const productImgs = data.images && data.images.length > 0 ? data.images : [];
+          c          setProduct(productData);
+          
+          const isClothing = productData.mainCategory === 'Clothing' || productData.category === 'Clothing';
+          const productImgs = productData.images && productData.images.length > 0 ? productData.images : [];
           setGalleryImages([...productImgs]);
           setSelectedImage(0);
           fetchRelatedProducts(data.mainCategory || data.category);
@@ -371,8 +373,11 @@ function ProductDetail() {
     try {
       const response = await fetch(`${API_URL}/api/products/${id}`);
       if (response.ok) {
-        const data = await response.json();
-        if (data && data._id) {
+      const data = await response.json();
+        
+      const productData = data.data || data;
+        
+        if (productData && productData._id) {
           setProduct(data);
           sessionStorage.setItem(`product_${id}`, JSON.stringify(data));
           sessionStorage.setItem(`product_cache_time_${id}`, Date.now().toString());
