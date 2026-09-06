@@ -119,9 +119,9 @@ function Home() {
         const cached = sessionStorage.getItem('products_cache');
         const cacheTime = sessionStorage.getItem('products_cache_time');
         
-        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
+         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
           const data = JSON.parse(cached);
-          const productsArray = data.products || data;
+          const productsArray = Array.isArray(data) ? data : (data.data || []);
           setProducts(productsArray);
           setLoading(false);
           return;
@@ -133,7 +133,7 @@ function Home() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         let data = await response.json();
-        const productsArray = data.products || data;
+        const productsArray = Array.isArray(data) ? data : (data.data || []);
         
         sessionStorage.setItem('products_cache', JSON.stringify(data));
         sessionStorage.setItem('products_cache_time', Date.now().toString());
