@@ -276,9 +276,9 @@ function Shop() {
         const cached = sessionStorage.getItem('products_cache');
         const cacheTime = sessionStorage.getItem('products_cache_time');
         
-        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
+         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
           const data = JSON.parse(cached);
-          const productsArray = data.products || data;
+          const productsArray = Array.isArray(data) ? data : (data.data || []);
           setProducts(productsArray.map(p => ({ ...p, id: p._id })));
           setLoading(false);
           return;
@@ -287,8 +287,8 @@ function Shop() {
         const response = await fetch(`${API_URL}/api/products`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
-        let data = await response.json();
-        const productsArray = data.products || data;
+                let data = await response.json();
+        const productsArray = Array.isArray(data) ? data : (data.data || []);
         
         // Save to cache
         sessionStorage.setItem('products_cache', JSON.stringify(data));
