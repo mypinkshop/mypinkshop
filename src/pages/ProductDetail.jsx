@@ -115,8 +115,7 @@ function ProductDetail() {
         
         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
           const data = JSON.parse(cached);
-          setProduct(data);
-          
+          const productData = data.data || data;  // ✅ Data extract karo
           setProduct(productData);
           
           const isClothing = productData.mainCategory === 'Clothing' || productData.category === 'Clothing';
@@ -139,16 +138,17 @@ function ProductDetail() {
         if (!response.ok) throw new Error('Product not found');
         
         const data = await response.json();
+        const productData = data.data || data;  // ✅ Data extract karo
         
-        if (data && data._id) {
+        if (productData && (productData._id || productData.id)) {
           // Save to cache
           sessionStorage.setItem(`product_${id}`, JSON.stringify(data));
           sessionStorage.setItem(`product_cache_time_${id}`, Date.now().toString());
           
-          setProduct(data);
+          setProduct(productData);
           
-          const isClothing = data.mainCategory === 'Clothing' || data.category === 'Clothing';
-          const productImgs = data.images && data.images.length > 0 ? data.images : [];
+          const isClothing = productData.mainCategory === 'Clothing' || productData.category === 'Clothing';
+          const productImgs = productData.images && productData.images.length > 0 ? productData.images : [];
           setGalleryImages([...productImgs]);
           setSelectedImage(0);
           fetchRelatedProducts(data.mainCategory || data.category);
@@ -375,10 +375,11 @@ function ProductDetail() {
       if (response.ok) {
       const data = await response.json();
         
-      const productData = data.data || data;
+              const data = await response.json();
+        const productData = data.data || data;
         
-        if (productData && productData._id) {
-          setProduct(data);
+        if (productData && (productData._id || productData.id)) {
+          setProduct(productData);
           sessionStorage.setItem(`product_${id}`, JSON.stringify(data));
           sessionStorage.setItem(`product_cache_time_${id}`, Date.now().toString());
         }
