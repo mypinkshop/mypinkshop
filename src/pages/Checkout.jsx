@@ -433,11 +433,11 @@ function Checkout() {
         paymentMethod: paymentMethod || 'cod'
       };
 
-      const response = await fetch(`${API_URL}/api/orders`, {
+       const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('adminToken')}`
         },
         body: JSON.stringify(orderData)
       });
