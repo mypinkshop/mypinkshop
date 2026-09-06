@@ -369,13 +369,12 @@ function ProductDetail() {
   };
 
   // ✅ Refresh product data after rating
-  const handleRatingSubmitted = async () => {
+    const handleRatingSubmitted = async () => {
     try {
       const response = await fetch(`${API_URL}/api/products/${id}`);
       if (response.ok) {
-      const data = await response.json();
-        
-              const data = await response.json();
+        // ✅ Ek hi baar data fetch karo
+        const data = await response.json();
         const productData = data.data || data;
         
         if (productData && (productData._id || productData.id)) {
