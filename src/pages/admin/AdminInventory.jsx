@@ -44,7 +44,7 @@ function AdminInventory() {
       let data = await response.json();
       
       // ✅ FIX: Handle both paginated and non-paginated response
-      const allProducts = data.products || data;
+      const allProducts = Array.isArray(data) ? data : (data.data || []);
       
       const productsWithStatus = allProducts.map(product => {
         let status = 'active';
