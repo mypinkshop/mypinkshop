@@ -62,9 +62,9 @@ function ProductDetail() {
     setLoadingRelated(true);
     try {
       const response = await fetch(`${API_URL}/api/products?category=${category}&limit=10`);
-            const data = await response.json();
+      const data = await response.json();
       let related = Array.isArray(data) ? data : (data.data || []);
-      related = related.filter(p => p._id !== id).slice(0, 6);
+      related = related.filter(p => (p._id !== id && p.id !== id)).slice(0, 6);
       setRelatedProducts(related);
     } catch (error) {
       console.error('Error fetching related products:', error);
@@ -122,10 +122,10 @@ function ProductDetail() {
           const productImgs = productData.images && productData.images.length > 0 ? productData.images : [];
           setGalleryImages([...productImgs]);
           setSelectedImage(0);
-          fetchRelatedProducts(data.mainCategory || data.category);
+          fetchRelatedProducts(productData.mainCategory || productData.category);
           
-          if (data.variations && data.variations.length > 0) {
-            const defaultVariation = data.variations[0];
+          if (productData.variations && productData.variations.length > 0) {
+            const defaultVariation = productData.variations[0];
             setSelectedVariation(defaultVariation);
             setSelectedVariationId(defaultVariation.id || defaultVariation._id);
             updateGalleryForVariation(defaultVariation, productImgs, isClothing);
@@ -141,8 +141,8 @@ function ProductDetail() {
         const productData = data.data || data;  // ✅ Data extract karo
         
         if (productData && (productData._id || productData.id)) {
-          // Save to cache
-          sessionStorage.setItem(`product_${id}`, JSON.stringify(data));
+          // ✅ Save to cache (productData ko save karo, data ko nahi)
+          sessionStorage.setItem(`product_${id}`, JSON.stringify(productData));
           sessionStorage.setItem(`product_cache_time_${id}`, Date.now().toString());
           
           setProduct(productData);
@@ -151,10 +151,10 @@ function ProductDetail() {
           const productImgs = productData.images && productData.images.length > 0 ? productData.images : [];
           setGalleryImages([...productImgs]);
           setSelectedImage(0);
-          fetchRelatedProducts(data.mainCategory || data.category);
+          fetchRelatedProducts(productData.mainCategory || productData.category);
           
-          if (data.variations && data.variations.length > 0) {
-            const defaultVariation = data.variations[0];
+          if (productData.variations && productData.variations.length > 0) {
+            const defaultVariation = productData.variations[0];
             setSelectedVariation(defaultVariation);
             setSelectedVariationId(defaultVariation.id || defaultVariation._id);
             updateGalleryForVariation(defaultVariation, productImgs, isClothing);
@@ -299,7 +299,7 @@ function ProductDetail() {
       navigate('/cart');
     } else {
       const cartItem = { 
-        id: product._id,
+        id: product._id || product.id,
         name: product.name, 
         price: getCurrentPrice(),
         quantity: quantity,
@@ -335,7 +335,7 @@ function ProductDetail() {
     }
     
     const cartItem = { 
-      id: product._id,
+      id: product._id || product.id,
       name: product.name, 
       price: getCurrentPrice(),
       quantity: quantity,
@@ -358,7 +358,7 @@ function ProductDetail() {
 
   const handleWishlistToggle = () => {
     if (!product) return;
-    const productId = product._id;
+    const productId = product._id || product.id;
     if (isInWishlist(productId)) {
       removeFromWishlist(productId);
       toast.success('Removed from wishlist');
@@ -369,17 +369,16 @@ function ProductDetail() {
   };
 
   // ✅ Refresh product data after rating
-    const handleRatingSubmitted = async () => {
+  const handleRatingSubmitted = async () => {
     try {
       const response = await fetch(`${API_URL}/api/products/${id}`);
       if (response.ok) {
-        // ✅ Ek hi baar data fetch karo
         const data = await response.json();
         const productData = data.data || data;
         
         if (productData && (productData._id || productData.id)) {
           setProduct(productData);
-          sessionStorage.setItem(`product_${id}`, JSON.stringify(data));
+          sessionStorage.setItem(`product_${id}`, JSON.stringify(productData));
           sessionStorage.setItem(`product_cache_time_${id}`, Date.now().toString());
         }
       }
@@ -441,11 +440,11 @@ function ProductDetail() {
       "name": product.name,
       "image": productImages[0],
       "description": product.shortDescription || (product.description ? (typeof product.description === 'string' ? product.description.substring(0, 200) : '') : ''),
-      "sku": product._id,
+      "sku": product._id || product.id,
       "brand": { "@type": "Brand", "name": product.brand || "MyPinkShop" },
       "offers": {
         "@type": "Offer",
-        "url": `https://www.mypinkshop.com/product/${product._id}`,
+        "url": `https://www.mypinkshop.com/product/${product._id || product.id}`,
         "priceCurrency": "INR",
         "price": currentPrice,
         "priceValidUntil": "2026-12-31",
@@ -502,7 +501,7 @@ function ProductDetail() {
       <Helmet>
         <title>{product.name} | Buy Online at Best Price | MyPinkShop</title>
         <meta name="description" content={product.shortDescription || `Buy ${product.name} online at best price in India. ${product.brand || 'MyPinkShop'} product with ₹${currentPrice}. Free shipping available. Shop now!`} />
-        <link rel="canonical" href={`https://www.mypinkshop.com/product/${product._id}`} />
+        <link rel="canonical" href={`https://www.mypinkshop.com/product/${product._id || product.id}`} />
         <meta property="og:title" content={`${product.name} | MyPinkShop`} />
         <meta property="og:description" content={product.shortDescription || `Shop ${product.name} at best price. ${discountPercent}% off available.`} />
         <meta property="og:image" content={productImages[0]} />
@@ -584,7 +583,7 @@ function ProductDetail() {
                   loading="eager"
                 />
                 <button onClick={handleWishlistToggle} className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:scale-110 transition">
-                  <span className="text-xl">{isInWishlist(product._id) ? '❤️' : '🤍'}</span>
+                  <span className="text-xl">{isInWishlist(product._id || product.id) ? '❤️' : '🤍'}</span>
                 </button>
                 {product.badge && <span className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full">{product.badge}</span>}
               </div>
@@ -775,7 +774,7 @@ function ProductDetail() {
               <h2 className="text-xl font-bold text-gray-800 mb-4">You May Also Like</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {relatedProducts.map((rp) => (
-                  <Link key={rp._id} to={`/product/${rp._id}`} className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition">
+                  <Link key={rp._id || rp.id} to={`/product/${rp._id || rp.id}`} className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition">
                     <div className="relative aspect-square overflow-hidden bg-gray-50">
                       <img src={getOptimizedImage(rp.images?.[0])} alt={rp.name} className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy" />
                       {rp.badge && <span className="absolute top-2 left-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full">{rp.badge}</span>}
