@@ -379,8 +379,17 @@ function Checkout() {
     }
   };
 
-  // ✅ Place Order (COD ya baaki methods)
+   // ✅ Place Order (COD ya baaki methods)
   const placeOrder = async () => {
+    const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+    
+    // ✅ Pehle Check: User logged in hai ya nahi?
+    if (!token) {
+      toast.error('Please login to place your order');
+      navigate('/login?redirect=/checkout');
+      return;
+    }
+    
     if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error('Please fill all address fields');
       return;
