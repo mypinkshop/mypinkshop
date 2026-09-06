@@ -66,13 +66,21 @@ function Cart() {
     fetchCoupons();
   }, [cart]);
 
-  const handleCheckout = () => {
+    const handleCheckout = () => {
+    const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+    
+    if (!token) {
+      toast.error('Please login to continue checkout');
+      navigate('/login?redirect=/checkout');
+      return;
+    }
+    
     setIsCheckingOut(true);
     setTimeout(() => {
       navigate('/checkout');
     }, 500);
   };
-
+  
   const handleImageError = (itemId) => {
     setImgErrors(prev => ({ ...prev, [itemId]: true }));
   };
