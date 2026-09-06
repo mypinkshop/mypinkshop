@@ -1182,7 +1182,7 @@ function AdminAddProduct() {
     };
 
     try {
-      const response = await fetch(`${API_URL}/api/products`, {
+      const response = await fetch(`${API_URL}/api/products/create`, {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(productData)
