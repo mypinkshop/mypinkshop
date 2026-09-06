@@ -252,7 +252,7 @@ function ClothingPage() {
         
         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
           const data = JSON.parse(cached);
-          const productsArray = data.products || data;
+          const productsArray = Array.isArray(data) ? data : (data.data || []);
           const clothingProducts = productsArray.filter(p => 
             (p.mainCategory === 'Clothing' || p.category === 'Clothing' || p.category === 'clothing') &&
             p.status === 'active'
@@ -265,8 +265,8 @@ function ClothingPage() {
         const response = await fetch(`${API_URL}/api/products`);
         if (!response.ok) throw new Error('Failed to load products');
         
-        let data = await response.json();
-        const productsArray = data.products || data;
+       let data = await response.json();
+        const productsArray = Array.isArray(data) ? data : (data.data || []);
         
         sessionStorage.setItem('products_cache', JSON.stringify(data));
         sessionStorage.setItem('products_cache_time', Date.now().toString());
