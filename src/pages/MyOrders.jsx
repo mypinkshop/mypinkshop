@@ -117,12 +117,20 @@ function MyOrders() {
       const normalized = ordersArray.map(order => ({
         ...order,
         _id: order._id || order.id,
-        createdAt: order.createdAt || order.created_at, // ✅ Added created_at mapping
+        createdAt: order.createdAt || order.created_at,
         updatedAt: order.updatedAt || order.updated_at,
+        // ✅ Database ka total_amount yahan map kar diya
+        total: order.total || order.total_amount || order.subtotal,
+        shippingAddress: order.shippingAddress || order.shipping_address,
+        paymentMethod: order.paymentMethod || order.payment_method,
+        paymentStatus: order.paymentStatus || order.payment_status,
         items: (order.items || []).map(item => ({
           ...item,
           productId: item.productId || item.product_id,
           name: item.name || item.product_name,
+          // ✅ Item image aur price ke liye fallback mapping
+          image: item.image || item.product_image || item.img,
+          price: item.price || item.unit_price || 0,
         })),
       }));
 
