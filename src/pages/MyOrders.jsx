@@ -117,6 +117,7 @@ function MyOrders() {
       const normalized = ordersArray.map(order => ({
         ...order,
         _id: order._id || order.id,
+        createdAt: order.createdAt || order.created_at, // ✅ Added created_at mapping
         updatedAt: order.updatedAt || order.updated_at,
         items: (order.items || []).map(item => ({
           ...item,
@@ -346,19 +347,22 @@ function MyOrders() {
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
     
-    // ✅ Pehle orderId check karo (MPS- format)
+    // ✅ SQLite column check
+    if (order.order_number) {
+      return order.order_number;
+    }
     if (order.orderId) {
       return order.orderId;
     }
     
-    // ✅ Agar _id hai toh slice karo
-    if (order._id) {
-      return order._id.slice(-12).toUpperCase();
+    const idVal = order._id || order.id;
+    if (idVal) {
+      return String(idVal).slice(-12).toUpperCase();
     }
     
     return 'N/A';
   };
-
+  
   // Stats Click Handlers
   const handleStatClick = (status) => {
     if (status === 'all') {
