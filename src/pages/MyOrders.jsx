@@ -57,6 +57,21 @@ function MyOrders() {
     fetchOrders();
   }, [user, navigate]);
 
+  // ✅ Safe Date Formatter (Fixes 'Invalid Date')
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const formattedString = dateString.includes(' ') && !dateString.includes('T') 
+      ? dateString.replace(' ', 'T') + (dateString.endsWith('Z') ? '' : 'Z') 
+      : dateString;
+      
+    const date = new Date(formattedString);
+    return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   // Auto-remove cancelled orders after 30 minutes
   useEffect(() => {
     const checkAndRemoveCancelled = () => {
@@ -600,7 +615,7 @@ function MyOrders() {
                           <div>
                             <span className="text-xs text-gray-400 font-medium">ORDER DATE</span>
                             <p className="text-sm font-medium text-gray-700">
-                              {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {formatDate(order.createdAt)}
                             </p>
                           </div>
                           <div>
@@ -786,7 +801,7 @@ function MyOrders() {
                       </div>
                       <div className="flex-1 pb-4">
                         <p className={`font-medium ${step.completed ? 'text-gray-800' : 'text-gray-400'}`}>{step.stage}</p>
-                        <p className="text-xs text-gray-400">{step.date}</p>
+                        <p className="text-xs text-gray-400">{formatDate(step.date)}</p>
                       </div>
                     </div>
                   ))}
