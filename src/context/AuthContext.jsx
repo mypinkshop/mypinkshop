@@ -67,9 +67,40 @@ export const AuthProvider = ({ children }) => {
     return { success: true };
   };
 
-  // ============ LOGIN ============
-  const login = async (email, password) => {
+  // ============ LOGIN (Supports both token/user sync AND email/password API call) ============
+  const login = async (emailOrToken, passwordOrUser) => {
+    // Agar pehla parameter token hai aur doosra user object hai (Login.jsx compatibility)
+    if (passwordOrUser && typeof passwordOrUser === 'object') {
+      const token = emailOrToken;
+      const userData = {
+        _id: passwordOrUser._id || passwordOrUser.id,
+        name: passwordOrUser.name,
+        email: passwordOrUser.email,
+        role: passwordOrUser.role || 'buyer',
+        profileImage: passwordOrUser.profileImage || passwordOrUser.avatar || null
+      };
+
+      setUser(userData);
+      setToken(token);
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('userEmail', userData.email);
+      localStorage.setItem('userName', userData.name);
+      localStorage.setItem('userRole', userData.role);
+      localStorage.setItem('userId', userData._id);
+      if (userData.profileImage) {
+        localStorage.setItem('profileImage', userData.profileImage);
+        sessionStorage.setItem('user_profile_image', userData.profileImage);
+      }
+
+      console.log('✅ Logged in via direct token sync:', userData);
+      return { success: true, data: userData };
+    }
+
+    // Otherwise, normal email & password API call
     try {
+      const email = emailOrToken;
+      const password = passwordOrUser;
       console.log('🔐 Login attempt for:', email);
       
       const res = await fetch(`${API_URL}/auth/login`, {
@@ -82,14 +113,16 @@ export const AuthProvider = ({ children }) => {
       
       if (res.ok && data.success) {
         const userData = {
-          _id: data.user._id || data.user.id,
-          name: data.user.name,
-          email: data.user.email,
-          role: data.user.role || 'buyer',
-          profileImage: data.user.profileImage || null
+          _id: data.user?._id || data.user?.id || data._id || data.id,
+          name: data.user?.name || data.name,
+          email: data.user?.email || data.email,
+          role: data.user?.role || data.role || 'buyer',
+          profileImage: data.user?.profileImage || data.profileImage || null
         };
         
-        localStorage.setItem('token', data.token);
+        const activeToken = data.token;
+
+        localStorage.setItem('token', activeToken);
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('userEmail', userData.email);
         localStorage.setItem('userName', userData.name);
@@ -100,7 +133,7 @@ export const AuthProvider = ({ children }) => {
           sessionStorage.setItem('user_profile_image', userData.profileImage);
         }
         
-        setToken(data.token);
+        setToken(activeToken);
         setUser(userData);
         
         console.log('✅ Login successful:', userData);
@@ -135,15 +168,13 @@ export const AuthProvider = ({ children }) => {
     return { success: true };
   };
 
-  // ============ UPDATE PROFILE ============ ✅ NEW
+  // ============ UPDATE PROFILE ============
   const updateUserProfile = (updatedData) => {
     setUser(prev => {
       const newUser = { ...prev, ...updatedData };
       
-      // ✅ Save to localStorage
       localStorage.setItem('user', JSON.stringify(newUser));
       
-      // ✅ Save profileImage separately
       if (updatedData.profileImage) {
         localStorage.setItem('profileImage', updatedData.profileImage);
         sessionStorage.setItem('user_profile_image', updatedData.profileImage);
@@ -196,7 +227,7 @@ export const AuthProvider = ({ children }) => {
       login,
       otpLogin,
       logout,
-      updateUserProfile, // ✅ NEW - Export this!
+      updateUserProfile,
       isAuthenticated,
       getCurrentUser,
       getToken
