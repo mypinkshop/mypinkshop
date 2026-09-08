@@ -82,8 +82,8 @@ function Register() {
       return;
     }
 
-    if (password.length < 8) {
-      setError('❌ Password must be at least 8 characters');
+    if (password.length < 6) {
+      setError('❌ Password must be at least 6 characters');
       return;
     }
 
@@ -513,9 +513,9 @@ function Register() {
                         checkPasswordStrength(e.target.value);
                       }}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                      placeholder="Min 8 characters"
+                      placeholder="Min 6 characters"
                       required
-                      minLength={8}
+                      minLength={6}
                     />
                     {password && (
                       <div className="mt-2">
@@ -525,7 +525,7 @@ function Register() {
                           </div>
                           <span className="text-xs font-medium text-gray-500">{getStrengthText()}</span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">Min 8 characters with letters, numbers & symbols</p>
+                        <p className="text-xs text-gray-400 mt-1">Min 6 characters with letters, numbers & symbols</p>
                       </div>
                     )}
                   </div>
