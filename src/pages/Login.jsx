@@ -57,8 +57,8 @@ function Login() {
 
       const data = await response.json();
 
-      if (data.success && data.token) {
-        // ✅ FIX: Using AuthContext login method to properly sync state and storage
+      // ✅ Agar response success hai aur token mil gaya
+      if (response.ok && data.success && data.token) {
         login(data.token, data.user);
         
         if (data.user?.role === 'admin') {
@@ -69,11 +69,12 @@ function Login() {
           navigate('/');
         }
       } else {
-        setError(data.error || data.message || '❌ Invalid email or password');
+        // ✅ Yahin screen par error dikhega, kahin redirect nahi hoga!
+        setError(data.error || data.message || '❌ Invalid email or password.');
       }
     } catch (err) {
       console.error('Password login error:', err);
-      setError('❌ Network issue. Please try again.');
+      setError('❌ Network issue. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -125,24 +126,13 @@ function Login() {
     <>
       <Helmet>
         <title>Login to MyPinkShop - Your Beauty & Fashion Store</title>
-        <meta name="description" content="Login to your MyPinkShop account to track orders, manage wishlist, and enjoy exclusive offers. New user? Sign up for 10% off your first order." />
-        <meta name="keywords" content="login, sign in, my account, mypinkshop login, customer login" />
+        <meta name="description" content="Login to your MyPinkShop account to track orders, manage wishlist, and enjoy exclusive offers." />
         <link rel="canonical" href="https://www.mypinkshop.com/login" />
-        <meta property="og:title" content="Login to MyPinkShop" />
-        <meta property="og:description" content="Login to your MyPinkShop account for exclusive offers and order tracking." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com/login" />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-login.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Login to MyPinkShop" />
-        <meta name="twitter:description" content="Login to your MyPinkShop account." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-login.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         
-        {/* Dynamic Offer Banner - Sirf Ek Baar */}
         <OfferBanner />
 
         {/* Header */}
@@ -220,9 +210,10 @@ function Login() {
                   <p className="text-gray-500 text-sm mt-1">Sign in to continue shopping</p>
                 </div>
 
+                {/* 🔴 ERROR MESSAGE SEEDHA SCREEN PAR DIKHEGA */}
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                    <span>⚠️</span> {error}
+                    <span>⚠️</span> <span>{error}</span>
                   </div>
                 )}
 
@@ -304,12 +295,6 @@ function Login() {
                 >
                   Create your account
                 </Link>
-
-                <p className="text-center text-xs text-gray-400 mt-6">
-                  By continuing, you agree to MyPinkShop's{' '}
-                  <Link to="/terms" className="text-pink-600 hover:underline">Terms of Service</Link> and{' '}
-                  <Link to="/privacy" className="text-pink-600 hover:underline">Privacy Policy</Link>.
-                </p>
               </div>
             ) : (
               // Forgot Password Form
@@ -374,21 +359,9 @@ function Login() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
-              <Link to="/terms" className="hover:text-pink-500 transition">Terms of Service</Link>
-              <Link to="/privacy" className="hover:text-pink-500 transition">Privacy Policy</Link>
-              <Link to="/contact" className="hover:text-pink-500 transition">Help</Link>
-              <Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link>
-            </div>
-            <p className="text-center text-xs text-gray-500">
-              © 2026 MyPinkShop. All rights reserved.
-            </p>
-            <p className="text-center text-xs text-gray-600 mt-2">
-              Made with 💖 for the girlies
-            </p>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-gray-500">
+            <p>© 2026 MyPinkShop. All rights reserved. Made with 💖 for the girlies</p>
           </div>
         </footer>
       </div>
