@@ -80,10 +80,6 @@ function Profile() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ FIX: backend (D1/Hono) returns every row with an `id` field (TEXT
-  // primary key), but this whole page was written against the old
-  // MongoDB backend which used `_id`. Rather than rewriting every render
-  // call-site below, we alias `_id` onto each row right where it's fetched.
   const withId = (item) => (item && typeof item === 'object' ? { ...item, _id: item._id || item.id } : item);
   const withIds = (arr) => (Array.isArray(arr) ? arr.map(withId) : []);
 
@@ -128,11 +124,9 @@ function Profile() {
       });
       
       const data = await response.json();
-      // ✅ FIX: backend wraps the payload as { success, data: { url } }
       if (data.success) {
         const imageUrl = data.data?.url || data.url;
         
-        // ✅ FIX: backend's PUT /users/profile reads `avatar`, not `profileImage`
         await fetch(`${API_URL}/api/users/profile`, {
           method: 'PUT',
           headers: {
@@ -192,8 +186,6 @@ function Profile() {
       
       if (response.ok) {
         const json = await response.json();
-        // ✅ FIX: backend returns { success, data: {...user} }; also the
-        // backend column is `created_at` (snake_case), not `createdAt`.
         const data = json.data || json;
         setUserData({
           name: data.name || '',
@@ -204,7 +196,6 @@ function Profile() {
           createdAt: data.created_at ? new Date(data.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
         });
         
-        // ✅ PROFILE IMAGE FIX: Agar image path relative hai toh API_URL prefix lagao
         if (data.avatar || data.profileImage) {
           let imgUrl = data.avatar || data.profileImage;
           if (imgUrl.startsWith('/')) {
@@ -230,8 +221,6 @@ function Profile() {
       });
       if (response.ok) {
         const data = await response.json();
-        // ✅ FIX: backend returns { success, data: [...] } directly (no
-        // "addresses" wrapper key), and rows use `line1/line2/pincode`.
         setAddresses(withIds((data.data || []).map(a => ({
           ...a,
           fullName: a.name,
@@ -245,6 +234,7 @@ function Profile() {
     }
   };
 
+  // ✅ FIXED: Robust mapping for D1 SQLite backend structure in Profile orders
   const fetchOrders = async () => {
     setOrdersLoading(true);
     try {
@@ -252,27 +242,44 @@ function Profile() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
+      let ordersArray = [];
       if (response.ok) {
         const data = await response.json();
-        // ✅ FIX: backend returns { success, data: [...] } directly.
-        const ordersData = withIds(Array.isArray(data.data) ? data.data : []);
-        const filteredOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'cancelled');
-        const sortedOrders = filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        setOrders(sortedOrders);
+        ordersArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
       } else {
         const fallbackRes = await fetch(`${API_URL}/api/orders/my-orders`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (fallbackRes.ok) {
           const data = await fallbackRes.json();
-          const ordersData = withIds(Array.isArray(data.data) ? data.data : []);
-          const filteredOrders = ordersData.filter(o => o.status?.toLowerCase() !== 'cancelled');
-          const sortedOrders = filteredOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-          setOrders(sortedOrders);
+          ordersArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
         }
       }
+
+      const normalized = ordersArray.map(order => ({
+        ...order,
+        _id: order._id || order.id,
+        createdAt: order.createdAt || order.created_at,
+        updatedAt: order.updatedAt || order.updated_at,
+        total: order.total || order.total_amount || order.subtotal || 0,
+        shippingAddress: order.shippingAddress || order.shipping_address,
+        paymentMethod: order.paymentMethod || order.payment_method,
+        paymentStatus: order.paymentStatus || order.payment_status,
+        items: (order.items || []).map(item => ({
+          ...item,
+          productId: item.productId || item.product_id || item.id,
+          name: item.name || item.product_name,
+          image: item.image || item.product_image || item.img,
+          price: item.price || item.unit_price || 0,
+        })),
+      }));
+
+      const filteredOrders = normalized.filter(o => o.status?.toLowerCase() !== 'cancelled');
+      const sortedOrders = filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setOrders(sortedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
+      setOrders([]);
     } finally {
       setOrdersLoading(false);
     }
@@ -348,7 +355,6 @@ function Profile() {
       const data = await response.json();
       
       if (response.ok) {
-        // ✅ FIX: backend wraps updated user under { data: {...} }
         setUserData(prev => ({ ...prev, [field]: data.data?.[field] || value }));
         setEditingField(null);
         toast.success(`${field} updated! ✨`);
@@ -372,7 +378,6 @@ function Profile() {
     }
     
     try {
-      // ✅ FIX: backend route is registered as PUT, not POST
       const response = await fetch(`${API_URL}/api/users/change-password`, {
         method: 'PUT',
         headers: {
@@ -420,8 +425,6 @@ function Profile() {
       : `${API_URL}/api/users/addresses`;
     const method = editingAddress ? 'PUT' : 'POST';
     
-    // ✅ FIX: backend field names are name/line1/line2/pincode, not
-    // fullName/addressLine1/addressLine2 — translate before sending.
     const payload = {
       name: addressForm.fullName,
       phone: addressForm.phone,
@@ -484,7 +487,6 @@ function Profile() {
 
   const setDefaultAddress = async (id) => {
     try {
-      // ✅ FIX: backend route is registered as PUT, not PATCH
       await fetch(`${API_URL}/api/users/addresses/${id}/default`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -497,28 +499,9 @@ function Profile() {
   };
 
   // ========== ORDER FUNCTIONS ==========
-  const handleReorder = async (order) => {
-    try {
-      for (const item of order.items) {
-        addToCart({
-          id: item.productId || item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity || 1,
-          image: item.image
-        });
-      }
-      toast.success('Added to cart! 🛒');
-      navigate('/cart');
-    } catch (error) {
-      toast.error('Error adding to cart');
-    }
-  };
-
   const cancelOrder = async (orderId) => {
     if (!confirm('Cancel this order?')) return;
     try {
-      // ✅ FIX: backend route is registered as PUT, not PATCH
       const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -662,29 +645,20 @@ function Profile() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // ✅ MPS- Format Order ID
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
-    
-    if (order.orderId && order.orderId.startsWith('MPS-')) {
-      return order.orderId;
-    }
-    
-    if (order._id) {
-      return order._id.slice(-12).toUpperCase();
-    }
-    
+    if (order.order_number) return order.order_number;
+    if (order.orderId && order.orderId.startsWith('MPS-')) return order.orderId;
+    if (order._id) return order._id.slice(-12).toUpperCase();
     return 'N/A';
   };
 
-  // ✅ IMAGE URL FIX FUNCTION
   const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
     return `${API_URL}${url}`;
   };
 
-  // ========== TABS ==========
   const tabs = [
     { id: 'orders', label: '📦 Orders' },
     { id: 'addresses', label: '📍 Addresses' },
@@ -706,7 +680,6 @@ function Profile() {
     );
   }
 
-  // Filter orders - Cancelled ko hatao
   const filteredOrders = filterStatus === 'all' 
     ? orders.filter(o => o.status?.toLowerCase() !== 'cancelled')
     : orders.filter(o => o.status?.toLowerCase() === filterStatus);
@@ -720,7 +693,6 @@ function Profile() {
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">
-        
         <OfferBanner />
 
         {/* Header */}
@@ -841,11 +813,9 @@ function Profile() {
             ))}
           </div>
 
-          {/* ========== ORDERS TAB - PROFESSIONAL (New Design) ========== */}
+          {/* ========== ORDERS TAB ========== */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              
-              {/* Header with Filter */}
               <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-[#fffafb]">
                 <h3 className="font-semibold text-gray-800 text-lg">
                   My Orders ({filteredOrders.length})
@@ -863,7 +833,6 @@ function Profile() {
                 </select>
               </div>
               
-              {/* Loading / Empty State */}
               {ordersLoading ? (
                 <div className="p-10 text-center">
                   <div className="w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -875,12 +844,9 @@ function Profile() {
                   <Link to="/shop" className="inline-block mt-4 bg-pink-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">Start Shopping →</Link>
                 </div>
               ) : (
-                /* Orders List */
                 <div className="p-4 sm:p-6 space-y-4">
                   {filteredOrders.map(order => (
                     <div key={order._id} className="border border-pink-100 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition">
-                      
-                      {/* Card Header: ID, Date, Total, Status */}
                       <div className="flex justify-between items-center px-5 py-4 bg-[#fffafb] border-b border-pink-50">
                         <div className="flex flex-wrap gap-4 sm:gap-8">
                           <div>
@@ -890,7 +856,7 @@ function Profile() {
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Date</p>
                             <p className="text-sm font-semibold text-gray-600 mt-1">
-                              {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
                             </p>
                           </div>
                           <div>
@@ -903,13 +869,11 @@ function Profile() {
                         </span>
                       </div>
 
-                      {/* Card Body: Product Items (Clickable) */}
                       <div className="px-5 py-4 border-b border-gray-50">
                         {order.items && order.items.length > 0 ? (
                           <div className="space-y-3">
                             {order.items.map((item, idx) => {
-                              // ✅ Product ID nikaalne ka safe logic (Object ya String dono handle karega)
-                              const productId = item.productId?._id || item.productId || item.id;
+                              const productId = item.productId || item.id;
                               
                               return (
                                 <Link 
@@ -942,7 +906,6 @@ function Profile() {
                         )}
                       </div>
 
-                      {/* Card Footer: Action Buttons */}
                       <div className="px-5 py-3 flex items-center justify-between">
                         <button 
                           onClick={() => navigate(`/order-tracking/${order._id}`)} 
@@ -952,7 +915,6 @@ function Profile() {
                           Track Order
                         </button>
                         
-                        {/* Cancel Button - Sirf pending/confirmed par dikhega */}
                         {['pending', 'confirmed'].includes(order.status?.toLowerCase()) && (
                           <button 
                             onClick={() => cancelOrder(order._id)} 
