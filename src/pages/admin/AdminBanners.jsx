@@ -96,7 +96,7 @@ function AdminBanners() {
 
     const url = isEdit
       ? `${API_BASE}/banners/${editingBanner._id || editingBanner.id}`
-      : `${API_BASE}/banners`;
+      : `${API_BASE}/banners/create`;
 
     const method = isEdit ? 'PUT' : 'POST';
 
