@@ -29,7 +29,7 @@ function AdminOffers() {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`${API_URL}/api/offers/all`, {
+      const response = await fetch(`${API_URL}/api/offers/admin/all`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
