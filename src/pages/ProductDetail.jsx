@@ -45,6 +45,7 @@ function ProductDetail() {
   
   const [galleryImages, setGalleryImages] = useState([]);
 
+  // ✅ Fixed API URL fallback for local development
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   const handleSearch = () => {
@@ -224,11 +225,8 @@ function ProductDetail() {
         toast.error('Delivery not available');
       }
     } catch (error) {
-      console.error('Delivery check error:', error);
-      setDeliveryStatus({
-        isDeliverable: true,
-        message: `✅ Delivery available to PIN ${pincode} (Standard 3-5 days)`
-      });
+      console.error('Delivery check network error:', error);
+      toast.error('Could not connect to shipping server');
     } finally {
       setCheckingDelivery(false);
     }
