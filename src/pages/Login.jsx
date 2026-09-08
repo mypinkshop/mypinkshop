@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import OfferBanner from '../components/OfferBanner';
@@ -16,6 +17,7 @@ function Login() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   
+  const { login } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
@@ -56,11 +58,8 @@ function Login() {
       const data = await response.json();
 
       if (data.success && data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userRole', data.user?.role || 'buyer');
-        localStorage.setItem('userEmail', data.user?.email || email);
-        localStorage.setItem('userName', data.user?.name || email.split('@')[0]);
-        localStorage.setItem('userId', data.user?._id || '');
+        // ✅ FIX: Using AuthContext login method to properly sync state and storage
+        login(data.token, data.user);
         
         if (data.user?.role === 'admin') {
           navigate('/admin/dashboard');
