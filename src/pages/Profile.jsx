@@ -52,6 +52,10 @@ function Profile() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   
+  // ✅ Tracking Modal States
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showTracking, setShowTracking] = useState(false);
+  
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   
@@ -94,6 +98,13 @@ function Profile() {
     if (e.key === 'Enter') {
       handleSearch();
     }
+  };
+
+  // ========== IMAGE URL FIX FUNCTION ==========
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('data:')) return url;
+    return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   // ========== PROFILE IMAGE ==========
@@ -234,7 +245,6 @@ function Profile() {
     }
   };
 
-  // ✅ FIXED: Robust mapping for D1 SQLite backend structure in Profile orders
   const fetchOrders = async () => {
     setOrdersLoading(true);
     try {
@@ -340,7 +350,7 @@ function Profile() {
     }
   };
 
-  // ========== UPDATE FUNCTIONS ==========
+  // ========== UPDATE FUNCTIONS (Fixed saving & backend wrapper response) ==========
   const handleFieldUpdate = async (field, value) => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -352,15 +362,24 @@ function Profile() {
         body: JSON.stringify({ [field]: value })
       });
       
-      const data = await response.json();
+      const json = await response.json();
       
-      if (response.ok) {
-        setUserData(prev => ({ ...prev, [field]: data.data?.[field] || value }));
+      if (response.ok && json.success) {
+        const updatedData = json.data || json;
+        setUserData(prev => ({
+          ...prev,
+          name: updatedData.name ?? prev.name,
+          email: updatedData.email ?? prev.email,
+          phone: updatedData.phone ?? prev.phone,
+          gender: updatedData.gender ?? prev.gender,
+          dob: updatedData.dob ?? prev.dob,
+          [field]: updatedData[field] !== undefined ? updatedData[field] : value
+        }));
         setEditingField(null);
         toast.success(`${field} updated! ✨`);
         fetchUserData();
       } else {
-        toast.error(data.error || 'Update failed');
+        toast.error(json.error || 'Update failed');
       }
     } catch (error) {
       toast.error('Error updating field');
@@ -645,18 +664,29 @@ function Profile() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // ✅ Order ID display without extra #
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
     if (order.order_number) return order.order_number;
-    if (order.orderId && order.orderId.startsWith('MPS-')) return order.orderId;
+    if (order.orderId) return order.orderId;
     if (order._id) return order._id.slice(-12).toUpperCase();
     return 'N/A';
   };
 
-  const getImageUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `${API_URL}${url}`;
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const getProgressWidth = (tracking) => {
+    if (!tracking || tracking.length === 0) return 0;
+    const completedCount = tracking.filter(t => t.completed).length;
+    return (completedCount / tracking.length) * 100;
   };
 
   const tabs = [
@@ -851,7 +881,8 @@ function Profile() {
                         <div className="flex flex-wrap gap-4 sm:gap-8">
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order ID</p>
-                            <p className="text-sm font-bold text-gray-700 mt-1">#{getOrderIdDisplay(order)}</p>
+                            {/* ✅ Fixed: Removed extra # */}
+                            <p className="text-sm font-bold text-gray-700 mt-1">{getOrderIdDisplay(order)}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Date</p>
@@ -907,8 +938,12 @@ function Profile() {
                       </div>
 
                       <div className="px-5 py-3 flex items-center justify-between">
+                        {/* ✅ Fixed: Track Order now opens modal instead of navigating away */}
                         <button 
-                          onClick={() => navigate(`/order-tracking/${order._id}`)} 
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setShowTracking(true);
+                          }} 
                           className="text-sm font-semibold text-gray-700 hover:text-pink-600 transition flex items-center gap-1.5"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -1260,6 +1295,52 @@ function Profile() {
           )}
 
         </div>
+
+        {/* Tracking Modal */}
+        {showTracking && selectedOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white p-4 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-800">📍 Track Order #{getOrderIdDisplay(selectedOrder)}</h3>
+                <button onClick={() => setShowTracking(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              </div>
+              <div className="p-6">
+                <div className="mb-6">
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500"
+                      style={{ width: `${getProgressWidth(selectedOrder.tracking)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-400 text-right mt-1">{Math.round(getProgressWidth(selectedOrder.tracking))}% complete</p>
+                </div>
+                
+                <div className="space-y-4">
+                  {selectedOrder.tracking && selectedOrder.tracking.map((step, idx) => (
+                    <div key={idx} className="flex gap-3">
+                      <div className="relative">
+                        <div className={`w-4 h-4 rounded-full mt-1 ${step.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
+                        {idx < selectedOrder.tracking.length - 1 && (
+                          <div className={`absolute top-5 left-1.5 w-0.5 h-8 ${step.completed && selectedOrder.tracking[idx+1]?.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
+                        )}
+                      </div>
+                      <div className="flex-1 pb-4">
+                        <p className={`font-medium ${step.completed ? 'text-gray-800' : 'text-gray-400'}`}>{step.stage}</p>
+                        <p className="text-xs text-gray-400">{formatDate(step.date)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 p-4 bg-pink-50 rounded-xl">
+                  <p className="text-sm font-semibold text-gray-600 mb-1">📍 Delivery Address</p>
+                  <p className="text-sm text-gray-600">{selectedOrder.shippingAddress || selectedOrder.address}</p>
+                  <p className="text-xs text-gray-400 mt-2">Payment: {selectedOrder.paymentMethod}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Address Modal */}
         {showAddressModal && (
