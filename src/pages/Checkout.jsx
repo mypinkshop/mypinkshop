@@ -7,7 +7,6 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
 function Checkout() {
-  // ✅ FIX: updateQuantity bhi import kiya
   const { cart, cartTotal, clearCart, removeFromCart, updateQuantity } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -54,11 +53,9 @@ function Checkout() {
   const subtotal = cartTotal();
   const discount = couponDiscount;
   
-  // ✅ EXCLUDING GST: Subtotal = Base Price (GST nikal ke)
   const basePrice = Math.round(subtotal / 1.18); 
   const gstAmount = subtotal - basePrice; 
   
-  // ✅ Delivery: 499+ FREE, warna ₹49
   let deliveryCharges = shippingInfo.shippingCharge;
   if (deliveryCharges === 0 || deliveryCharges === null || deliveryCharges === undefined) {
     deliveryCharges = subtotal >= 499 ? 0 : 49;
@@ -66,7 +63,6 @@ function Checkout() {
     deliveryCharges = 0;
   }
   
-  // ✅ Total = Base Price + GST + Delivery
   const total = basePrice + gstAmount + deliveryCharges;
 
   const generateOrderId = () => {
@@ -82,7 +78,7 @@ function Checkout() {
       try {
         const response = await fetch(`${API_URL}/api/shipping/settings`);
         const data = await response.json();
-                if (data.success || data.data) {
+        if (data.success || data.data) {
           const settings = data.data || data.settings || data;
           setShippingInfo(prev => ({
             ...prev,
@@ -111,7 +107,7 @@ function Checkout() {
               weight: 0.5
             })
           });
-                    const data = await response.json();
+          const data = await response.json();
           const deliveryData = data.data || data;
           
           if (deliveryData.success || deliveryData.deliverable) {
@@ -318,9 +314,6 @@ function Checkout() {
       });
       
       const data = await response.json();
-      
-      // ✅ FIX: backend wraps as { success, data: { coupon, discountAmount, valid } }
-      // — discountAmount is a sibling of coupon, not nested inside it.
       const result = data.data || data;
       
       if (result.valid) {
@@ -349,56 +342,14 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
-  // ⚠️ GATEWAY MISMATCH — NOT FIXABLE WITHOUT YOUR INPUT:
-  // This function calls POST /api/payments/initiate expecting a PhonePe
-  // redirect flow, but backend/src/routes/payments.js is a Razorpay
-  // scaffold (POST /create-order + /verify, using Razorpay checkout.js on
-  // the frontend) — there is no /initiate route, and no PhonePe credentials
-  // anywhere in this codebase. These are two different gateways; I can't
-  // safely invent one without your merchant credentials. Until you decide
-  // which gateway to actually use and provide its keys, this shows a clear
-  // error instead of silently failing.
   const handlePhonePePayment = async () => {
     toast.error('Online payment is not configured yet. Please use Cash on Delivery, or contact support to enable UPI/Card payment.');
     return;
-    /* Original code kept for reference once a real gateway is wired up:
-    try {
-      localStorage.setItem('cart', JSON.stringify(cart));
-      localStorage.setItem('orderTotal', JSON.stringify(total));
-      localStorage.setItem('checkoutAddress', JSON.stringify({
-        fullName: formData.fullName,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        pincode: formData.pincode
-      }));
-
-      const response = await fetch(`${API_URL}/api/payments/initiate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        window.location.href = data.redirectUrl; // Redirect to PhonePe
-      } else {
-        toast.error('Payment initiation failed. Please try again.');
-      }
-    } catch (error) {
-      console.error('PhonePe Payment Error:', error);
-      toast.error('Something went wrong. Please try again.');
-    }
-    */
   };
 
-   // ✅ Place Order (COD ya baaki methods)
   const placeOrder = async () => {
     const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
     
-    // ✅ Pehle Check: User logged in hai ya nahi?
     if (!token) {
       toast.error('Please login to place your order');
       navigate('/login?redirect=/checkout');
@@ -424,14 +375,12 @@ function Checkout() {
       saveNewAddress();
     }
 
-    // 🔥 Agar UPI select kiya hai, toh PhonePe pe redirect karo
     if (paymentMethod === 'upi') {
       await handlePhonePePayment();
       setIsPlacingOrder(false);
       return;
     }
 
-    // 🛒 Normal Order (COD)
     try {
       const orderData = {
         items: cart.map(item => ({
@@ -461,7 +410,7 @@ function Checkout() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || localStorage.getItem('adminToken')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(orderData)
       });
@@ -469,13 +418,12 @@ function Checkout() {
       const data = await response.json();
 
       if (!response.ok) {
-        // ✅ FIX: backend's fail() puts the message in `error`, not `message`
         throw new Error(data.error || 'Failed to place order');
       }
 
-      // ✅ FIX: backend wraps as { success, data: { order, orderId, orderNumber } }
       const result = data.data || data;
-      const newOrderId = result.orderId || result.order?.id || result.order?._id || generateOrderId();
+      // ✅ Fixed: Extracts clean order ID / order number without extra #
+      const newOrderId = result.orderNumber || result.order_number || result.orderId || result.order?.id || result.order?._id || generateOrderId();
       setOrderId(newOrderId);
       
       clearCart();
@@ -525,6 +473,7 @@ function Checkout() {
               <span className="text-5xl text-green-600">✓</span>
             </div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Order Placed! 🎉</h1>
+            {/* ✅ Fixed: Clean Order ID without # */}
             <p className="text-gray-500 mb-2">Order ID: <span className="font-semibold text-pink-600 font-mono">{orderId}</span></p>
             <p className="text-gray-600 mb-6">Your order has been confirmed. You will receive a confirmation email shortly.</p>
             
@@ -1047,7 +996,6 @@ function Checkout() {
                         {item.color && ` • ${item.color}`}
                       </p>
                       
-                      {/* ✅ QTY INCREASE / DECREASE BUTTONS */}
                       <div className="flex items-center gap-2 mt-1">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
@@ -1067,7 +1015,6 @@ function Checkout() {
                       <p className="text-sm font-semibold text-pink-600 mt-1">₹{item.price * item.quantity}</p>
                     </div>
 
-                    {/* ✅ REMOVE BUTTON */}
                     <button
                       onClick={() => {
                         removeFromCart(item.id);
