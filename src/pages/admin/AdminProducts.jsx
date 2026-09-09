@@ -21,11 +21,12 @@ function AdminProducts() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [processingId, setProcessingId] = useState(null);
+  
+  // Direct stock input state tracking: { [productId]: stringValue }
+  const [stockInputs, setStockInputs] = useState({});
 
-  // ✅ Fixed for Vite environment variables
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Auth check
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
@@ -35,7 +36,6 @@ function AdminProducts() {
     loadProducts();
   }, [navigate]);
 
-  // Load products from backend API - Bulletproof Array Validation
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -58,16 +58,25 @@ function AdminProducts() {
       if (!response.ok) throw new Error('Failed to load products');
       
       let data = await response.json();
-      
-      // ✅ FIX: Handle both paginated and non-paginated response safely
       const rawProducts = data.products || data.data || data;
       const allProducts = Array.isArray(rawProducts) ? rawProducts : [];
       
       const approved = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
       const pending = allProducts.filter(p => p.adminApproved !== true);
       
-      setProducts(approved.map(p => ({ ...p, _id: p._id || p.id })));
-      setPendingProducts(pending.map(p => ({ ...p, _id: p._id || p.id })));
+      const mappedApproved = approved.map(p => ({ ...p, _id: p._id || p.id }));
+      const mappedPending = pending.map(p => ({ ...p, _id: p._id || p.id }));
+
+      setProducts(mappedApproved);
+      setPendingProducts(mappedPending);
+
+      // Initialize stock inputs map
+      const initialStock = {};
+      [...mappedApproved, ...mappedPending].forEach(p => {
+        initialStock[p._id] = String(p.stock || 0);
+      });
+      setStockInputs(initialStock);
+
     } catch (error) {
       console.error('Error loading products:', error);
       setError('Failed to load products');
@@ -79,21 +88,20 @@ function AdminProducts() {
     }
   };
 
-  // Update stock in backend
   const updateStock = async (productId, newStock) => {
-    if (newStock < 0) return;
+    const parsedStock = parseInt(newStock, 10);
+    if (isNaN(parsedStock) || parsedStock < 0) return;
     
     setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
-      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ stock: newStock })
+        body: JSON.stringify({ stock: parsedStock })
       });
       
       if (response.status === 401) {
@@ -104,8 +112,12 @@ function AdminProducts() {
       
       if (!response.ok) throw new Error('Update failed');
       
-      toast.success(`✅ Stock updated to ${newStock}`);
-      await loadProducts();
+      toast.success(`✅ Stock updated to ${parsedStock}`);
+      
+      // Update local state directly for instant UI reflection
+      setProducts(prev => prev.map(p => p._id === productId ? { ...p, stock: parsedStock } : p));
+      setPendingProducts(prev => prev.map(p => p._id === productId ? { ...p, stock: parsedStock } : p));
+      setStockInputs(prev => ({ ...prev, [productId]: String(parsedStock) }));
     } catch (error) {
       console.error('Error updating stock:', error);
       toast.error('Failed to update stock');
@@ -114,12 +126,10 @@ function AdminProducts() {
     }
   };
 
-  // Approve product
   const approveProduct = async (productId) => {
     setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
-      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'PUT',
         headers: {
@@ -129,88 +139,56 @@ function AdminProducts() {
         body: JSON.stringify({ adminApproved: true, status: 'active' })
       });
       
-      if (response.status === 401) {
-        localStorage.removeItem('adminToken');
-        navigate('/admin/login');
-        return;
-      }
-      
       if (!response.ok) throw new Error('Approval failed');
-      
       toast.success('✅ Product approved');
       await loadProducts();
     } catch (error) {
-      console.error('Error approving product:', error);
       toast.error('Failed to approve product');
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Reject product
   const rejectProduct = async (productId) => {
     if (!window.confirm('Reject and delete this product?')) return;
-    
     setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
-      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      if (response.status === 401) {
-        localStorage.removeItem('adminToken');
-        navigate('/admin/login');
-        return;
-      }
-      
       if (!response.ok) throw new Error('Rejection failed');
-      
       toast.success('❌ Product rejected and removed');
       await loadProducts();
     } catch (error) {
-      console.error('Error rejecting product:', error);
       toast.error('Failed to reject product');
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Delete product
   const deleteProduct = async (productId) => {
     setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
-      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      if (response.status === 401) {
-        localStorage.removeItem('adminToken');
-        navigate('/admin/login');
-        return;
-      }
-      
       if (!response.ok) throw new Error('Delete failed');
-      
       toast.success('🗑 Product deleted');
       await loadProducts();
       setShowDeleteModal(false);
       setProductToDelete(null);
       setSelectedProducts([]);
     } catch (error) {
-      console.error('Error deleting product:', error);
       toast.error('Failed to delete product');
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Bulk delete
   const bulkDelete = async () => {
     if (selectedProducts.length === 0) {
       toast.error('Select products to delete');
@@ -220,37 +198,27 @@ function AdminProducts() {
     
     const token = localStorage.getItem('adminToken');
     let deleted = 0;
-    let failed = 0;
 
     for (const productId of selectedProducts) {
       try {
-        const response = await fetch(`${API_URL}/api/products/${productId}`, {
+        const res = await fetch(`${API_URL}/api/products/${productId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (response.ok) {
-          deleted++;
-        } else {
-          failed++;
-        }
-      } catch (err) {
-        failed++;
-      }
+        if (res.ok) deleted++;
+      } catch (err) {}
     }
     
-    toast.success(`✅ ${deleted} products deleted${failed > 0 ? `, ${failed} failed` : ''}`);
+    toast.success(`✅ ${deleted} products deleted successfully`);
     await loadProducts();
     setSelectedProducts([]);
   };
 
-  // Toggle product status
   const toggleProductStatus = async (productId, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    
     setProcessingId(productId);
     try {
       const token = localStorage.getItem('adminToken');
-      
       const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'PUT',
         headers: {
@@ -259,19 +227,10 @@ function AdminProducts() {
         },
         body: JSON.stringify({ status: newStatus })
       });
-      
-      if (response.status === 401) {
-        localStorage.removeItem('adminToken');
-        navigate('/admin/login');
-        return;
-      }
-      
       if (!response.ok) throw new Error('Status update failed');
-      
       toast.success(`✅ Status updated to ${newStatus}`);
       await loadProducts();
     } catch (error) {
-      console.error('Error updating status:', error);
       toast.error('Failed to update status');
     } finally {
       setProcessingId(null);
@@ -299,21 +258,20 @@ function AdminProducts() {
     }
   };
 
-  // Get unique brands safely
   const uniqueBrands = [...new Set((Array.isArray(products) ? products : []).map(p => p.brand).filter(Boolean))].sort();
 
   const getStatusBadge = (status) => {
     switch(status) {
-      case 'active': return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✅ Active</span>;
-      case 'inactive': return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">⛔ Inactive</span>;
-      default: return <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">{status}</span>;
+      case 'active': return <span className="px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Active</span>;
+      case 'inactive': return <span className="px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-semibold">Inactive</span>;
+      default: return <span className="px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-semibold">{status || 'Draft'}</span>;
     }
   };
 
   const getStockBadge = (stock) => {
-    if (stock === 0) return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">❌ Out of Stock</span>;
-    if (stock < 10) return <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium animate-pulse">⚠️ Low Stock</span>;
-    return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✅ In Stock</span>;
+    if (stock === 0) return <span className="text-xs text-red-600 font-medium">Out of Stock</span>;
+    if (stock < 10) return <span className="text-xs text-amber-600 font-medium">Low Stock</span>;
+    return <span className="text-xs text-green-600 font-medium">In Stock</span>;
   };
 
   const categories = [
@@ -325,7 +283,6 @@ function AdminProducts() {
     { value: 'accessories', label: 'Accessories' },
   ];
 
-  // Filter products safely
   const filteredApproved = (Array.isArray(products) ? products : []).filter(p => {
     if (searchTerm && !p.name?.toLowerCase().includes(searchTerm.toLowerCase()) && !p.sku?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (filterCategory !== 'all' && p.mainCategory?.toLowerCase() !== filterCategory && p.category?.toLowerCase() !== filterCategory) return false;
@@ -344,41 +301,18 @@ function AdminProducts() {
   const lowStockCount = (Array.isArray(products) ? products : []).filter(p => p.stock < 10 && p.stock > 0).length;
   const outOfStockCount = (Array.isArray(products) ? products : []).filter(p => p.stock === 0).length;
 
-  const handleStatsClick = (type) => {
-    setActiveTab('approved');
-    setSearchTerm('');
-    setFilterBrand('all');
-    setBrandSearch('');
-    if (type === 'pending') {
-      setActiveTab('pending');
-    } else if (type === 'active') {
-      setFilterStockStatus('all');
-      setFilterCategory('all');
-    } else if (type === 'lowstock') {
-      setFilterStockStatus('lowstock');
-      setFilterCategory('all');
-    } else if (type === 'outofstock') {
-      setFilterStockStatus('outofstock');
-      setFilterCategory('all');
-    } else if (type === 'all') {
-      setFilterStockStatus('all');
-      setFilterCategory('all');
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const currentProducts = activeTab === 'approved' ? filteredApproved : pendingProducts;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading products...</p>
+          <p className="text-gray-500 font-medium">Loading products...</p>
         </div>
       </div>
     );
   }
-
-  const currentProducts = activeTab === 'approved' ? filteredApproved : pendingProducts;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-pink-50/30">
@@ -392,147 +326,103 @@ function AdminProducts() {
             <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">📦 Product Management</h1>
             <p className="text-xs text-gray-400 mt-0.5">Manage your product catalog</p>
           </div>
-          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg hover:scale-105 transition-all">
+          <Link to="/admin/add-product" className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition-all">
             + Add Product
           </Link>
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
           {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-            <div onClick={() => handleStatsClick('all')} className="bg-white rounded-2xl shadow-sm border border-pink-100 p-4 cursor-pointer hover:shadow-md hover:border-pink-300 transition group">
-              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Total Products</p><span className="text-xl text-gray-400 group-hover:scale-110 transition">📦</span></div>
-              <p className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">{totalProducts}</p>
+            <div onClick={() => { setActiveTab('approved'); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); }} className="bg-white rounded-2xl shadow-sm border border-pink-100 p-4 cursor-pointer hover:shadow-md transition">
+              <p className="text-xs text-gray-500 mb-1">Total Products</p>
+              <p className="text-2xl font-bold text-gray-800">{totalProducts}</p>
             </div>
-            <div onClick={() => handleStatsClick('active')} className="bg-white rounded-2xl shadow-sm border border-green-100 p-4 cursor-pointer hover:shadow-md hover:border-green-300 transition group">
-              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Active</p><span className="text-xl text-green-500 group-hover:scale-110 transition">✅</span></div>
+            <div onClick={() => { setActiveTab('approved'); setFilterStockStatus('all'); }} className="bg-white rounded-2xl shadow-sm border border-green-100 p-4 cursor-pointer hover:shadow-md transition">
+              <p className="text-xs text-gray-500 mb-1">Active</p>
               <p className="text-2xl font-bold text-green-600">{activeCount}</p>
             </div>
-            <div onClick={() => handleStatsClick('pending')} className="bg-white rounded-2xl shadow-sm border border-amber-100 p-4 cursor-pointer hover:shadow-md hover:border-amber-300 transition group">
-              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Pending</p><span className="text-xl text-amber-500 group-hover:scale-110 transition">⏳</span></div>
+            <div onClick={() => setActiveTab('pending')} className="bg-white rounded-2xl shadow-sm border border-amber-100 p-4 cursor-pointer hover:shadow-md transition">
+              <p className="text-xs text-gray-500 mb-1">Pending Approval</p>
               <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
             </div>
-            <div onClick={() => handleStatsClick('lowstock')} className="bg-white rounded-2xl shadow-sm border border-orange-100 p-4 cursor-pointer hover:shadow-md hover:border-orange-300 transition group">
-              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Low Stock</p><span className="text-xl text-orange-500 group-hover:scale-110 transition">⚠️</span></div>
+            <div onClick={() => { setActiveTab('approved'); setFilterStockStatus('lowstock'); }} className="bg-white rounded-2xl shadow-sm border border-orange-100 p-4 cursor-pointer hover:shadow-md transition">
+              <p className="text-xs text-gray-500 mb-1">Low Stock</p>
               <p className="text-2xl font-bold text-orange-600">{lowStockCount}</p>
             </div>
-            <div onClick={() => handleStatsClick('outofstock')} className="bg-white rounded-2xl shadow-sm border border-red-100 p-4 cursor-pointer hover:shadow-md hover:border-red-300 transition group">
-              <div className="flex items-center justify-between mb-2"><p className="text-xs text-gray-500">Out of Stock</p><span className="text-xl text-red-500 group-hover:scale-110 transition">❌</span></div>
+            <div onClick={() => { setActiveTab('approved'); setFilterStockStatus('outofstock'); }} className="bg-white rounded-2xl shadow-sm border border-red-100 p-4 cursor-pointer hover:shadow-md transition">
+              <p className="text-xs text-gray-500 mb-1">Out of Stock</p>
               <p className="text-2xl font-bold text-red-600">{outOfStockCount}</p>
             </div>
           </div>
 
           {/* Tabs */}
           <div className="flex flex-wrap gap-6 border-b border-pink-100 mb-6">
-            <button onClick={() => { setActiveTab('approved'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              ✅ Approved ({products.length})
+            <button onClick={() => { setActiveTab('approved'); setSelectedProducts([]); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'approved' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
+              ✅ Approved Products ({products.length})
             </button>
-            <button onClick={() => { setActiveTab('pending'); setSelectedProducts([]); setSearchTerm(''); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              ⏳ Pending ({pendingProducts.length})
+            <button onClick={() => { setActiveTab('pending'); setSelectedProducts([]); }} className={`pb-2 text-sm font-medium transition-all ${activeTab === 'pending' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-gray-700'}`}>
+              ⏳ Pending Approval ({pendingProducts.length})
             </button>
           </div>
 
-          {/* Filters */}
+          {/* Filters Bar */}
           {activeTab === 'approved' && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 mb-6 overflow-hidden">
-              <div className="p-4 border-b border-pink-100 flex flex-wrap justify-between items-center gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="relative">
-                    <input type="text" placeholder="Search by name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-56 pl-9 pr-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white" />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-                  </div>
-                  
-                  <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white">
-                    {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
-                  </select>
-                  
-                  <div className="relative" style={{ zIndex: 60 }}>
-                    <div className="flex items-center border border-pink-200 rounded-xl bg-white overflow-hidden">
-                      <input
-                        type="text"
-                        placeholder="Search by brand..."
-                        value={brandSearch}
-                        onChange={(e) => {
-                          setBrandSearch(e.target.value);
-                          setShowBrandDropdown(true);
-                        }}
-                        onFocus={() => setShowBrandDropdown(true)}
-                        className="px-3 py-2 text-sm focus:outline-none flex-1 min-w-[140px]"
-                      />
-                      <button onClick={() => setShowBrandDropdown(!showBrandDropdown)} className="px-2 py-2 border-l border-pink-200 text-gray-400 hover:text-pink-500">
-                        <span className="text-sm">▼</span>
-                      </button>
-                    </div>
-                    
-                    {showBrandDropdown && (
-                      <div className="absolute top-full left-0 mt-1 w-full min-w-[200px] bg-white border border-pink-200 rounded-xl shadow-lg max-h-60 overflow-y-auto" style={{ zIndex: 9999 }}>
-                        <button onClick={() => { setFilterBrand('all'); setBrandSearch(''); setShowBrandDropdown(false); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition ${filterBrand === 'all' ? 'bg-pink-100 text-pink-600 font-medium' : 'text-gray-700'}`}>
-                          All Brands
-                        </button>
-                        {uniqueBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).map(brand => (
-                          <button key={brand} onClick={() => { setFilterBrand(brand); setBrandSearch(''); setShowBrandDropdown(false); }} className="w-full text-left px-3 py-2 text-sm hover:bg-pink-50 transition">
-                            {brand}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <select value={filterStockStatus} onChange={(e) => setFilterStockStatus(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white">
-                    <option value="all">All Stock</option>
-                    <option value="instock">In Stock (&gt;10)</option>
-                    <option value="lowstock">Low Stock (1-10)</option>
-                    <option value="outofstock">Out of Stock (0)</option>
-                  </select>
-                  
-                  {(filterBrand !== 'all' || searchTerm || filterCategory !== 'all' || filterStockStatus !== 'all') && (
-                    <button onClick={() => { setSearchTerm(''); setFilterCategory('all'); setFilterBrand('all'); setFilterStockStatus('all'); setBrandSearch(''); }} className="px-3 py-2 text-sm text-pink-600 hover:bg-pink-50 rounded-xl transition">
-                      Clear All ✕
-                    </button>
-                  )}
-                </div>
-                
-                {selectedProducts.length > 0 && (
-                  <button onClick={bulkDelete} className="bg-gradient-to-r from-red-500 to-rose-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition">
-                    🗑️ Delete Selected ({selectedProducts.length})
-                  </button>
-                )}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 mb-6 p-4 flex flex-wrap justify-between items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <input type="text" placeholder="Search by name or SKU..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-56 px-3 py-2 border border-pink-200 rounded-xl text-sm bg-white outline-none focus:border-pink-500" />
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm bg-white outline-none focus:border-pink-500">
+                  {categories.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
+                </select>
+                <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm bg-white outline-none focus:border-pink-500">
+                  <option value="all">All Brands</option>
+                  {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <select value={filterStockStatus} onChange={(e) => setFilterStockStatus(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-xl text-sm bg-white outline-none focus:border-pink-500">
+                  <option value="all">All Stock Status</option>
+                  <option value="instock">In Stock (&gt;10)</option>
+                  <option value="lowstock">Low Stock (1-10)</option>
+                  <option value="outofstock">Out of Stock (0)</option>
+                </select>
               </div>
+              {selectedProducts.length > 0 && (
+                <button onClick={bulkDelete} className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-600 transition">
+                  🗑️ Delete Selected ({selectedProducts.length})
+                </button>
+              )}
             </div>
           )}
 
-          {/* Products Table */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
+          {/* Products Table with Direct Stock Input & Action Buttons */}
+          <div className="bg-white rounded-2xl border border-pink-100 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gradient-to-r from-pink-50 to-rose-50 border-b border-pink-100">
+                <thead className="bg-pink-50/70 border-b border-pink-100">
                   <tr>
                     {activeTab === 'approved' && <th className="px-4 py-3 w-8"><input type="checkbox" onChange={handleSelectAll} checked={selectedProducts.length === currentProducts.length && currentProducts.length > 0} className="rounded border-pink-300" /></th>}
-                    <th className="px-4 py-3 text-left text-gray-700 font-semibold">Product</th>
-                    <th className="px-4 py-3 text-left text-gray-700 font-semibold">Brand</th>
-                    <th className="px-4 py-3 text-left text-gray-700 font-semibold">SKU</th>
-                    <th className="px-4 py-3 text-right text-gray-700 font-semibold">Price</th>
-                    <th className="px-4 py-3 text-center text-gray-700 font-semibold">Stock</th>
-                    <th className="px-4 py-3 text-center text-gray-700 font-semibold">Status</th>
-                    <th className="px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Product</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Brand</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">SKU</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Price</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Stock Management</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Status</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pink-50">
                   {currentProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={activeTab === 'approved' ? 8 : 7} className="px-4 py-16 text-center">
-                        <div className="text-6xl mb-4">📦</div>
-                        <p className="text-gray-400">{activeTab === 'pending' ? 'No products pending' : 'No products found'}</p>
-                        {activeTab === 'approved' && <Link to="/admin/add-product" className="mt-3 inline-block text-pink-500 text-sm hover:underline">Add your first product →</Link>}
+                      <td colSpan={activeTab === 'approved' ? 8 : 7} className="px-4 py-16 text-center text-gray-400">
+                        <div className="text-5xl mb-2">📦</div>
+                        <p>{activeTab === 'pending' ? 'No products pending approval' : 'No products found'}</p>
                       </td>
                     </tr>
                   ) : (
                     currentProducts.map(product => (
-                      <tr key={product._id} className="hover:bg-pink-50/30 transition">
+                      <tr key={product._id} className="hover:bg-pink-50/20 transition">
                         {activeTab === 'approved' && (
                           <td className="px-4 py-3">
                             <input type="checkbox" checked={selectedProducts.includes(product._id)} onChange={() => handleSelectProduct(product._id)} className="rounded border-pink-300" />
@@ -541,44 +431,64 @@ function AdminProducts() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {product.images && product.images[0] ? (
-                              <img src={product.images[0]} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-pink-100 shadow-sm" loading="lazy" />
+                              <img src={product.images[0]} alt={product.name} className="w-10 h-10 rounded-xl object-cover border border-pink-100 shadow-sm" />
                             ) : (
-                              <div className="w-10 h-10 bg-gradient-to-br from-pink-100 to-rose-100 rounded-xl flex items-center justify-center text-lg">✨</div>
+                              <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center text-lg">✨</div>
                             )}
                             <div>
                               <p className="font-medium text-gray-800 line-clamp-1">{product.name}</p>
-                              <p className="text-xs text-gray-400 capitalize">{product.mainCategory || product.category}</p>
+                              <p className="text-xs text-gray-400 capitalize">{product.category}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full">{product.brand || 'N/A'}</span>
-                        </td>
+                        <td className="px-4 py-3"><span className="text-xs bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full">{product.brand || 'N/A'}</span></td>
                         <td className="px-4 py-3 text-gray-500 text-xs font-mono">{product.sku?.slice(-8) || 'N/A'}</td>
                         <td className="px-4 py-3 text-right font-bold text-pink-600">₹{product.price}</td>
+                        
+                        {/* ✅ STOCK MANAGEMENT: Direct Input Field + Plus/Minus Buttons */}
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => updateStock(product._id, (product.stock || 0) - 1)} disabled={processingId === product._id || product.stock === 0} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 disabled:opacity-50">-</button>
-                            <div className="flex flex-col items-center">
-                              {getStockBadge(product.stock || 0)}
-                              <span className="text-xs text-gray-500 mt-1">{product.stock || 0} units</span>
-                            </div>
-                            <button onClick={() => updateStock(product._id, (product.stock || 0) + 1)} disabled={processingId === product._id} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-pink-100 transition font-bold text-gray-600 disabled:opacity-50">+</button>
+                            <button 
+                              onClick={() => updateStock(product._id, (product.stock || 0) - 1)} 
+                              disabled={processingId === product._id || (product.stock || 0) <= 0}
+                              className="w-6 h-6 rounded-full bg-gray-100 hover:bg-pink-100 text-gray-600 font-bold transition disabled:opacity-40"
+                            >-</button>
+                            
+                            <input 
+                              type="number"
+                              min="0"
+                              value={stockInputs[product._id] !== undefined ? stockInputs[product._id] : (product.stock || 0)}
+                              onChange={(e) => setStockInputs({ ...stockInputs, [product._id]: e.target.value })}
+                              onBlur={(e) => updateStock(product._id, e.target.value)}
+                              className="w-16 px-2 py-1 text-center border border-pink-200 rounded-lg text-sm font-semibold outline-none focus:border-pink-500 bg-white"
+                            />
+                            
+                            <button 
+                              onClick={() => updateStock(product._id, (product.stock || 0) + 1)} 
+                              disabled={processingId === product._id}
+                              className="w-6 h-6 rounded-full bg-gray-100 hover:bg-pink-100 text-gray-600 font-bold transition disabled:opacity-40"
+                            >+</button>
                           </div>
+                          <div className="text-center mt-1">{getStockBadge(product.stock || 0)}</div>
                         </td>
+
                         <td className="px-4 py-3 text-center">{getStatusBadge(product.status)}</td>
+                        
+                        {/* ✅ RESTORED FULL ACTION BUTTONS (Edit, Toggle Status, Delete) */}
                         <td className="px-4 py-3 text-center">
-                          <div className="flex justify-center gap-2">
+                          <div className="flex justify-center items-center gap-1.5">
                             {activeTab === 'pending' ? (
                               <>
-                                <button onClick={() => approveProduct(product._id)} disabled={processingId === product._id} className="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition" title="Approve">✅</button>
-                                <button onClick={() => rejectProduct(product._id)} disabled={processingId === product._id} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Reject">❌</button>
+                                <button onClick={() => approveProduct(product._id)} disabled={processingId === product._id} className="px-3 py-1 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition">Approve</button>
+                                <button onClick={() => rejectProduct(product._id)} disabled={processingId === product._id} className="px-3 py-1 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 transition">Reject</button>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => editProduct(product._id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="Edit">✏️</button>
-                                <button onClick={() => toggleProductStatus(product._id, product.status)} disabled={processingId === product._id} className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg transition" title="Toggle Status">{product.status === 'active' ? '🔒' : '🔓'}</button>
-                                <button onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">🗑️</button>
+                                <button onClick={() => editProduct(product._id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition" title="Edit Product">✏️ Edit</button>
+                                <button onClick={() => toggleProductStatus(product._id, product.status)} disabled={processingId === product._id} className={`p-2 rounded-xl transition ${product.status === 'active' ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`} title={product.status === 'active' ? 'Disable Product' : 'Enable Product'}>
+                                  {product.status === 'active' ? '🔒 Disable' : '🔓 Enable'}
+                                </button>
+                                <button onClick={() => { setProductToDelete(product); setShowDeleteModal(true); }} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition" title="Delete Product">🗑️</button>
                               </>
                             )}
                           </div>
@@ -591,21 +501,18 @@ function AdminProducts() {
             </div>
           </div>
 
-          <div className="mt-4 text-center">
-            <p className="text-xs text-gray-400">Showing {currentProducts.length} of {activeTab === 'approved' ? products.length : pendingProducts.length} products</p>
-          </div>
         </div>
       </div>
 
       {/* Delete Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">🗑️ Delete Product</h3>
-            <p className="text-gray-500 text-sm mb-6">Are you sure you want to delete "{productToDelete.name}"?</p>
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">🗑️ Delete Product</h3>
+            <p className="text-gray-500 text-sm mb-6">Are you sure you want to delete "{productToDelete.name}"? This action cannot be undone.</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 border rounded-xl">Cancel</button>
-              <button onClick={() => deleteProduct(productToDelete._id)} className="flex-1 px-4 py-2 bg-red-500 text-white rounded-xl">Delete</button>
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2.5 border rounded-xl text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => deleteProduct(productToDelete._id)} className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600">Delete</button>
             </div>
           </div>
         </div>
