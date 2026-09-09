@@ -63,7 +63,6 @@ function AdminOrders() {
         const json = await ordersRes.json();
         const ordersArray = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
         
-        // ✅ Robust Normalization inspired by MyOrders.jsx
         const normalized = ordersArray.map(order => {
           let parsedAddress = order.shippingAddress || order.shipping_address || order.address;
           if (typeof parsedAddress === 'string') {
@@ -84,6 +83,7 @@ function AdminOrders() {
               ...item,
               productId: item.productId || item.product_id,
               name: item.name || item.product_name,
+              brand: item.brand || item.product_brand || 'MyPinkShop',
               image: item.image || item.product_image || item.img,
               price: item.price || item.unit_price || 0,
             })),
@@ -203,7 +203,6 @@ function AdminOrders() {
     }
   };
 
-  // ✅ Exact matching MyOrders ID display logic
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
     if (order.order_number) return order.order_number;
@@ -238,7 +237,13 @@ function AdminOrders() {
     return String(addr || 'N/A');
   };
 
-  const getBrand = (order) => order.vendorName || order.brand || order.vendorId?.name || 'MyPinkShop';
+  const getBrand = (order) => {
+    if (order.vendorName || order.brand) return order.vendorName || order.brand;
+    if (order.items && order.items.length > 0) {
+      return order.items[0].brand || 'MyPinkShop';
+    }
+    return 'MyPinkShop';
+  };
 
   const filteredOrders = orders.filter(order => {
     if (filterStatus === 'cancelled') return ['cancelled', 'failed'].includes(order.status?.toLowerCase());
@@ -254,6 +259,37 @@ function AdminOrders() {
     }
     return true;
   });
+
+  // 📥 Export Filtered Orders to CSV for Warehouse Team
+  const exportToCSV = () => {
+    if (filteredOrders.length === 0) {
+      toast.error('No orders to export!');
+      return;
+    }
+
+    const headers = ['Order ID', 'Date', 'Customer Name', 'Phone', 'Address', 'Items & Brands', 'Total (INR)', 'Payment', 'Status'];
+    const rows = filteredOrders.map(order => [
+      getOrderIdDisplay(order),
+      order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
+      `"${getCustomerName(order)}"`,
+      `"${getCustomerPhone(order)}"`,
+      `"${getCustomerAddress(order).replace(/"/g, '""')}"`,
+      `"${(order.items || []).map(i => `${i.quantity}x ${i.name} [Brand: ${i.brand}]`).join(' | ').replace(/"/g, '""')}"`,
+      order.total || 0,
+      order.paymentMethod || 'COD',
+      order.status || 'Pending'
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Warehouse_Orders_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('📥 Orders exported successfully for warehouse!');
+  };
 
   const totalOrders = orders.length;
   const activeOrders = orders.filter(o => !['cancelled', 'failed', 'delivered'].includes(o.status?.toLowerCase())).length;
@@ -285,14 +321,21 @@ function AdminOrders() {
           </h1>
           <p className="text-[11px] text-slate-300">Super Admin Order Fulfillment Central • MyPinkShop</p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <input 
             type="text" 
             placeholder="Search Order ID, Customer..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-64 px-3 py-1.5 bg-white text-slate-900 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#ff9900]"
+            className="w-full sm:w-56 px-3 py-1.5 bg-white text-slate-900 rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#ff9900]"
           />
+          <button 
+            onClick={exportToCSV}
+            className="bg-[#ff9900] hover:bg-[#fa9400] text-slate-900 px-3.5 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 shrink-0"
+            title="Download CSV for Warehouse"
+          >
+            <span>📥</span> Export CSV
+          </button>
         </div>
       </div>
 
@@ -359,7 +402,7 @@ function AdminOrders() {
                   <tr>
                     <th className="p-3">Order ID / Date</th>
                     <th className="p-3">Customer & Address</th>
-                    <th className="p-3">Items Summary</th>
+                    <th className="p-3">Items & Brand Summary</th>
                     <th className="p-3 text-right">Total (INR)</th>
                     <th className="p-3 text-center">Payment</th>
                     <th className="p-3 text-center">Status</th>
@@ -386,7 +429,13 @@ function AdminOrders() {
                           </td>
                           <td className="p-3 align-top">
                             <p className="font-medium text-slate-800">{order.items?.length || 0} item(s)</p>
-                            <p className="text-[11px] text-slate-500 line-clamp-1">{order.items?.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                            <div className="text-[11px] text-slate-600 mt-0.5 space-y-0.5">
+                              {order.items?.map((i, idx) => (
+                                <p key={idx} className="line-clamp-1">
+                                  <span className="font-bold text-pink-600">[{i.brand || 'MyPinkShop'}]</span> {i.quantity}x {i.name}
+                                </p>
+                              ))}
+                            </div>
                           </td>
                           <td className="p-3 align-top text-right font-bold text-slate-900">₹{(order.total || 0).toLocaleString()}</td>
                           <td className="p-3 align-top text-center"><span className="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-semibold uppercase">{order.paymentMethod || 'COD'}</span></td>
@@ -479,7 +528,7 @@ function AdminOrders() {
                 <p className="font-bold mb-1">Items Ordered:</p>
                 {selectedOrder.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between py-1 border-b border-slate-100">
-                    <span>{item.quantity}x {item.name}</span>
+                    <span><strong>[{item.brand || 'MyPinkShop'}]</strong> {item.quantity}x {item.name}</span>
                     <span className="font-semibold">₹{item.price * item.quantity}</span>
                   </div>
                 ))}
