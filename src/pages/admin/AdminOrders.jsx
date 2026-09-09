@@ -61,8 +61,36 @@ function AdminOrders() {
 
       if (ordersRes.ok) {
         const json = await ordersRes.json();
-        const ordersData = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
-        setOrders(ordersData.map(o => ({ ...o, _id: o._id || o.id })));
+        const ordersArray = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
+        
+        // ✅ Robust Normalization inspired by MyOrders.jsx
+        const normalized = ordersArray.map(order => {
+          let parsedAddress = order.shippingAddress || order.shipping_address || order.address;
+          if (typeof parsedAddress === 'string') {
+            try {
+              parsedAddress = JSON.parse(parsedAddress);
+            } catch (e) {}
+          }
+
+          return {
+            ...order,
+            _id: order._id || order.id,
+            createdAt: order.createdAt || order.created_at,
+            total: order.total || order.total_amount || order.subtotal || 0,
+            shippingAddress: parsedAddress,
+            paymentMethod: order.paymentMethod || order.payment_method || 'cod',
+            paymentStatus: order.paymentStatus || order.payment_status || 'Paid',
+            items: (order.items || []).map(item => ({
+              ...item,
+              productId: item.productId || item.product_id,
+              name: item.name || item.product_name,
+              image: item.image || item.product_image || item.img,
+              price: item.price || item.unit_price || 0,
+            })),
+          };
+        });
+
+        setOrders(normalized);
       } else {
         setError('Failed to load orders');
         toast.error('Failed to load orders');
@@ -170,53 +198,65 @@ function AdminOrders() {
       case 'confirmed': return <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-semibold border border-indigo-200">Confirmed</span>;
       case 'processing': return <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs font-semibold border border-purple-200">Processing</span>;
       case 'pending': return <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-semibold border border-amber-200">Pending</span>;
-      case 'cancelled': return <span className="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs font-semibold border border-red-200">Cancelled</span>;
+      case 'cancelled': case 'failed': return <span className="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs font-semibold border border-red-200">Cancelled</span>;
       default: return <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs font-semibold">{status || 'Pending'}</span>;
     }
   };
 
-  // ✅ Bulletproof helpers to catch order ID, customer details, and address correctly
-  const getOrderId = (order) => order.orderNumber || order.order_number || order.orderId || order._id || 'N/A';
+  // ✅ Exact matching MyOrders ID display logic
+  const getOrderIdDisplay = (order) => {
+    if (!order) return 'N/A';
+    if (order.order_number) return order.order_number;
+    if (order.orderId) return order.orderId;
+    if (order.orderNumber) return order.orderNumber;
+    const idVal = order._id || order.id;
+    return idVal ? String(idVal) : 'N/A';
+  };
   
   const getCustomerName = (order) => {
-    return order.shippingAddress?.fullName || order.shippingAddress?.name || 
-           order.address?.fullName || order.address?.name || 
+    const addr = order.shippingAddress;
+    return (typeof addr === 'object' && addr !== null ? (addr.fullName || addr.name) : null) || 
            order.buyerName || order.customerName || 
            order.userId?.name || order.user?.name || 'Customer';
   };
 
   const getCustomerPhone = (order) => {
-    return order.shippingAddress?.phone || order.address?.phone || order.userId?.phone || order.user?.phone || 'N/A';
+    const addr = order.shippingAddress;
+    return (typeof addr === 'object' && addr !== null ? addr.phone : null) || 
+           order.userId?.phone || order.user?.phone || 'N/A';
   };
 
   const getCustomerAddress = (order) => {
-    const addr = order.shippingAddress || order.address || {};
-    const line = addr.addressLine1 || addr.address || addr.line1 || '';
-    const city = addr.city || '';
-    const pincode = addr.pincode || '';
-    if (!line && !city) return 'No address provided';
-    return `${line}, ${city} - ${pincode}`;
+    const addr = order.shippingAddress;
+    if (typeof addr === 'object' && addr !== null) {
+      const line = addr.addressLine1 || addr.address || addr.line1 || '';
+      const city = addr.city || '';
+      const state = addr.state || '';
+      const pincode = addr.pincode || '';
+      return `${line}, ${city}, ${state} - ${pincode}`;
+    }
+    return String(addr || 'N/A');
   };
 
   const getBrand = (order) => order.vendorName || order.brand || order.vendorId?.name || 'MyPinkShop';
 
   const filteredOrders = orders.filter(order => {
-    if (filterStatus === 'cancelled') return order.status?.toLowerCase() === 'cancelled';
-    if (order.status?.toLowerCase() === 'cancelled') return false; 
+    if (filterStatus === 'cancelled') return ['cancelled', 'failed'].includes(order.status?.toLowerCase());
+    if (['cancelled', 'failed'].includes(order.status?.toLowerCase())) return false; 
 
     if (filterStatus !== 'all' && order.status?.toLowerCase() !== filterStatus) return false;
     if (filterBrand !== 'all' && getBrand(order) !== filterBrand) return false;
     
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      return String(getOrderId(order)).toLowerCase().includes(searchLower) || 
+      return String(getOrderIdDisplay(order)).toLowerCase().includes(searchLower) || 
              String(getCustomerName(order)).toLowerCase().includes(searchLower);
     }
     return true;
   });
 
   const totalOrders = orders.length;
-  const activeOrders = orders.filter(o => !['cancelled', 'delivered'].includes(o.status?.toLowerCase())).length;
+  const activeOrders = orders.filter(o => !['cancelled', 'failed', 'delivered'].includes(o.status?.toLowerCase())).length;
   const shippedOrders = orders.filter(o => o.status?.toLowerCase() === 'shipped').length;
   const pendingReturns = returns.filter(r => r.status === 'pending').length;
   const brands = [...new Set(orders.map(order => getBrand(order)))];
@@ -282,7 +322,7 @@ function AdminOrders() {
           {/* Tab Switcher */}
           <div className="flex bg-white rounded-t-xl border-x border-t border-slate-200 px-4 pt-3 gap-6">
             <button onClick={() => setActiveTab('orders')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'orders' ? 'text-[#ff9900] border-[#ff9900]' : 'text-slate-600 border-transparent hover:text-slate-900'}`}>
-              Orders List ({orders.filter(o => o.status?.toLowerCase() !== 'cancelled').length})
+              Orders List ({orders.filter(o => !['cancelled', 'failed'].includes(o.status?.toLowerCase())).length})
             </button>
             <button onClick={() => setActiveTab('returns')} className={`pb-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'returns' ? 'text-[#ff9900] border-[#ff9900]' : 'text-slate-600 border-transparent hover:text-slate-900'}`}>
               Returns & Refunds ({returns.length})
@@ -336,7 +376,7 @@ function AdminOrders() {
                       filteredOrders.map(order => (
                         <tr key={order._id} className="hover:bg-slate-50 transition">
                           <td className="p-3 align-top">
-                            <p className="font-mono font-bold text-slate-900">#{getOrderId(order)}</p>
+                            <p className="font-mono font-bold text-slate-900">{getOrderIdDisplay(order)}</p>
                             <p className="text-[11px] text-slate-500 mt-0.5">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</p>
                           </td>
                           <td className="p-3 align-top">
@@ -369,7 +409,7 @@ function AdminOrders() {
                               <button 
                                 onClick={() => {
                                   setSelectedOrder(order);
-                                  const addr = order.shippingAddress || order.address || {};
+                                  const addr = order.shippingAddress || {};
                                   setEditFormData({
                                     _id: order._id,
                                     fullName: getCustomerName(order),
@@ -428,7 +468,7 @@ function AdminOrders() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDetailsModal(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4 border-b pb-3">
-              <h3 className="text-base font-bold text-slate-900">📦 Order Details #{getOrderId(selectedOrder)}</h3>
+              <h3 className="text-base font-bold text-slate-900">📦 Order Details {getOrderIdDisplay(selectedOrder)}</h3>
               <button onClick={() => setShowDetailsModal(false)} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
             </div>
             <div className="space-y-3 text-xs text-slate-700">
