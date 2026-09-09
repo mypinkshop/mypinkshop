@@ -26,7 +26,7 @@ function Cart() {
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [eligibleCoupons, setEligibleCoupons] = useState([]);
 
-  // ✅ Live Shipping State with strict Shiprocket/Settings sync
+  // ✅ Live Shipping State from Shiprocket API
   const [shippingCharge, setShippingCharge] = useState(49);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(499);
 
@@ -35,7 +35,7 @@ function Cart() {
   const subtotal = cartTotal();
   const FREE_SHIPPING_THRESHOLD = freeShippingThreshold;
 
-  // ✅ Fetch active coupons & shipping settings safely
+  // ✅ Fetch active coupons & shipping settings
   useEffect(() => {
     const fetchCouponsAndShipping = async () => {
       try {
@@ -50,8 +50,9 @@ function Cart() {
         const response = await fetch(
           `${API_URL}/coupons/active?cartItems=${encodeURIComponent(JSON.stringify(cartItemsWithVendor))}`
         );
-        if (response.ok) {
-          const data = await response.json();
+        const data = await response.json();
+
+        if (data.success || data.data) {
           const coupons = data.data || data.coupons || [];
           setAvailableCoupons(coupons);
           
@@ -65,15 +66,13 @@ function Cart() {
         console.error('Failed to fetch coupons:', error);
       }
 
-      // Fetch shipping settings
+      // Fetch live shipping settings & default charges
       try {
         const res = await fetch(`${API_URL}/shipping/settings`);
-        if (res.ok) {
-          const settingsData = await res.json();
-          const settings = settingsData.data || settingsData.settings || settingsData;
-          if (settings && settings.freeShippingThreshold) {
-            setFreeShippingThreshold(Number(settings.freeShippingThreshold));
-          }
+        const settingsData = await res.json();
+        const settings = settingsData.data || settingsData.settings || settingsData;
+        if (settings.freeShippingThreshold) {
+          setFreeShippingThreshold(Number(settings.freeShippingThreshold));
         }
       } catch (err) {
         console.error('Failed to load shipping settings', err);
@@ -83,10 +82,11 @@ function Cart() {
     fetchCouponsAndShipping();
   }, [cart, API_URL]);
 
-  // ✅ Shiprocket live delivery check integration
+  // ✅ Fetch live shipping charge if user has a saved address or default pincode
   useEffect(() => {
     const fetchLiveShipping = async () => {
       try {
+        // Default default Mumbai/fallback pincode or saved address pincode
         const savedAddresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
         const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
         const targetPincode = defaultAddr?.pincode || '400072';
@@ -100,13 +100,11 @@ function Cart() {
             weight: 0.5
           })
         });
-
-        if (res.ok) {
-          const data = await res.json();
-          const deliveryData = data.data || data;
-          if (deliveryData && deliveryData.shippingCharge !== undefined) {
-            setShippingCharge(Number(deliveryData.shippingCharge));
-          }
+        const data = await res.json();
+        const deliveryData = data.data || data;
+        
+        if (deliveryData.success !== false && deliveryData.shippingCharge !== undefined) {
+          setShippingCharge(Number(deliveryData.shippingCharge));
         }
       } catch (err) {
         console.error('Live shipping calculation error:', err);
@@ -205,8 +203,8 @@ function Cart() {
       const data = await response.json();
       const result = data.data || data;
 
-      if (!response.ok || !result.valid) {
-        toast.error(data.error || result.message || 'Invalid coupon code');
+      if (!result.valid) {
+        toast.error(data.error || result.message || 'Invalid coupon');
         return;
       }
 
@@ -214,11 +212,16 @@ function Cart() {
       setAppliedCoupon({ ...result.coupon, discountAmount: result.discountAmount });
       setCouponApplied(true);
       
-      toast.success(`🎉 Successfully applied ${result.coupon?.code || couponCode}! You saved ₹${result.discountAmount}`);
+      if (result.coupon?.isVendorCoupon && result.coupon?.vendorName) {
+        toast.success(`🎉 ${result.coupon.code} applied! You saved ₹${result.discountAmount} on ${result.coupon.vendorName} products`);
+      } else {
+        toast.success(`🎉 ${result.coupon?.code} applied! You saved ₹${result.discountAmount}`);
+      }
+      
       setCouponCode('');
 
     } catch (error) {
-      toast.error('Invalid coupon code');
+      toast.error('Error applying coupon');
     } finally {
       setValidatingCoupon(false);
     }
@@ -232,6 +235,8 @@ function Cart() {
   };
 
   const totalWithDiscount = subtotal - discount;
+  
+  // ✅ Free shipping rule: Subtotal >= 499 means 0 shipping, otherwise Shiprocket live charge
   const shipping = totalWithDiscount >= FREE_SHIPPING_THRESHOLD ? 0 : Number(shippingCharge || 49);
   const finalTotal = totalWithDiscount + shipping;
   const remainingForFree = FREE_SHIPPING_THRESHOLD - totalWithDiscount;
@@ -336,6 +341,54 @@ function Cart() {
               </Link>
             </div>
           </div>
+
+          <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">M</span>
+                    </div>
+                    <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                  </div>
+                  <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white mb-4">Shop</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                    <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                    <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                    <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                    <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white mb-4">Support</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                    <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                    <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                    <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                    <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                    <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                    <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                  </ul>
+                </div>
+              </div>
+              <div className="text-center pt-8 border-t border-gray-800">
+                <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+                <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+              </div>
+            </div>
+          </footer>
         </div>
       </>
     );
@@ -525,11 +578,8 @@ function Cart() {
                 
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between text-gray-600">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Subtotal</span>
-                      <span className="text-[10px] text-gray-400">(incl. GST)</span>
-                    </div>
-                    <span className="font-semibold text-gray-800">₹{subtotal}</span>
+                    <span>Subtotal</span>
+                    <span>₹{subtotal}</span>
                   </div>
 
                   {/* Coupon Section */}
@@ -612,16 +662,16 @@ function Cart() {
                     </div>
                   )}
                   
-                  <div className="flex justify-between items-center text-gray-600 pt-1 border-t border-pink-100">
-                    <span className="font-medium">Delivery Charges</span>
-                    <span className={`font-semibold ${shipping === 0 ? 'text-green-600' : 'text-gray-800'}`}>
-                      {shipping === 0 ? 'FREE' : `₹${shipping}`}
+                  <div className="flex justify-between text-gray-600 pt-1 border-t border-pink-100">
+                    <span>Shipping</span>
+                    <span className={shipping === 0 ? 'text-green-500 font-medium' : ''}>
+                      {shipping === 0 ? 'FREE' : '₹' + shipping}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex justify-between text-xl font-bold text-gray-800 pt-2 border-t border-pink-100 mb-6">
-                  <span>Total Cart Value</span>
+                  <span>Total</span>
                   <span className="text-pink-500">₹{finalTotal}</span>
                 </div>
 
