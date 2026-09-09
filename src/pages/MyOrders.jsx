@@ -645,7 +645,7 @@ function MyOrders() {
 
                     <div className="mt-6 p-4 bg-pink-50/70 rounded-xl border border-pink-100">
                       <p className="text-xs font-semibold text-gray-700 mb-1">📍 Delivery Address</p>
-                      <p className="text-xs text-gray-600">{selectedOrder.shippingAddress || selectedOrder.address}</p>
+                      {/* Clean Formatted Address */} <div className="text-xs text-gray-600 space-y-0.5">   <p className="font-semibold text-gray-800">{selectedOrder.shippingAddress?.fullName || user?.fullName || 'Customer'}</p>   <p>{selectedOrder.shippingAddress?.addressLine1 || selectedOrder.shippingAddress || selectedOrder.address || 'N/A'}</p>   <p>     {selectedOrder.shippingAddress?.city || 'Mumbai'}, {selectedOrder.shippingAddress?.state || 'Maharashtra'} - <span className="font-mono font-medium">{selectedOrder.shippingAddress?.pincode || '400072'}</span>   </p>   <p className="text-gray-400">Phone: {selectedOrder.shippingAddress?.phone || 'N/A'}</p> </div>
                       <p className="text-[11px] text-gray-400 mt-2">Payment Method: {selectedOrder.paymentMethod} ({selectedOrder.paymentStatus || 'Paid'})</p>
                     </div>
                   </div>
