@@ -13,7 +13,7 @@ function Profile() {
   const { user, logout, token, updateUserProfile } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount, wishlist, removeFromWishlist } = useWishlist();
-  const [activeTab, setActiveTab] = useState('hub'); // 'hub' for Amazon/Nykaa style dashboard grid, or specific tabs
+  const [activeTab, setActiveTab] = useState('hub');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -61,10 +61,7 @@ function Profile() {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   
   const [savedCards, setSavedCards] = useState([]);
-  const [cardsLoading, setCardsLoading] = useState(false);
-  const [showCardModal, setShowCardModal] = useState(false);
   
-  const [showPasswordEdit, setShowPasswordEdit] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -276,7 +273,6 @@ function Profile() {
   };
 
   const fetchSavedCards = async () => {
-    setCardsLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/users/cards`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -293,8 +289,6 @@ function Profile() {
       }
     } catch (error) {
       console.error('Failed to fetch cards:', error);
-    } finally {
-      setCardsLoading(false);
     }
   };
 
@@ -309,13 +303,10 @@ function Profile() {
         body: JSON.stringify({ [field]: value })
       });
       
-      const json = await response.json();
-      
-      if (response.ok && json.success) {
-        const updatedData = json.data || json;
+      if (response.ok) {
         setUserData(prev => ({
           ...prev,
-          [field]: updatedData[field] !== undefined ? updatedData[field] : value
+          [field]: value
         }));
         setEditingField(null);
         
@@ -323,6 +314,7 @@ function Profile() {
         toast.success(`${fieldLabels[field] || field} Changed Successfully! ✨`);
         fetchUserData();
       } else {
+        const json = await response.json().catch(() => ({}));
         toast.error(json.error || 'Update failed');
       }
     } catch (error) {
@@ -352,10 +344,10 @@ function Profile() {
       
       if (response.ok) {
         toast.success('Password Changed Successfully! 🔒');
-        setShowPasswordEdit(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
+        setActiveTab('hub');
       } else {
         const error = await response.json();
         toast.error(error.error || 'Current password is incorrect');
@@ -631,7 +623,7 @@ function Profile() {
         </div>
 
         {/* Main Content Area */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-6xl">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
           
           {/* Top Profile Banner */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -670,11 +662,10 @@ function Profile() {
             )}
           </div>
 
-          {/* ================= AMAZON / NYKAA STYLE DASHBOARD HUB ================= */}
+          {/* DASHBOARD HUB */}
           {activeTab === 'hub' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               
-              {/* Tile 1: Orders */}
               <div 
                 onClick={() => setActiveTab('orders')}
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
@@ -691,7 +682,6 @@ function Profile() {
                 </div>
               </div>
 
-              {/* Tile 2: Addresses */}
               <div 
                 onClick={() => setActiveTab('addresses')}
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
@@ -708,7 +698,6 @@ function Profile() {
                 </div>
               </div>
 
-              {/* Tile 3: Profile Details */}
               <div 
                 onClick={() => setActiveTab('profile')}
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
@@ -725,7 +714,6 @@ function Profile() {
                 </div>
               </div>
 
-              {/* Tile 4: Wishlist */}
               <div 
                 onClick={() => setActiveTab('wishlist')}
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
@@ -742,7 +730,6 @@ function Profile() {
                 </div>
               </div>
 
-              {/* Tile 5: Payments */}
               <div 
                 onClick={() => setActiveTab('payments')}
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
@@ -752,14 +739,13 @@ function Profile() {
                     💳
                   </div>
                   <h3 className="text-lg font-bold text-gray-800 mb-1">Payment Options</h3>
-                  <p className="text-sm text-gray-500">Manage saved credit/debit cards and preferred UPI IDs for quick checkout.</p>
+                  <p className="text-sm text-gray-500">Manage saved credit/debit cards and preferred payment options.</p>
                 </div>
                 <div className="mt-6 flex items-center text-sm font-semibold text-emerald-600 group-hover:translate-x-1 transition-transform">
                   Manage Payments →
                 </div>
               </div>
 
-              {/* Tile 6: Security / Password */}
               <div 
                 onClick={() => setActiveTab('security')}
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
@@ -779,7 +765,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ================= ORDERS TAB ================= */}
+          {/* ORDERS TAB */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-[#fffafb]">
@@ -889,7 +875,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ================= ADDRESSES TAB ================= */}
+          {/* ADDRESSES TAB */}
           {activeTab === 'addresses' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
@@ -948,7 +934,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ================= PROFILE / SECURITY DETAILS TAB ================= */}
+          {/* PROFILE / EDIT TAB */}
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
@@ -1043,7 +1029,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ================= WISHLIST TAB ================= */}
+          {/* WISHLIST TAB */}
           {activeTab === 'wishlist' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
@@ -1083,11 +1069,11 @@ function Profile() {
             </div>
           )}
 
-          {/* ================= PAYMENTS TAB ================= */}
+          {/* PAYMENTS TAB */}
           {activeTab === 'payments' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800 text-lg">Payment Options (Saved Cards & UPI)</h3>
+                <h3 className="font-semibold text-gray-800 text-lg">Payment Options</h3>
               </div>
               <div className="p-6">
                 {savedCards.length === 0 ? (
@@ -1114,7 +1100,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ================= SECURITY TAB ================= */}
+          {/* SECURITY TAB */}
           {activeTab === 'security' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-xl mx-auto">
               <div className="px-6 py-4 border-b border-gray-100">
