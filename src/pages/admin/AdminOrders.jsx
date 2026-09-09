@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
@@ -17,7 +17,17 @@ function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editFormData, setEditFormData] = useState({});
+  const [editFormData, setEditFormData] = useState({
+    fullName: '',
+    phone: '',
+    addressLine1: '',
+    city: '',
+    state: '',
+    pincode: '',
+    total: 0,
+    paymentMethod: 'cod',
+    status: 'pending'
+  });
   const [processingId, setProcessingId] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
@@ -96,9 +106,9 @@ function AdminOrders() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success(`✅ Order status updated to ${newStatus}${data.shipmentId ? ' & Shiprocket Order Created! 🚀' : ''}`);
+        toast.success(`✅ Order status updated to ${newStatus}`);
         setOrders(orders.map(order => 
-          order._id === orderId ? { ...order, status: newStatus, trackingNumber: data.trackingNumber || order.trackingNumber } : order
+          order._id === orderId ? { ...order, status: newStatus } : order
         ));
       } else {
         toast.error(data.error || data.message || 'Failed to update status');
@@ -116,17 +126,32 @@ function AdminOrders() {
     const orderId = editFormData._id;
 
     try {
+      const payload = {
+        total: Number(editFormData.total),
+        paymentMethod: editFormData.paymentMethod,
+        status: editFormData.status,
+        shippingAddress: {
+          fullName: editFormData.fullName,
+          phone: editFormData.phone,
+          addressLine1: editFormData.addressLine1,
+          city: editFormData.city,
+          state: editFormData.state,
+          pincode: editFormData.pincode,
+          country: 'India'
+        }
+      };
+
       const res = await fetch(`${API_URL}/api/orders/${orderId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(editFormData)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        toast.success('✅ Order details updated successfully');
+        toast.success('✅ Order updated successfully');
         setShowEditModal(false);
         loadOrders(token);
       } else {
@@ -150,9 +175,29 @@ function AdminOrders() {
     }
   };
 
-  const getOrderId = (order) => order.orderNumber || order.orderId || order._id;
-  const getCustomerName = (order) => order.buyerName || order.customerName || order.shippingAddress?.fullName || order.address?.fullName || order.userId?.name || 'Customer';
-  const getCustomerPhone = (order) => order.shippingAddress?.phone || order.address?.phone || order.userId?.phone || 'N/A';
+  // ✅ Bulletproof helpers to catch order ID, customer details, and address correctly
+  const getOrderId = (order) => order.orderNumber || order.order_number || order.orderId || order._id || 'N/A';
+  
+  const getCustomerName = (order) => {
+    return order.shippingAddress?.fullName || order.shippingAddress?.name || 
+           order.address?.fullName || order.address?.name || 
+           order.buyerName || order.customerName || 
+           order.userId?.name || order.user?.name || 'Customer';
+  };
+
+  const getCustomerPhone = (order) => {
+    return order.shippingAddress?.phone || order.address?.phone || order.userId?.phone || order.user?.phone || 'N/A';
+  };
+
+  const getCustomerAddress = (order) => {
+    const addr = order.shippingAddress || order.address || {};
+    const line = addr.addressLine1 || addr.address || addr.line1 || '';
+    const city = addr.city || '';
+    const pincode = addr.pincode || '';
+    if (!line && !city) return 'No address provided';
+    return `${line}, ${city} - ${pincode}`;
+  };
+
   const getBrand = (order) => order.vendorName || order.brand || order.vendorId?.name || 'MyPinkShop';
 
   const filteredOrders = orders.filter(order => {
@@ -164,8 +209,8 @@ function AdminOrders() {
     
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      return getOrderId(order).toLowerCase().includes(searchLower) || 
-             getCustomerName(order).toLowerCase().includes(searchLower);
+      return String(getOrderId(order)).toLowerCase().includes(searchLower) || 
+             String(getCustomerName(order)).toLowerCase().includes(searchLower);
     }
     return true;
   });
@@ -192,13 +237,13 @@ function AdminOrders() {
       <Helmet><title>Orders Manager - Amazon Seller Style</title></Helmet>
       <AdminSidebar />
       
-      {/* Amazon Seller Central Style Top Header */}
+      {/* Top Header */}
       <div className="bg-[#232f3e] text-white px-4 sm:px-6 py-3.5 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-md flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-base sm:text-lg font-bold flex items-center gap-2">
             <span>📋</span> Manage Orders & Shipments
           </h1>
-          <p className="text-[11px] text-slate-300">Order Fulfillment Central • MyPinkShop</p>
+          <p className="text-[11px] text-slate-300">Super Admin Order Fulfillment Central • MyPinkShop</p>
         </div>
         <div className="w-full sm:w-auto">
           <input 
@@ -266,7 +311,7 @@ function AdminOrders() {
             </div>
           )}
 
-          {/* Amazon Seller Central Data Table */}
+          {/* Orders Data Table */}
           <div className="bg-white rounded-b-xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -288,65 +333,74 @@ function AdminOrders() {
                     <tr><td colSpan="7" className="p-12 text-center text-slate-400 font-semibold">No returns found</td></tr>
                   ) : (
                     activeTab === 'orders' ? (
-                      filteredOrders.map(order => {
-                        const addr = order.shippingAddress || order.address || {};
-                        return (
-                          <tr key={order._id} className="hover:bg-slate-50 transition">
-                            <td className="p-3 align-top">
-                              <p className="font-mono font-bold text-slate-900">#{getOrderId(order)}</p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</p>
-                            </td>
-                            <td className="p-3 align-top">
-                              <p className="font-semibold text-slate-900">{getCustomerName(order)}</p>
-                              <p className="text-[11px] text-slate-600">📞 {getCustomerPhone(order)}</p>
-                              <p className="text-[11px] text-slate-500 line-clamp-1">{addr.addressLine1 || addr.address || ''}, {addr.city || ''} - {addr.pincode || ''}</p>
-                            </td>
-                            <td className="p-3 align-top">
-                              <p className="font-medium text-slate-800">{order.items?.length || 0} item(s)</p>
-                              <p className="text-[11px] text-slate-500 line-clamp-1">{order.items?.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
-                            </td>
-                            <td className="p-3 align-top text-right font-bold text-slate-900">₹{(order.total || 0).toLocaleString()}</td>
-                            <td className="p-3 align-top text-center"><span className="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-semibold uppercase">{order.paymentMethod || 'COD'}</span></td>
-                            <td className="p-3 align-top text-center">{getStatusBadge(order.status)}</td>
-                            <td className="p-3 align-top text-center">
-                              <div className="flex justify-center items-center gap-1.5 flex-wrap">
-                                <select 
-                                  value={order.status || 'pending'} 
-                                  onChange={(e) => updateOrderStatus(order._id, e.target.value)}
-                                  disabled={processingId === order._id}
-                                  className="px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-semibold text-slate-800 outline-none focus:border-[#ff9900]"
-                                >
-                                  <option value="pending">Pending</option>
-                                  <option value="processing">Processing</option>
-                                  <option value="confirmed">Confirmed</option>
-                                  <option value="shipped">Shipped</option>
-                                  <option value="delivered">Delivered</option>
-                                  <option value="cancelled">Cancelled</option>
-                                </select>
-                                <button 
-                                  onClick={() => {
-                                    setSelectedOrder(order);
-                                    setEditFormData(order);
-                                    setShowEditModal(true);
-                                  }} 
-                                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded font-medium transition"
-                                >
-                                  ✏️ Edit
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setSelectedOrder(order);
-                                    setShowDetailsModal(true);
-                                  }} 
-                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded font-medium transition"
-                                >
-                                  👁️ View
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
+                      filteredOrders.map(order => (
+                        <tr key={order._id} className="hover:bg-slate-50 transition">
+                          <td className="p-3 align-top">
+                            <p className="font-mono font-bold text-slate-900">#{getOrderId(order)}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</p>
+                          </td>
+                          <td className="p-3 align-top">
+                            <p className="font-semibold text-slate-900">{getCustomerName(order)}</p>
+                            <p className="text-[11px] text-slate-600">📞 {getCustomerPhone(order)}</p>
+                            <p className="text-[11px] text-slate-500 line-clamp-2">{getCustomerAddress(order)}</p>
+                          </td>
+                          <td className="p-3 align-top">
+                            <p className="font-medium text-slate-800">{order.items?.length || 0} item(s)</p>
+                            <p className="text-[11px] text-slate-500 line-clamp-1">{order.items?.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                          </td>
+                          <td className="p-3 align-top text-right font-bold text-slate-900">₹{(order.total || 0).toLocaleString()}</td>
+                          <td className="p-3 align-top text-center"><span className="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-semibold uppercase">{order.paymentMethod || 'COD'}</span></td>
+                          <td className="p-3 align-top text-center">{getStatusBadge(order.status)}</td>
+                          <td className="p-3 align-top text-center">
+                            <div className="flex justify-center items-center gap-1.5 flex-wrap">
+                              <select 
+                                value={order.status || 'pending'} 
+                                onChange={(e) => updateOrderStatus(order._id, e.target.value)}
+                                disabled={processingId === order._id}
+                                className="px-2 py-1 bg-slate-50 border border-slate-300 rounded text-xs font-semibold text-slate-800 outline-none focus:border-[#ff9900]"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                              <button 
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  const addr = order.shippingAddress || order.address || {};
+                                  setEditFormData({
+                                    _id: order._id,
+                                    fullName: getCustomerName(order),
+                                    phone: getCustomerPhone(order),
+                                    addressLine1: addr.addressLine1 || addr.address || '',
+                                    city: addr.city || '',
+                                    state: addr.state || '',
+                                    pincode: addr.pincode || '',
+                                    total: order.total || 0,
+                                    paymentMethod: order.paymentMethod || 'cod',
+                                    status: order.status || 'pending'
+                                  });
+                                  setShowEditModal(true);
+                                }} 
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded font-medium transition"
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  setShowDetailsModal(true);
+                                }} 
+                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded font-medium transition"
+                              >
+                                👁️ View
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                     ) : (
                       returns.map(ret => (
                         <tr key={ret._id} className="hover:bg-slate-50 transition">
@@ -380,7 +434,7 @@ function AdminOrders() {
             <div className="space-y-3 text-xs text-slate-700">
               <p><strong>Customer Name:</strong> {getCustomerName(selectedOrder)}</p>
               <p><strong>Phone:</strong> {getCustomerPhone(selectedOrder)}</p>
-              <p><strong>Shipping Address:</strong> {selectedOrder.shippingAddress?.addressLine1 || selectedOrder.address?.addressLine1 || ''}, {selectedOrder.shippingAddress?.city || selectedOrder.address?.city || ''} - {selectedOrder.shippingAddress?.pincode || selectedOrder.address?.pincode || ''}</p>
+              <p><strong>Shipping Address:</strong> {getCustomerAddress(selectedOrder)}</p>
               <div className="border-t pt-2">
                 <p className="font-bold mb-1">Items Ordered:</p>
                 {selectedOrder.items?.map((item, idx) => (
@@ -399,41 +453,72 @@ function AdminOrders() {
         </div>
       )}
 
-      {/* Edit Order Modal */}
+      {/* Super Admin Full Edit Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowEditModal(false)}>
-          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4 border-b pb-3">
-              <h3 className="text-base font-bold text-slate-900">✏️ Edit Order Info</h3>
+              <h3 className="text-base font-bold text-slate-900">✏️ Super Admin Order Editor</h3>
               <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
             </div>
             <form onSubmit={handleSaveEditedOrder} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Total Amount (₹)</label>
-                <input 
-                  type="number" 
-                  value={editFormData.total || ''} 
-                  onChange={(e) => setEditFormData({...editFormData, total: Number(e.target.value)})}
-                  className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" 
-                  required 
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Customer Name</label>
+                  <input type="text" value={editFormData.fullName} onChange={(e) => setEditFormData({...editFormData, fullName: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
+                  <input type="text" value={editFormData.phone} onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
+                </div>
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Payment Method</label>
-                <select 
-                  value={editFormData.paymentMethod || 'cod'} 
-                  onChange={(e) => setEditFormData({...editFormData, paymentMethod: e.target.value})}
-                  className="w-full px-3 py-2 border rounded-lg bg-white outline-none focus:border-[#ff9900]"
-                >
-                  <option value="cod">COD</option>
-                  <option value="card">Card</option>
-                  <option value="upi">UPI</option>
-                  <option value="netbanking">Net Banking</option>
-                </select>
+                <label className="block font-semibold text-slate-700 mb-1">Street Address</label>
+                <input type="text" value={editFormData.addressLine1} onChange={(e) => setEditFormData({...editFormData, addressLine1: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
               </div>
-              <div className="pt-3 flex gap-2">
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">City</label>
+                  <input type="text" value={editFormData.city} onChange={(e) => setEditFormData({...editFormData, city: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">State</label>
+                  <input type="text" value={editFormData.state} onChange={(e) => setEditFormData({...editFormData, state: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Pincode</label>
+                  <input type="text" value={editFormData.pincode} onChange={(e) => setEditFormData({...editFormData, pincode: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Total (₹)</label>
+                  <input type="number" value={editFormData.total} onChange={(e) => setEditFormData({...editFormData, total: e.target.value})} className="w-full px-3 py-2 border rounded-lg outline-none focus:border-[#ff9900]" required />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Payment</label>
+                  <select value={editFormData.paymentMethod} onChange={(e) => setEditFormData({...editFormData, paymentMethod: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white outline-none focus:border-[#ff9900]">
+                    <option value="cod">COD</option>
+                    <option value="card">Card</option>
+                    <option value="upi">UPI</option>
+                    <option value="netbanking">Net Banking</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Status</label>
+                  <select value={editFormData.status} onChange={(e) => setEditFormData({...editFormData, status: e.target.value})} className="w-full px-3 py-2 border rounded-lg bg-white outline-none focus:border-[#ff9900]">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+              <div className="pt-4 flex gap-2">
                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-2 border rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="submit" className="flex-1 py-2 bg-[#ff9900] hover:bg-[#fa9400] text-slate-900 rounded-lg font-bold">Save Changes</button>
+                <button type="submit" className="flex-1 py-2 bg-[#ff9900] hover:bg-[#fa9400] text-slate-900 rounded-lg font-bold">Save All Changes</button>
               </div>
             </form>
           </div>
