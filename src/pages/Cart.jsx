@@ -26,7 +26,7 @@ function Cart() {
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [eligibleCoupons, setEligibleCoupons] = useState([]);
 
-  // ✅ Live Shipping State from Shiprocket API
+  // ✅ Live Shipping State with strict Shiprocket/Settings sync
   const [shippingCharge, setShippingCharge] = useState(49);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(499);
 
@@ -35,7 +35,7 @@ function Cart() {
   const subtotal = cartTotal();
   const FREE_SHIPPING_THRESHOLD = freeShippingThreshold;
 
-  // ✅ Fetch active coupons & shipping settings
+  // ✅ Fetch active coupons & shipping settings safely
   useEffect(() => {
     const fetchCouponsAndShipping = async () => {
       try {
@@ -50,9 +50,8 @@ function Cart() {
         const response = await fetch(
           `${API_URL}/coupons/active?cartItems=${encodeURIComponent(JSON.stringify(cartItemsWithVendor))}`
         );
-        const data = await response.json();
-
-        if (data.success || data.data) {
+        if (response.ok) {
+          const data = await response.json();
           const coupons = data.data || data.coupons || [];
           setAvailableCoupons(coupons);
           
@@ -66,13 +65,15 @@ function Cart() {
         console.error('Failed to fetch coupons:', error);
       }
 
-      // Fetch live shipping settings & default charges
+      // Fetch shipping settings
       try {
         const res = await fetch(`${API_URL}/shipping/settings`);
-        const settingsData = await res.json();
-        const settings = settingsData.data || settingsData.settings || settingsData;
-        if (settings.freeShippingThreshold) {
-          setFreeShippingThreshold(Number(settings.freeShippingThreshold));
+        if (res.ok) {
+          const settingsData = await res.json();
+          const settings = settingsData.data || settingsData.settings || settingsData;
+          if (settings && settings.freeShippingThreshold) {
+            setFreeShippingThreshold(Number(settings.freeShippingThreshold));
+          }
         }
       } catch (err) {
         console.error('Failed to load shipping settings', err);
@@ -82,7 +83,7 @@ function Cart() {
     fetchCouponsAndShipping();
   }, [cart, API_URL]);
 
-  // ✅ Fetch live shipping charge if user has a saved address or default pincode
+  // ✅ Shiprocket live delivery check integration
   useEffect(() => {
     const fetchLiveShipping = async () => {
       try {
@@ -99,11 +100,13 @@ function Cart() {
             weight: 0.5
           })
         });
-        const data = await res.json();
-        const deliveryData = data.data || data;
-        
-        if (deliveryData.success !== false && deliveryData.shippingCharge !== undefined) {
-          setShippingCharge(Number(deliveryData.shippingCharge));
+
+        if (res.ok) {
+          const data = await res.json();
+          const deliveryData = data.data || data;
+          if (deliveryData && deliveryData.shippingCharge !== undefined) {
+            setShippingCharge(Number(deliveryData.shippingCharge));
+          }
         }
       } catch (err) {
         console.error('Live shipping calculation error:', err);
@@ -202,7 +205,7 @@ function Cart() {
       const data = await response.json();
       const result = data.data || data;
 
-      if (!result.valid) {
+      if (!response.ok || !result.valid) {
         toast.error(data.error || result.message || 'Invalid coupon code');
         return;
       }
@@ -212,10 +215,10 @@ function Cart() {
       setCouponApplied(true);
       
       toast.success(`🎉 Successfully applied ${result.coupon?.code || couponCode}! You saved ₹${result.discountAmount}`);
-      setCouponCode();
+      setCouponCode('');
 
     } catch (error) {
-      toast.error('Invalid coupon or error applying coupon');
+      toast.error('Invalid coupon code');
     } finally {
       setValidatingCoupon(false);
     }
