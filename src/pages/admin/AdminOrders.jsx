@@ -260,25 +260,33 @@ function AdminOrders() {
     return true;
   });
 
-  // 📥 Export Filtered Orders to CSV for Warehouse Team
+  // 📥 Export Filtered Orders to CSV with separate Brand & Product columns
   const exportToCSV = () => {
     if (filteredOrders.length === 0) {
       toast.error('No orders to export!');
       return;
     }
 
-    const headers = ['Order ID', 'Date', 'Customer Name', 'Phone', 'Address', 'Items & Brands', 'Total (INR)', 'Payment', 'Status'];
-    const rows = filteredOrders.map(order => [
-      getOrderIdDisplay(order),
-      order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
-      `"${getCustomerName(order)}"`,
-      `"${getCustomerPhone(order)}"`,
-      `"${getCustomerAddress(order).replace(/"/g, '""')}"`,
-      `"${(order.items || []).map(i => `${i.quantity}x ${i.name} [Brand: ${i.brand}]`).join(' | ').replace(/"/g, '""')}"`,
-      order.total || 0,
-      order.paymentMethod || 'COD',
-      order.status || 'Pending'
-    ]);
+    const headers = ['Order ID', 'Date', 'Customer Name', 'Phone', 'Address', 'Brand Name', 'Product Name & Qty', 'Total (INR)', 'Payment', 'Status'];
+    const rows = [];
+
+    filteredOrders.forEach(order => {
+      const items = order.items && order.items.length > 0 ? order.items : [{ brand: getBrand(order), name: 'General Item', quantity: 1 }];
+      items.forEach(item => {
+        rows.push([
+          getOrderIdDisplay(order),
+          order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
+          `"${getCustomerName(order)}"`,
+          `"${getCustomerPhone(order)}"`,
+          `"${getCustomerAddress(order).replace(/"/g, '""')}"`,
+          `"${item.brand || 'MyPinkShop'}"`,
+          `"${item.quantity}x ${item.name}"`,
+          order.total || 0,
+          order.paymentMethod || 'COD',
+          order.status || 'Pending'
+        ]);
+      });
+    });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -288,7 +296,7 @@ function AdminOrders() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('📥 Orders exported successfully for warehouse!');
+    toast.success('📥 Orders exported successfully with separate brand/product columns!');
   };
 
   const totalOrders = orders.length;
@@ -332,7 +340,7 @@ function AdminOrders() {
           <button 
             onClick={exportToCSV}
             className="bg-[#ff9900] hover:bg-[#fa9400] text-slate-900 px-3.5 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 shrink-0"
-            title="Download CSV for Warehouse"
+            title="Download CSV with separate Brand & Product columns for Warehouse"
           >
             <span>📥</span> Export CSV
           </button>
@@ -394,7 +402,7 @@ function AdminOrders() {
             </div>
           )}
 
-          {/* Orders Data Table */}
+          {/* Orders Data Table with Separate Brand & Product Columns */}
           <div className="bg-white rounded-b-xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -402,7 +410,8 @@ function AdminOrders() {
                   <tr>
                     <th className="p-3">Order ID / Date</th>
                     <th className="p-3">Customer & Address</th>
-                    <th className="p-3">Items & Brand Summary</th>
+                    <th className="p-3">Brand Name</th>
+                    <th className="p-3">Product Name</th>
                     <th className="p-3 text-right">Total (INR)</th>
                     <th className="p-3 text-center">Payment</th>
                     <th className="p-3 text-center">Status</th>
@@ -411,9 +420,9 @@ function AdminOrders() {
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-xs">
                   {activeTab === 'orders' && filteredOrders.length === 0 ? (
-                    <tr><td colSpan="7" className="p-12 text-center text-slate-400 font-semibold">No orders found</td></tr>
+                    <tr><td colSpan="8" className="p-12 text-center text-slate-400 font-semibold">No orders found</td></tr>
                   ) : activeTab === 'returns' && returns.length === 0 ? (
-                    <tr><td colSpan="7" className="p-12 text-center text-slate-400 font-semibold">No returns found</td></tr>
+                    <tr><td colSpan="8" className="p-12 text-center text-slate-400 font-semibold">No returns found</td></tr>
                   ) : (
                     activeTab === 'orders' ? (
                       filteredOrders.map(order => (
@@ -427,12 +436,22 @@ function AdminOrders() {
                             <p className="text-[11px] text-slate-600">📞 {getCustomerPhone(order)}</p>
                             <p className="text-[11px] text-slate-500 line-clamp-2">{getCustomerAddress(order)}</p>
                           </td>
+                          {/* Separate Brand Column */}
                           <td className="p-3 align-top">
-                            <p className="font-medium text-slate-800">{order.items?.length || 0} item(s)</p>
-                            <div className="text-[11px] text-slate-600 mt-0.5 space-y-0.5">
+                            <div className="space-y-1">
                               {order.items?.map((i, idx) => (
-                                <p key={idx} className="line-clamp-1">
-                                  <span className="font-bold text-pink-600">[{i.brand || 'MyPinkShop'}]</span> {i.quantity}x {i.name}
+                                <span key={idx} className="inline-block bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded font-bold text-[11px]">
+                                  {i.brand || 'MyPinkShop'}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          {/* Separate Product Name Column */}
+                          <td className="p-3 align-top">
+                            <div className="space-y-1 text-slate-800">
+                              {order.items?.map((i, idx) => (
+                                <p key={idx} className="font-medium line-clamp-2">
+                                  <span className="font-bold text-slate-900">{i.quantity}x</span> {i.name}
                                 </p>
                               ))}
                             </div>
@@ -527,9 +546,9 @@ function AdminOrders() {
               <div className="border-t pt-2">
                 <p className="font-bold mb-1">Items Ordered:</p>
                 {selectedOrder.items?.map((item, idx) => (
-                  <div key={idx} className="flex justify-between py-1 border-b border-slate-100">
-                    <span><strong>[{item.brand || 'MyPinkShop'}]</strong> {item.quantity}x {item.name}</span>
-                    <span className="font-semibold">₹{item.price * item.quantity}</span>
+                  <div key={idx} className="flex justify-between py-1 border-b border-slate-100 gap-2">
+                    <span><strong className="text-amber-700">[{item.brand || 'MyPinkShop'}]</strong> {item.quantity}x {item.name}</span>
+                    <span className="font-semibold shrink-0">₹{item.price * item.quantity}</span>
                   </div>
                 ))}
               </div>
