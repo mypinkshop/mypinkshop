@@ -11,9 +11,9 @@ import toast from 'react-hot-toast';
 function Profile() {
   const navigate = useNavigate();
   const { user, logout, token, updateUserProfile } = useAuth();
-  const { addToCart, cartCount } = useCart();
+  const { cartCount } = useCart();
   const { wishlistCount, wishlist, removeFromWishlist } = useWishlist();
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState('hub'); // 'hub' for Amazon/Nykaa style dashboard grid, or specific tabs
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -52,7 +52,6 @@ function Profile() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   
-  // ✅ Tracking Modal States
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showTracking, setShowTracking] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState(false);
@@ -64,21 +63,7 @@ function Profile() {
   const [savedCards, setSavedCards] = useState([]);
   const [cardsLoading, setCardsLoading] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
-  const [cardForm, setCardForm] = useState({
-    last4: '',
-    cardType: '',
-    expiryMonth: '',
-    expiryYear: '',
-    isDefault: false
-  });
-
-  const [upiOptions, setUpiOptions] = useState([]);
-  const [showUpiModal, setShowUpiModal] = useState(false);
-  const [upiForm, setUpiForm] = useState({
-    upiId: '',
-    isDefault: false
-  });
-
+  
   const [showPasswordEdit, setShowPasswordEdit] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -96,9 +81,7 @@ function Profile() {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+    if (e.key === 'Enter') handleSearch();
   };
 
   const getImageUrl = (url) => {
@@ -174,8 +157,7 @@ function Profile() {
       fetchAddresses(),
       fetchOrders(),
       fetchReviews(),
-      fetchSavedCards(),
-      fetchUpiOptions()
+      fetchSavedCards()
     ]);
     setLoading(false);
   };
@@ -313,20 +295,6 @@ function Profile() {
       console.error('Failed to fetch cards:', error);
     } finally {
       setCardsLoading(false);
-    }
-  };
-
-  const fetchUpiOptions = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/users/upi`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUpiOptions(withIds((data.data || []).map(u => ({ ...u, isDefault: !!u.is_default }))));
-      }
-    } catch (error) {
-      console.error('Failed to fetch UPI:', error);
     }
   };
 
@@ -564,16 +532,6 @@ function Profile() {
     });
   };
 
-  const tabs = [
-    { id: 'orders', label: '📦 Orders' },
-    { id: 'addresses', label: '📍 Addresses' },
-    { id: 'profile', label: '👤 Profile' },
-    { id: 'wishlist', label: '❤️ Wishlist' },
-    { id: 'reviews', label: '⭐ Reviews' },
-    { id: 'payments', label: '💳 Payments' },
-    { id: 'security', label: '🔐 Security' }
-  ];
-
   if (!user || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -593,13 +551,14 @@ function Profile() {
     <>
       <Helmet>
         <title>My Account - MyPinkShop</title>
-        <meta name="description" content="Manage your MyPinkShop account." />
+        <meta name="description" content="Manage your MyPinkShop account, orders, and addresses." />
         <link rel="canonical" href="https://www.mypinkshop.com/profile" />
       </Helmet>
 
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <OfferBanner />
 
+        {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -654,20 +613,31 @@ function Profile() {
           </div>
         </header>
 
+        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
             <span className="text-gray-400">/</span>
-            <span className="text-pink-600 font-medium">My Account</span>
+            {activeTab === 'hub' ? (
+              <span className="text-pink-600 font-medium">My Account</span>
+            ) : (
+              <>
+                <button onClick={() => setActiveTab('hub')} className="text-gray-500 hover:text-pink-500 transition">My Account</button>
+                <span className="text-gray-400">/</span>
+                <span className="text-pink-600 font-medium capitalize">{activeTab}</span>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Main Content Area */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-6xl">
           
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          {/* Top Profile Banner */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-2xl text-white overflow-hidden">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-2xl text-white overflow-hidden shadow-inner">
                   {profileImage ? (
                     <img src={getImageUrl(profileImage)} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -684,37 +654,132 @@ function Profile() {
                   </div>
                 )}
               </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-bold text-gray-800">{userData.name || 'User'}</h2>
-                <p className="text-sm text-gray-500">{userData.email}</p>
-                <p className="text-xs text-gray-400">Member since {userData.createdAt}</p>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Hello, {userData.name || 'User'}! ✨</h2>
+                <p className="text-sm text-gray-500">{userData.email} • {userData.phone || 'No phone added'}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Member since {userData.createdAt}</p>
               </div>
-              <button 
-                onClick={logout}
-                className="text-sm text-rose-600 border border-rose-200 px-4 py-1.5 rounded-full hover:bg-rose-50 transition"
-              >
-                Logout
-              </button>
             </div>
-          </div>
-
-          <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-hide">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                  activeTab === tab.id 
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300'
-                }`}
+            {activeTab !== 'hub' && (
+              <button 
+                onClick={() => setActiveTab('hub')}
+                className="text-sm text-pink-600 bg-pink-50 border border-pink-200 px-4 py-2 rounded-xl hover:bg-pink-100 transition font-medium flex items-center gap-1.5"
               >
-                {tab.label}
+                ← Back to Dashboard
               </button>
-            ))}
+            )}
           </div>
 
-          {/* ========== ORDERS TAB (Synced with MyOrders layout & live Shiprocket tracking) ========== */}
+          {/* ================= AMAZON / NYKAA STYLE DASHBOARD HUB ================= */}
+          {activeTab === 'hub' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* Tile 1: Orders */}
+              <div 
+                onClick={() => setActiveTab('orders')}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-pink-50 text-pink-500 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                    📦
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">Your Orders</h3>
+                  <p className="text-sm text-gray-500">Track, return, or buy things again, and manage active shipments.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-pink-600 group-hover:translate-x-1 transition-transform">
+                  View Orders →
+                </div>
+              </div>
+
+              {/* Tile 2: Addresses */}
+              <div 
+                onClick={() => setActiveTab('addresses')}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                    📍
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">Your Addresses</h3>
+                  <p className="text-sm text-gray-500">Edit addresses for orders and gifts, add new delivery locations.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-blue-600 group-hover:translate-x-1 transition-transform">
+                  Manage Addresses →
+                </div>
+              </div>
+
+              {/* Tile 3: Profile Details */}
+              <div 
+                onClick={() => setActiveTab('profile')}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                    👤
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">Login & Security</h3>
+                  <p className="text-sm text-gray-500">Edit name, email, phone number, gender, date of birth, and profile details.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-purple-600 group-hover:translate-x-1 transition-transform">
+                  Edit Profile →
+                </div>
+              </div>
+
+              {/* Tile 4: Wishlist */}
+              <div 
+                onClick={() => setActiveTab('wishlist')}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                    ❤️
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">Your Wishlist</h3>
+                  <p className="text-sm text-gray-500">View saved favorite items, skincare products, and fashion items.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-rose-600 group-hover:translate-x-1 transition-transform">
+                  View Wishlist →
+                </div>
+              </div>
+
+              {/* Tile 5: Payments */}
+              <div 
+                onClick={() => setActiveTab('payments')}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                    💳
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">Payment Options</h3>
+                  <p className="text-sm text-gray-500">Manage saved credit/debit cards and preferred UPI IDs for quick checkout.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-emerald-600 group-hover:translate-x-1 transition-transform">
+                  Manage Payments →
+                </div>
+              </div>
+
+              {/* Tile 6: Security / Password */}
+              <div 
+                onClick={() => setActiveTab('security')}
+                className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-300 transition cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                    🔐
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">Security & Password</h3>
+                  <p className="text-sm text-gray-500">Change your password and secure your account against unauthorized access.</p>
+                </div>
+                <div className="mt-6 flex items-center text-sm font-semibold text-amber-600 group-hover:translate-x-1 transition-transform">
+                  Update Password →
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* ================= ORDERS TAB ================= */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-[#fffafb]">
@@ -824,11 +889,11 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== ADDRESSES TAB ========== */}
+          {/* ================= ADDRESSES TAB ================= */}
           {activeTab === 'addresses' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="font-semibold text-gray-800">Saved Addresses</h3>
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800 text-lg">Saved Addresses</h3>
                 <button
                   onClick={() => {
                     setEditingAddress(null);
@@ -844,40 +909,37 @@ function Profile() {
                     });
                     setShowAddressModal(true);
                   }}
-                  className="text-pink-600 text-sm hover:underline"
+                  className="bg-pink-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-pink-600 transition shadow-sm"
                 >
-                  + Add New
+                  + Add New Address
                 </button>
               </div>
               
               {addresses.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">No addresses saved</div>
+                <div className="p-12 text-center text-gray-400">No addresses saved yet</div>
               ) : (
-                <div className="p-4 space-y-3">
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                   {addresses.map(addr => (
-                    <div key={addr._id} className="border border-gray-100 rounded-xl p-4 hover:shadow-sm transition">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          {addr.isDefault && (
-                            <span className="text-xs bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full">Default</span>
-                          )}
-                          <p className="font-medium text-gray-800 mt-1">{addr.fullName}</p>
-                          <p className="text-sm text-gray-500">{addr.addressLine1}</p>
-                          {addr.addressLine2 && <p className="text-sm text-gray-500">{addr.addressLine2}</p>}
-                          <p className="text-sm text-gray-500">{addr.city}, {addr.state} - {addr.pincode}</p>
-                          <p className="text-sm text-gray-500">📞 {addr.phone}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => {
-                            setEditingAddress(addr);
-                            setAddressForm(addr);
-                            setShowAddressModal(true);
-                          }} className="text-sm text-pink-600 hover:underline">Edit</button>
-                          <button onClick={() => deleteAddress(addr._id)} className="text-sm text-rose-600 hover:underline">Delete</button>
-                          {!addr.isDefault && (
-                            <button onClick={() => setDefaultAddress(addr._id)} className="text-sm text-gray-500 hover:underline">Set Default</button>
-                          )}
-                        </div>
+                    <div key={addr._id} className="border border-pink-100 bg-pink-50/30 rounded-2xl p-5 relative hover:shadow-md transition">
+                      {addr.isDefault && (
+                        <span className="absolute top-4 right-4 text-xs bg-pink-100 text-pink-600 px-2.5 py-1 rounded-full font-semibold">Default</span>
+                      )}
+                      <p className="font-bold text-gray-800 text-base mb-1">{addr.fullName}</p>
+                      <p className="text-sm text-gray-600">{addr.addressLine1}</p>
+                      {addr.addressLine2 && <p className="text-sm text-gray-600">{addr.addressLine2}</p>}
+                      <p className="text-sm text-gray-600">{addr.city}, {addr.state} - <span className="font-mono font-medium">{addr.pincode}</span></p>
+                      <p className="text-sm text-gray-600 mt-2">📞 {addr.phone}</p>
+                      
+                      <div className="mt-4 pt-3 border-t border-pink-100 flex gap-3">
+                        <button onClick={() => {
+                          setEditingAddress(addr);
+                          setAddressForm(addr);
+                          setShowAddressModal(true);
+                        }} className="text-sm text-blue-600 font-medium hover:underline">Edit</button>
+                        <button onClick={() => deleteAddress(addr._id)} className="text-sm text-rose-600 font-medium hover:underline">Delete</button>
+                        {!addr.isDefault && (
+                          <button onClick={() => setDefaultAddress(addr._id)} className="text-sm text-gray-500 font-medium hover:underline">Set Default</button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -886,167 +948,133 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PROFILE TAB (With fixed Gender/DOB & Success Toasts) ========== */}
+          {/* ================= PROFILE / SECURITY DETAILS TAB ================= */}
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800">Profile Details</h3>
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800 text-lg">Login & Security / Profile Details</h3>
               </div>
-              <div className="divide-y divide-gray-50">
-                <div className="p-4 flex justify-between items-center">
+              <div className="divide-y divide-gray-100">
+                <div className="p-6 flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-gray-400">Full Name</p>
-                    <p className="font-medium text-gray-800">{userData.name}</p>
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Full Name</p>
+                    <p className="font-semibold text-gray-800 text-base mt-0.5">{userData.name}</p>
                   </div>
                   {editingField === 'name' ? (
                     <div className="flex gap-2">
-                      <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
-                      <button onClick={() => handleFieldUpdate('name', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
-                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                      <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('name', editValue)} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium">Save</button>
+                      <button onClick={() => setEditingField(null)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm">Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingField('name'); setEditValue(userData.name); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                    <button onClick={() => { setEditingField('name'); setEditValue(userData.name); }} className="text-pink-600 font-semibold text-sm hover:underline">Edit</button>
                   )}
                 </div>
 
-                <div className="p-4 flex justify-between items-center">
+                <div className="p-6 flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-gray-400">Email</p>
-                    <p className="font-medium text-gray-800">{userData.email}</p>
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Email Address</p>
+                    <p className="font-semibold text-gray-800 text-base mt-0.5">{userData.email}</p>
                   </div>
                   {editingField === 'email' ? (
                     <div className="flex gap-2">
-                      <input type="email" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
-                      <button onClick={() => handleFieldUpdate('email', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
-                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                      <input type="email" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('email', editValue)} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium">Save</button>
+                      <button onClick={() => setEditingField(null)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm">Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingField('email'); setEditValue(userData.email); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                    <button onClick={() => { setEditingField('email'); setEditValue(userData.email); }} className="text-pink-600 font-semibold text-sm hover:underline">Edit</button>
                   )}
                 </div>
 
-                <div className="p-4 flex justify-between items-center">
+                <div className="p-6 flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-gray-400">Phone</p>
-                    <p className="font-medium text-gray-800">{userData.phone || 'Not added'}</p>
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Phone Number</p>
+                    <p className="font-semibold text-gray-800 text-base mt-0.5">{userData.phone || 'Not added'}</p>
                   </div>
                   {editingField === 'phone' ? (
                     <div className="flex gap-2">
-                      <input type="tel" value={editValue} onChange={(e) => setEditValue(e.target.value)} maxLength="10" className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
-                      <button onClick={() => handleFieldUpdate('phone', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
-                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                      <input type="tel" value={editValue} onChange={(e) => setEditValue(e.target.value)} maxLength="10" className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('phone', editValue)} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium">Save</button>
+                      <button onClick={() => setEditingField(null)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm">Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingField('phone'); setEditValue(userData.phone || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                    <button onClick={() => { setEditingField('phone'); setEditValue(userData.phone || ''); }} className="text-pink-600 font-semibold text-sm hover:underline">Edit</button>
                   )}
                 </div>
 
-                <div className="p-4 flex justify-between items-center">
+                <div className="p-6 flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-gray-400">Gender</p>
-                    <p className="font-medium text-gray-800">{userData.gender || 'Not specified'}</p>
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Gender</p>
+                    <p className="font-semibold text-gray-800 text-base mt-0.5">{userData.gender || 'Not specified'}</p>
                   </div>
                   {editingField === 'gender' ? (
                     <div className="flex gap-2">
-                      <select value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500 bg-white">
+                      <select value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-pink-500 bg-white">
                         <option value="">Select</option>
                         <option value="Female">Female</option>
                         <option value="Male">Male</option>
                         <option value="Other">Other</option>
                       </select>
-                      <button onClick={() => handleFieldUpdate('gender', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
-                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                      <button onClick={() => handleFieldUpdate('gender', editValue)} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium">Save</button>
+                      <button onClick={() => setEditingField(null)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm">Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingField('gender'); setEditValue(userData.gender || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                    <button onClick={() => { setEditingField('gender'); setEditValue(userData.gender || ''); }} className="text-pink-600 font-semibold text-sm hover:underline">Edit</button>
                   )}
                 </div>
 
-                <div className="p-4 flex justify-between items-center">
+                <div className="p-6 flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-gray-400">Date of Birth</p>
-                    <p className="font-medium text-gray-800">{userData.dob || 'Not specified'}</p>
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Date of Birth</p>
+                    <p className="font-semibold text-gray-800 text-base mt-0.5">{userData.dob || 'Not specified'}</p>
                   </div>
                   {editingField === 'dob' ? (
                     <div className="flex gap-2">
-                      <input type="date" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
-                      <button onClick={() => handleFieldUpdate('dob', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
-                      <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
+                      <input type="date" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('dob', editValue)} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium">Save</button>
+                      <button onClick={() => setEditingField(null)} className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm">Cancel</button>
                     </div>
                   ) : (
-                    <button onClick={() => { setEditingField('dob'); setEditValue(userData.dob || ''); }} className="text-pink-600 text-sm hover:underline">Edit</button>
+                    <button onClick={() => { setEditingField('dob'); setEditValue(userData.dob || ''); }} className="text-pink-600 font-semibold text-sm hover:underline">Edit</button>
                   )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* ========== WISHLIST TAB ========== */}
+          {/* ================= WISHLIST TAB ================= */}
           {activeTab === 'wishlist' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800">My Wishlist ({wishlist?.length || 0})</h3>
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800 text-lg">My Wishlist ({wishlist?.length || 0})</h3>
               </div>
               {!wishlist || wishlist.length === 0 ? (
-                <div className="p-8 text-center">
-                  <p className="text-gray-400">Your wishlist is empty</p>
-                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Start Shopping →</Link>
+                <div className="p-12 text-center">
+                  <p className="text-gray-400 mb-3">Your wishlist is empty</p>
+                  <Link to="/shop" className="inline-block bg-pink-500 text-white px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-pink-600 transition">Start Shopping →</Link>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-50">
-                  {wishlist.slice(0, 5).map(product => (
-                    <div key={product.id} className="p-4 flex items-center gap-4">
-                      <Link to={`/product/${product.id}`}>
-                        <img src={getImageUrl(product.image)} alt={product.name} className="w-16 h-16 object-cover rounded-lg" />
+                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {wishlist.map(product => (
+                    <div key={product.id} className="border border-pink-100 rounded-2xl p-4 flex items-center gap-4 bg-white shadow-sm hover:shadow-md transition">
+                      <Link to={`/product/${product.id}`} className="shrink-0">
+                        <img src={getImageUrl(product.image)} alt={product.name} className="w-20 h-20 object-cover rounded-xl border border-pink-100" />
                       </Link>
-                      <div className="flex-1">
-                        <Link to={`/product/${product.id}`} className="font-medium text-gray-800 hover:text-pink-500">
+                      <div className="flex-1 min-w-0">
+                        <Link to={`/product/${product.id}`} className="font-semibold text-gray-800 text-sm hover:text-pink-500 line-clamp-1">
                           {product.name}
                         </Link>
-                        <p className="text-pink-600 font-bold">₹{product.price}</p>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          removeFromWishlist(product.id);
-                          toast.success('Removed from wishlist');
-                        }} 
-                        className="text-rose-500 text-sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ========== REVIEWS TAB ========== */}
-          {activeTab === 'reviews' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800">My Reviews</h3>
-              </div>
-              {reviewsLoading ? (
-                <div className="p-8 text-center">
-                  <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                </div>
-              ) : reviews.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">No reviews yet</div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {reviews.map(review => (
-                    <div key={review._id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <Link to={`/product/${review.productId?._id}`} className="font-medium text-gray-800 hover:text-pink-500">
-                            {review.productId?.name}
-                          </Link>
-                          <div className="flex text-yellow-400 text-sm mt-1">
-                            {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
-                          </div>
-                          <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
-                        </div>
+                        <p className="text-pink-600 font-bold text-base mt-1">₹{product.price}</p>
+                        <button 
+                          onClick={() => {
+                            removeFromWishlist(product.id);
+                            toast.success('Removed from wishlist');
+                          }} 
+                          className="text-rose-500 text-xs font-medium mt-2 hover:underline flex items-center gap-1"
+                        >
+                          🗑️ Remove
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1055,28 +1083,29 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PAYMENTS TAB ========== */}
+          {/* ================= PAYMENTS TAB ================= */}
           {activeTab === 'payments' && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-semibold text-gray-800">Saved Cards</h3>
-                  <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add Card</button>
-                </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800 text-lg">Payment Options (Saved Cards & UPI)</h3>
+              </div>
+              <div className="p-6">
                 {savedCards.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400">No saved cards</div>
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-4xl mb-2">💳</p>
+                    <p>No saved cards or payment options found</p>
+                  </div>
                 ) : (
-                  <div className="divide-y divide-gray-50">
+                  <div className="space-y-3">
                     {savedCards.map(card => (
-                      <div key={card._id} className="p-4 flex justify-between items-center">
+                      <div key={card._id} className="p-4 border rounded-xl flex justify-between items-center">
                         <div className="flex items-center gap-3">
                           <span className="text-2xl">💳</span>
                           <div>
-                            <p className="font-medium">•••• {card.last4}</p>
+                            <p className="font-bold text-gray-800">•••• {card.last4}</p>
                             <p className="text-xs text-gray-500">Expires {card.expiryMonth}/{card.expiryYear}</p>
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteCard(card._id)} className="text-rose-500 text-sm">Remove</button>
                       </div>
                     ))}
                   </div>
@@ -1085,33 +1114,36 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== SECURITY TAB ========== */}
+          {/* ================= SECURITY TAB ================= */}
           {activeTab === 'security' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800">Security Settings</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden max-w-xl mx-auto">
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800 text-lg">Change Password</h3>
               </div>
-              <div className="p-4">
-                {showPasswordEdit ? (
-                  <div className="space-y-3">
-                    <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
-                    <input type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
-                    <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
-                    <div className="flex gap-2">
-                      <button onClick={handlePasswordUpdate} className="bg-pink-500 text-white px-4 py-2 rounded-xl text-sm hover:shadow-lg transition">Save</button>
-                      <button onClick={() => setShowPasswordEdit(false)} className="bg-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 transition">Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline font-medium">Change Password</button>
-                )}
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Password *</label>
+                  <input type="password" placeholder="Enter current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Password (min 6 chars) *</label>
+                  <input type="password" placeholder="Enter new password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password *</label>
+                  <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
+                </div>
+                <div className="pt-2 flex gap-3">
+                  <button onClick={handlePasswordUpdate} className="flex-1 bg-pink-500 text-white py-3 rounded-xl font-semibold hover:bg-pink-600 transition shadow-md">Update Password</button>
+                  <button onClick={() => setActiveTab('hub')} className="px-6 bg-gray-100 text-gray-600 py-3 rounded-xl font-semibold hover:bg-gray-200 transition">Cancel</button>
+                </div>
               </div>
             </div>
           )}
 
         </div>
 
-        {/* ✅ LIVE TRACKING MODAL */}
+        {/* LIVE TRACKING MODAL */}
         {showTracking && selectedOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowTracking(false)}>
             <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -1164,31 +1196,6 @@ function Profile() {
                         </div>
                       )}
                     </div>
-
-                    <div className="mt-6 p-4 bg-pink-50/70 rounded-xl border border-pink-100">
-                      <p className="text-xs font-semibold text-gray-700 mb-2">📍 Delivery Address</p>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <p className="font-bold text-gray-800 text-sm">
-                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                            ? (selectedOrder.shippingAddress.fullName || user?.fullName || 'Customer')
-                            : (user?.fullName || 'Customer')}
-                        </p>
-                        <p>
-                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                            ? (selectedOrder.shippingAddress.addressLine1 || selectedOrder.shippingAddress.address || 'N/A')
-                            : (String(selectedOrder.shippingAddress || selectedOrder.address || 'N/A'))}
-                        </p>
-                        <p>
-                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (
-                            <>
-                              {selectedOrder.shippingAddress.city || 'Mumbai'}, {selectedOrder.shippingAddress.state || 'Maharashtra'} - <span className="font-mono font-semibold">{selectedOrder.shippingAddress.pincode || '400072'}</span>
-                            </>
-                          ) : (
-                            'Mumbai, Maharashtra - 400072'
-                          )}
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -1225,10 +1232,52 @@ function Profile() {
           </div>
         )}
 
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
           </div>
         </footer>
       </div>
