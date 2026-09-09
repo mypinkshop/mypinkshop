@@ -55,6 +55,8 @@ function Profile() {
   // ✅ Tracking Modal States
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showTracking, setShowTracking] = useState(false);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [liveTrackingData, setLiveTrackingData] = useState(null);
   
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -87,7 +89,6 @@ function Profile() {
   const withId = (item) => (item && typeof item === 'object' ? { ...item, _id: item._id || item.id } : item);
   const withIds = (arr) => (Array.isArray(arr) ? arr.map(withId) : []);
 
-  // ========== SEARCH ==========
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -100,14 +101,12 @@ function Profile() {
     }
   };
 
-  // ========== IMAGE URL FIX FUNCTION ==========
   const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http') || url.startsWith('data:')) return url;
     return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  // ========== PROFILE IMAGE ==========
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -123,7 +122,6 @@ function Profile() {
     }
     
     setUploadingImage(true);
-    
     const formData = new FormData();
     formData.append('images', file);
     
@@ -137,7 +135,6 @@ function Profile() {
       const data = await response.json();
       if (data.success) {
         const imageUrl = data.data?.url || data.url;
-        
         await fetch(`${API_URL}/api/users/profile`, {
           method: 'PUT',
           headers: {
@@ -162,7 +159,6 @@ function Profile() {
     }
   };
 
-  // ========== FETCH DATA ==========
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
@@ -170,11 +166,6 @@ function Profile() {
     }
     fetchAllData();
   }, [user, token]);
-
-  useEffect(() => {
-    const savedImage = sessionStorage.getItem('user_profile_image');
-    if (savedImage) setProfileImage(savedImage);
-  }, []);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -209,15 +200,9 @@ function Profile() {
         
         if (data.avatar || data.profileImage) {
           let imgUrl = data.avatar || data.profileImage;
-          if (imgUrl.startsWith('/')) {
-            imgUrl = `${API_URL}${imgUrl}`;
-          }
+          if (imgUrl.startsWith('/')) imgUrl = `${API_URL}${imgUrl}`;
           setProfileImage(imgUrl);
           sessionStorage.setItem('user_profile_image', imgUrl);
-          localStorage.setItem('profileImage', imgUrl);
-          if (updateUserProfile) {
-            updateUserProfile({ profileImage: imgUrl });
-          }
         }
       }
     } catch (error) {
@@ -256,37 +241,33 @@ function Profile() {
       if (response.ok) {
         const data = await response.json();
         ordersArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
-      } else {
-        const fallbackRes = await fetch(`${API_URL}/api/orders/my-orders`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (fallbackRes.ok) {
-          const data = await fallbackRes.json();
-          ordersArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
-        }
       }
 
-      const normalized = ordersArray.map(order => ({
-        ...order,
-        _id: order._id || order.id,
-        createdAt: order.createdAt || order.created_at,
-        updatedAt: order.updatedAt || order.updated_at,
-        total: order.total || order.total_amount || order.subtotal || 0,
-        shippingAddress: order.shippingAddress || order.shipping_address,
-        paymentMethod: order.paymentMethod || order.payment_method,
-        paymentStatus: order.paymentStatus || order.payment_status,
-        items: (order.items || []).map(item => ({
-          ...item,
-          productId: item.productId || item.product_id || item.id,
-          name: item.name || item.product_name,
-          image: item.image || item.product_image || item.img,
-          price: item.price || item.unit_price || 0,
-        })),
-      }));
+      const normalized = ordersArray.map(order => {
+        let parsedAddress = order.shippingAddress || order.shipping_address;
+        if (typeof parsedAddress === 'string') {
+          try { parsedAddress = JSON.parse(parsedAddress); } catch (e) {}
+        }
+        return {
+          ...order,
+          _id: order._id || order.id,
+          createdAt: order.createdAt || order.created_at,
+          updatedAt: order.updatedAt || order.updated_at,
+          total: order.total || order.total_amount || order.subtotal || 0,
+          shippingAddress: parsedAddress,
+          paymentMethod: order.paymentMethod || order.payment_method,
+          paymentStatus: order.paymentStatus || order.payment_status,
+          items: (order.items || []).map(item => ({
+            ...item,
+            productId: item.productId || item.product_id || item.id,
+            name: item.name || item.product_name,
+            image: item.image || item.product_image || item.img,
+            price: item.price || item.unit_price || 0,
+          })),
+        };
+      });
 
-      const filteredOrders = normalized.filter(o => o.status?.toLowerCase() !== 'cancelled');
-      const sortedOrders = filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setOrders(sortedOrders);
+      setOrders(normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
       console.error('Error fetching orders:', error);
       setOrders([]);
@@ -323,7 +304,6 @@ function Profile() {
         setSavedCards(withIds((data.data || []).map(c => ({
           ...c,
           last4: c.card_last4,
-          cardHolderName: c.card_holder_name,
           expiryMonth: c.expiry_month,
           expiryYear: c.expiry_year,
           isDefault: !!c.is_default,
@@ -350,7 +330,6 @@ function Profile() {
     }
   };
 
-  // ========== UPDATE FUNCTIONS (Fixed saving & backend wrapper response) ==========
   const handleFieldUpdate = async (field, value) => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -368,15 +347,12 @@ function Profile() {
         const updatedData = json.data || json;
         setUserData(prev => ({
           ...prev,
-          name: updatedData.name ?? prev.name,
-          email: updatedData.email ?? prev.email,
-          phone: updatedData.phone ?? prev.phone,
-          gender: updatedData.gender ?? prev.gender,
-          dob: updatedData.dob ?? prev.dob,
           [field]: updatedData[field] !== undefined ? updatedData[field] : value
         }));
         setEditingField(null);
-        toast.success(`${field} updated! ✨`);
+        
+        const fieldLabels = { name: 'Name', email: 'Email', phone: 'Phone number', gender: 'Gender', dob: 'Date of Birth' };
+        toast.success(`${fieldLabels[field] || field} Changed Successfully! ✨`);
         fetchUserData();
       } else {
         toast.error(json.error || 'Update failed');
@@ -407,7 +383,7 @@ function Profile() {
       });
       
       if (response.ok) {
-        toast.success('Password changed! 🔒');
+        toast.success('Password Changed Successfully! 🔒');
         setShowPasswordEdit(false);
         setCurrentPassword('');
         setNewPassword('');
@@ -421,29 +397,13 @@ function Profile() {
     }
   };
 
-  // ========== ADDRESS FUNCTIONS ==========
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!addressForm.fullName.trim() || !addressForm.phone || !addressForm.pincode || !addressForm.addressLine1 || !addressForm.city || !addressForm.state) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-    
-    if (!/^[0-9]{10}$/.test(addressForm.phone)) {
-      toast.error('Enter valid 10-digit phone');
-      return;
-    }
-    if (!/^[0-9]{6}$/.test(addressForm.pincode)) {
-      toast.error('Enter valid 6-digit pincode');
-      return;
-    }
-    
     const url = editingAddress 
       ? `${API_URL}/api/users/addresses/${editingAddress.id || editingAddress._id}`
       : `${API_URL}/api/users/addresses`;
     const method = editingAddress ? 'PUT' : 'POST';
-    
+
     const payload = {
       name: addressForm.fullName,
       phone: addressForm.phone,
@@ -466,20 +426,10 @@ function Profile() {
       });
       
       if (response.ok) {
-        toast.success(editingAddress ? 'Address updated! ✨' : 'Address added! ✨');
+        toast.success(editingAddress ? 'Address Updated! ✨' : 'Address Added! ✨');
         fetchAddresses();
         setShowAddressModal(false);
         setEditingAddress(null);
-        setAddressForm({
-          fullName: '',
-          phone: '',
-          pincode: '',
-          addressLine1: '',
-          addressLine2: '',
-          city: '',
-          state: '',
-          isDefault: false
-        });
       } else {
         toast.error('Failed to save address');
       }
@@ -517,146 +467,78 @@ function Profile() {
     }
   };
 
-  // ========== ORDER FUNCTIONS ==========
   const cancelOrder = async (orderId) => {
     if (!confirm('Cancel this order?')) return;
     try {
       const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        toast.success('Order cancelled!');
+        toast.success('Order cancelled successfully!');
         fetchOrders();
       }
     } catch (error) {
-      toast.error('Error cancelling');
+      toast.error('Error cancelling order');
     }
   };
 
-  // ========== CARD FUNCTIONS ==========
-  const handleAddCard = async () => {
-    if (!cardForm.last4 || cardForm.last4.length !== 4) {
-      toast.error('Enter last 4 digits');
-      return;
-    }
-    if (!cardForm.expiryMonth || cardForm.expiryMonth.length !== 2) {
-      toast.error('Enter expiry month (MM)');
-      return;
-    }
-    if (!cardForm.expiryYear || cardForm.expiryYear.length !== 4) {
-      toast.error('Enter expiry year (YYYY)');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/cards`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(cardForm)
-      });
-      
-      if (response.ok) {
-        toast.success('Card saved! 💳');
-        setShowCardModal(false);
-        setCardForm({ last4: '', cardType: '', expiryMonth: '', expiryYear: '', isDefault: false });
-        fetchSavedCards();
-      } else {
-        toast.error('Failed to save card');
-      }
-    } catch (error) {
-      toast.error('Error saving card');
-    }
-  };
+  const handleTrackOrder = async (order) => {
+    setSelectedOrder(order);
+    setShowTracking(true);
+    setTrackingLoading(true);
+    setLiveTrackingData(null);
 
-  const handleDeleteCard = async (cardId) => {
-    if (!confirm('Delete this card?')) return;
+    const targetOrderId = order.orderId || order._id || order.id;
+
     try {
-      const response = await fetch(`${API_URL}/api/users/cards/${cardId}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_URL}/api/shipping/tracking/${targetOrderId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        toast.success('Card deleted!');
-        fetchSavedCards();
+      const data = await response.json();
+      if (data.success && data.trackingData) {
+        setLiveTrackingData(data.trackingData);
       }
-    } catch (error) {
-      toast.error('Error deleting card');
+    } catch (err) {
+      console.error('Error fetching live tracking:', err);
+    } finally {
+      setTrackingLoading(false);
     }
   };
 
-  // ========== UPI FUNCTIONS ==========
-  const handleAddUpi = async () => {
-    if (!upiForm.upiId || !upiForm.upiId.includes('@')) {
-      toast.error('Enter valid UPI ID (example@upi)');
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_URL}/api/users/upi`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(upiForm)
-      });
-      
-      if (response.ok) {
-        toast.success('UPI added! 📱');
-        setShowUpiModal(false);
-        setUpiForm({ upiId: '', isDefault: false });
-        fetchUpiOptions();
-      } else {
-        toast.error('Failed to add UPI');
-      }
-    } catch (error) {
-      toast.error('Error adding UPI');
-    }
-  };
-
-  const handleDeleteUpi = async (upiId) => {
-    if (!confirm('Delete this UPI?')) return;
-    try {
-      const response = await fetch(`${API_URL}/api/users/upi/${upiId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        toast.success('UPI deleted!');
-        fetchUpiOptions();
-      }
-    } catch (error) {
-      toast.error('Error deleting UPI');
-    }
-  };
-
-  // ========== UI HELPERS ==========
   const getStatusColor = (status) => {
-    const colors = {
-      delivered: 'text-emerald-600 bg-emerald-50',
-      shipped: 'text-blue-600 bg-blue-50',
-      confirmed: 'text-purple-600 bg-purple-50',
-      pending: 'text-amber-600 bg-amber-50',
-      processing: 'text-amber-600 bg-amber-50',
-      cancelled: 'text-rose-600 bg-rose-50'
-    };
-    return colors[status?.toLowerCase()] || 'text-gray-600 bg-gray-50';
+    switch(status?.toLowerCase()) {
+      case 'delivered': return 'text-emerald-600 bg-emerald-50';
+      case 'shipped': return 'text-blue-600 bg-blue-50';
+      case 'confirmed': return 'text-purple-600 bg-purple-50';
+      case 'pending': case 'processing': return 'text-amber-600 bg-amber-50';
+      case 'cancelled': case 'failed': return 'text-rose-600 bg-rose-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
   };
 
   const getStatusText = (status) => {
-    const texts = {
-      delivered: 'Delivered',
-      shipped: 'Shipped',
-      confirmed: 'Confirmed',
-      pending: 'Processing',
-      processing: 'Processing',
-      cancelled: 'Cancelled'
-    };
-    return texts[status?.toLowerCase()] || status || 'Processing';
+    switch(status?.toLowerCase()) {
+      case 'delivered': return 'Delivered';
+      case 'shipped': return 'Shipped';
+      case 'confirmed': return 'Confirmed';
+      case 'pending': case 'processing': return 'Processing';
+      case 'cancelled': return 'Cancelled';
+      case 'failed': return 'Payment Failed';
+      default: return status || 'Processing';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'delivered': return '✅';
+      case 'shipped': return '🚚';
+      case 'confirmed': return '📋';
+      case 'pending': case 'processing': return '⏳';
+      case 'cancelled': return '❌';
+      case 'failed': return '💔';
+      default: return '📦';
+    }
   };
 
   const getInitials = (name) => {
@@ -664,13 +546,12 @@ function Profile() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // ✅ Order ID display without extra #
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
     if (order.order_number) return order.order_number;
     if (order.orderId) return order.orderId;
-    if (order._id) return order._id.slice(-12).toUpperCase();
-    return 'N/A';
+    const idVal = order._id || order.id;
+    return idVal ? String(idVal).slice(-12).toUpperCase() : 'N/A';
   };
 
   const formatDate = (dateString) => {
@@ -681,12 +562,6 @@ function Profile() {
       month: 'short',
       year: 'numeric'
     });
-  };
-
-  const getProgressWidth = (tracking) => {
-    if (!tracking || tracking.length === 0) return 0;
-    const completedCount = tracking.filter(t => t.completed).length;
-    return (completedCount / tracking.length) * 100;
   };
 
   const tabs = [
@@ -711,7 +586,7 @@ function Profile() {
   }
 
   const filteredOrders = filterStatus === 'all' 
-    ? orders.filter(o => o.status?.toLowerCase() !== 'cancelled')
+    ? orders 
     : orders.filter(o => o.status?.toLowerCase() === filterStatus);
 
   return (
@@ -725,7 +600,6 @@ function Profile() {
       <div className="min-h-screen bg-gray-50">
         <OfferBanner />
 
-        {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -751,7 +625,7 @@ function Profile() {
                   />
                   <button 
                     onClick={handleSearch}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                   >
                     <span className="hidden sm:inline">Search</span>
                     <span className="sm:hidden">🔍</span>
@@ -780,7 +654,6 @@ function Profile() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -791,7 +664,6 @@ function Profile() {
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           
-          {/* Profile Header */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -826,7 +698,6 @@ function Profile() {
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-hide">
             {tabs.map(tab => (
               <button
@@ -843,24 +714,28 @@ function Profile() {
             ))}
           </div>
 
-          {/* ========== ORDERS TAB ========== */}
+          {/* ========== ORDERS TAB (Synced with MyOrders layout & live Shiprocket tracking) ========== */}
           {activeTab === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-[#fffafb]">
                 <h3 className="font-semibold text-gray-800 text-lg">
                   My Orders ({filteredOrders.length})
                 </h3>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-full text-sm focus:outline-none focus:border-pink-500 bg-white shadow-sm cursor-pointer"
-                >
-                  <option value="all">All Orders</option>
-                  <option value="pending">Processing</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                </select>
+                <div className="flex gap-2 flex-wrap">
+                  {['all', 'pending', 'confirmed', 'shipped', 'delivered'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setFilterStatus(status)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        filterStatus === status 
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md' 
+                          : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300'
+                      }`}
+                    >
+                      {status === 'all' ? 'All' : getStatusText(status)}
+                    </button>
+                  ))}
+                </div>
               </div>
               
               {ordersLoading ? (
@@ -869,100 +744,81 @@ function Profile() {
                   <p className="text-gray-400 mt-3">Loading orders...</p>
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="p-10 text-center">
-                  <p className="text-gray-400">No orders found</p>
-                  <Link to="/shop" className="inline-block mt-4 bg-pink-500 text-white px-6 py-2 rounded-full hover:shadow-lg transition">Start Shopping →</Link>
+                <div className="p-12 text-center">
+                  <div className="text-6xl mb-3">📦</div>
+                  <p className="text-gray-500 font-medium">No orders found</p>
+                  <Link to="/shop" className="inline-block mt-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2.5 rounded-full text-sm font-semibold hover:shadow-lg transition">Start Shopping →</Link>
                 </div>
               ) : (
-                <div className="p-4 sm:p-6 space-y-4">
-                  {filteredOrders.map(order => (
-                    <div key={order._id} className="border border-pink-100 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition">
-                      <div className="flex justify-between items-center px-5 py-4 bg-[#fffafb] border-b border-pink-50">
-                        <div className="flex flex-wrap gap-4 sm:gap-8">
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order ID</p>
-                            {/* ✅ Fixed: Removed extra # */}
-                            <p className="text-sm font-bold text-gray-700 mt-1">{getOrderIdDisplay(order)}</p>
+                <div className="p-4 sm:p-6 space-y-6">
+                  {filteredOrders.map(order => {
+                    const canCancel = ['pending', 'confirmed'].includes(order.status?.toLowerCase()) && order.paymentStatus !== 'failed';
+                    const isCancelled = ['cancelled', 'failed'].includes(order.status?.toLowerCase());
+                    const isDelivered = order.status?.toLowerCase() === 'delivered';
+
+                    return (
+                      <div key={order._id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${isCancelled ? 'border-rose-200 opacity-70' : isDelivered ? 'border-emerald-200' : 'border-pink-100'}`}>
+                        <div className={`px-5 py-3 flex flex-wrap justify-between items-center gap-3 border-b ${isCancelled ? 'bg-rose-50' : isDelivered ? 'bg-emerald-50' : 'bg-pink-50/80'}`}>
+                          <div className="flex items-center gap-6 flex-wrap">
+                            <div>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ORDER ID</span>
+                              <p className="text-sm font-mono font-bold text-gray-800">{getOrderIdDisplay(order)}</p>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">ORDER DATE</span>
+                              <p className="text-sm font-medium text-gray-700">{formatDate(order.createdAt)}</p>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">TOTAL</span>
+                              <p className="text-sm font-bold text-pink-600">₹{order.total?.toLocaleString()}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order Date</p>
-                            <p className="text-sm font-semibold text-gray-600 mt-1">
-                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</p>
-                            <p className="text-sm font-bold text-gray-700 mt-1">₹{order.total?.toLocaleString()}</p>
+                          <div className={`px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusColor(order.status)} flex items-center gap-1.5`}>
+                            <span>{getStatusIcon(order.status)}</span>
+                            {getStatusText(order.status)}
                           </div>
                         </div>
-                        <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${getStatusColor(order.status)}`}>
-                          {getStatusText(order.status)}
-                        </span>
-                      </div>
 
-                      <div className="px-5 py-4 border-b border-gray-50">
-                        {order.items && order.items.length > 0 ? (
-                          <div className="space-y-3">
-                            {order.items.map((item, idx) => {
-                              const productId = item.productId || item.id;
-                              
-                              return (
-                                <Link 
-                                  key={idx} 
-                                  to={productId ? `/product/${productId}` : '#'}
-                                  className="flex items-start gap-4 group"
-                                >
-                                  <div className="w-14 h-14 rounded-lg border border-gray-100 p-1 bg-white shrink-0 overflow-hidden">
-                                    {item.image ? (
-                                      <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
-                                    ) : (
-                                      <div className="w-full h-full bg-pink-50 rounded flex items-center justify-center text-lg">🛍️</div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-800 line-clamp-2 leading-snug group-hover:text-pink-600 transition">
-                                      {item.name}
-                                    </p>
-                                    <div className="flex justify-between items-center mt-1">
-                                      <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
-                                      <p className="text-sm font-semibold text-gray-700">₹{item.price?.toLocaleString()}</p>
-                                    </div>
-                                  </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-400">No items found</p>
-                        )}
-                      </div>
+                        <div className="px-5 py-4">
+                          {order.items && order.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
+                              <Link to={`/product/${item.productId}`} className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-pink-100 flex-shrink-0 flex items-center justify-center p-1 hover:shadow-md transition">
+                                {item.image ? (
+                                  <img src={getImageUrl(item.image)} alt={item.name} className="w-full h-full object-contain" />
+                                ) : (
+                                  <div className="text-2xl">🛍️</div>
+                                )}
+                              </Link>
+                              <div className="flex-1">
+                                <Link to={`/product/${item.productId}`} className="font-semibold text-gray-800 text-sm hover:text-pink-600 transition line-clamp-1">{item.name}</Link>
+                                <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gray-800">₹{(item.price * item.quantity)?.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
 
-                      <div className="px-5 py-3 flex items-center justify-between">
-                        {/* ✅ Fixed: Track Order now opens modal instead of navigating away */}
-                        <button 
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setShowTracking(true);
-                          }} 
-                          className="text-sm font-semibold text-gray-700 hover:text-pink-600 transition flex items-center gap-1.5"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          Track Order
-                        </button>
-                        
-                        {['pending', 'confirmed'].includes(order.status?.toLowerCase()) && (
+                        <div className="px-5 py-3 border-t bg-gray-50/50 flex flex-wrap gap-3 justify-between items-center">
                           <button 
-                            onClick={() => cancelOrder(order._id)} 
-                            className="text-sm font-semibold text-rose-600 bg-rose-50 px-4 py-2 rounded-full hover:bg-rose-100 transition flex items-center gap-1.5"
+                            onClick={() => handleTrackOrder(order)} 
+                            className="px-4 py-1.5 text-pink-600 border border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-medium flex items-center gap-1"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            Cancel Order
+                            📍 Track Order
                           </button>
-                        )}
+                          {canCancel && !isCancelled && (
+                            <button 
+                              onClick={() => cancelOrder(order._id)} 
+                              className="px-4 py-1.5 text-rose-600 border border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-medium"
+                            >
+                              ❌ Cancel Order
+                            </button>
+                          )}
+                        </div>
                       </div>
-
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -984,7 +840,7 @@ function Profile() {
                       addressLine2: '', 
                       city: '', 
                       state: '', 
-                      isDefault: addresses.length === 0
+                      isDefault: addresses.length === 0 
                     });
                     setShowAddressModal(true);
                   }}
@@ -1030,7 +886,7 @@ function Profile() {
             </div>
           )}
 
-          {/* ========== PROFILE TAB ========== */}
+          {/* ========== PROFILE TAB (With fixed Gender/DOB & Success Toasts) ========== */}
           {activeTab === 'profile' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
@@ -1044,8 +900,8 @@ function Profile() {
                   </div>
                   {editingField === 'name' ? (
                     <div className="flex gap-2">
-                      <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm" />
-                      <button onClick={() => handleFieldUpdate('name', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('name', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
                       <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
                     </div>
                   ) : (
@@ -1060,8 +916,8 @@ function Profile() {
                   </div>
                   {editingField === 'email' ? (
                     <div className="flex gap-2">
-                      <input type="email" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm" />
-                      <button onClick={() => handleFieldUpdate('email', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <input type="email" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('email', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
                       <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
                     </div>
                   ) : (
@@ -1076,8 +932,8 @@ function Profile() {
                   </div>
                   {editingField === 'phone' ? (
                     <div className="flex gap-2">
-                      <input type="tel" value={editValue} onChange={(e) => setEditValue(e.target.value)} maxLength="10" className="border border-gray-200 rounded-lg px-3 py-1 text-sm" />
-                      <button onClick={() => handleFieldUpdate('phone', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <input type="tel" value={editValue} onChange={(e) => setEditValue(e.target.value)} maxLength="10" className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('phone', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
                       <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
                     </div>
                   ) : (
@@ -1092,13 +948,13 @@ function Profile() {
                   </div>
                   {editingField === 'gender' ? (
                     <div className="flex gap-2">
-                      <select value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm">
+                      <select value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500 bg-white">
                         <option value="">Select</option>
                         <option value="Female">Female</option>
                         <option value="Male">Male</option>
                         <option value="Other">Other</option>
                       </select>
-                      <button onClick={() => handleFieldUpdate('gender', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <button onClick={() => handleFieldUpdate('gender', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
                       <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
                     </div>
                   ) : (
@@ -1113,8 +969,8 @@ function Profile() {
                   </div>
                   {editingField === 'dob' ? (
                     <div className="flex gap-2">
-                      <input type="date" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm" />
-                      <button onClick={() => handleFieldUpdate('dob', editValue)} className="text-emerald-500 text-sm">Save</button>
+                      <input type="date" value={editValue} onChange={(e) => setEditValue(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1 text-sm outline-none focus:border-pink-500" />
+                      <button onClick={() => handleFieldUpdate('dob', editValue)} className="text-emerald-500 text-sm font-medium">Save</button>
                       <button onClick={() => setEditingField(null)} className="text-gray-400 text-sm">Cancel</button>
                     </div>
                   ) : (
@@ -1160,11 +1016,6 @@ function Profile() {
                       </button>
                     </div>
                   ))}
-                  {wishlist.length > 5 && (
-                    <div className="p-3 text-center">
-                      <Link to="/wishlist" className="text-pink-600 text-sm hover:underline">View all {wishlist.length} items →</Link>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1179,13 +1030,9 @@ function Profile() {
               {reviewsLoading ? (
                 <div className="p-8 text-center">
                   <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading reviews...</p>
                 </div>
               ) : reviews.length === 0 ? (
-                <div className="p-8 text-center">
-                  <p className="text-gray-400">No reviews yet</p>
-                  <Link to="/shop" className="inline-block mt-3 text-pink-600 hover:underline">Shop and review →</Link>
-                </div>
+                <div className="p-8 text-center text-gray-400">No reviews yet</div>
               ) : (
                 <div className="divide-y divide-gray-50">
                   {reviews.map(review => (
@@ -1201,7 +1048,6 @@ function Profile() {
                           <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-400 mt-2">{new Date(review.createdAt).toLocaleDateString()}</p>
                     </div>
                   ))}
                 </div>
@@ -1217,12 +1063,7 @@ function Profile() {
                   <h3 className="font-semibold text-gray-800">Saved Cards</h3>
                   <button onClick={() => setShowCardModal(true)} className="text-pink-600 text-sm hover:underline">+ Add Card</button>
                 </div>
-                {cardsLoading ? (
-                  <div className="p-8 text-center">
-                    <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="text-gray-400 mt-2">Loading cards...</p>
-                  </div>
-                ) : savedCards.length === 0 ? (
+                {savedCards.length === 0 ? (
                   <div className="p-8 text-center text-gray-400">No saved cards</div>
                 ) : (
                   <div className="divide-y divide-gray-50">
@@ -1233,35 +1074,9 @@ function Profile() {
                           <div>
                             <p className="font-medium">•••• {card.last4}</p>
                             <p className="text-xs text-gray-500">Expires {card.expiryMonth}/{card.expiryYear}</p>
-                            {card.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
                           </div>
                         </div>
                         <button onClick={() => handleDeleteCard(card._id)} className="text-rose-500 text-sm">Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-semibold text-gray-800">UPI IDs</h3>
-                  <button onClick={() => setShowUpiModal(true)} className="text-pink-600 text-sm hover:underline">+ Add UPI</button>
-                </div>
-                {upiOptions.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400">No UPI IDs saved</div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {upiOptions.map(upi => (
-                      <div key={upi._id} className="p-4 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">📱</span>
-                          <div>
-                            <p className="font-medium">{upi.upiId}</p>
-                            {upi.isDefault && <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Default</span>}
-                          </div>
-                        </div>
-                        <button onClick={() => handleDeleteUpi(upi._id)} className="text-rose-500 text-sm">Remove</button>
                       </div>
                     ))}
                   </div>
@@ -1279,16 +1094,16 @@ function Profile() {
               <div className="p-4">
                 {showPasswordEdit ? (
                   <div className="space-y-3">
-                    <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
-                    <input type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
-                    <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl" />
+                    <input type="password" placeholder="Current Password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
+                    <input type="password" placeholder="New Password (min 6 chars)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
+                    <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-pink-500" />
                     <div className="flex gap-2">
                       <button onClick={handlePasswordUpdate} className="bg-pink-500 text-white px-4 py-2 rounded-xl text-sm hover:shadow-lg transition">Save</button>
                       <button onClick={() => setShowPasswordEdit(false)} className="bg-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm hover:bg-gray-300 transition">Cancel</button>
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline">Change Password</button>
+                  <button onClick={() => setShowPasswordEdit(true)} className="text-pink-600 text-sm hover:underline font-medium">Change Password</button>
                 )}
               </div>
             </div>
@@ -1296,47 +1111,86 @@ function Profile() {
 
         </div>
 
-        {/* Tracking Modal */}
+        {/* ✅ LIVE TRACKING MODAL */}
         {showTracking && selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowTracking(false)}>
+            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="sticky top-0 bg-white p-4 border-b border-pink-100 rounded-t-2xl flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">📍 Track Order #{getOrderIdDisplay(selectedOrder)}</h3>
                 <button onClick={() => setShowTracking(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
               </div>
               <div className="p-6">
-                <div className="mb-6">
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500"
-                      style={{ width: `${getProgressWidth(selectedOrder.tracking)}%` }}
-                    ></div>
+                {trackingLoading ? (
+                  <div className="text-center py-10">
+                    <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                    <p className="text-sm text-gray-400">Fetching live tracking updates...</p>
                   </div>
-                  <p className="text-xs text-gray-400 text-right mt-1">{Math.round(getProgressWidth(selectedOrder.tracking))}% complete</p>
-                </div>
-                
-                <div className="space-y-4">
-                  {selectedOrder.tracking && selectedOrder.tracking.map((step, idx) => (
-                    <div key={idx} className="flex gap-3">
+                ) : (
+                  <div className="space-y-6">
+                    <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-pink-100">
+                      
                       <div className="relative">
-                        <div className={`w-4 h-4 rounded-full mt-1 ${step.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
-                        {idx < selectedOrder.tracking.length - 1 && (
-                          <div className={`absolute top-5 left-1.5 w-0.5 h-8 ${step.completed && selectedOrder.tracking[idx+1]?.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
-                        )}
+                        <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">✓</div>
+                        <p className="font-semibold text-gray-800 text-sm">Order Placed (Website)</p>
+                        <p className="text-xs text-gray-400">{formatDate(selectedOrder.createdAt)}</p>
                       </div>
-                      <div className="flex-1 pb-4">
-                        <p className={`font-medium ${step.completed ? 'text-gray-800' : 'text-gray-400'}`}>{step.stage}</p>
-                        <p className="text-xs text-gray-400">{formatDate(step.date)}</p>
+
+                      <div className="relative">
+                        <div className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-xs ${['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status?.toLowerCase()) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                          {['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status?.toLowerCase()) ? '✓' : '•'}
+                        </div>
+                        <p className={`font-semibold text-sm ${['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status?.toLowerCase()) ? 'text-gray-800' : 'text-gray-400'}`}>
+                          Order Processed & Confirmed (Admin Panel)
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status?.toLowerCase()) ? formatDate(selectedOrder.updatedAt || selectedOrder.createdAt) : 'Pending admin review'}
+                        </p>
+                      </div>
+
+                      {liveTrackingData?.tracking_data?.shipment_track ? (
+                        liveTrackingData.tracking_data.shipment_track.map((track, idx) => (
+                          <div key={idx} className="relative">
+                            <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs">📦</div>
+                            <p className="font-semibold text-gray-800 text-sm">{track.current_status || 'In Transit'}</p>
+                            <p className="text-xs text-gray-500">{track.location || 'Hub'} - {track.activity}</p>
+                            <p className="text-xs text-gray-400">{track.date}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="relative">
+                          <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-amber-400 text-white flex items-center justify-center text-xs">⏳</div>
+                          <p className="font-semibold text-gray-600 text-sm">Awaiting Courier Pickup (Shiprocket)</p>
+                          <p className="text-xs text-gray-400">Shipment is being prepared for dispatch from our Mumbai warehouse.</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-6 p-4 bg-pink-50/70 rounded-xl border border-pink-100">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">📍 Delivery Address</p>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <p className="font-bold text-gray-800 text-sm">
+                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
+                            ? (selectedOrder.shippingAddress.fullName || user?.fullName || 'Customer')
+                            : (user?.fullName || 'Customer')}
+                        </p>
+                        <p>
+                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
+                            ? (selectedOrder.shippingAddress.addressLine1 || selectedOrder.shippingAddress.address || 'N/A')
+                            : (String(selectedOrder.shippingAddress || selectedOrder.address || 'N/A'))}
+                        </p>
+                        <p>
+                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (
+                            <>
+                              {selectedOrder.shippingAddress.city || 'Mumbai'}, {selectedOrder.shippingAddress.state || 'Maharashtra'} - <span className="font-mono font-semibold">{selectedOrder.shippingAddress.pincode || '400072'}</span>
+                            </>
+                          ) : (
+                            'Mumbai, Maharashtra - 400072'
+                          )}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 p-4 bg-pink-50 rounded-xl">
-                  <p className="text-sm font-semibold text-gray-600 mb-1">📍 Delivery Address</p>
-                  <p className="text-sm text-gray-600">{selectedOrder.shippingAddress || selectedOrder.address}</p>
-                  <p className="text-xs text-gray-400 mt-2">Payment: {selectedOrder.paymentMethod}</p>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1351,14 +1205,14 @@ function Profile() {
                 <button onClick={() => setShowAddressModal(false)} className="text-gray-400 text-2xl">&times;</button>
               </div>
               <form onSubmit={handleAddressSubmit} className="p-5 space-y-3">
-                <input type="text" placeholder="Full Name *" value={addressForm.fullName} onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
-                <input type="tel" placeholder="Mobile Number *" value={addressForm.phone} onChange={(e) => setAddressForm({...addressForm, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required maxLength="10" />
-                <input type="text" placeholder="Pincode *" value={addressForm.pincode} onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required maxLength="6" />
-                <input type="text" placeholder="Address Line 1 *" value={addressForm.addressLine1} onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
-                <input type="text" placeholder="Address Line 2 (Optional)" value={addressForm.addressLine2} onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" />
+                <input type="text" placeholder="Full Name *" value={addressForm.fullName} onChange={(e) => setAddressForm({...addressForm, fullName: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" required />
+                <input type="tel" placeholder="Mobile Number *" value={addressForm.phone} onChange={(e) => setAddressForm({...addressForm, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" required maxLength="10" />
+                <input type="text" placeholder="Pincode *" value={addressForm.pincode} onChange={(e) => setAddressForm({...addressForm, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" required maxLength="6" />
+                <input type="text" placeholder="Address Line 1 *" value={addressForm.addressLine1} onChange={(e) => setAddressForm({...addressForm, addressLine1: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" required />
+                <input type="text" placeholder="Address Line 2 (Optional)" value={addressForm.addressLine2} onChange={(e) => setAddressForm({...addressForm, addressLine2: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" />
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="City *" value={addressForm.city} onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
-                  <input type="text" placeholder="State *" value={addressForm.state} onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
+                  <input type="text" placeholder="City *" value={addressForm.city} onChange={(e) => setAddressForm({...addressForm, city: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" required />
+                  <input type="text" placeholder="State *" value={addressForm.state} onChange={(e) => setAddressForm({...addressForm, state: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 outline-none" required />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer text-sm">
                   <input type="checkbox" checked={addressForm.isDefault} onChange={(e) => setAddressForm({...addressForm, isDefault: e.target.checked})} /> Set as default
@@ -1371,103 +1225,10 @@ function Profile() {
           </div>
         )}
 
-        {/* Card Modal */}
-        {showCardModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold mb-4">Add New Card</h3>
-              <select value={cardForm.cardType} onChange={(e) => setCardForm({...cardForm, cardType: e.target.value})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none">
-                <option value="">Select Card Type</option>
-                <option value="visa">Visa</option>
-                <option value="mastercard">Mastercard</option>
-                <option value="rupay">RuPay</option>
-              </select>
-              <input type="text" placeholder="Last 4 digits *" maxLength="4" value={cardForm.last4} onChange={(e) => setCardForm({...cardForm, last4: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" required />
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <input type="text" placeholder="Expiry Month (MM)" maxLength="2" value={cardForm.expiryMonth} onChange={(e) => setCardForm({...cardForm, expiryMonth: e.target.value.replace(/[^0-9]/g, '').slice(0, 2)})} className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" />
-                <input type="text" placeholder="Expiry Year (YYYY)" maxLength="4" value={cardForm.expiryYear} onChange={(e) => setCardForm({...cardForm, expiryYear: e.target.value.replace(/[^0-9]/g, '').slice(0, 4)})} className="px-4 py-2.5 border border-gray-200 rounded-xl focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" />
-              </div>
-              <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm">
-                <input type="checkbox" checked={cardForm.isDefault} onChange={(e) => setCardForm({...cardForm, isDefault: e.target.checked})} /> Set as default
-              </label>
-              <div className="flex gap-3">
-                <button onClick={handleAddCard} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save Card</button>
-                <button onClick={() => setShowCardModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* UPI Modal */}
-        {showUpiModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold mb-4">Add UPI ID</h3>
-              <input 
-                type="text" 
-                placeholder="example@upi" 
-                value={upiForm.upiId} 
-                onChange={(e) => setUpiForm({...upiForm, upiId: e.target.value})} 
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mb-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-200 outline-none" 
-              />
-              <p className="text-xs text-gray-400 mb-3">Enter your UPI ID (e.g., name@upi, name@paytm, etc.)</p>
-              <label className="flex items-center gap-2 mb-4 cursor-pointer text-sm">
-                <input type="checkbox" checked={upiForm.isDefault} onChange={(e) => setUpiForm({...upiForm, isDefault: e.target.checked})} /> Set as default
-              </label>
-              <div className="flex gap-3">
-                <button onClick={handleAddUpi} className="flex-1 bg-pink-500 text-white py-2 rounded-xl hover:shadow-lg transition">Save UPI</button>
-                <button onClick={() => setShowUpiModal(false)} className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-xl hover:bg-gray-300 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">M</span>
-                  </div>
-                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-                </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-4">Shop</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-4">Support</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">TikTok</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-                </ul>
-              </div>
-            </div>
-            <div className="text-center pt-8 border-t border-gray-800">
-              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-            </div>
+          <div className="max-w-7xl mx-auto px-4 text-center">
+            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
           </div>
         </footer>
       </div>
