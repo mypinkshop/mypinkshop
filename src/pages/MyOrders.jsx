@@ -85,23 +85,34 @@ function MyOrders() {
       
       const data = await response.json();
       const ordersArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
-      const normalized = ordersArray.map(order => ({
-        ...order,
-        _id: order._id || order.id,
-        createdAt: order.createdAt || order.created_at,
-        updatedAt: order.updatedAt || order.updated_at,
-        total: order.total || order.total_amount || order.subtotal,
-        shippingAddress: order.shippingAddress || order.shipping_address,
-        paymentMethod: order.paymentMethod || order.payment_method,
-        paymentStatus: order.paymentStatus || order.payment_status,
-        items: (order.items || []).map(item => ({
-          ...item,
-          productId: item.productId || item.product_id,
-          name: item.name || item.product_name,
-          image: item.image || item.product_image || item.img,
-          price: item.price || item.unit_price || 0,
-        })),
-      }));
+      const normalized = ordersArray.map(order => {
+        let parsedAddress = order.shippingAddress || order.shipping_address;
+        if (typeof parsedAddress === 'string') {
+          try {
+            parsedAddress = JSON.parse(parsedAddress);
+          } catch (e) {
+            // Keep as string if not JSON
+          }
+        }
+
+        return {
+          ...order,
+          _id: order._id || order.id,
+          createdAt: order.createdAt || order.created_at,
+          updatedAt: order.updatedAt || order.updated_at,
+          total: order.total || order.total_amount || order.subtotal,
+          shippingAddress: parsedAddress,
+          paymentMethod: order.paymentMethod || order.payment_method,
+          paymentStatus: order.paymentStatus || order.payment_status,
+          items: (order.items || []).map(item => ({
+            ...item,
+            productId: item.productId || item.product_id,
+            name: item.name || item.product_name,
+            image: item.image || item.product_image || item.img,
+            price: item.price || item.unit_price || 0,
+          })),
+        };
+      });
 
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
       const filteredData = normalized.filter(order => {
@@ -221,7 +232,6 @@ function MyOrders() {
     navigate('/cart');
   };
 
-  // ✅ Fetch Real-time Shiprocket Tracking Data
   const handleTrackOrder = async (order) => {
     setSelectedOrder(order);
     setShowTracking(true);
@@ -504,7 +514,7 @@ function MyOrders() {
             </div>
           ) : (
             <div className="space-y-6">
-              {filteredOrders.map((order, index) => {
+              {filteredOrders.map((order) => {
                 const canCancel = ['pending', 'confirmed'].includes(order.status) && order.paymentStatus !== 'failed';
                 const isCancelled = ['cancelled', 'failed'].includes(order.status);
                 const isDelivered = order.status === 'delivered';
@@ -540,7 +550,6 @@ function MyOrders() {
                         
                         return (
                           <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
-                            {/* ✅ FIXED: Uncropped Full Product Image */}
                             <Link to={`/product/${item.productId}`} className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-pink-100 flex-shrink-0 flex items-center justify-center p-1 hover:shadow-md transition">
                               {item.image ? (
                                 <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
@@ -583,7 +592,7 @@ function MyOrders() {
           )}
         </div>
 
-        {/* ✅ LIVE TRACKING MODAL (Website Step -> Admin Processing -> Shiprocket Live Milestones) */}
+        {/* ✅ LIVE TRACKING MODAL */}
         {showTracking && selectedOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowTracking(false)}>
             <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -643,11 +652,41 @@ function MyOrders() {
                       )}
                     </div>
 
+                    {/* ✅ CLEAN USER-FRIENDLY ADDRESS DISPLAY */}
                     <div className="mt-6 p-4 bg-pink-50/70 rounded-xl border border-pink-100">
-                      <p className="text-xs font-semibold text-gray-700 mb-1">📍 Delivery Address</p>
-                      {/* Clean Formatted Address */} <div className="text-xs text-gray-600 space-y-0.5">   <p className="font-semibold text-gray-800">{selectedOrder.shippingAddress?.fullName || user?.fullName || 'Customer'}</p>   <p>{selectedOrder.shippingAddress?.addressLine1 || selectedOrder.shippingAddress || selectedOrder.address || 'N/A'}</p>   <p>     {selectedOrder.shippingAddress?.city || 'Mumbai'}, {selectedOrder.shippingAddress?.state || 'Maharashtra'} - <span className="font-mono font-medium">{selectedOrder.shippingAddress?.pincode || '400072'}</span>   </p>   <p className="text-gray-400">Phone: {selectedOrder.shippingAddress?.phone || 'N/A'}</p> </div>
-                      <p className="text-[11px] text-gray-400 mt-2">Payment Method: {selectedOrder.paymentMethod} ({selectedOrder.paymentStatus || 'Paid'})</p>
+                      <p className="text-xs font-semibold text-gray-700 mb-2">📍 Delivery Address</p>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <p className="font-bold text-gray-800 text-sm">
+                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
+                            ? (selectedOrder.shippingAddress.fullName || user?.fullName || 'Customer')
+                            : (user?.fullName || 'Customer')}
+                        </p>
+                        <p>
+                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
+                            ? (selectedOrder.shippingAddress.addressLine1 || selectedOrder.shippingAddress.address || 'N/A')
+                            : (String(selectedOrder.shippingAddress || selectedOrder.address || 'N/A'))}
+                        </p>
+                        <p>
+                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (
+                            <>
+                              {selectedOrder.shippingAddress.city || 'Mumbai'}, {selectedOrder.shippingAddress.state || 'Maharashtra'} - <span className="font-mono font-semibold">{selectedOrder.shippingAddress.pincode || '400072'}</span>
+                            </>
+                          ) : (
+                            'Mumbai, Maharashtra - 400072'
+                          )}
+                        </p>
+                        <p className="text-gray-500 pt-1">
+                          Phone: <span className="font-medium">{typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (selectedOrder.shippingAddress.phone || 'N/A') : 'N/A'}</span>
+                        </p>
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-pink-200/50 flex justify-between items-center text-[11px] text-gray-500">
+                        <span>Payment: <strong className="uppercase">{selectedOrder.paymentMethod || 'Online'}</strong></span>
+                        <span className="capitalize px-2 py-0.5 bg-white rounded-full border border-pink-200 font-medium text-pink-600">
+                          {selectedOrder.paymentStatus || 'Paid'}
+                        </span>
+                      </div>
                     </div>
+
                   </div>
                 )}
               </div>
