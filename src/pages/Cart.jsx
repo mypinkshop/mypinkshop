@@ -26,13 +26,19 @@ function Cart() {
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [eligibleCoupons, setEligibleCoupons] = useState([]);
 
+  // ✅ Live Shipping State from Shiprocket API
+  const [shippingCharge, setShippingCharge] = useState(49);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(499);
+
   const API_URL = `${import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com'}/api`;
 
-  // ✅ Fetch available coupons - WITH CART ITEMS
+  const subtotal = cartTotal();
+  const FREE_SHIPPING_THRESHOLD = freeShippingThreshold;
+
+  // ✅ Fetch active coupons & shipping settings
   useEffect(() => {
-    const fetchCoupons = async () => {
+    const fetchCouponsAndShipping = async () => {
       try {
-        // ✅ Cart items se vendorId nikaalo
         const cartItemsWithVendor = cart.map(item => ({
           id: item.id,
           productId: item.id,
@@ -41,32 +47,76 @@ function Cart() {
           quantity: item.quantity
         }));
 
-        // ✅ Backend ko bhejo
         const response = await fetch(
           `${API_URL}/coupons/active?cartItems=${encodeURIComponent(JSON.stringify(cartItemsWithVendor))}`
         );
         const data = await response.json();
 
-                if (data.success || data.data) {
+        if (data.success || data.data) {
           const coupons = data.data || data.coupons || [];
           setAvailableCoupons(coupons);
           
-          // ✅ Frontend filter (safety)
           const eligible = coupons.filter(coupon => {
-            if (!coupon.vendorId) return true; // Admin coupon - always eligible
-            return cart.some(item => item.vendorId === coupon.vendorId); // Vendor coupon - only if vendor's products in cart
+            if (!coupon.vendorId) return true;
+            return cart.some(item => item.vendorId === coupon.vendorId);
           });
           setEligibleCoupons(eligible);
         }
       } catch (error) {
         console.error('Failed to fetch coupons:', error);
       }
+
+      // Fetch live shipping settings & default charges
+      try {
+        const res = await fetch(`${API_URL}/shipping/settings`);
+        const settingsData = await res.json();
+        const settings = settingsData.data || settingsData.settings || settingsData;
+        if (settings.freeShippingThreshold) {
+          setFreeShippingThreshold(Number(settings.freeShippingThreshold));
+        }
+      } catch (err) {
+        console.error('Failed to load shipping settings', err);
+      }
     };
 
-    fetchCoupons();
-  }, [cart]);
+    fetchCouponsAndShipping();
+  }, [cart, API_URL]);
 
-    const handleCheckout = () => {
+  // ✅ Fetch live shipping charge if user has a saved address or default pincode
+  useEffect(() => {
+    const fetchLiveShipping = async () => {
+      try {
+        // Default default Mumbai/fallback pincode or saved address pincode
+        const savedAddresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
+        const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
+        const targetPincode = defaultAddr?.pincode || '400072';
+
+        const res = await fetch(`${API_URL}/shipping/check-delivery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pincode: targetPincode,
+            cartTotal: subtotal,
+            weight: 0.5
+          })
+        });
+        const data = await res.json();
+        const deliveryData = data.data || data;
+        
+        if (deliveryData.success !== false && deliveryData.shippingCharge !== undefined) {
+          setShippingCharge(Number(deliveryData.shippingCharge));
+        }
+      } catch (err) {
+        console.error('Live shipping calculation error:', err);
+      }
+    };
+
+    if (subtotal > 0) {
+      fetchLiveShipping();
+    }
+  }, [subtotal, API_URL]);
+
+  const handleCheckout = () => {
     const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
     
     if (!token) {
@@ -119,7 +169,6 @@ function Cart() {
     }
   };
 
-  // ✅ Apply Coupon - With vendor support
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Please enter a coupon code');
@@ -129,7 +178,6 @@ function Cart() {
     setValidatingCoupon(true);
 
     try {
-      // ✅ Send cart items with vendorId for vendor coupon validation
       const cartItemsWithVendor = cart.map(item => ({
         id: item.id,
         productId: item.id,
@@ -148,13 +196,11 @@ function Cart() {
           code: couponCode.toUpperCase(),
           cartTotal: subtotal,
           userId: user?._id || null,
-          cartItems: cartItemsWithVendor // ✅ Send cart items
+          cartItems: cartItemsWithVendor
         })
       });
 
       const data = await response.json();
-
-      // ✅ FIX: backend wraps as { success, data: { coupon, discountAmount, valid } }
       const result = data.data || data;
 
       if (!result.valid) {
@@ -162,12 +208,10 @@ function Cart() {
         return;
       }
 
-      // ✅ Coupon valid — discountAmount is a sibling of coupon, not nested
       setDiscount(result.discountAmount);
       setAppliedCoupon({ ...result.coupon, discountAmount: result.discountAmount });
       setCouponApplied(true);
       
-      // ✅ Show vendor-specific message if vendor coupon
       if (result.coupon?.isVendorCoupon && result.coupon?.vendorName) {
         toast.success(`🎉 ${result.coupon.code} applied! You saved ₹${result.discountAmount} on ${result.coupon.vendorName} products`);
       } else {
@@ -190,14 +234,13 @@ function Cart() {
     toast.success('Coupon removed');
   };
 
-  const subtotal = cartTotal();
-  const FREE_SHIPPING_THRESHOLD = 499;
   const totalWithDiscount = subtotal - discount;
-  const shipping = totalWithDiscount > FREE_SHIPPING_THRESHOLD ? 0 : 49;
+  
+  // ✅ Free shipping rule: Subtotal >= 499 means 0 shipping, otherwise Shiprocket live charge
+  const shipping = totalWithDiscount >= FREE_SHIPPING_THRESHOLD ? 0 : Number(shippingCharge || 49);
   const finalTotal = totalWithDiscount + shipping;
   const remainingForFree = FREE_SHIPPING_THRESHOLD - totalWithDiscount;
 
-  // SEO Schema
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -221,17 +264,7 @@ function Cart() {
         <Helmet>
           <title>Shopping Cart - MyPinkShop | Your cart is empty</title>
           <meta name="description" content="Your shopping cart is empty. Shop the latest skincare, makeup, hair care, clothing, and accessories at MyPinkShop. Free shipping on orders above ₹499." />
-          <meta name="keywords" content="shopping cart, empty cart, buy products, skincare, makeup, clothing, accessories" />
           <link rel="canonical" href="https://www.mypinkshop.com/cart" />
-          <meta property="og:title" content="Shopping Cart - MyPinkShop" />
-          <meta property="og:description" content="Your shopping cart is empty. Start shopping now!" />
-          <meta property="og:type" content="website" />
-          <meta property="og:url" content="https://www.mypinkshop.com/cart" />
-          <meta property="og:image" content="https://www.mypinkshop.com/og-cart.jpg" />
-          <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content="Shopping Cart - MyPinkShop" />
-          <meta name="twitter:description" content="Your shopping cart is empty. Start shopping now!" />
-          <meta name="twitter:image" content="https://www.mypinkshop.com/og-cart.jpg" />
           <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
           <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
         </Helmet>
@@ -264,7 +297,7 @@ function Cart() {
                     />
                     <button 
                       onClick={handleSearch}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                     >
                       <span className="hidden sm:inline">Search</span>
                       <span className="sm:hidden">🔍</span>
@@ -366,23 +399,12 @@ function Cart() {
       <Helmet>
         <title>Shopping Cart - MyPinkShop | Review Your Order</title>
         <meta name="description" content="Review your shopping cart at MyPinkShop. Checkout securely with free shipping on orders above ₹499. Cash on delivery available." />
-        <meta name="keywords" content="shopping cart, checkout, buy products, cart items, mypinkshop cart" />
         <link rel="canonical" href="https://www.mypinkshop.com/cart" />
-        <meta property="og:title" content="Shopping Cart - MyPinkShop" />
-        <meta property="og:description" content="Review your cart and checkout securely. Free shipping on orders above ₹499." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.mypinkshop.com/cart" />
-        <meta property="og:image" content="https://www.mypinkshop.com/og-cart.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Shopping Cart - MyPinkShop" />
-        <meta name="twitter:description" content="Review your cart and checkout securely." />
-        <meta name="twitter:image" content="https://www.mypinkshop.com/og-cart.jpg" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
         <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-        
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex flex-col">
         <OfferBanner />
 
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
@@ -410,7 +432,7 @@ function Cart() {
                   />
                   <button 
                     onClick={handleSearch}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                   >
                     <span className="hidden sm:inline">Search</span>
                     <span className="sm:hidden">🔍</span>
@@ -455,7 +477,7 @@ function Cart() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 flex flex-wrap items-center gap-2">
             <span>🛒</span> Shopping Cart
             <span className="text-sm font-normal text-gray-400">({cart.reduce((sum, i) => sum + i.quantity, 0)} items)</span>
@@ -560,7 +582,7 @@ function Cart() {
                     <span>₹{subtotal}</span>
                   </div>
 
-                  {/* ✅ COUPON SECTION WITH VENDOR SUPPORT */}
+                  {/* Coupon Section */}
                   {couponApplied ? (
                     <div className="flex flex-col gap-1 py-2 border-t border-pink-100">
                       <div className="flex justify-between text-green-600">
@@ -569,18 +591,6 @@ function Cart() {
                           {appliedCoupon?.isVendorCoupon && appliedCoupon?.vendorName && (
                             <span className="text-[10px] text-purple-600 font-normal">
                               🛍️ Applicable on {appliedCoupon.vendorName} products only
-                            </span>
-                          )}
-                          {appliedCoupon?.description && (
-                            <span className="text-[10px] text-gray-500 font-normal">
-                              {appliedCoupon.description}
-                            </span>
-                          )}
-                          {!appliedCoupon?.description && appliedCoupon?.discountValue && (
-                            <span className="text-[10px] text-gray-500 font-normal">
-                              {appliedCoupon.discountType === 'percentage' 
-                                ? `${appliedCoupon.discountValue}% off` 
-                                : `₹${appliedCoupon.discountValue} off`}
                             </span>
                           )}
                         </div>
@@ -619,14 +629,10 @@ function Cart() {
                         </button>
                       </div>
                       
-                      {/* ✅ Available Coupons with Vendor Info */}
                       {!couponApplied && eligibleCoupons.length > 0 && (
                         <div className="mt-1">
                           <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
                             <span>🎫</span> Available Coupons
-                            <span className="text-[10px] text-gray-400 font-normal">
-                              ({eligibleCoupons.length} eligible)
-                            </span>
                           </p>
                           <div className="flex flex-col gap-1.5">
                             {eligibleCoupons.map((c, idx) => (
@@ -643,47 +649,14 @@ function Cart() {
                                     <span className="text-[10px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">
                                       {c.discountType === 'percentage' ? `${c.discountValue}% OFF` : `₹${c.discountValue} OFF`}
                                     </span>
-                                    {c.vendorId && (
-                                      <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">
-                                        🛍️ {c.vendorName || 'Vendor'}
-                                      </span>
-                                    )}
-                                    {!c.vendorId && (
-                                      <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">
-                                        🌐 All Products
-                                      </span>
-                                    )}
                                   </div>
                                   <span className="text-[10px] text-pink-500 group-hover:text-pink-700 group-hover:underline">
                                     Apply →
                                   </span>
                                 </div>
-                                {c.description && (
-                                  <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
-                                    {c.description}
-                                  </p>
-                                )}
-                                {!c.description && (
-                                  <p className="text-[10px] text-gray-400 mt-0.5">
-                                    Min. Order ₹{c.minOrderValue}
-                                  </p>
-                                )}
                               </button>
                             ))}
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* ✅ Show ineligible coupons message */}
-                      {!couponApplied && availableCoupons.length > 0 && eligibleCoupons.length === 0 && (
-                        <div className="mt-1">
-                          <p className="text-xs text-gray-400 flex items-center gap-1">
-                            <span>🔒</span> No coupons available for your cart
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            {availableCoupons.some(c => c.vendorId) && 
-                              'Vendor coupons require products from that vendor in your cart'}
-                          </p>
                         </div>
                       )}
                     </div>
@@ -729,7 +702,7 @@ function Cart() {
         </div>
 
         {/* Footer */}
-        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
+        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
