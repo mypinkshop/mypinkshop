@@ -977,34 +977,14 @@ function AdminAddProduct() {
   const [keyFeature, setKeyFeature] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
-
-  const compressImage = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (e) => {
-      const img = new Image();
-      img.src = e.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width, height = img.height;
-        const maxWidth = 800;
-        if (width > maxWidth) { height = (height * maxWidth) / width; width = maxWidth; }
-        canvas.width = width; canvas.height = height;
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        canvas.toBlob(blob => resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() })), 'image/jpeg', 0.7);
-      };
-      img.onerror = reject;
-    };
-    reader.onerror = reject;
-  });
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   const uploadImageToBackend = async (file) => {
     const token = localStorage.getItem('adminToken');
     if (!token) throw new Error('Session expired');
     try {
-      const compressedFile = await compressImage(file);
       const formDataImg = new FormData();
-      formDataImg.append('images', compressedFile);
+      formDataImg.append('images', file);
       const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -1013,7 +993,10 @@ function AdminAddProduct() {
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
       return data.data?.url || data.url;
-    } catch (error) { throw error; }
+    } catch (error) { 
+      console.error("Upload Error:", error);
+      throw error; 
+    }
   };
 
   const handleImageUpload = async (e) => {
@@ -1037,7 +1020,7 @@ function AdminAddProduct() {
           uploadedUrls.push(url);
         }
       } catch (error) { 
-        toast.error(`Failed: ${file.name}`); 
+        toast.error(`Failed to upload: ${file.name}`); 
       }
     }
     if (uploadedUrls.length) {
@@ -1086,8 +1069,6 @@ function AdminAddProduct() {
     }
   };
 
-  // 🔥 VARIABLE DECLARATIONS FIXED HERE
-  const currentSubCategories = getCurrentSubCategories();
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
   // 🔥 STRICT VALIDATION WITH TOAST & BROWSER ALERT
@@ -1378,7 +1359,7 @@ function AdminAddProduct() {
             <div className="flex items-center gap-3 sm:gap-4">
               <Link to="/admin/inventory" className="text-gray-500 hover:text-pink-600 transition p-1"><IconBack /></Link>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Add New Product (SEO ID: {productId})</h1>
+                <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Add New Product</h1>
                 <p className="text-xs text-gray-400 hidden sm:block">Built for Google Top Rank & Shopping</p>
               </div>
             </div>
