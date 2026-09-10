@@ -154,12 +154,12 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     
     let metaTitle = `${product.name}`;
     if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
-    metaTitle = `${metaTitle} | MyPinkShop`;
+    metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
     
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ` online at best price. Shop now at MyPinkShop.`;
+    metaDescription += ` online at lowest price with free delivery. Shop now at MyPinkShop.`;
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
     
     const autoKeywords = [
@@ -168,7 +168,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       product.detectedCategory,
       product.detectedSubCategory,
       'online shopping',
-      'best price',
+      'lowest price',
       'MyPinkShop'
     ].filter(Boolean);
     const metaKeywords = [...new Set(autoKeywords)].join(', ');
@@ -439,12 +439,12 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
     
     let metaTitle = `${product.name}`;
     if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
-    metaTitle = `${metaTitle} | MyPinkShop`;
+    metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
     
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ` online at best price. Shop now at MyPinkShop.`;
+    metaDescription += ` online at lowest price with free delivery. Shop now at MyPinkShop.`;
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
     
     const autoKeywords = [
@@ -453,7 +453,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       product.detectedCategory,
       product.detectedSubCategory,
       'online shopping',
-      'best price',
+      'lowest price',
       'MyPinkShop'
     ].filter(Boolean);
     const metaKeywords = [...new Set(autoKeywords)].join(', ');
@@ -674,7 +674,7 @@ const VariationSelectWithSearch = ({
 };
 
 // ============================================
-// MAIN ADMIN ADD PRODUCT COMPONENT (FULL ORIGINAL UNCUT 1800+ LINES VERSION)
+// MAIN ADMIN ADD PRODUCT COMPONENT
 // ============================================
 function AdminAddProduct() {
   const navigate = useNavigate();
@@ -686,8 +686,9 @@ function AdminAddProduct() {
   const [newSubCategory, setNewSubCategory] = useState('');
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
+  const [loading, setLoading] = useState(false); // 🔥 Added missing loading state
   
-  // 🔥 Permanent Pre-Generated SEO Product ID matching actual links exactly (`prod_...`)
+  // Permanent Pre-Generated SEO Product ID
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
   const [brands, setBrands] = useState([
@@ -725,6 +726,36 @@ function AdminAddProduct() {
   });
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+  // SEO META TAG GENERATOR
+  useEffect(() => {
+    if (formData.productName) {
+      const titleSlug = formData.productName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      const fullSlug = `${titleSlug}-${productId}`;
+      
+      let metaTitle = `${formData.productName}`;
+      if (formData.brand) metaTitle = `${formData.productName} - ${formData.brand}`;
+      metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
+      if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
+      
+      let metaDescription = `Buy ${formData.productName}`;
+      if (formData.brand) metaDescription += ` by ${formData.brand}`;
+      metaDescription += ` online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!`;
+      if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
+      
+      const autoKeywords = [
+        formData.brand, formData.category, formData.subCategory,
+        ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
+      ].filter(Boolean);
+      const metaKeywords = [...new Set(autoKeywords)].join(', ');
+      
+      setSeoData({ metaTitle, metaDescription, metaKeywords, slug: fullSlug });
+    }
+  }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
 
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
   const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Creamy', 'Powder', 'Liquid', 'Velvet'];
@@ -834,40 +865,136 @@ function AdminAddProduct() {
     }
   };
 
-  const currentSubCategories = getCurrentSubCategories();
-  const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
+  const toggleSelectVariation = (id) => {
+    setSelectedVariationIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
 
-  // 🔥 SEO META TAG AUTO-GENERATOR WITH EXACT `prod_...` MATCH (FIXED URL SLUG)
-  useEffect(() => {
-    let metaTitle = formData.productName ? `${formData.productName} ${formData.brand ? `- ${formData.brand}` : ''} | Lowest Price on MyPinkShop` : 'Add New Product | MyPinkShop';
-    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-    
-    let metaDescription = formData.productName ? `Buy ${formData.productName} online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!` : 'Add products to your store.';
-    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-    
-    const autoKeywords = [
-      formData.brand, formData.category, formData.subCategory,
-      ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
-    ].filter(Boolean);
-    const metaKeywords = [...new Set(autoKeywords)].join(', ');
+  const selectAllVariations = () => {
+    if (selectedVariationIds.length === variations.length) {
+      setSelectedVariationIds([]);
+    } else {
+      setSelectedVariationIds(variations.map(v => v.id));
+    }
+  };
 
-    // 🔥 Exact match slug to productId
-    setSeoData({ metaTitle, metaDescription, metaKeywords, slug: productId });
-  }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
+  const deleteSelectedVariations = () => {
+    if (selectedVariationIds.length === 0) {
+      toast.error('Please select variations to delete');
+      return;
+    }
+    if (window.confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
+      setVariations(variations.filter(v => !selectedVariationIds.includes(v.id)));
+      setSelectedVariationIds([]);
+    }
+  };
+
+  const saveVariation = () => {
+    if (!variationForm.name) {
+      toast.error(`Please select ${variationAttrs.type}`);
+      return;
+    }
+    
+    const existingIndex = variations.findIndex(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
+    const newVariation = {
+      id: editingVariation?.id || Date.now(),
+      name: variationForm.name,
+      secondaryName: variationForm.attributes.secondary || '',
+      price: parseFloat(variationForm.price) || 0,
+      mrp: parseFloat(variationForm.mrp) || parseFloat(variationForm.price) * 1.2 || 0,
+      stock: parseInt(variationForm.stock) || 0,
+      sku: variationForm.sku || `VAR-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      image: variationForm.image || '',
+      attributes: variationForm.attributes || {}
+    };
+    
+    if (editingVariation) {
+      const updated = [...variations];
+      updated[variations.findIndex(v => v.id === editingVariation.id)] = newVariation;
+      setVariations(updated);
+      toast.success('✅ Variation updated successfully!');
+    } else {
+      if (existingIndex !== -1) {
+        toast.error(`⚠️ This ${variationAttrs.type} combination already exists!`);
+        return;
+      }
+      setVariations([...variations, newVariation]);
+      toast.success(`✅ ${variationAttrs.type} added successfully!`);
+    }
+    setVariationModalOpen(false);
+    setEditingVariation(null);
+    setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} });
+  };
+
+  const editVariation = (variation) => {
+    setEditingVariation(variation);
+    setVariationForm({ 
+      name: variation.name, 
+      price: variation.price, 
+      mrp: variation.mrp || variation.price * 1.2,
+      stock: variation.stock, 
+      sku: variation.sku, 
+      image: variation.image || '',
+      attributes: { secondary: variation.secondaryName || '' } 
+    });
+    setVariationModalOpen(true);
+  };
+
+  const deleteVariation = (variationId) => {
+    if (window.confirm('Delete this variation?')) {
+      setVariations(variations.filter(v => v.id !== variationId));
+    }
+  };
+
+  const uploadVariationImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formDataImg = new FormData();
+    formDataImg.append('images', file);
+    
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataImg
+      });
+      const data = await response.json();
+      const imageUrl = data.data?.url || data.url;
+      if (imageUrl) {
+        setVariationForm({ ...variationForm, image: imageUrl });
+        toast.success('✅ Image uploaded!');
+      }
+    } catch (error) {
+      toast.error('Upload failed');
+    }
+  };
+
+  const setImages = (images) => setFormData(prev => ({ ...prev, images }));
+
+  const [currentBullet, setCurrentBullet] = useState('');
+  const [keyFeature, setKeyFeature] = useState('');
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   const uploadImageToBackend = async (file) => {
     const token = localStorage.getItem('adminToken');
     if (!token) throw new Error('Session expired');
-    const formDataImg = new FormData();
-    formDataImg.append('images', file);
-    const response = await fetch(`${API_URL}/api/upload`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formDataImg
-    });
-    if (!response.ok) throw new Error('Upload failed');
-    const data = await response.json();
-    return data.data?.url || data.url;
+    try {
+      const formDataImg = new FormData();
+      formDataImg.append('images', file);
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataImg
+      });
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      return data.data?.url || data.url;
+    } catch (error) { 
+      console.error("Upload Error:", error);
+      throw error; 
+    }
   };
 
   const handleImageUpload = async (e) => {
@@ -887,8 +1014,12 @@ function AdminAddProduct() {
       }
       try {
         const url = await uploadImageToBackend(file);
-        if (url) uploadedUrls.push(url);
-      } catch (error) { toast.error(`Failed: ${file.name}`); }
+        if (url) {
+          uploadedUrls.push(url);
+        }
+      } catch (error) { 
+        toast.error(`Failed: ${file.name}`); 
+      }
     }
     if (uploadedUrls.length) {
       setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
@@ -935,6 +1066,9 @@ function AdminAddProduct() {
       toast.error('Please enter a valid brand name');
     }
   };
+
+  const currentSubCategories = getCurrentSubCategories();
+  const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
   // 🔥 STRICT VALIDATION WITH TOAST & ALERT
   const validateAndProceed = (targetStep) => {
@@ -993,7 +1127,7 @@ function AdminAddProduct() {
     const finalSku = formData.sku || generateSKU();
 
     const productData = {
-      id: productId,
+      id: productId, // ✅ SEO ID MATCH (prod_...)
       name: formData.productName, 
       brand: formData.brand, 
       category: formData.subCategory,
@@ -1026,7 +1160,7 @@ function AdminAddProduct() {
       metaTitle: seoData.metaTitle, 
       metaDescription: seoData.metaDescription,
       metaKeywords: seoData.metaKeywords, 
-      slug: productId, 
+      slug: productId, // ✅ SEO URL MATCH (prod_...)
       status: 'active', 
       adminApproved: true, 
       isNew: true, 
@@ -1604,7 +1738,7 @@ function AdminAddProduct() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description</label>
-                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <textarea value={seoData.metaDescription} onChange={(e) => setseoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
                   </div>
                   
                   <div className="p-4 bg-blue-50 rounded-xl">
