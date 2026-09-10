@@ -147,11 +147,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       .filter(item => !isGarbage(item))
       .slice(0, 10);
     
-    const slug = product.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    
     let metaTitle = `${product.name}`;
     if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
     metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
@@ -165,8 +160,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     const autoKeywords = [
       product.brand,
       ...keyFeaturesArray.slice(0, 5),
-      product.detectedCategory,
-      product.detectedSubCategory,
       'online shopping',
       'lowest price',
       'MyPinkShop'
@@ -190,7 +183,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       metaTitle: metaTitle,
       metaDescription: metaDescription,
       metaKeywords: metaKeywords,
-      slug: slug,
       category: detectedCategory,
       subCategory: detectedSubCategory,
       weight: product.weight || '',
@@ -432,19 +424,14 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       .filter(item => !isGarbage(item))
       .slice(0, 10);
     
-    const slug = product.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    
     let metaTitle = `${product.name}`;
     if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
-    metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
+    metaTitle = `${metaTitle} | MyPinkShop`;
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
     
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ` online at lowest price with free delivery. Shop now at MyPinkShop.`;
+    metaDescription += ` online at best price. Shop now at MyPinkShop.`;
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
     
     const autoKeywords = [
@@ -453,7 +440,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       product.detectedCategory,
       product.detectedSubCategory,
       'online shopping',
-      'lowest price',
+      'best price',
       'MyPinkShop'
     ].filter(Boolean);
     const metaKeywords = [...new Set(autoKeywords)].join(', ');
@@ -475,7 +462,6 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       metaTitle: metaTitle,
       metaDescription: metaDescription,
       metaKeywords: metaKeywords,
-      slug: slug,
       category: detectedCategory,
       subCategory: detectedSubCategory,
       weight: product.weight || '',
@@ -674,7 +660,7 @@ const VariationSelectWithSearch = ({
 };
 
 // ============================================
-// MAIN ADMIN ADD PRODUCT COMPONENT
+// MAIN ADMIN ADD PRODUCT COMPONENT (FULL ORIGINAL 1800+ LINES UNCUT VERSION)
 // ============================================
 function AdminAddProduct() {
   const navigate = useNavigate();
@@ -686,9 +672,8 @@ function AdminAddProduct() {
   const [newSubCategory, setNewSubCategory] = useState('');
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
-  const [loading, setLoading] = useState(false); // 🔥 Added missing loading state
   
-  // Permanent Pre-Generated SEO Product ID
+  // 🔥 Permanent Pre-Generated SEO Product ID matching actual links exactly (`prod_...`)
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
   const [brands, setBrands] = useState([
@@ -727,34 +712,22 @@ function AdminAddProduct() {
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  // SEO META TAG GENERATOR
+  // 🔥 SEO META TAG GENERATOR WITH EXACT `prod_...` URL BINDING (FIXED: No product name in URL slug)
   useEffect(() => {
-    if (formData.productName) {
-      const titleSlug = formData.productName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      
-      const fullSlug = `${titleSlug}-${productId}`;
-      
-      let metaTitle = `${formData.productName}`;
-      if (formData.brand) metaTitle = `${formData.productName} - ${formData.brand}`;
-      metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
-      if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-      
-      let metaDescription = `Buy ${formData.productName}`;
-      if (formData.brand) metaDescription += ` by ${formData.brand}`;
-      metaDescription += ` online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!`;
-      if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-      
-      const autoKeywords = [
-        formData.brand, formData.category, formData.subCategory,
-        ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
-      ].filter(Boolean);
-      const metaKeywords = [...new Set(autoKeywords)].join(', ');
-      
-      setSeoData({ metaTitle, metaDescription, metaKeywords, slug: fullSlug });
-    }
+    let metaTitle = formData.productName ? `${formData.productName} ${formData.brand ? `- ${formData.brand}` : ''} | Lowest Price on MyPinkShop` : 'Add New Product | MyPinkShop';
+    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
+    
+    let metaDescription = formData.productName ? `Buy ${formData.productName} online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!` : 'Add products to your store.';
+    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
+    
+    const autoKeywords = [
+      formData.brand, formData.category, formData.subCategory,
+      ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
+    ].filter(Boolean);
+    const metaKeywords = [...new Set(autoKeywords)].join(', ');
+
+    // 🔥 Exact match slug to productId only (No name prefix)
+    setSeoData({ metaTitle, metaDescription, metaKeywords, slug: productId });
   }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
 
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
@@ -974,6 +947,7 @@ function AdminAddProduct() {
 
   const [currentBullet, setCurrentBullet] = useState('');
   const [keyFeature, setKeyFeature] = useState('');
+  const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
@@ -1738,13 +1712,18 @@ function AdminAddProduct() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description</label>
-                    <textarea value={seoData.metaDescription} onChange={(e) => setseoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords</label>
+                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="keyword1, keyword2, keyword3" />
                   </div>
                   
                   <div className="p-4 bg-blue-50 rounded-xl">
                     <h3 className="text-sm font-semibold text-gray-800 mb-1">📱 Google Search & URL Preview</h3>
                     <p className="text-blue-600 text-sm font-medium truncate">{seoData.metaTitle}</p>
-                    <p className="text-green-700 text-xs font-mono break-all">https://www.mypinkshop.com/product/{seoData.slug}</p>
+                    {/* 🔥 EXACT MATCH URL: https://www.mypinkshop.com/product/prod_... (No product name prefix) */}
+                    <p className="text-green-700 text-xs font-mono break-all">https://www.mypinkshop.com/product/{productId}</p>
                     <p className="text-gray-600 text-xs mt-1 line-clamp-2">{seoData.metaDescription}</p>
                   </div>
                 </div>
