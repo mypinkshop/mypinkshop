@@ -687,7 +687,7 @@ function AdminAddProduct() {
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
   
-  // 🔥 Pre-generated permanent Product ID for exact Google SEO URL structure
+  // 🔥 Permanent Pre-Generated SEO Product ID
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
   const [brands, setBrands] = useState([
@@ -726,42 +726,9 @@ function AdminAddProduct() {
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  // 🔥 SEO META TAG GENERATOR WITH `prod_...` URL BINDING
-  useEffect(() => {
-    if (formData.productName) {
-      const titleSlug = formData.productName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      
-      const fullSlug = `${titleSlug}-${productId}`;
-      
-      let metaTitle = `${formData.productName}`;
-      if (formData.brand) metaTitle = `${formData.productName} - ${formData.brand}`;
-      metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
-      if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-      
-      let metaDescription = `Buy ${formData.productName}`;
-      if (formData.brand) metaDescription += ` by ${formData.brand}`;
-      metaDescription += ` online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!`;
-      if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-      
-      const autoKeywords = [
-        formData.brand, formData.category, formData.subCategory,
-        ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
-      ].filter(Boolean);
-      const metaKeywords = [...new Set(autoKeywords)].join(', ');
-      
-      setSeoData({ metaTitle, metaDescription, metaKeywords, slug: fullSlug });
-    }
-  }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
-
-  const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
-  const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Creamy', 'Powder', 'Liquid', 'Velvet'];
-  const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer', 'Buildable'];
-  const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
-  const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
-
+  // ============================================
+  // 🔥 SAFE HELPER DECLARATIONS (FIXED SCOPE)
+  // ============================================
   const subCategoriesOptions = {
     Skincare: [
       'Face Wash', 'Cleanser', 'Face Scrub', 'Toner', 'Serum', 'Moisturizer', 'Face Cream',
@@ -804,6 +771,52 @@ function AdminAddProduct() {
     ]
   };
 
+  const getCurrentSubCategories = () => {
+    const category = formData.category;
+    if (!category) return [];
+    return [...(subCategoriesOptions[category] || []), ...(customSubCategories[category] || [])];
+  };
+
+  // ✅ SAFELY DECLARED BEFORE RENDERING
+  const currentSubCategories = getCurrentSubCategories();
+  const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
+
+  // 🔥 SEO META TAG GENERATOR WITH `prod_...` URL BINDING
+  useEffect(() => {
+    if (formData.productName) {
+      const titleSlug = formData.productName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      const fullSlug = `${titleSlug}-${productId}`;
+      
+      let metaTitle = `${formData.productName}`;
+      if (formData.brand) metaTitle = `${formData.productName} - ${formData.brand}`;
+      metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
+      if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
+      
+      let metaDescription = `Buy ${formData.productName}`;
+      if (formData.brand) metaDescription += ` by ${formData.brand}`;
+      metaDescription += ` online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!`;
+      if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
+      
+      const autoKeywords = [
+        formData.brand, formData.category, formData.subCategory,
+        ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
+      ].filter(Boolean);
+      const metaKeywords = [...new Set(autoKeywords)].join(', ');
+      
+      setSeoData({ metaTitle, metaDescription, metaKeywords, slug: fullSlug });
+    }
+  }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
+
+  const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
+  const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Creamy', 'Powder', 'Liquid', 'Velvet'];
+  const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer', 'Buildable'];
+  const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
+  const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
+
   const getVariationAttributes = () => {
     switch(formData.category) {
       case 'Skincare': 
@@ -839,12 +852,6 @@ function AdminAddProduct() {
     const updated = { ...customSubCategories, [category]: [...(customSubCategories[category] || []), newSubCat] };
     setCustomSubCategories(updated);
     localStorage.setItem('customSubCategories', JSON.stringify(updated));
-  };
-
-  const getCurrentSubCategories = () => {
-    const category = formData.category;
-    if (!category) return [];
-    return [...(subCategoriesOptions[category] || []), ...(customSubCategories[category] || [])];
   };
 
   const handleAddNewSubCategory = () => {
@@ -1020,7 +1027,7 @@ function AdminAddProduct() {
           uploadedUrls.push(url);
         }
       } catch (error) { 
-        toast.error(`Failed to upload: ${file.name}`); 
+        toast.error(`Failed: ${file.name}`); 
       }
     }
     if (uploadedUrls.length) {
@@ -1068,8 +1075,6 @@ function AdminAddProduct() {
       toast.error('Please enter a valid brand name');
     }
   };
-
-  const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
   // 🔥 STRICT VALIDATION WITH TOAST & BROWSER ALERT
   const validateAndProceed = (targetStep) => {
@@ -1387,8 +1392,8 @@ function AdminAddProduct() {
         <div className="mb-6">
           <div className="flex gap-1 sm:gap-2 border-b border-pink-100">
             <button onClick={() => setActiveTab('manual')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'manual' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>✏️ Manual Entry</button>
-            <button onClick={() => setActiveTab('import')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'import' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📦 Amazon Importer</button>
-            <button onClick={() => setActiveTab('flipkart')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'flipkart' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🛒 Flipkart Importer</button>
+            <button onClick={() => setActiveTab('import')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'import' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📦 Import from Amazon</button>
+            <button onClick={() => setActiveTab('flipkart')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'flipkart' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🛒 Import from Flipkart</button>
           </div>
         </div>
 
@@ -1774,7 +1779,7 @@ function AdminAddProduct() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-4 border-t">
-                  <button onClick={() => validateAndProceed(4)} className="px-5 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
+                  <button onClick={() => validateAndProceed(4)} className="px-5 sm:px-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
                   <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-2 rounded-lg font-medium shadow-md hover:shadow-lg disabled:opacity-50 text-sm">{loading ? 'Publishing...' : '✓ Publish & Rank on Google'}</button>
                 </div>
               </div>
