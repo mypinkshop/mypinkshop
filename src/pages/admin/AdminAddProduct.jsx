@@ -687,7 +687,7 @@ function AdminAddProduct() {
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
   
-  // 🔥 Permanent Pre-Generated SEO Product ID
+  // 🔥 Pre-generated permanent Product ID for exact Google SEO URL structure
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
   const [brands, setBrands] = useState([
@@ -1086,6 +1086,8 @@ function AdminAddProduct() {
     }
   };
 
+  // 🔥 VARIABLE DECLARATIONS FIXED HERE
+  const currentSubCategories = getCurrentSubCategories();
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
   // 🔥 STRICT VALIDATION WITH TOAST & BROWSER ALERT
