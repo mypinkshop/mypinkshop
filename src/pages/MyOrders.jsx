@@ -60,29 +60,37 @@ function MyOrders() {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const formattedString = dateString.includes(' ') && !dateString.includes('T')
-      ? dateString.replace(' ', 'T') + (dateString.endsWith('Z') ? '' : 'Z')
-      : dateString;
+    const formattedString =
+      dateString.includes(' ') && !dateString.includes('T')
+        ? dateString.replace(' ', 'T') + (dateString.endsWith('Z') ? '' : 'Z')
+        : dateString;
     const date = new Date(formattedString);
-    return isNaN(date.getTime()) ? dateString : date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    return isNaN(date.getTime())
+      ? dateString
+      : date.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
   };
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/orders/user`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) throw new Error('Failed to fetch orders');
 
       const data = await response.json();
-      const ordersArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
-      const normalized = ordersArray.map(order => {
+      const ordersArray = Array.isArray(data.data)
+        ? data.data
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      const normalized = ordersArray.map((order) => {
         let parsedAddress = order.shippingAddress || order.shipping_address;
         if (typeof parsedAddress === 'string') {
           try {
@@ -100,7 +108,7 @@ function MyOrders() {
           shippingAddress: parsedAddress,
           paymentMethod: order.paymentMethod || order.payment_method,
           paymentStatus: order.paymentStatus || order.payment_status,
-          items: (order.items || []).map(item => ({
+          items: (order.items || []).map((item) => ({
             ...item,
             productId: item.productId || item.product_id,
             name: item.name || item.product_name,
@@ -111,9 +119,11 @@ function MyOrders() {
       });
 
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
-      const filteredData = normalized.filter(order => {
+      const filteredData = normalized.filter((order) => {
         if (order.status === 'cancelled' || order.status === 'failed') {
-          const cancelledTime = new Date(order.updatedAt || order.cancelledAt).getTime();
+          const cancelledTime = new Date(
+            order.updatedAt || order.cancelledAt
+          ).getTime();
           return cancelledTime >= thirtyMinutesAgo;
         }
         return true;
@@ -126,9 +136,9 @@ function MyOrders() {
           for (const item of order.items) {
             try {
               const eligibility = await canUserReview(item.productId);
-              setReviewEligibility(prev => ({
+              setReviewEligibility((prev) => ({
                 ...prev,
-                [`${order._id}_${item.productId}`]: eligibility
+                [`${order._id}_${item.productId}`]: eligibility,
               }));
             } catch (err) {}
           }
@@ -142,20 +152,16 @@ function MyOrders() {
     }
   };
 
-  // ============ STATUS HELPERS (SAB PINK GRADIENT) ============
   const getStatusConfig = (status) => {
-    // ✅ Sab status pe SAME pink gradient — brand consistency
-    const PINK_GRADIENT = 'from-pink-500 to-rose-500';
-
     const configs = {
-      delivered: { label: 'Delivered', icon: '✓', gradient: PINK_GRADIENT },
-      shipped: { label: 'Shipped', icon: '🚚', gradient: PINK_GRADIENT },
-      confirmed: { label: 'Confirmed', icon: '📋', gradient: PINK_GRADIENT },
-      processing: { label: 'Processing', icon: '⏳', gradient: PINK_GRADIENT },
-      pending: { label: 'Processing', icon: '⏳', gradient: PINK_GRADIENT },
-      cancelled: { label: 'Cancelled', icon: '✕', gradient: PINK_GRADIENT },
-      failed: { label: 'Failed', icon: '✕', gradient: PINK_GRADIENT },
-      refunded: { label: 'Refunded', icon: '↩', gradient: PINK_GRADIENT },
+      delivered: { label: 'Delivered', icon: '✓', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+      shipped: { label: 'Shipped', icon: '🚚', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+      confirmed: { label: 'Confirmed', icon: '📋', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+      processing: { label: 'Processing', icon: '⏳', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+      pending: { label: 'Processing', icon: '⏳', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+      cancelled: { label: 'Cancelled', icon: '✕', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+      failed: { label: 'Failed', icon: '✕', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+      refunded: { label: 'Refunded', icon: '↩', bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' },
     };
     return configs[status] || configs.pending;
   };
@@ -178,8 +184,8 @@ function MyOrders() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (response.ok) {
         toast.success('Order cancelled successfully!');
@@ -194,13 +200,13 @@ function MyOrders() {
   };
 
   const reorder = (order) => {
-    order.items.forEach(item => {
+    order.items.forEach((item) => {
       addToCart({
         id: item.productId,
         name: item.name,
         price: item.price,
         quantity: 1,
-        image: item.image
+        image: item.image,
       });
     });
     toast.success('Items added to cart!');
@@ -217,7 +223,7 @@ function MyOrders() {
 
     try {
       const response = await fetch(`${API_URL}/api/shipping/tracking/${targetOrderId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
       if (data.success && data.trackingData) {
@@ -249,7 +255,7 @@ function MyOrders() {
     setUploadingImages(true);
     try {
       const uploadedUrls = await uploadReviewMedia(files);
-      setImages(prev => [...prev, ...uploadedUrls]);
+      setImages((prev) => [...prev, ...uploadedUrls]);
     } catch (error) {
       toast.error('Failed to upload images: ' + error.message);
     } finally {
@@ -273,7 +279,10 @@ function MyOrders() {
 
     setSubmitting(true);
     try {
-      const eligibility = reviewEligibility[`${selectedOrderForReview._id}_${selectedProduct.productId}`];
+      const eligibility =
+        reviewEligibility[
+          `${selectedOrderForReview._id}_${selectedProduct.productId}`
+        ];
       const result = await addReview(
         selectedProduct.productId,
         eligibility?.orderId || selectedOrderForReview._id,
@@ -303,17 +312,25 @@ function MyOrders() {
 
   const filterOrders = () => {
     if (filterStatus === 'all') return orders;
-    if (filterStatus === 'pending') return orders.filter(o => ['pending', 'processing', 'confirmed', 'shipped'].includes(o.status));
-    if (filterStatus === 'cancelled') return orders.filter(o => ['cancelled', 'failed'].includes(o.status));
-    return orders.filter(order => order.status === filterStatus);
+    if (filterStatus === 'pending')
+      return orders.filter((o) =>
+        ['pending', 'processing', 'confirmed', 'shipped'].includes(o.status)
+      );
+    if (filterStatus === 'cancelled')
+      return orders.filter((o) => ['cancelled', 'failed'].includes(o.status));
+    return orders.filter((order) => order.status === filterStatus);
   };
 
   const filteredOrders = filterOrders();
 
   const totalOrders = orders.length;
-  const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
-  const pendingOrders = orders.filter(o => ['pending', 'processing', 'confirmed', 'shipped'].includes(o.status)).length;
-  const cancelledOrders = orders.filter(o => ['cancelled', 'failed'].includes(o.status)).length;
+  const deliveredOrders = orders.filter((o) => o.status === 'delivered').length;
+  const pendingOrders = orders.filter((o) =>
+    ['pending', 'processing', 'confirmed', 'shipped'].includes(o.status)
+  ).length;
+  const cancelledOrders = orders.filter((o) =>
+    ['cancelled', 'failed'].includes(o.status)
+  ).length;
 
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
@@ -326,23 +343,50 @@ function MyOrders() {
 
   const getStatusText = (status) => getStatusConfig(status).label;
 
+  // ✅ Timeline steps for order progress
+  const getOrderTimeline = (status) => {
+    const steps = [
+      { key: 'placed', label: 'Ordered', icon: '✓' },
+      { key: 'confirmed', label: 'Confirmed', icon: '✓' },
+      { key: 'shipped', label: 'Shipped', icon: '🚚' },
+      { key: 'delivered', label: 'Delivered', icon: '📦' },
+    ];
+
+    const statusIndex = {
+      pending: 0,
+      processing: 0,
+      confirmed: 1,
+      shipped: 2,
+      delivered: 3,
+      cancelled: -1,
+      failed: -1,
+    };
+
+    const currentIdx = statusIndex[status] ?? 0;
+    return steps.map((step, idx) => ({
+      ...step,
+      active: currentIdx >= idx,
+      completed: currentIdx > idx,
+    }));
+  };
+
   // ============ LOADING SKELETON ============
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white">
+      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100">
         <OfferBanner />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-            {[1,2,3,4].map(i => (
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-white rounded-2xl p-5 animate-pulse">
                 <div className="h-3 bg-gray-200 rounded w-20 mb-3"></div>
                 <div className="h-8 bg-gray-200 rounded w-12"></div>
               </div>
             ))}
           </div>
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white rounded-3xl shadow-sm mb-6 overflow-hidden animate-pulse">
-              <div className="h-20 bg-gray-100"></div>
+              <div className="h-20 bg-pink-50"></div>
               <div className="p-6">
                 <div className="h-20 bg-gray-100 rounded-xl"></div>
               </div>
@@ -361,11 +405,11 @@ function MyOrders() {
         <link rel="canonical" href="https://www.mypinkshop.com/my-orders" />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white">
+      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100">
         <OfferBanner />
 
         {/* ============ HEADER ============ */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
@@ -373,8 +417,12 @@ function MyOrders() {
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+                    MyPinkShop
+                  </h1>
+                  <p className="text-[9px] sm:text-[10px] text-pink-500 font-semibold tracking-wider">
+                    FOR THE GIRLIES ✨
+                  </p>
                 </div>
               </Link>
 
@@ -386,7 +434,7 @@ function MyOrders() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border-2 border-pink-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-white"
                   />
                   <button
                     onClick={handleSearch}
@@ -403,23 +451,33 @@ function MyOrders() {
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
+                      {wishlistCount}
+                    </span>
+                  )}
                 </Link>
 
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
+                      {cartCount}
+                    </span>
+                  )}
                 </Link>
 
-                {user ? <Avatar user={user} onLogout={logout} /> :
+                {user ? (
+                  <Avatar user={user} onLogout={logout} />
+                ) : (
                   <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
-                }
+                )}
               </div>
             </div>
           </div>
@@ -435,102 +493,103 @@ function MyOrders() {
         </div>
 
         {/* ============ PREMIUM STATS CARDS ============ */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <button
               onClick={() => setFilterStatus('all')}
-              className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'all'
                   ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
-                  : 'bg-white border border-pink-100'
+                  : 'bg-white border-2 border-pink-100'
               }`}
             >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'all' ? 'text-pink-100' : 'text-gray-400'}`}>Total</span>
-                  <span className={`text-2xl ${filterStatus === 'all' ? '' : 'opacity-60'}`}>📦</span>
-                </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'all' ? 'text-white' : 'text-gray-800'}`}>{totalOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'all' ? 'text-pink-100' : 'text-gray-500'}`}>All Orders</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${filterStatus === 'all' ? 'text-pink-100' : 'text-gray-400'}`}>Total</span>
+                <span className="text-xl sm:text-2xl">📦</span>
               </div>
+              <p className={`text-2xl sm:text-3xl font-bold ${filterStatus === 'all' ? 'text-white' : 'text-gray-900'}`}>{totalOrders}</p>
+              <p className={`text-[10px] sm:text-xs mt-1 font-medium ${filterStatus === 'all' ? 'text-pink-100' : 'text-gray-500'}`}>All Orders</p>
             </button>
 
             <button
               onClick={() => setFilterStatus('delivered')}
-              className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'delivered'
                   ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
-                  : 'bg-white border border-pink-100'
+                  : 'bg-white border-2 border-pink-100'
               }`}
             >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'delivered' ? 'text-pink-100' : 'text-gray-400'}`}>Delivered</span>
-                  <span className={`text-2xl ${filterStatus === 'delivered' ? '' : 'opacity-60'}`}>✅</span>
-                </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'delivered' ? 'text-white' : 'text-pink-600'}`}>{deliveredOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'delivered' ? 'text-pink-100' : 'text-gray-500'}`}>Completed</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${filterStatus === 'delivered' ? 'text-pink-100' : 'text-gray-400'}`}>Delivered</span>
+                <span className="text-xl sm:text-2xl">✅</span>
               </div>
+              <p className={`text-2xl sm:text-3xl font-bold ${filterStatus === 'delivered' ? 'text-white' : 'text-pink-600'}`}>{deliveredOrders}</p>
+              <p className={`text-[10px] sm:text-xs mt-1 font-medium ${filterStatus === 'delivered' ? 'text-pink-100' : 'text-gray-500'}`}>Completed</p>
             </button>
 
             <button
               onClick={() => setFilterStatus('pending')}
-              className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'pending'
                   ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
-                  : 'bg-white border border-pink-100'
+                  : 'bg-white border-2 border-pink-100'
               }`}
             >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'pending' ? 'text-pink-100' : 'text-gray-400'}`}>In Progress</span>
-                  <span className={`text-2xl ${filterStatus === 'pending' ? '' : 'opacity-60'}`}>⏳</span>
-                </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'pending' ? 'text-white' : 'text-pink-600'}`}>{pendingOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'pending' ? 'text-pink-100' : 'text-gray-500'}`}>Active</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${filterStatus === 'pending' ? 'text-pink-100' : 'text-gray-400'}`}>In Progress</span>
+                <span className="text-xl sm:text-2xl">⏳</span>
               </div>
+              <p className={`text-2xl sm:text-3xl font-bold ${filterStatus === 'pending' ? 'text-white' : 'text-pink-600'}`}>{pendingOrders}</p>
+              <p className={`text-[10px] sm:text-xs mt-1 font-medium ${filterStatus === 'pending' ? 'text-pink-100' : 'text-gray-500'}`}>Active</p>
             </button>
 
             <button
               onClick={() => setFilterStatus('cancelled')}
-              className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
+              className={`group relative overflow-hidden rounded-2xl p-4 sm:p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'cancelled'
                   ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
-                  : 'bg-white border border-pink-100'
+                  : 'bg-white border-2 border-pink-100'
               }`}
             >
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'cancelled' ? 'text-pink-100' : 'text-gray-400'}`}>Cancelled</span>
-                  <span className={`text-2xl ${filterStatus === 'cancelled' ? '' : 'opacity-60'}`}>✕</span>
-                </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'cancelled' ? 'text-white' : 'text-pink-600'}`}>{cancelledOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'cancelled' ? 'text-pink-100' : 'text-gray-500'}`}>Failed/Cancelled</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${filterStatus === 'cancelled' ? 'text-pink-100' : 'text-gray-400'}`}>Cancelled</span>
+                <span className="text-xl sm:text-2xl">✕</span>
               </div>
+              <p className={`text-2xl sm:text-3xl font-bold ${filterStatus === 'cancelled' ? 'text-white' : 'text-pink-600'}`}>{cancelledOrders}</p>
+              <p className={`text-[10px] sm:text-xs mt-1 font-medium ${filterStatus === 'cancelled' ? 'text-pink-100' : 'text-gray-500'}`}>Failed/Cancelled</p>
             </button>
           </div>
         </div>
 
         {/* ============ MAIN CONTENT ============ */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-          <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+          <div className="mb-6 flex flex-wrap justify-between items-center gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">My Orders</h1>
-              <p className="text-gray-500 text-sm">{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'} {filterStatus !== 'all' && `• ${getStatusText(filterStatus)}`}</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">My Orders</h1>
+              <p className="text-gray-600 text-sm font-medium">
+                {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
+                {filterStatus !== 'all' && ` • ${getStatusText(filterStatus)}`}
+              </p>
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              {['all', 'pending', 'delivered', 'cancelled'].map(status => (
+              {['all', 'pending', 'delivered', 'cancelled'].map((status) => (
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
                     filterStatus === status
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-200/50'
-                      : 'bg-white border border-gray-200 text-gray-600 hover:border-pink-300 hover:bg-pink-50'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-200'
+                      : 'bg-white border-2 border-pink-200 text-gray-700 hover:bg-pink-50'
                   }`}
                 >
-                  {status === 'all' ? 'All Orders' : status === 'pending' ? 'In Progress' : status === 'delivered' ? 'Delivered' : 'Cancelled'}
+                  {status === 'all'
+                    ? 'All'
+                    : status === 'pending'
+                    ? 'In Progress'
+                    : status === 'delivered'
+                    ? 'Delivered'
+                    : 'Cancelled'}
                 </button>
               ))}
             </div>
@@ -538,131 +597,199 @@ function MyOrders() {
 
           {/* ============ EMPTY STATE ============ */}
           {filteredOrders.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 sm:p-16 text-center border border-pink-100 shadow-sm">
+            <div className="bg-white rounded-3xl p-12 sm:p-16 text-center border-2 border-pink-100 shadow-lg">
               <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center">
                 <span className="text-6xl">🛍️</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                {filterStatus === 'all' ? 'No orders yet' : `No ${getStatusText(filterStatus).toLowerCase()} orders`}
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                {filterStatus === 'all'
+                  ? 'No orders yet'
+                  : `No ${getStatusText(filterStatus).toLowerCase()} orders`}
               </h2>
-              <p className="text-gray-400 mb-8 max-w-md mx-auto">
+              <p className="text-gray-500 mb-8 max-w-md mx-auto font-medium">
                 {filterStatus === 'all'
                   ? "You haven't placed any orders yet. Start shopping to see them here!"
                   : `You don't have any ${getStatusText(filterStatus).toLowerCase()} orders right now.`}
               </p>
-              <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3.5 rounded-full font-semibold hover:shadow-lg transition-all">
+              <Link
+                to="/shop"
+                className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3.5 rounded-full font-bold hover:shadow-lg transition-all transform hover:-translate-y-1"
+              >
                 Start Shopping →
               </Link>
             </div>
           ) : (
             <div className="space-y-5">
               {filteredOrders.map((order) => {
-                const canCancel = ['pending', 'processing', 'confirmed'].includes(order.status) && order.paymentStatus !== 'failed';
+                const canCancel =
+                  ['pending', 'processing', 'confirmed'].includes(order.status) &&
+                  order.paymentStatus !== 'failed';
                 const isCancelled = ['cancelled', 'failed'].includes(order.status);
                 const isDelivered = order.status === 'delivered';
                 const statusConfig = getStatusConfig(order.status);
                 const payConfig = getPaymentStatusConfig(order.paymentStatus);
+                const timeline = getOrderTimeline(order.status);
 
                 return (
                   <div
                     key={order._id}
-                    className={`bg-white rounded-3xl border overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ${
-                      isCancelled ? 'border-rose-100' : isDelivered ? 'border-emerald-100' : 'border-pink-100'
+                    className={`bg-white rounded-3xl border-2 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ${
+                      isCancelled
+                        ? 'border-rose-100'
+                        : isDelivered
+                        ? 'border-emerald-100'
+                        : 'border-pink-100'
                     }`}
                   >
-                    {/* ✅ PREMIUM PINK GRADIENT HEADER (Same as Payment Success) */}
-                    <div className={`bg-gradient-to-r ${statusConfig.gradient} px-5 sm:px-6 py-4`}>
+                    {/* HEADER — STATUS BAR */}
+                    <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-5 sm:px-6 py-4">
                       <div className="flex flex-wrap justify-between items-center gap-3">
-                        <div className="flex flex-wrap items-center gap-5 sm:gap-8">
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-8">
                           <div>
-                            <p className="text-[10px] font-semibold text-white/80 uppercase tracking-wider">Order Number</p>
+                            <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Order ID</p>
                             <p className="text-sm sm:text-base font-bold text-white font-mono">{getOrderIdDisplay(order)}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-semibold text-white/80 uppercase tracking-wider">Order Date</p>
-                            <p className="text-sm sm:text-base font-medium text-white">{formatDate(order.createdAt)}</p>
+                            <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Placed On</p>
+                            <p className="text-sm sm:text-base font-semibold text-white">{formatDate(order.createdAt)}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-semibold text-white/80 uppercase tracking-wider">Total</p>
+                            <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Total</p>
                             <p className="text-sm sm:text-base font-bold text-white">₹{order.total?.toLocaleString()}</p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                          <span className="bg-white/25 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                             <span>{statusConfig.icon}</span>
                             {statusConfig.label}
                           </span>
-                          <span className={`bg-white/20 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full`}>
+                          <span className={`bg-white/25 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full`}>
                             {payConfig.label}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* ✅ ITEMS */}
-                    <div className="px-5 sm:px-6 py-4">
-                      {order.items && order.items.map((item, idx) => {
-                        const eligibilityKey = `${order._id}_${item.productId}`;
-                        const canReview = reviewEligibility[eligibilityKey]?.canReview && !reviewEligibility[eligibilityKey]?.alreadyReviewed && isDelivered;
-                        const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
+                    {/* TIMELINE (only for non-cancelled orders) */}
+                    {!isCancelled && (
+                      <div className="px-5 sm:px-6 py-5 bg-gradient-to-r from-pink-50/50 to-rose-50/50 border-b border-pink-100">
+                        <div className="flex items-center justify-between relative">
+                          <div className="absolute left-6 right-6 top-4 h-0.5 bg-pink-200 -z-0">
+                            <div
+                              className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-500"
+                              style={{
+                                width: `${((timeline.filter((t) => t.active).length - 1) / (timeline.length - 1)) * 100}%`,
+                              }}
+                            ></div>
+                          </div>
 
-                        return (
-                          <div key={idx} className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0">
-                            <Link
-                              to={`/product/${item.productId}`}
-                              className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 flex-shrink-0 flex items-center justify-center p-1 hover:shadow-md hover:scale-105 transition-all"
+                          {timeline.map((step, idx) => (
+                            <div key={idx} className="flex flex-col items-center relative z-10 flex-1">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                  step.active
+                                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                                    : 'bg-white border-2 border-pink-200 text-gray-400'
+                                }`}
+                              >
+                                {step.completed ? '✓' : step.icon}
+                              </div>
+                              <p
+                                className={`text-[10px] sm:text-xs mt-2 font-semibold ${
+                                  step.active ? 'text-pink-700' : 'text-gray-400'
+                                }`}
+                              >
+                                {step.label}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ITEMS */}
+                    <div className="px-5 sm:px-6 py-4">
+                      {order.items &&
+                        order.items.map((item, idx) => {
+                          const eligibilityKey = `${order._id}_${item.productId}`;
+                          const canReview =
+                            reviewEligibility[eligibilityKey]?.canReview &&
+                            !reviewEligibility[eligibilityKey]?.alreadyReviewed &&
+                            isDelivered;
+                          const alreadyReviewed = reviewEligibility[eligibilityKey]?.alreadyReviewed;
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-4 py-3 border-b border-pink-50 last:border-0"
                             >
-                              {item.image ? (
-                                <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
-                              ) : (
-                                <div className="text-2xl">🛍️</div>
-                              )}
-                            </Link>
-                            <div className="flex-1 min-w-0">
                               <Link
                                 to={`/product/${item.productId}`}
-                                className="font-semibold text-gray-800 text-sm hover:text-pink-600 transition line-clamp-1"
+                                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 flex-shrink-0 flex items-center justify-center p-1 hover:shadow-md hover:scale-105 transition-all"
                               >
-                                {item.name}
+                                {item.image ? (
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="w-full h-full object-contain"
+                                  />
+                                ) : (
+                                  <div className="text-2xl">🛍️</div>
+                                )}
                               </Link>
-                              <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity}</p>
-                              {item.variationName && (
-                                <p className="text-xs text-gray-400">Option: {item.variationName}</p>
-                              )}
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <p className="font-bold text-gray-800 text-sm">₹{(item.price * item.quantity).toLocaleString()}</p>
-                              {isDelivered && canReview && (
-                                <button
-                                  onClick={() => handleWriteReview(order, item)}
-                                  className="mt-2 px-3 py-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs hover:shadow-md transition"
+                              <div className="flex-1 min-w-0">
+                                <Link
+                                  to={`/product/${item.productId}`}
+                                  className="font-bold text-gray-900 text-sm sm:text-base hover:text-pink-600 transition line-clamp-2"
                                 >
-                                  ✍️ Review
-                                </button>
-                              )}
-                              {alreadyReviewed && (
-                                <span className="mt-2 inline-block text-emerald-500 text-xs font-medium">✓ Reviewed</span>
-                              )}
+                                  {item.name}
+                                </Link>
+                                <p className="text-xs sm:text-sm text-gray-500 mt-1 font-medium">
+                                  Qty: {item.quantity}
+                                </p>
+                                {item.variationName && (
+                                  <p className="text-xs text-gray-500 font-medium">
+                                    Size: {item.variationName}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="font-bold text-pink-600 text-sm sm:text-base">
+                                  ₹{(item.price * item.quantity).toLocaleString()}
+                                </p>
+                                {isDelivered && canReview && (
+                                  <button
+                                    onClick={() => handleWriteReview(order, item)}
+                                    className="mt-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs font-bold hover:shadow-md transition"
+                                  >
+                                    ✍️ Review
+                                  </button>
+                                )}
+                                {alreadyReviewed && (
+                                  <span className="mt-2 inline-block text-emerald-600 text-xs font-bold">
+                                    ✓ Reviewed
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
 
-                    {/* ✅ ACTION BUTTONS */}
-                    <div className="px-5 sm:px-6 py-4 border-t border-pink-50 bg-gradient-to-r from-pink-50/50 to-rose-50/50 flex flex-wrap gap-3 justify-between items-center">
+                    {/* ACTION BUTTONS */}
+                    <div className="px-5 sm:px-6 py-4 border-t-2 border-pink-50 bg-gradient-to-r from-pink-50/50 to-rose-50/50 flex flex-wrap gap-3 justify-between items-center">
                       <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => handleTrackOrder(order)}
-                          className="px-4 py-2 text-pink-600 bg-white border border-pink-200 rounded-full hover:bg-pink-50 hover:border-pink-300 transition text-sm font-medium flex items-center gap-1.5"
+                          className="px-4 py-2.5 text-pink-600 bg-white border-2 border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-bold flex items-center gap-1.5"
                         >
-                          📍 Track Order
+                          📍 Track
                         </button>
                         {isDelivered && (
                           <button
                             onClick={() => reorder(order)}
-                            className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-md transition text-sm font-medium flex items-center gap-1.5"
+                            className="px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-md transition text-sm font-bold flex items-center gap-1.5"
                           >
                             🛒 Buy Again
                           </button>
@@ -671,7 +798,7 @@ function MyOrders() {
                       {canCancel && !isCancelled && (
                         <button
                           onClick={() => cancelOrder(order._id)}
-                          className="px-4 py-2 text-rose-600 bg-white border border-rose-200 rounded-full hover:bg-rose-50 hover:border-rose-300 transition text-sm font-medium"
+                          className="px-4 py-2.5 text-rose-600 bg-white border-2 border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-bold"
                         >
                           ✕ Cancel Order
                         </button>
@@ -684,10 +811,34 @@ function MyOrders() {
           )}
         </div>
 
-        {/* ============ LIVE TRACKING MODAL (PREMIUM) ============ */}
+        {/* ============ TRUST BADGES ============ */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          <div className="bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100 border-2 border-pink-200 rounded-3xl p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { icon: '🚚', title: 'Free Shipping', sub: 'On orders ₹499+' },
+                { icon: '💵', title: 'COD Available', sub: 'Pay on delivery' },
+                { icon: '↩️', title: 'Easy Returns', sub: '7-day return' },
+                { icon: '🔒', title: 'Secure', sub: '100% trusted' },
+              ].map((badge, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row items-center sm:items-start gap-2 text-center sm:text-left bg-white rounded-2xl p-3 shadow-sm">
+                  <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                    <span className="text-lg">{badge.icon}</span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-xs">{badge.title}</p>
+                    <p className="text-[10px] text-gray-500 font-medium">{badge.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ============ LIVE TRACKING MODAL ============ */}
         {showTracking && selectedOrder && (
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-in fade-in"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowTracking(false)}
           >
             <div
@@ -696,7 +847,7 @@ function MyOrders() {
             >
               <div className="sticky top-0 bg-gradient-to-r from-pink-500 to-rose-500 p-5 rounded-t-3xl flex justify-between items-center z-10">
                 <div>
-                  <p className="text-[10px] font-semibold text-white/80 uppercase tracking-wider">Tracking Order</p>
+                  <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Tracking Order</p>
                   <h3 className="text-base font-bold text-white font-mono">{getOrderIdDisplay(selectedOrder)}</h3>
                 </div>
                 <button
@@ -711,51 +862,56 @@ function MyOrders() {
                 {trackingLoading ? (
                   <div className="text-center py-10">
                     <div className="animate-spin w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-                    <p className="text-sm text-gray-400">Fetching live tracking...</p>
+                    <p className="text-sm text-gray-400 font-medium">Fetching live tracking...</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Timeline */}
                     <div className="relative pl-8 space-y-6 before:absolute before:left-3 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-pink-300 before:via-pink-200 before:to-gray-200">
-
-                      {/* Step 1 */}
                       <div className="relative">
                         <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-pink-100">
                           ✓
                         </div>
-                        <p className="font-semibold text-gray-800 text-sm">Order Placed</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(selectedOrder.createdAt)}</p>
+                        <p className="font-bold text-gray-900 text-sm">Order Placed</p>
+                        <p className="text-xs text-gray-500 mt-0.5 font-medium">{formatDate(selectedOrder.createdAt)}</p>
                       </div>
 
-                      {/* Step 2 */}
                       <div className="relative">
-                        <div className={`absolute -left-8 top-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ring-4 shadow-md ${
-                          ['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status)
-                            ? 'bg-pink-500 text-white ring-pink-100'
-                            : 'bg-gray-200 text-gray-500 ring-gray-100'
-                        }`}>
+                        <div
+                          className={`absolute -left-8 top-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ring-4 shadow-md ${
+                            ['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status)
+                              ? 'bg-pink-500 text-white ring-pink-100'
+                              : 'bg-gray-200 text-gray-500 ring-gray-100'
+                          }`}
+                        >
                           {['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status) ? '✓' : '•'}
                         </div>
-                        <p className={`font-semibold text-sm ${['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status) ? 'text-gray-800' : 'text-gray-400'}`}>
+                        <p
+                          className={`font-bold text-sm ${
+                            ['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status)
+                              ? 'text-gray-900'
+                              : 'text-gray-400'
+                          }`}
+                        >
                           Order Confirmed
                         </p>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-xs text-gray-500 mt-0.5 font-medium">
                           {['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status)
                             ? formatDate(selectedOrder.updatedAt || selectedOrder.createdAt)
                             : 'Pending confirmation'}
                         </p>
                       </div>
 
-                      {/* Live Updates */}
                       {liveTrackingData?.tracking_data?.shipment_track ? (
                         liveTrackingData.tracking_data.shipment_track.map((track, idx) => (
                           <div key={idx} className="relative">
                             <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-pink-100">
                               📦
                             </div>
-                            <p className="font-semibold text-gray-800 text-sm">{track.current_status || 'In Transit'}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{track.location || 'Hub'} - {track.activity}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{track.date}</p>
+                            <p className="font-bold text-gray-900 text-sm">{track.current_status || 'In Transit'}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                              {track.location || 'Hub'} - {track.activity}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5 font-medium">{track.date}</p>
                           </div>
                         ))
                       ) : (
@@ -763,42 +919,63 @@ function MyOrders() {
                           <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-pink-400 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-pink-100">
                             ⏳
                           </div>
-                          <p className="font-semibold text-gray-600 text-sm">Preparing Shipment</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Your order is being prepared for dispatch.</p>
+                          <p className="font-bold text-gray-700 text-sm">Preparing Shipment</p>
+                          <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                            Your order is being prepared for dispatch.
+                          </p>
                         </div>
                       )}
                     </div>
 
-                    {/* Address Card */}
-                    <div className="p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl border border-pink-100">
+                    <div className="p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl border-2 border-pink-100">
                       <p className="text-xs font-bold text-gray-700 mb-3 flex items-center gap-1.5">
                         <span>📍</span> Delivery Address
                       </p>
                       <div className="text-xs text-gray-600 space-y-1">
-                        <p className="font-bold text-gray-800 text-sm">
+                        <p className="font-bold text-gray-900 text-sm">
                           {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                            ? (selectedOrder.shippingAddress.fullName || user?.fullName || 'Customer')
-                            : (user?.fullName || 'Customer')}
+                            ? selectedOrder.shippingAddress.fullName || user?.fullName || 'Customer'
+                            : user?.fullName || 'Customer'}
                         </p>
-                        <p>
+                        <p className="font-medium">
                           {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                            ? (selectedOrder.shippingAddress.addressLine1 || selectedOrder.shippingAddress.address || 'N/A')
+                            ? selectedOrder.shippingAddress.addressLine1 ||
+                              selectedOrder.shippingAddress.address ||
+                              'N/A'
                             : String(selectedOrder.shippingAddress || selectedOrder.address || 'N/A')}
                         </p>
-                        <p>
+                        <p className="font-medium">
                           {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (
                             <>
-                              {selectedOrder.shippingAddress.city || 'Mumbai'}, {selectedOrder.shippingAddress.state || 'Maharashtra'} - <span className="font-mono font-semibold">{selectedOrder.shippingAddress.pincode || '400072'}</span>
+                              {selectedOrder.shippingAddress.city || 'Mumbai'},{' '}
+                              {selectedOrder.shippingAddress.state || 'Maharashtra'} -{' '}
+                              <span className="font-mono font-bold">
+                                {selectedOrder.shippingAddress.pincode || '400072'}
+                              </span>
                             </>
-                          ) : 'Mumbai, Maharashtra - 400072'}
+                          ) : (
+                            'Mumbai, Maharashtra - 400072'
+                          )}
                         </p>
-                        <p className="text-gray-500 pt-1">
-                          Phone: <span className="font-medium">{typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (selectedOrder.shippingAddress.phone || 'N/A') : 'N/A'}</span>
+                        <p className="text-gray-500 pt-1 font-medium">
+                          Phone:{' '}
+                          <span className="font-bold">
+                            {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
+                              ? selectedOrder.shippingAddress.phone || 'N/A'
+                              : 'N/A'}
+                          </span>
                         </p>
                       </div>
-                      <div className="mt-3 pt-3 border-t border-pink-200/60 flex justify-between items-center text-[11px]">
-                        <span className="text-gray-500">Payment: <strong className="uppercase text-gray-700">{selectedOrder.paymentMethod || 'Online'}</strong></span>
-                        <span className={`capitalize px-2.5 py-1 rounded-full font-semibold ${getPaymentStatusConfig(selectedOrder.paymentStatus).bg} ${getPaymentStatusConfig(selectedOrder.paymentStatus).text}`}>
+                      <div className="mt-3 pt-3 border-t border-pink-200 flex justify-between items-center text-[11px]">
+                        <span className="text-gray-500 font-medium">
+                          Payment:{' '}
+                          <strong className="uppercase text-gray-700">
+                            {selectedOrder.paymentMethod || 'Online'}
+                          </strong>
+                        </span>
+                        <span
+                          className={`capitalize px-2.5 py-1 rounded-full font-bold ${getPaymentStatusConfig(selectedOrder.paymentStatus).bg} ${getPaymentStatusConfig(selectedOrder.paymentStatus).text}`}
+                        >
                           {getPaymentStatusConfig(selectedOrder.paymentStatus).label}
                         </span>
                       </div>
@@ -812,8 +989,14 @@ function MyOrders() {
 
         {/* ============ REVIEW MODAL ============ */}
         {showReviewModal && selectedProduct && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowReviewModal(false)}>
-            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowReviewModal(false)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="sticky top-0 bg-gradient-to-r from-pink-500 to-rose-500 border-b border-pink-100 p-5 rounded-t-3xl flex justify-between items-center z-10">
                 <h3 className="text-lg font-bold text-white">✍️ Write a Review</h3>
                 <button
@@ -826,19 +1009,29 @@ function MyOrders() {
 
               <div className="p-5 space-y-5">
                 <div className="flex gap-3 pb-4 border-b border-pink-100">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 p-1 flex items-center justify-center">
-                    {selectedProduct.image ? <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-contain" /> : <div>🛍️</div>}
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 p-1 flex items-center justify-center">
+                    {selectedProduct.image ? (
+                      <img
+                        src={selectedProduct.image}
+                        alt={selectedProduct.name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div>🛍️</div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 text-sm line-clamp-2">{selectedProduct.name}</p>
-                    <p className="text-xs text-gray-400 mt-1 font-mono">#{getOrderIdDisplay(selectedOrderForReview)}</p>
+                    <p className="font-bold text-gray-900 text-sm line-clamp-2">{selectedProduct.name}</p>
+                    <p className="text-xs text-gray-500 mt-1 font-mono font-medium">
+                      #{getOrderIdDisplay(selectedOrderForReview)}
+                    </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Your Rating *</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Your Rating *</label>
                   <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map(star => (
+                    {[1, 2, 3, 4, 5].map((star) => (
                       <button
                         key={star}
                         onMouseEnter={() => setHoverRating(star)}
@@ -846,40 +1039,49 @@ function MyOrders() {
                         onClick={() => setRating(star)}
                         className="text-4xl focus:outline-none transition-transform hover:scale-110"
                       >
-                        <span className={star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-300'}>★</span>
+                        <span
+                          className={
+                            star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-300'
+                          }
+                        >
+                          ★
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Review Title</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Review Title</label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Summarize your experience"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm"
+                    className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
                     maxLength="100"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your Review *</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Your Review *</label>
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows="4"
                     placeholder="Share your experience with this product"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm resize-none"
+                    className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm resize-none bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Add Photos</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Add Photos</label>
                   <div className="flex flex-wrap gap-3 mb-3">
                     {images.map((img, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-2xl overflow-hidden border border-pink-100">
+                      <div
+                        key={idx}
+                        className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-pink-100"
+                      >
                         <img src={img} alt={`Review ${idx}`} className="w-full h-full object-cover" />
                         <button
                           onClick={() => removeImage(idx)}
@@ -890,10 +1092,17 @@ function MyOrders() {
                       </div>
                     ))}
                   </div>
-                  <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="reviewImageUpload" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="reviewImageUpload"
+                  />
                   <label
                     htmlFor="reviewImageUpload"
-                    className="inline-flex items-center gap-2 px-4 py-3 border-2 border-dashed border-pink-200 rounded-2xl cursor-pointer hover:bg-pink-50 transition text-sm text-pink-600 font-medium"
+                    className="inline-flex items-center gap-2 px-4 py-3 border-2 border-dashed border-pink-300 rounded-2xl cursor-pointer hover:bg-pink-50 transition text-sm text-pink-600 font-bold"
                   >
                     {uploadingImages ? (
                       <>
@@ -910,13 +1119,13 @@ function MyOrders() {
                   <button
                     onClick={handleSubmitReview}
                     disabled={submitting}
-                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl hover:shadow-lg transition disabled:opacity-50 font-semibold text-sm"
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl hover:shadow-lg transition disabled:opacity-50 font-bold text-sm"
                   >
                     {submitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                   <button
                     onClick={() => setShowReviewModal(false)}
-                    className="flex-1 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition font-medium text-sm text-gray-600"
+                    className="flex-1 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition font-bold text-sm text-gray-600"
                   >
                     Cancel
                   </button>
@@ -927,10 +1136,51 @@ function MyOrders() {
         )}
 
         {/* ============ FOOTER ============ */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+        <footer className="bg-gray-900 text-gray-400 py-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
           </div>
         </footer>
       </div>
