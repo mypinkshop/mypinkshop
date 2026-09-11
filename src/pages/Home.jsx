@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import SkeletonCard from '../components/SkeletonCard';
 import SkeletonBanner from '../components/SkeletonBanner';
 import ProductCard from '../components/ProductCard';
+// ✅ Safe cache helpers (quota-safe)
+import { setCacheWithTTL, getCacheWithTTL } from '../lib/utils';
 
 // ============ Newsletter Section ============
 const NewsletterSection = () => (
@@ -97,7 +99,7 @@ function Home() {
     clothing: false,
     accessories: false
   });
-  
+
   const sectionRefs = {
     skincare: useRef(null),
     makeup: useRef(null),
@@ -108,36 +110,34 @@ function Home() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Load products
+  // ✅ Load products (quota-safe cache)
   useEffect(() => {
     const abortController = new AbortController();
-    
+
     const loadProducts = async () => {
       try {
         setLoading(true);
-        
-        const cached = sessionStorage.getItem('products_cache');
-        const cacheTime = sessionStorage.getItem('products_cache_time');
-        
-         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
-          const data = JSON.parse(cached);
-          const productsArray = Array.isArray(data) ? data : (data.data || []);
+
+        // ✅ Safe read with TTL (1 minute)
+        const cached = getCacheWithTTL(sessionStorage, 'products_cache');
+        if (cached) {
+          const productsArray = Array.isArray(cached) ? cached : (cached.data || []);
           setProducts(productsArray);
           setLoading(false);
           return;
         }
-        
+
         const response = await fetch(`${API_URL}/api/products`, {
           signal: abortController.signal
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-        let data = await response.json();
+
+        const data = await response.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
-        
-        sessionStorage.setItem('products_cache', JSON.stringify(data));
-        sessionStorage.setItem('products_cache_time', Date.now().toString());
-        
+
+        // ✅ Safe write with TTL (quota-safe, auto-cleanup)
+        setCacheWithTTL(sessionStorage, 'products_cache', data, 60 * 1000);
+
         setProducts(productsArray);
       } catch (error) {
         if (error.name !== 'AbortError') {
@@ -149,33 +149,33 @@ function Home() {
       }
     };
     loadProducts();
-    
+
     return () => abortController.abort();
   }, [API_URL]);
 
-  // Load banners
+  // ✅ Load banners (quota-safe cache)
   useEffect(() => {
     const abortController = new AbortController();
-    
+
     const loadBanners = async () => {
       try {
-        const cached = sessionStorage.getItem('banners_cache');
-        const cacheTime = sessionStorage.getItem('banners_cache_time');
-        
-        if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 120000) {
-          setBanners(JSON.parse(cached));
+        // ✅ Safe read with TTL (2 minutes)
+        const cached = getCacheWithTTL(sessionStorage, 'banners_cache');
+        if (cached) {
+          setBanners(cached);
           return;
         }
-        
+
         const response = await fetch(`${API_URL}/api/banners/active`, {
           signal: abortController.signal
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
+
         const data = await response.json();
         setBanners(data);
-        sessionStorage.setItem('banners_cache', JSON.stringify(data));
-        sessionStorage.setItem('banners_cache_time', Date.now().toString());
+
+        // ✅ Safe write with TTL
+        setCacheWithTTL(sessionStorage, 'banners_cache', data, 2 * 60 * 1000);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error("Error loading banners:", error);
@@ -184,7 +184,7 @@ function Home() {
       }
     };
     loadBanners();
-    
+
     return () => abortController.abort();
   }, [API_URL]);
 
@@ -228,7 +228,7 @@ function Home() {
       link.as = 'image';
       link.href = banners[0].images[0];
       document.head.appendChild(link);
-      
+
       return () => {
         if (document.head.contains(link)) {
           document.head.removeChild(link);
@@ -251,7 +251,7 @@ function Home() {
     if (!products.length) return;
 
     const observers = [];
-    
+
     Object.entries(sectionRefs).forEach(([key, ref]) => {
       if (ref.current) {
         const observer = new IntersectionObserver(
@@ -300,7 +300,7 @@ function Home() {
     }
 
     return {
-      newArrivals: products.filter(p => p.isNew).length > 0 
+      newArrivals: products.filter(p => p.isNew).length > 0
         ? products.filter(p => p.isNew).slice(0, 4)
         : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4),
       skincareProducts: products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4),
@@ -453,15 +453,15 @@ function Home() {
 
               <div className="flex-1 max-w-md lg:max-w-2xl">
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Search for products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
-                  <button 
+                  <button
                     onClick={handleSearch}
                     className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                   >
@@ -478,15 +478,15 @@ function Home() {
                   </svg>
                   {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
                 </button>
-                
+
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                   {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
                 </Link>
-                
-                {user ? <Avatar user={user} onLogout={logout} /> : 
+
+                {user ? <Avatar user={user} onLogout={logout} /> :
                   <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -517,8 +517,8 @@ function Home() {
                 <Link key={banner.id} to={banner.link} className="w-full flex-shrink-0">
                   <div className="relative">
                     {banner.images && banner.images[0] ? (
-                      <img 
-                        src={banner.images[0]} 
+                      <img
+                        src={banner.images[0]}
                         alt={banner.title}
                         loading={idx === 0 ? "eager" : "lazy"}
                         decoding="async"
@@ -549,7 +549,7 @@ function Home() {
                 </Link>
               ))}
             </div>
-            
+
             {banners.length > 1 && (
               <>
                 <button onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)} className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
@@ -560,7 +560,7 @@ function Home() {
                 </button>
               </>
             )}
-            
+
             {banners.length > 1 && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                 {banners.map((_, idx) => (
@@ -632,8 +632,7 @@ function Home() {
                         <span className="text-white text-2xl font-bold">📢 {banner.name || 'Sponsored'}</span>
                       </div>
                     )}
-                    
-                    {/* Overlay */}
+
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
                       <div className="text-white">
                         <p className="text-sm font-semibold">{banner.name || 'Sponsored'}</p>
@@ -645,8 +644,7 @@ function Home() {
                         )}
                       </div>
                     </div>
-                    
-                    {/* Sponsored Badge */}
+
                     <div className="absolute top-3 right-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
                       <span>📢</span> Sponsored
                     </div>
@@ -672,8 +670,8 @@ function Home() {
                     <div className="absolute top-3 left-3 z-10 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
                       <span>📢</span> Sponsored
                     </div>
-                    <ProductCard 
-                      product={product} 
+                    <ProductCard
+                      product={product}
                       addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
@@ -697,9 +695,9 @@ function Home() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {newArrivals.map(product => (
-                  <ProductCard 
-                    key={product._id} 
-                    product={product} 
+                  <ProductCard
+                    key={product._id}
+                    product={product}
                     addToCart={addToCart}
                     isInWishlist={isInWishlist}
                     addToWishlist={addToWishlist}
@@ -726,9 +724,9 @@ function Home() {
               {visibleSections.skincare ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {skincareProducts.map(product => (
-                    <ProductCard 
-                      key={product._id} 
-                      product={product} 
+                    <ProductCard
+                      key={product._id}
+                      product={product}
                       addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
@@ -740,7 +738,7 @@ function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -762,9 +760,9 @@ function Home() {
               {visibleSections.makeup ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {makeupProducts.map(product => (
-                    <ProductCard 
-                      key={product._id} 
-                      product={product} 
+                    <ProductCard
+                      key={product._id}
+                      product={product}
                       addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
@@ -776,7 +774,7 @@ function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="bg-gray-100 rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -798,9 +796,9 @@ function Home() {
               {visibleSections.hair ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {hairProducts.map(product => (
-                    <ProductCard 
-                      key={product._id} 
-                      product={product} 
+                    <ProductCard
+                      key={product._id}
+                      product={product}
                       addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
@@ -812,7 +810,7 @@ function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -834,9 +832,9 @@ function Home() {
               {visibleSections.clothing ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {clothingProducts.map(product => (
-                    <ProductCard 
-                      key={product._id} 
-                      product={product} 
+                    <ProductCard
+                      key={product._id}
+                      product={product}
                       addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
@@ -848,7 +846,7 @@ function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="bg-gray-100 rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -870,9 +868,9 @@ function Home() {
               {visibleSections.accessories ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                   {accessoriesProducts.map(product => (
-                    <ProductCard 
-                      key={product._id} 
-                      product={product} 
+                    <ProductCard
+                      key={product._id}
+                      product={product}
                       addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
@@ -884,7 +882,7 @@ function Home() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
