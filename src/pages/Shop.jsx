@@ -7,6 +7,7 @@ import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
+import { setCacheWithTTL, getCacheWithTTL } from '../lib/utils';
 
 // Optimized Product Card Component
 const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
@@ -272,29 +273,26 @@ function Shop() {
       try {
         setLoading(true);
         
-        // Check cache first
-        const cached = sessionStorage.getItem('products_cache');
-        const cacheTime = sessionStorage.getItem('products_cache_time');
-        
-         if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 60000) {
-          const data = JSON.parse(cached);
-          const productsArray = Array.isArray(data) ? data : (data.data || []);
-          setProducts(productsArray.map(p => ({ ...p, id: p._id })));
-          setLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`${API_URL}/api/products`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-                let data = await response.json();
-        const productsArray = Array.isArray(data) ? data : (data.data || []);
-        
-        // Save to cache
-        sessionStorage.setItem('products_cache', JSON.stringify(data));
-        sessionStorage.setItem('products_cache_time', Date.now().toString());
-        
-        setProducts(productsArray.map(p => ({ ...p, id: p._id })));
+        // ✅ Safe read with TTL
+const cached = getCacheWithTTL(sessionStorage, 'products_cache');
+
+if (cached) {
+  const productsArray = Array.isArray(cached) ? cached : (cached.data || []);
+  setProducts(productsArray.map(p => ({ ...p, id: p._id })));
+  setLoading(false);
+  return;
+}
+
+const response = await fetch(`${API_URL}/api/products`);
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+let data = await response.json();
+const productsArray = Array.isArray(data) ? data : (data.data || []);
+
+// ✅ Safe write with TTL (5 minutes)
+setCacheWithTTL(sessionStorage, 'products_cache', data, 5 * 60 * 1000);
+
+setProducts(productsArray.map(p => ({ ...p, id: p._id })));
       } catch (error) {
         console.error("Error loading products:", error);
         setProducts([]);
