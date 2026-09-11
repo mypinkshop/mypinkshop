@@ -226,7 +226,7 @@ function Login() {
 
                   <div className="space-y-5">
                     {[
-                      { icon: '🎁', title: 'Exclusive Offers', sub: '15% off on first order' },
+                      { icon: '🎁', title: 'Exclusive Offers', sub: 'Extra 10% off on first order' },
                       { icon: '🚚', title: 'Free Shipping', sub: 'On orders above ₹499' },
                       { icon: '💖', title: 'Save Wishlist', sub: 'Never lose your favorites' },
                       { icon: '📦', title: 'Track Orders', sub: 'Real-time delivery updates' },
