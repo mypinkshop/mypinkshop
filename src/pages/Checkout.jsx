@@ -363,9 +363,85 @@ function Checkout() {
     setTimeout(() => setCouponMessage(null), 2000);
   };
 
+  // ✅ REAL PhonePe Payment Integration
   const handlePhonePePayment = async () => {
-    toast.error('Online payment is not configured yet. Please use Cash on Delivery, or contact support to enable UPI/Card payment.');
-    return;
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+      
+      if (!token) {
+        toast.error('Please login to continue');
+        navigate('/login?redirect=/checkout');
+        return;
+      }
+
+      // 1. Create the order first
+      const orderData = {
+        items: cart.map(item => ({
+          productId: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image || null,
+          variationName: item.size || null,
+          variationSecondary: item.color || null,
+          vendorId: item.vendorId || null
+        })),
+        total: total,
+        address: {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          addressLine1: formData.address,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.pincode,
+          country: formData.country || 'India'
+        },
+        paymentMethod: 'upi'
+      };
+
+      const orderResponse = await fetch(`${API_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      const orderResult = await orderResponse.json();
+      const result = orderResult.data || orderResult;
+
+      if (!orderResponse.ok) {
+        throw new Error(orderResult.error || 'Failed to create order');
+      }
+
+      const newOrderId = result.orderId || result.order?.id;
+
+      // 2. Initiate PhonePe payment
+      const payResponse = await fetch(`${API_URL}/api/payments/initiate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ orderId: newOrderId })
+      });
+
+      const payData = await payResponse.json();
+      const paymentInfo = payData.data || payData;
+
+      if (!payResponse.ok || !paymentInfo.redirectUrl) {
+        throw new Error(payData.error || 'Failed to initiate payment');
+      }
+
+      // 3. Redirect to PhonePe
+      toast.success('Redirecting to PhonePe...');
+      window.location.href = paymentInfo.redirectUrl;
+
+    } catch (error) {
+      console.error('PhonePe Payment Error:', error);
+      toast.error(error.message || 'Payment failed. Please try again.');
+    }
   };
 
   const placeOrder = async () => {
@@ -391,8 +467,16 @@ function Checkout() {
       saveNewAddress();
     }
 
+    // ✅ UPI (PhonePe) payment
     if (paymentMethod === 'upi') {
       await handlePhonePePayment();
+      setIsPlacingOrder(false);
+      return;
+    }
+
+    // ❌ Card/Netbanking abhi supported nahi hai
+    if (paymentMethod === 'card' || paymentMethod === 'netbanking') {
+      toast.error('This payment method is coming soon. Please use COD or UPI.');
       setIsPlacingOrder(false);
       return;
     }
