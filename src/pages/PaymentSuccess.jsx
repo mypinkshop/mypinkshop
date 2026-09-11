@@ -16,6 +16,7 @@ const PaymentSuccess = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState('verifying');
   const [orderData, setOrderData] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!merchantTransactionId) {
@@ -23,6 +24,9 @@ const PaymentSuccess = () => {
       toast.error('Invalid payment session');
       return;
     }
+
+    let cancelled = false;
+    let timeoutId = null;
 
     const verifyPayment = async () => {
       try {
@@ -39,9 +43,12 @@ const PaymentSuccess = () => {
           body: JSON.stringify({ merchantTransactionId }),
         });
 
+        if (cancelled) return;
+
         const verifyData = await verifyRes.json();
         console.log('Verify response:', verifyData);
 
+        // ✅ SUCCESS
         if (verifyData.success && verifyData.data?.verified) {
           setStatus('success');
           setOrderData({
@@ -50,26 +57,54 @@ const PaymentSuccess = () => {
             orderId: verifyData.data.orderId,
             txnId: merchantTransactionId,
           });
+          setIsLoading(false);
           toast.success('Payment Successful! 🎉');
 
           localStorage.removeItem('cart');
           localStorage.removeItem('orderTotal');
           localStorage.removeItem('checkoutAddress');
-        } else {
-          setStatus('failed');
-          toast.error('Payment verification failed');
+          return;
         }
-      } catch (error) {
-        console.error('Verification error:', error);
+
+        // ⏳ PENDING — retry
+        if (verifyData.data?.status === 'pending' && retryCount < 3) {
+          console.log(`Pending... retry ${retryCount + 1}/3`);
+          timeoutId = setTimeout(() => {
+            if (!cancelled) setRetryCount(c => c + 1);
+          }, 3000);
+          return;
+        }
+
+        // ❌ Truly FAILED
         setStatus('failed');
-        toast.error('Something went wrong');
-      } finally {
         setIsLoading(false);
+        toast.error('Payment verification failed');
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Verification error:', error);
+
+        // Network error par bhi retry
+        if (retryCount < 3) {
+          timeoutId = setTimeout(() => {
+            if (!cancelled) setRetryCount(c => c + 1);
+          }, 3000);
+          return;
+        }
+
+        setStatus('failed');
+        setIsLoading(false);
+        toast.error('Something went wrong');
       }
     };
 
     verifyPayment();
-  }, [merchantTransactionId]);
+
+    // ✅ Cleanup — component unmount ho toh timeout clear + fetch cancel
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [merchantTransactionId, retryCount]);
 
   // 🔄 VERIFYING
   if (status === 'verifying' || isLoading) {
@@ -78,7 +113,11 @@ const PaymentSuccess = () => {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-500 text-lg">Verifying Payment...</p>
-          <p className="text-gray-400 text-sm mt-2">Please wait, don't close this page</p>
+          <p className="text-gray-400 text-sm mt-2">
+            {retryCount > 0
+              ? `Checking with PhonePe... (${retryCount}/3)`
+              : "Please wait, don't close this page"}
+          </p>
         </div>
       </div>
     );
