@@ -1,10 +1,5 @@
 // src/lib/utils.js
 // Frontend-only storage helpers — quota-safe + TTL cache
-// Backend wale utils (ok, fail, genId) yahan nahi chahiye.
-
-// ============================================================
-// ✅ STORAGE MANAGER (Frontend-only)
-// ============================================================
 
 const CACHE_PREFIXES = [
   'product_',
@@ -51,7 +46,6 @@ function isCacheKey(key) {
 
 export function safeSetItem(storage, key, value, options = {}) {
   const { protected: isProtected = false } = options;
-
   try {
     storage.setItem(key, value);
     return true;
