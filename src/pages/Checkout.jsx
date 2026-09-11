@@ -527,14 +527,17 @@ function Checkout() {
 
       // ✅✅✅ CRITICAL FIX: Backend `orderId` (database id) priority 1
       // Backend `orders.js` POST / returns: { order, orderId: id, orderNumber }
-      const newOrderId =
-        result.orderId ||         // ✅ Priority 1 — Backend ka database ID (order_xxx)
-        result.order?.id ||       // ✅ Priority 2 — Nested order object se
-        result.order?._id ||      // ✅ Priority 3 — MongoDB style
-        result.id ||              // ✅ Priority 4 — Direct id
-        result.order_number ||    // Fallback
-        result.orderNumber;       // Fallback
+      // ✅ `MPS-...` (order_number) priority 1
+const newOrderId =
+  result.orderNumber ||
+  result.order_number ||
+  result.order?.orderNumber ||
+  result.order?.order_number ||
+  result.orderId ||
+  result.order?.id ||
+  result.id;
 
+console.log('✅ newOrderId:', newOrderId);
       console.log('✅ newOrderId (for payment):', newOrderId);
 
       if (!newOrderId) {
