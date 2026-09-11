@@ -13,7 +13,7 @@ const PaymentSuccess = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Token check — user logged in hai ya nahi
+  // ✅ Token check
   const token =
     typeof window !== 'undefined'
       ? localStorage.getItem('token') || localStorage.getItem('auth_token')
@@ -23,12 +23,13 @@ const PaymentSuccess = () => {
   const RETRY_DELAY = 5000;
 
   const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState('verifying'); // verifying | success | pending | failed | guest
+  // verifying | success | pending | failed | guest | guest_success
+  const [status, setStatus] = useState('verifying');
   const [orderData, setOrderData] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    // ✅ Agar user logged in nahi hai → guest mode
+    // ✅ Agar token nahi hai → guest mode (verify call hi nahi)
     if (!token) {
       setStatus('guest');
       setIsLoading(false);
@@ -63,19 +64,29 @@ const PaymentSuccess = () => {
 
         // ✅ SUCCESS
         if (verifyData.success && verifyData.data?.verified) {
-          setStatus('success');
-          setOrderData({
-            orderNumber: verifyData.data.orderNumber,
-            orderTotal: verifyData.data.orderTotal,
-            orderId: verifyData.data.orderId,
-            txnId: merchantTransactionId,
-          });
-          setIsLoading(false);
-          toast.success('Payment Successful! 🎉');
+          const data = verifyData.data;
 
-          localStorage.removeItem('cart');
-          localStorage.removeItem('orderTotal');
-          localStorage.removeItem('checkoutAddress');
+          // ✅ orderNumber hai → user owner hai → full success page
+          if (data.orderNumber) {
+            setStatus('success');
+            setOrderData({
+              orderNumber: data.orderNumber,
+              orderTotal: data.orderTotal,
+              orderId: data.orderId,
+              txnId: merchantTransactionId,
+            });
+            toast.success('Payment Successful! 🎉');
+
+            localStorage.removeItem('cart');
+            localStorage.removeItem('orderTotal');
+            localStorage.removeItem('checkoutAddress');
+          } else {
+            // ✅ Payment successful, lekin user owner nahi → guest_success
+            setStatus('guest_success');
+            toast.success('Payment Successful! 🎉');
+          }
+
+          setIsLoading(false);
           return;
         }
 
@@ -122,10 +133,46 @@ const PaymentSuccess = () => {
   }, [merchantTransactionId, retryCount, token]);
 
   // ============================================================
-  // ✅ GUEST — user logged in nahi hai
-  // PhonePe jaisa clean success message
+  // ✅ GUEST — user logged in nahi hai (verify call hi nahi hui)
   // ============================================================
   if (status === 'guest') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-pink-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-8 text-center">
+            <div className="w-20 h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
+              <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Payment Successful!</h1>
+            <p className="text-pink-100 mt-2 text-sm">Thank you for your payment</p>
+          </div>
+
+          <div className="p-8 text-center">
+            <p className="text-gray-600 mb-4 text-base font-medium">
+              🎉 Your payment has been received successfully.
+            </p>
+            <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+              Please check your orders on the device where you placed the order.
+            </p>
+
+            <Link
+              to="/"
+              className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+            >
+              Go to Homepage
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // ✅ GUEST SUCCESS — payment done, lekin user owner nahi hai
+  // ============================================================
+  if (status === 'guest_success') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-pink-100 overflow-hidden">
@@ -204,11 +251,9 @@ const PaymentSuccess = () => {
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-6">
               <p className="text-sm text-gray-700 text-center leading-relaxed">
                 📱 <strong>Don't worry!</strong> Your payment is being verified.
-                <br />
-                <br />
+                <br /><br />
                 It may take up to <strong>5 minutes</strong>. We'll update your order automatically once confirmed.
-                <br />
-                <br />
+                <br /><br />
                 <span className="text-xs text-gray-500">
                   Check your order status anytime in <strong>My Orders</strong>.
                 </span>
@@ -292,7 +337,7 @@ const PaymentSuccess = () => {
   }
 
   // ============================================================
-  // ✅ SUCCESS
+  // ✅ SUCCESS (Owner only)
   // ============================================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative overflow-hidden">
