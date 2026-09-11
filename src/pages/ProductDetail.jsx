@@ -854,27 +854,36 @@ function ProductDetail() {
                 )}
               </div>
 
-              {/* Offers Box */}
-              <div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 rounded-2xl p-4">
-                <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <span>🎁</span> Available Offers
-                </h4>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-pink-500 mt-0.5">•</span>
-                    <span><strong>Bank Offer:</strong> 10% off on HDFC Bank Cards, up to ₹500</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-pink-500 mt-0.5">•</span>
-                    <span><strong>Special Price:</strong> Get extra {discountPercent}% off</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-pink-500 mt-0.5">•</span>
-                    <span><strong>Free Delivery:</strong> On orders above ₹499</span>
-                  </li>
-                </ul>
-              </div>
-
+              {/* ✅ Why Shop With Us */}
+<div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 rounded-2xl p-4">
+  <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+    <span>💖</span> Why Shop With Us
+  </h4>
+  <ul className="space-y-2.5 text-sm text-gray-700">
+    <li className="flex items-start gap-2">
+      <span className="text-green-500 mt-0.5 font-bold">✓</span>
+      <span><strong>100% Original Products</strong> — Sourced directly from brands</span>
+    </li>
+    <li className="flex items-start gap-2">
+      <span className="text-green-500 mt-0.5 font-bold">✓</span>
+      <span><strong>Easy 7-Day Returns</strong> on unused products with original packaging</span>
+    </li>
+    <li className="flex items-start gap-2">
+      <span className="text-green-500 mt-0.5 font-bold">✓</span>
+      <span><strong>Free Shipping</strong> on orders above ₹499</span>
+    </li>
+    <li className="flex items-start gap-2">
+      <span className="text-green-500 mt-0.5 font-bold">✓</span>
+      <span><strong>Secure Payments</strong> — UPI, Cards, COD, NetBanking available</span>
+    </li>
+    {discountPercent > 0 && (
+      <li className="flex items-start gap-2">
+        <span className="text-green-500 mt-0.5 font-bold">✓</span>
+        <span><strong>Best Price</strong> — {discountPercent}% off right now!</span>
+      </li>
+    )}
+  </ul>
+</div>
             </div>
           </div>
 
@@ -1042,13 +1051,54 @@ function ProductDetail() {
           </div>
         )}
 
-        {/* ============ FOOTER ============ */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-            <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-            <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+       {/* ============ FOOTER ============ */}
+<footer className="bg-gray-900 text-gray-400 py-12">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">M</span>
           </div>
-        </footer>
+          <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+        </div>
+        <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+      </div>
+      <div>
+        <h4 className="font-semibold text-white mb-4">Shop</h4>
+        <ul className="space-y-2 text-sm">
+          <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+          <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+          <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+          <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+          <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+        </ul>
+      </div>
+      <div>
+        <h4 className="font-semibold text-white mb-4">Support</h4>
+        <ul className="space-y-2 text-sm">
+          <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+          <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+          <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+          <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+        </ul>
+      </div>
+      <div>
+        <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+        <ul className="space-y-2 text-sm">
+          <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+          <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
+          <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+          <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+        </ul>
+      </div>
+    </div>
+    <div className="text-center pt-8 border-t border-gray-800">
+      <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+      <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+    </div>
+  </div>
+</footer>
 
         <style>{`
           .scrollbar-hide::-webkit-scrollbar { display: none; }
