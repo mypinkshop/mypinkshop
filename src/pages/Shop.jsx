@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -138,27 +138,21 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     }
   };
 
-  // ✅ Discount calculation — multiple field names support
   const mrp = product.originalPrice || product.mrp || product.original_price || product.comparePrice;
   const price = product.price || product.sellingPrice || 0;
-  const discountPercent = mrp && mrp > price
-    ? Math.round(((mrp - price) / mrp) * 100)
-    : 0;
-
+  const discountPercent = mrp && mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
   const rating = product.rating || 4.5;
   const isOutOfStock = product.stock === 0;
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-pink-50 relative flex flex-col">
 
-      {/* Discount Badge */}
       {discountPercent > 0 && (
         <div className="absolute top-3 left-3 z-20 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full shadow-md">
           {discountPercent}% OFF
         </div>
       )}
 
-      {/* Wishlist Heart */}
       <button
         onClick={handleWishlistToggle}
         className="absolute top-3 right-3 z-20 w-9 h-9 bg-white/95 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform border border-pink-100"
@@ -272,6 +266,7 @@ function Shop() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all'); // ✅ NEW
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('all');
@@ -281,13 +276,18 @@ function Shop() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Read URL query params
+  // ✅ Read URL query params — including `sub` and `brand`
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const urlSearch = params.get('search');
     const urlCategory = params.get('category');
+    const urlSub = params.get('sub');
+    const urlBrand = params.get('brand');
+
     if (urlSearch) setSearchTerm(urlSearch);
     if (urlCategory) setSelectedCategory(urlCategory.toLowerCase());
+    if (urlSub) setSelectedSubcategory(urlSub);
+    if (urlBrand) setSelectedBrand(urlBrand);
   }, [location.search]);
 
   // Load products
@@ -325,7 +325,7 @@ function Shop() {
     loadProducts();
   }, []);
 
-  // ✅ Filter + sort
+  // ✅ Filter + sort — with subcategory
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
@@ -343,6 +343,14 @@ function Shop() {
       });
     }
 
+    // ✅ Subcategory filter
+    if (selectedSubcategory !== 'all') {
+      filtered = filtered.filter(p => {
+        const sub = (p.subCategory || p.subcategory || '').toLowerCase().trim();
+        return sub === selectedSubcategory.toLowerCase().trim();
+      });
+    }
+
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
@@ -354,7 +362,6 @@ function Shop() {
       return price >= min && price <= max;
     });
 
-    // ✅ Discount filter — multiple field names support
     if (selectedDiscount > 0) {
       filtered = filtered.filter(p => {
         const mrp = p.originalPrice || p.mrp || p.original_price || p.comparePrice;
@@ -376,11 +383,25 @@ function Shop() {
     }
 
     return filtered;
-  }, [products, searchTerm, selectedCategory, selectedBrand, minPrice, maxPrice, selectedDiscount, sortBy]);
+  }, [products, searchTerm, selectedCategory, selectedSubcategory, selectedBrand, minPrice, maxPrice, selectedDiscount, sortBy]);
+
+  // ✅ Subcategories — based on selected category
+  const subcategories = useMemo(() => {
+    let pool = products;
+    if (selectedCategory !== 'all') {
+      pool = products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === selectedCategory.toLowerCase());
+    }
+    const subs = [...new Set(pool.map(p => p.subCategory || p.subcategory).filter(Boolean))].sort();
+    return [
+      { id: 'all', name: 'All Subcategories', count: pool.length },
+      ...subs.map(s => ({ id: s, name: s, count: pool.filter(p => (p.subCategory || p.subcategory) === s).length }))
+    ];
+  }, [products, selectedCategory]);
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('all');
+    setSelectedSubcategory('all');
     setSelectedBrand('all');
     setMinPrice('');
     setMaxPrice('');
@@ -420,6 +441,7 @@ function Shop() {
 
   const activeFilterCount = [
     selectedCategory !== 'all',
+    selectedSubcategory !== 'all',
     selectedBrand !== 'all',
     minPrice,
     maxPrice,
@@ -448,7 +470,6 @@ function Shop() {
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
-        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -536,7 +557,10 @@ function Shop() {
               {categoryChips.map(chip => (
                 <button
                   key={chip.id}
-                  onClick={() => setSelectedCategory(chip.id)}
+                  onClick={() => {
+                    setSelectedCategory(chip.id);
+                    setSelectedSubcategory('all'); // ✅ Reset subcategory on category change
+                  }}
                   className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                     selectedCategory === chip.id
                       ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-200'
@@ -557,13 +581,24 @@ function Shop() {
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
             <span className="text-gray-400">/</span>
             <span className="text-pink-600 font-medium">Shop</span>
+            {selectedCategory !== 'all' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="text-pink-600 font-medium capitalize">{selectedCategory}</span>
+              </>
+            )}
+            {selectedSubcategory !== 'all' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="text-pink-600 font-medium">{selectedSubcategory}</span>
+              </>
+            )}
           </div>
         </div>
 
         {/* MAIN CONTENT */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
 
-          {/* Top Bar */}
           <div className="mb-6 flex flex-wrap justify-between items-center gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-pink-100 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap">
               <button
@@ -596,12 +631,16 @@ function Shop() {
             </select>
           </div>
 
-          {/* Active Filter Chips */}
           {activeFilterCount > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {selectedCategory !== 'all' && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedCategory} <button onClick={() => setSelectedCategory('all')} className="hover:text-pink-900">×</button>
+                  {selectedCategory} <button onClick={() => { setSelectedCategory('all'); setSelectedSubcategory('all'); }} className="hover:text-pink-900">×</button>
+                </span>
+              )}
+              {selectedSubcategory !== 'all' && (
+                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                  {selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')} className="hover:text-pink-900">×</button>
                 </span>
               )}
               {selectedBrand !== 'all' && (
@@ -627,7 +666,6 @@ function Shop() {
 
           <div className="flex gap-6 lg:gap-8">
 
-            {/* SIDEBAR FILTERS */}
             <aside className={`${showFilters ? 'fixed inset-0 z-50 bg-black/50 lg:static lg:bg-transparent lg:z-auto' : 'hidden lg:block'} lg:w-72 xl:w-80 flex-shrink-0`} onClick={() => setShowFilters(false)}>
 
               <div
@@ -655,7 +693,10 @@ function Shop() {
                             type="radio"
                             name="category"
                             checked={selectedCategory === cat.id}
-                            onChange={() => setSelectedCategory(cat.id)}
+                            onChange={() => {
+                              setSelectedCategory(cat.id);
+                              setSelectedSubcategory('all');
+                            }}
                             className="w-4 h-4 text-pink-500 focus:ring-pink-400"
                           />
                           <span className={`text-sm ${selectedCategory === cat.id ? 'font-semibold text-pink-700' : 'text-gray-700'}`}>{cat.name}</span>
@@ -665,6 +706,32 @@ function Shop() {
                     ))}
                   </div>
                 </div>
+
+                {/* ✅ Subcategory — only shown when category selected */}
+                {selectedCategory !== 'all' && subcategories.length > 1 && (
+                  <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
+                    <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
+                      <span>📁</span> Subcategory
+                    </h3>
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {subcategories.map(sub => (
+                        <label key={sub.id} className={`flex items-center justify-between cursor-pointer px-3 py-2 rounded-xl transition ${selectedSubcategory === sub.id ? 'bg-pink-50 border border-pink-200' : 'hover:bg-pink-50'}`}>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="subcategory"
+                              checked={selectedSubcategory === sub.id}
+                              onChange={() => setSelectedSubcategory(sub.id)}
+                              className="w-4 h-4 text-pink-500 focus:ring-pink-400"
+                            />
+                            <span className={`text-sm ${selectedSubcategory === sub.id ? 'font-semibold text-pink-700' : 'text-gray-700'}`}>{sub.name}</span>
+                          </div>
+                          <span className="text-xs text-gray-400">{sub.count}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Brand */}
                 {brands.length > 1 && (
@@ -708,7 +775,7 @@ function Shop() {
                   </div>
                 </div>
 
-                {/* Discount Filter */}
+                {/* Discount */}
                 <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
                   <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
                     <span>🎁</span> Discount
