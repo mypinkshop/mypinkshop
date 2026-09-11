@@ -10,9 +10,12 @@ import toast from 'react-hot-toast';
 
 function Checkout() {
   const { cart, cartTotal, clearCart, removeFromCart, updateQuantity } = useCart();
-  const { user, logout } = useAuth();
+  const { user, logout, token: authToken } = useAuth();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
+
+  // ✅ Token — auth context OR localStorage
+  const token = authToken || localStorage.getItem('token') || localStorage.getItem('adminToken');
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -33,6 +36,7 @@ function Checkout() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState(null);
+  const [showAddressDropdown, setShowAddressDropdown] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -51,16 +55,14 @@ function Checkout() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  const subtotal = cartTotal();           // ✅ Product amount (GST already included)
+  const subtotal = cartTotal();
   const discount = couponDiscount;
 
-  // ✅ Shipping only — no separate GST
   const deliveryCharges =
     subtotal >= (shippingInfo.freeShippingThreshold || 499)
       ? 0
       : Number(shippingInfo.shippingCharge) || 0;
 
-  // ✅ Total = Subtotal + Shipping − Discount
   const total = subtotal + deliveryCharges - discount;
 
   const handleSearch = () => {
@@ -73,6 +75,7 @@ function Checkout() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  // ✅ Load shipping settings
   useEffect(() => {
     const loadShippingSettings = async () => {
       try {
@@ -92,6 +95,7 @@ function Checkout() {
     loadShippingSettings();
   }, [API_URL]);
 
+  // ✅ Check delivery on pincode change
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -140,40 +144,103 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL]);
 
+  // ✅✅✅ LOAD ADDRESSES FROM BOTH BACKEND + LOCALSTORAGE
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) {
       navigate('/cart');
     }
-    const addresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
-    setSavedAddresses(addresses);
+
+    const loadAddresses = async () => {
+      // 1. localStorage se
+      const localAddresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
+
+      // 2. Backend se (agar logged in hai)
+      let backendAddresses = [];
+      if (user && token) {
+        try {
+          const res = await fetch(`${API_URL}/api/users/addresses`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            backendAddresses = (data.data || []).map((a) => ({
+              id: a.id || a._id,
+              fullName: a.name || a.fullName,
+              phone: a.phone,
+              address: a.line1 || a.address,
+              addressLine2: a.line2 || '',
+              city: a.city,
+              state: a.state,
+              pincode: a.pincode,
+              isDefault: !!a.is_default,
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to load backend addresses:', err);
+        }
+      }
+
+      // ✅ Merge + deduplicate
+      const allAddresses = [...backendAddresses, ...localAddresses];
+      const unique = allAddresses.filter(
+        (addr, idx, arr) =>
+          idx ===
+          arr.findIndex(
+            (a) =>
+              a.pincode === addr.pincode &&
+              (a.fullName || '').toLowerCase() === (addr.fullName || '').toLowerCase() &&
+              (a.address || '').toLowerCase() === (addr.address || '').toLowerCase() &&
+              (a.phone || '') === (addr.phone || '')
+          )
+      );
+
+      // ✅ Default address ko sabse pehle rakho
+      unique.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
+
+      setSavedAddresses(unique);
+
+      // ✅ Default address auto-select
+      const defaultAddr = unique.find((a) => a.isDefault);
+      if (defaultAddr && !selectedAddress) {
+        setSelectedAddress(defaultAddr.id);
+        setFormData((prev) => ({
+          ...prev,
+          fullName: defaultAddr.fullName,
+          phone: defaultAddr.phone,
+          address: defaultAddr.address,
+          city: defaultAddr.city,
+          state: defaultAddr.state,
+          pincode: defaultAddr.pincode,
+        }));
+      }
+    };
+
+    loadAddresses();
+
     if (user) {
       setFormData((prev) => ({ ...prev, email: user.email, fullName: user.name || '' }));
     }
-  }, [cart.length, navigate, orderPlaced, user]);
+  }, [cart.length, navigate, orderPlaced, user, token, API_URL]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleAddressSelect = (address) => {
-    if (selectedAddress === address.id) {
-      setSelectedAddress(null);
-      setFormData({ ...formData, fullName: '', phone: '', address: '', city: '', state: '', pincode: '' });
-    } else {
-      setSelectedAddress(address.id);
-      setFormData({
-        ...formData,
-        fullName: address.fullName,
-        phone: address.phone,
-        address: address.address,
-        city: address.city,
-        state: address.state,
-        pincode: address.pincode,
-      });
-      setIsEditing(false);
-      setEditingAddressId(null);
-      toast.success('Address selected! ✨');
-    }
+    setSelectedAddress(address.id);
+    setFormData({
+      ...formData,
+      fullName: address.fullName,
+      phone: address.phone,
+      address: address.address,
+      city: address.city,
+      state: address.state,
+      pincode: address.pincode,
+    });
+    setIsEditing(false);
+    setEditingAddressId(null);
+    setShowAddressDropdown(false);
+    toast.success('Address selected! ✨');
   };
 
   const handleEditAddress = (address) => {
@@ -189,6 +256,7 @@ function Checkout() {
       pincode: address.pincode,
     });
     setSelectedAddress(null);
+    setShowAddressDropdown(false);
   };
 
   const saveEditedAddress = () => {
@@ -244,21 +312,21 @@ function Checkout() {
   const saveNewAddress = () => {
     const newAddress = {
       id: Date.now(),
-      fullName: formData.fullName,
-      phone: formData.phone,
-      address: formData.address,
-      city: formData.city,
-      state: formData.state,
-      pincode: formData.pincode,
+      fullName: (formData.fullName || '').trim(),
+      phone: (formData.phone || '').trim(),
+      address: (formData.address || '').trim(),
+      city: (formData.city || '').trim(),
+      state: (formData.state || '').trim(),
+      pincode: (formData.pincode || '').trim(),
     };
 
     const duplicate = savedAddresses.find(
       (addr) =>
-        addr.pincode === newAddress.pincode &&
-        addr.fullName.toLowerCase() === newAddress.fullName.toLowerCase() &&
-        addr.address.toLowerCase() === newAddress.address.toLowerCase() &&
-        addr.city.toLowerCase() === newAddress.city.toLowerCase() &&
-        addr.phone === newAddress.phone
+        (addr.pincode || '').trim() === newAddress.pincode &&
+        (addr.fullName || '').trim().toLowerCase() === newAddress.fullName.toLowerCase() &&
+        (addr.address || '').trim().toLowerCase() === newAddress.address.toLowerCase() &&
+        (addr.city || '').trim().toLowerCase() === newAddress.city.toLowerCase() &&
+        (addr.phone || '').trim() === newAddress.phone
     );
 
     if (!duplicate) {
@@ -267,6 +335,7 @@ function Checkout() {
       localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
       return true;
     }
+    console.log('⚠️ Duplicate address skipped');
     return false;
   };
 
@@ -283,7 +352,7 @@ function Checkout() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(user && { Authorization: `Bearer ${localStorage.getItem('token')}` }),
+          ...(user && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({
           code: couponCode,
@@ -321,8 +390,6 @@ function Checkout() {
 
   const handlePhonePePayment = async (newOrderId) => {
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
-
       const payResponse = await fetch(`${API_URL}/api/payments/initiate`, {
         method: 'POST',
         headers: {
@@ -349,8 +416,6 @@ function Checkout() {
   };
 
   const placeOrder = async () => {
-    const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
-
     if (!token) {
       toast.error('Please login to place your order');
       navigate('/login?redirect=/checkout');
@@ -370,7 +435,8 @@ function Checkout() {
     setIsPlacingOrder(true);
     setOrderTotal(total);
 
-    if (formData.saveAddress && !isEditing) {
+    // ✅ Sirf tab save karo jab naya address ho
+    if (formData.saveAddress && !isEditing && !selectedAddress) {
       saveNewAddress();
     }
 
@@ -426,7 +492,8 @@ function Checkout() {
         throw new Error('Order ID missing from server response');
       }
 
-      if (formData.saveAddress) {
+      // ✅ Backend sync sirf naye address pe
+      if (formData.saveAddress && !selectedAddress && !isEditing) {
         fetch(`${API_URL}/api/users/addresses`, {
           method: 'POST',
           headers: {
@@ -482,6 +549,9 @@ function Checkout() {
     return 'Delivery available (4-5 business days)';
   };
 
+  // ============================================================
+  // ORDER PLACED SUCCESS
+  // ============================================================
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 flex flex-col">
@@ -628,6 +698,9 @@ function Checkout() {
     );
   }
 
+  // ============================================================
+  // CHECKOUT FORM
+  // ============================================================
   return (
     <>
       <Helmet>
@@ -775,95 +848,112 @@ function Checkout() {
                     </div>
                   </div>
 
+                  {/* ✅ SAVED ADDRESSES DROPDOWN */}
                   {savedAddresses.length > 0 && (
-                    <div className="mb-6">
-                      <p className="text-sm font-semibold text-gray-700 mb-3">📌 Saved Addresses</p>
-                      <div className="grid grid-cols-1 gap-3">
-                        {savedAddresses.map((addr) => (
-                          <div
-                            key={addr.id}
-                            onClick={() => handleAddressSelect(addr)}
-                            className={`p-4 border-2 rounded-xl transition-all cursor-pointer ${
-                              selectedAddress === addr.id
-                                ? 'border-pink-500 bg-pink-50 shadow-md'
-                                : 'border-gray-200 hover:border-pink-200'
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <input
-                                type="radio"
-                                name="savedAddress"
-                                checked={selectedAddress === addr.id}
-                                onChange={() => {}}
-                                className="mt-1 w-4 h-4 accent-pink-500 flex-shrink-0 pointer-events-none"
-                              />
-                              <div className="flex-1 pointer-events-none">
-                                <p className="font-semibold text-gray-900">{addr.fullName}</p>
-                                <p className="text-sm text-gray-500">
-                                  {addr.address}, {addr.city}, {addr.state} - {addr.pincode}
-                                </p>
-                                <p className="text-sm text-gray-500">📞 {addr.phone}</p>
-                              </div>
-                              <div className="flex gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => handleEditAddress(addr)}
-                                  className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                                  title="Edit"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteAddress(addr.id)}
-                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
-                                  title="Delete"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
+                    <div className="mb-6 relative">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        📌 Select from saved addresses ({savedAddresses.length})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressDropdown(!showAddressDropdown)}
+                        className="w-full flex items-center justify-between gap-3 px-4 py-3 border-2 border-pink-200 rounded-xl bg-white hover:border-pink-400 transition text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          {selectedAddress ? (
+                            (() => {
+                              const addr = savedAddresses.find((a) => a.id === selectedAddress);
+                              if (!addr) return <span className="text-gray-400">Select an address...</span>;
+                              return (
+                                <div>
+                                  <p className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                                    {addr.fullName}
+                                    {addr.isDefault && (
+                                      <span className="text-[10px] bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full font-bold">
+                                        ⭐ Default
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-500 truncate">
+                                    {addr.address}, {addr.city} - {addr.pincode}
+                                  </p>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-gray-500 font-medium">Select a saved address...</span>
+                          )}
+                        </div>
+                        <span className={`text-pink-500 text-lg transition-transform ${showAddressDropdown ? 'rotate-180' : ''}`}>
+                          ▼
+                        </span>
+                      </button>
 
-                            {editingAddressId === addr.id && (
-                              <div className="mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
-                                <p className="text-xs text-blue-600 font-medium mb-2">✏️ Editing this address...</p>
-                                <div className="flex gap-2">
+                      {showAddressDropdown && (
+                        <div className="absolute z-30 mt-2 w-full bg-white border-2 border-pink-200 rounded-xl shadow-xl max-h-80 overflow-y-auto">
+                          {savedAddresses.map((addr) => (
+                            <div
+                              key={addr.id}
+                              className={`p-4 border-b border-pink-100 last:border-0 cursor-pointer transition ${
+                                selectedAddress === addr.id ? 'bg-pink-50' : 'hover:bg-pink-50'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div
+                                  className="flex-1"
+                                  onClick={() => handleAddressSelect(addr)}
+                                >
+                                  <p className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                                    {addr.fullName}
+                                    {addr.isDefault && (
+                                      <span className="text-[10px] bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full font-bold">
+                                        ⭐ Default
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    {addr.address}, {addr.city}, {addr.state} - {addr.pincode}
+                                  </p>
+                                  <p className="text-xs text-gray-500">📞 {addr.phone}</p>
+                                </div>
+                                <div className="flex gap-1.5 flex-shrink-0">
                                   <button
-                                    onClick={saveEditedAddress}
-                                    className="px-4 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition"
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditAddress(addr);
+                                    }}
+                                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition text-xs"
+                                    title="Edit"
                                   >
-                                    Save
+                                    ✏️
                                   </button>
                                   <button
-                                    onClick={cancelEdit}
-                                    className="px-4 py-1.5 bg-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-300 transition"
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteAddress(addr.id);
+                                    }}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition text-xs"
+                                    title="Delete"
                                   >
-                                    Cancel
+                                    🗑️
                                   </button>
                                 </div>
                               </div>
-                            )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                            {selectedAddress === addr.id && !editingAddressId && (
-                              <div className="mt-3 pt-3 border-t border-pink-200" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => {
-                                    setStep(2);
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                  }}
-                                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition-all"
-                                >
-                                  Continue to Delivery 🚚 →
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
                       <div className="relative my-5">
                         <div className="absolute inset-0 flex items-center">
                           <div className="w-full border-t border-pink-100"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                          <span className="px-3 bg-white text-gray-400 font-medium">or add new address</span>
+                          <span className="px-3 bg-white text-gray-400 font-medium">
+                            or add new address
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -960,7 +1050,7 @@ function Checkout() {
                         </p>
                       )}
                       {!shippingInfo.checking && formData.pincode.length === 6 && (
-                        <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+                        <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1 font-medium">
                           ✅ {getDeliveryDateDisplay()}
                         </p>
                       )}
@@ -973,13 +1063,33 @@ function Checkout() {
                         onChange={(e) => setFormData({ ...formData, saveAddress: e.target.checked })}
                         className="w-4 h-4 accent-pink-500 rounded"
                       />
-                      <label htmlFor="saveAddress" className="ml-2 text-sm text-gray-600">
+                      <label htmlFor="saveAddress" className="ml-2 text-sm text-gray-600 font-medium">
                         Save this address for future
                       </label>
                     </div>
                   </div>
 
-                  {!selectedAddress && (
+                  {editingAddressId && (
+                    <div className="mt-4 p-3 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-center justify-between gap-3">
+                      <p className="text-sm text-blue-700 font-bold">✏️ Editing saved address...</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveEditedAddress}
+                          className="px-4 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition font-bold"
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-4 py-1.5 bg-white text-gray-600 text-sm rounded-lg hover:bg-gray-50 border border-gray-200 transition font-bold"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!selectedAddress && !editingAddressId && (
                     <button
                       onClick={() => {
                         if (formData.fullName && formData.phone && formData.address && formData.city && formData.pincode) {
@@ -1018,11 +1128,7 @@ function Checkout() {
                   </div>
 
                   <div className="space-y-3">
-                    <label
-                      className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                        true ? 'border-pink-500 bg-pink-50 shadow-md' : 'border-gray-200'
-                      }`}
-                    >
+                    <label className="flex items-center justify-between p-4 border-2 border-pink-500 bg-pink-50 shadow-md rounded-xl cursor-pointer">
                       <div className="flex items-center gap-4">
                         <input
                           type="radio"
@@ -1047,7 +1153,7 @@ function Checkout() {
 
                   {subtotal < shippingInfo.freeShippingThreshold && (
                     <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                      <p className="text-sm text-amber-700 flex items-center gap-2">
+                      <p className="text-sm text-amber-700 flex items-center gap-2 font-medium">
                         🚚 Add ₹{shippingInfo.freeShippingThreshold - subtotal} more for{' '}
                         <strong>FREE delivery</strong>
                       </p>
@@ -1233,7 +1339,7 @@ function Checkout() {
                   </div>
                 </div>
 
-                {/* SUMMARY — NO SEPARATE GST */}
+                {/* SUMMARY */}
                 <div className="space-y-2.5 text-sm border-t border-pink-100 pt-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
@@ -1270,6 +1376,7 @@ function Checkout() {
                   </p>
                 </div>
 
+                {/* ✅ DELIVERY ADDRESS + EXPECTED DATE */}
                 {formData.address && (
                   <div className="mt-4 p-3 bg-pink-50 rounded-xl border border-pink-100">
                     <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
@@ -1280,6 +1387,15 @@ function Checkout() {
                       {formData.address}, {formData.city} - {formData.pincode}
                     </p>
                     <p className="text-xs text-gray-600">📞 {formData.phone}</p>
+
+                    {/* ✅ Expected Delivery Date */}
+                    {formData.pincode && formData.pincode.length === 6 && (
+                      <div className="mt-2 pt-2 border-t border-pink-200">
+                        <p className="text-xs font-bold text-green-700 flex items-center gap-1">
+                          🚚 {getDeliveryDateDisplay()}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
