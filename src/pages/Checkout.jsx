@@ -141,17 +141,15 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL]);
 
-  // ✅✅✅ LOAD ADDRESSES — token dependency REMOVED to prevent infinite loop
+  // ✅ LOAD ADDRESSES — token dependency REMOVED to prevent infinite loop
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) {
       navigate('/cart');
     }
 
     const loadAddresses = async () => {
-      // 1. localStorage se
       const localAddresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
 
-      // 2. Backend se (agar logged in hai)
       let backendAddresses = [];
       if (user && token) {
         try {
@@ -177,7 +175,6 @@ function Checkout() {
         }
       }
 
-      // ✅ Merge + deduplicate
       const allAddresses = [...backendAddresses, ...localAddresses];
       const unique = allAddresses.filter(
         (addr, idx, arr) =>
@@ -191,12 +188,10 @@ function Checkout() {
           )
       );
 
-      // ✅ Default address ko sabse pehle rakho
       unique.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
 
       setSavedAddresses(unique);
 
-      // ✅ Default address auto-select
       const defaultAddr = unique.find((a) => a.isDefault);
       if (defaultAddr && !selectedAddress) {
         setSelectedAddress(defaultAddr.id);
@@ -217,7 +212,6 @@ function Checkout() {
     if (user) {
       setFormData((prev) => ({ ...prev, email: user.email, fullName: user.name || '' }));
     }
-    // ✅ `token` dependency se HATA DIYA — infinite loop fix
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.length, navigate, orderPlaced, user, API_URL]);
 
@@ -240,6 +234,7 @@ function Checkout() {
     setEditingAddressId(null);
     setShowAddressDropdown(false);
     toast.success('Address selected! ✨');
+    // ✅ Button hamesha visible hai, user click karega
   };
 
   const handleEditAddress = (address) => {
@@ -338,6 +333,63 @@ function Checkout() {
     return false;
   };
 
+  // ✅ VALIDATION — specific error messages
+  const validateAddress = () => {
+    if (!formData.fullName || !formData.fullName.trim()) {
+      toast.error('❌ Please enter your Full Name');
+      return false;
+    }
+    if (!formData.email || !formData.email.trim()) {
+      toast.error('❌ Please enter your Email Address');
+      return false;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
+      toast.error('❌ Please enter a valid Email Address');
+      return false;
+    }
+    if (!formData.phone || !formData.phone.trim()) {
+      toast.error('❌ Please enter your Phone Number');
+      return false;
+    }
+    if (formData.phone.replace(/\D/g, '').length !== 10) {
+      toast.error('❌ Phone number must be 10 digits');
+      return false;
+    }
+    if (!formData.address || !formData.address.trim()) {
+      toast.error('❌ Please enter your Address');
+      return false;
+    }
+    if (!formData.city || !formData.city.trim()) {
+      toast.error('❌ Please enter your City');
+      return false;
+    }
+    if (!formData.state || !formData.state.trim()) {
+      toast.error('❌ Please enter your State');
+      return false;
+    }
+    if (!formData.pincode || !formData.pincode.trim()) {
+      toast.error('❌ Please enter your Pincode');
+      return false;
+    }
+    if (formData.pincode.replace(/\D/g, '').length !== 6) {
+      toast.error('❌ Pincode must be 6 digits');
+      return false;
+    }
+    if (!shippingInfo.deliverable && formData.pincode.length === 6) {
+      toast.error('❌ Sorry, we do not deliver to this pincode');
+      return false;
+    }
+    return true;
+  };
+
+  // ✅ CONTINUE HANDLER — validation + step advance
+  const handleContinueToDelivery = () => {
+    if (validateAddress()) {
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Please enter a coupon code');
@@ -421,13 +473,7 @@ function Checkout() {
       return;
     }
 
-    if (!formData.fullName || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
-      toast.error('Please fill all address fields');
-      return;
-    }
-
-    if (!shippingInfo.deliverable && formData.pincode.length === 6) {
-      toast.error('Sorry, we do not deliver to this pincode');
+    if (!validateAddress()) {
       return;
     }
 
@@ -845,6 +891,7 @@ function Checkout() {
                     </div>
                   </div>
 
+                  {/* ✅ SAVED ADDRESSES DROPDOWN */}
                   {savedAddresses.length > 0 && (
                     <div className="mb-6 relative">
                       <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -987,7 +1034,8 @@ function Checkout() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        placeholder="Enter phone number"
+                        maxLength="10"
+                        placeholder="10-digit mobile number"
                         className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
                         required
                       />
@@ -1085,21 +1133,13 @@ function Checkout() {
                     </div>
                   )}
 
-                  {!selectedAddress && !editingAddressId && (
-                    <button
-                      onClick={() => {
-                        if (formData.fullName && formData.phone && formData.address && formData.city && formData.pincode) {
-                          setStep(2);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        } else {
-                          toast.error('Please fill all required address fields');
-                        }
-                      }}
-                      className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition-all"
-                    >
-                      Continue to Delivery 🚚 →
-                    </button>
-                  )}
+                  {/* ✅✅✅ CONTINUE BUTTON — HAMESHA VISIBLE */}
+                  <button
+                    onClick={handleContinueToDelivery}
+                    className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition-all"
+                  >
+                    Continue to Delivery 🚚 →
+                  </button>
                 </div>
               )}
 
