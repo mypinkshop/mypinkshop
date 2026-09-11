@@ -27,7 +27,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     return url;
   };
 
-  // Wishlist state sync
   useEffect(() => {
     const checkWishlist = () => {
       if (user) {
@@ -139,8 +138,11 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     }
   };
 
-  const discountPercent = product.originalPrice && product.originalPrice > product.price
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  // ✅ Discount calculation — multiple field names support
+  const mrp = product.originalPrice || product.mrp || product.original_price || product.comparePrice;
+  const price = product.price || product.sellingPrice || 0;
+  const discountPercent = mrp && mrp > price
+    ? Math.round(((mrp - price) / mrp) * 100)
     : 0;
 
   const rating = product.rating || 4.5;
@@ -165,7 +167,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       </button>
 
       <Link to={`/product/${product._id || product.id}`} className="block">
-        {/* Image */}
         <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 flex items-center justify-center">
           {!imageLoaded && !imgError && (
             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-pink-50 via-white to-rose-50" />
@@ -187,7 +188,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             </div>
           )}
 
-          {/* Out of Stock Overlay */}
           {isOutOfStock && (
             <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10">
               <span className="bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-full">
@@ -196,7 +196,6 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             </div>
           )}
 
-          {/* NEW Badge */}
           {product.isNew && !isOutOfStock && (
             <span className="absolute bottom-3 left-3 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
               ✨ NEW
@@ -206,21 +205,18 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       </Link>
 
       <div className="p-3 sm:p-4 flex flex-col flex-1">
-        {/* Brand */}
         {product.brand && (
           <p className="text-[10px] sm:text-xs font-semibold text-pink-600 uppercase tracking-wider mb-1">
             {product.brand}
           </p>
         )}
 
-        {/* Title */}
         <Link to={`/product/${product._id || product.id}`}>
           <h3 className="font-semibold text-gray-800 text-xs sm:text-sm mb-2 line-clamp-2 hover:text-pink-600 transition min-h-[2.5rem]">
             {product.name}
           </h3>
         </Link>
 
-        {/* Rating */}
         <div className="flex items-center gap-1.5 mb-2">
           <span className="bg-green-50 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
             {rating.toFixed(1)} <span className="text-yellow-500">★</span>
@@ -228,15 +224,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
           <span className="text-[10px] text-gray-400">(50+)</span>
         </div>
 
-        {/* Price */}
         <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-          <span className="text-base sm:text-lg font-bold text-pink-600">₹{product.price}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
+          <span className="text-base sm:text-lg font-bold text-pink-600">₹{price.toLocaleString()}</span>
+          {mrp && mrp > price && (
+            <span className="text-xs text-gray-400 line-through">₹{mrp.toLocaleString()}</span>
           )}
         </div>
 
-        {/* Actions */}
         <div className="mt-auto flex gap-2">
           {isAdded ? (
             <button
@@ -280,17 +274,14 @@ function Shop() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [selectedRating, setSelectedRating] = useState(0);
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedDiscount, setSelectedDiscount] = useState(0);
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
 
-  const searchBarRef = useRef(null);
-
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Read URL query params (search, category)
+  // Read URL query params
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const urlSearch = params.get('search');
@@ -334,7 +325,7 @@ function Shop() {
     loadProducts();
   }, []);
 
-  // Filter + sort
+  // ✅ Filter + sort
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
@@ -358,30 +349,34 @@ function Shop() {
 
     const min = minPrice ? parseFloat(minPrice) : 0;
     const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-    filtered = filtered.filter(p => p.price >= min && p.price <= max);
+    filtered = filtered.filter(p => {
+      const price = p.price || p.sellingPrice || 0;
+      return price >= min && price <= max;
+    });
 
-    if (selectedRating > 0) {
-      filtered = filtered.filter(p => Math.floor(p.rating || 4) >= selectedRating);
-    }
-
+    // ✅ Discount filter — multiple field names support
     if (selectedDiscount > 0) {
       filtered = filtered.filter(p => {
-        if (!p.originalPrice || p.originalPrice <= p.price) return false;
-        const disc = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
+        const mrp = p.originalPrice || p.mrp || p.original_price || p.comparePrice;
+        const price = p.price || p.sellingPrice || 0;
+
+        if (!mrp || mrp <= price) return false;
+
+        const disc = Math.round(((mrp - price) / mrp) * 100);
         return disc >= selectedDiscount;
       });
     }
 
     switch (sortBy) {
-      case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
-      case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
+      case 'price_low': filtered.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
+      case 'price_high': filtered.sort((a, b) => (b.price || 0) - (a.price || 0)); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
       case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
       default: break;
     }
 
     return filtered;
-  }, [products, searchTerm, selectedCategory, selectedBrand, minPrice, maxPrice, selectedRating, selectedDiscount, sortBy]);
+  }, [products, searchTerm, selectedCategory, selectedBrand, minPrice, maxPrice, selectedDiscount, sortBy]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -389,7 +384,6 @@ function Shop() {
     setSelectedBrand('all');
     setMinPrice('');
     setMaxPrice('');
-    setSelectedRating(0);
     setSelectedDiscount(0);
     setSortBy('default');
     navigate('/shop');
@@ -401,7 +395,6 @@ function Shop() {
     }
   };
 
-  // Category chips
   const categoryChips = [
     { id: 'all', name: 'All', icon: '✨' },
     { id: 'skincare', name: 'Skincare', icon: '🧴' },
@@ -425,13 +418,11 @@ function Shop() {
     return [{ id: 'all', name: 'All Brands', count: products.length }, ...unique.map(b => ({ id: b, name: b, count: products.filter(p => p.brand === b).length }))];
   }, [products]);
 
-  // Active filter count
   const activeFilterCount = [
     selectedCategory !== 'all',
     selectedBrand !== 'all',
     minPrice,
     maxPrice,
-    selectedRating > 0,
     selectedDiscount > 0,
   ].filter(Boolean).length;
 
@@ -457,7 +448,7 @@ function Shop() {
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
-        {/* ============ HEADER ============ */}
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -474,7 +465,6 @@ function Shop() {
               <div className="flex-1 max-w-md lg:max-w-2xl">
                 <div className="relative">
                   <input
-                    ref={searchBarRef}
                     type="text"
                     placeholder="Search for products..."
                     value={searchTerm}
@@ -519,7 +509,7 @@ function Shop() {
           </div>
         </header>
 
-        {/* ============ HERO BANNER ============ */}
+        {/* HERO */}
         <div className="relative bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200 overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center relative">
             <div className="absolute inset-0 flex items-center justify-center opacity-5 text-[200px] pointer-events-none select-none">
@@ -539,7 +529,7 @@ function Shop() {
           </div>
         </div>
 
-        {/* ============ CATEGORY CHIPS (Horizontal Scroll) ============ */}
+        {/* CATEGORY CHIPS */}
         <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-pink-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-3 scrollbar-hide">
@@ -561,7 +551,7 @@ function Shop() {
           </div>
         </div>
 
-        {/* ============ BREADCRUMB ============ */}
+        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -570,10 +560,10 @@ function Shop() {
           </div>
         </div>
 
-        {/* ============ MAIN CONTENT ============ */}
+        {/* MAIN CONTENT */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
 
-          {/* Top Bar — Filter + Sort */}
+          {/* Top Bar */}
           <div className="mb-6 flex flex-wrap justify-between items-center gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-pink-100 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap">
               <button
@@ -619,14 +609,14 @@ function Shop() {
                   {selectedBrand} <button onClick={() => setSelectedBrand('all')} className="hover:text-pink-900">×</button>
                 </span>
               )}
-              {selectedRating > 0 && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedRating}★ & up <button onClick={() => setSelectedRating(0)} className="hover:text-pink-900">×</button>
-                </span>
-              )}
               {selectedDiscount > 0 && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
                   {selectedDiscount}%+ off <button onClick={() => setSelectedDiscount(0)} className="hover:text-pink-900">×</button>
+                </span>
+              )}
+              {(minPrice || maxPrice) && (
+                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                  ₹{minPrice || 0} - ₹{maxPrice || '∞'} <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="hover:text-pink-900">×</button>
                 </span>
               )}
               <button onClick={clearFilters} className="text-xs text-pink-600 underline hover:text-pink-800 font-semibold">
@@ -637,7 +627,7 @@ function Shop() {
 
           <div className="flex gap-6 lg:gap-8">
 
-            {/* ============ SIDEBAR FILTERS (Desktop) ============ */}
+            {/* SIDEBAR FILTERS */}
             <aside className={`${showFilters ? 'fixed inset-0 z-50 bg-black/50 lg:static lg:bg-transparent lg:z-auto' : 'hidden lg:block'} lg:w-72 xl:w-80 flex-shrink-0`} onClick={() => setShowFilters(false)}>
 
               <div
@@ -645,7 +635,6 @@ function Shop() {
                 onClick={(e) => e.stopPropagation()}
               >
 
-                {/* Mobile Header */}
                 {showFilters && (
                   <div className="flex justify-between items-center mb-4 lg:hidden">
                     <h3 className="text-lg font-bold text-gray-800">Filters</h3>
@@ -653,7 +642,7 @@ function Shop() {
                   </div>
                 )}
 
-                {/* Category Filter */}
+                {/* Category */}
                 <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
                   <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
                     <span>📂</span> Categories
@@ -677,7 +666,7 @@ function Shop() {
                   </div>
                 </div>
 
-                {/* Brand Filter */}
+                {/* Brand */}
                 {brands.length > 1 && (
                   <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
                     <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
@@ -695,7 +684,7 @@ function Shop() {
                   </div>
                 )}
 
-                {/* Price Filter */}
+                {/* Price */}
                 <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
                   <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
                     <span>💰</span> Price Range
@@ -731,36 +720,12 @@ function Shop() {
                         onClick={() => setSelectedDiscount(selectedDiscount === d ? 0 : d)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
                           selectedDiscount === d
-                            ? 'bg-pink-500 text-white'
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
                             : 'bg-pink-50 text-pink-600 border border-pink-200 hover:bg-pink-100'
                         }`}
                       >
                         {d}% or more
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Rating Filter */}
-                <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <span>⭐</span> Customer Rating
-                  </h3>
-                  <div className="space-y-1.5">
-                    {[4, 3, 2].map(r => (
-                      <label key={r} className={`flex items-center gap-3 cursor-pointer px-3 py-2 rounded-xl transition ${selectedRating === r ? 'bg-pink-50 border border-pink-200' : 'hover:bg-pink-50'}`}>
-                        <input
-                          type="radio"
-                          name="rating"
-                          checked={selectedRating === r}
-                          onChange={() => setSelectedRating(selectedRating === r ? 0 : r)}
-                          className="w-4 h-4 text-pink-500"
-                        />
-                        <div className="flex text-yellow-400 text-sm">
-                          {'★'.repeat(r)}{'☆'.repeat(5 - r)}
-                        </div>
-                        <span className="text-xs text-gray-500">& above</span>
-                      </label>
                     ))}
                   </div>
                 </div>
@@ -777,7 +742,7 @@ function Shop() {
               </div>
             </aside>
 
-            {/* ============ PRODUCTS GRID ============ */}
+            {/* PRODUCTS GRID */}
             <div className="flex-1 min-w-0">
 
               {filteredProducts.length === 0 ? (
@@ -813,7 +778,7 @@ function Shop() {
           </div>
         </div>
 
-        {/* ============ FOOTER ============ */}
+        {/* FOOTER */}
         <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
