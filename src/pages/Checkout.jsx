@@ -72,7 +72,6 @@ function Checkout() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // ✅ Load shipping settings
   useEffect(() => {
     const loadShippingSettings = async () => {
       try {
@@ -92,7 +91,6 @@ function Checkout() {
     loadShippingSettings();
   }, [API_URL]);
 
-  // ✅ Check delivery on pincode change
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -141,7 +139,6 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL]);
 
-  // ✅ LOAD ADDRESSES — token dependency REMOVED to prevent infinite loop
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) {
       navigate('/cart');
@@ -234,7 +231,6 @@ function Checkout() {
     setEditingAddressId(null);
     setShowAddressDropdown(false);
     toast.success('Address selected! ✨');
-    // ✅ Button hamesha visible hai, user click karega
   };
 
   const handleEditAddress = (address) => {
@@ -333,7 +329,6 @@ function Checkout() {
     return false;
   };
 
-  // ✅ VALIDATION — specific error messages
   const validateAddress = () => {
     if (!formData.fullName || !formData.fullName.trim()) {
       toast.error('❌ Please enter your Full Name');
@@ -382,7 +377,6 @@ function Checkout() {
     return true;
   };
 
-  // ✅ CONTINUE HANDLER — validation + step advance
   const handleContinueToDelivery = () => {
     if (validateAddress()) {
       setStep(2);
@@ -441,6 +435,8 @@ function Checkout() {
 
   const handlePhonePePayment = async (newOrderId) => {
     try {
+      console.log('💳 Initiating PhonePe payment for orderId:', newOrderId);
+
       const payResponse = await fetch(`${API_URL}/api/payments/initiate`, {
         method: 'POST',
         headers: {
@@ -451,6 +447,8 @@ function Checkout() {
       });
 
       const payData = await payResponse.json();
+      console.log('💳 PhonePe initiate response:', payData);
+
       const paymentInfo = payData.data || payData;
 
       if (!payResponse.ok || !paymentInfo.redirectUrl) {
@@ -519,20 +517,28 @@ function Checkout() {
       });
 
       const data = await response.json();
+      console.log('✅ Order response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to place order');
       }
 
       const result = data.data || data;
+
+      // ✅✅✅ CRITICAL FIX: Backend `orderId` (database id) priority 1
+      // Backend `orders.js` POST / returns: { order, orderId: id, orderNumber }
       const newOrderId =
-        result.orderNumber ||
-        result.order_number ||
-        result.orderId ||
-        result.order?.id ||
-        result.order?._id;
+        result.orderId ||         // ✅ Priority 1 — Backend ka database ID (order_xxx)
+        result.order?.id ||       // ✅ Priority 2 — Nested order object se
+        result.order?._id ||      // ✅ Priority 3 — MongoDB style
+        result.id ||              // ✅ Priority 4 — Direct id
+        result.order_number ||    // Fallback
+        result.orderNumber;       // Fallback
+
+      console.log('✅ newOrderId (for payment):', newOrderId);
 
       if (!newOrderId) {
+        console.error('❌ No order ID found in response:', data);
         throw new Error('Order ID missing from server response');
       }
 
@@ -842,7 +848,6 @@ function Checkout() {
 
             <div className="lg:col-span-2 space-y-5">
 
-              {/* STEPPER */}
               <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                 <div className="flex items-center justify-between relative">
                   <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
@@ -880,7 +885,6 @@ function Checkout() {
                 </div>
               </div>
 
-              {/* STEP 1 — ADDRESS */}
               {step === 1 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center gap-3 mb-6">
@@ -891,7 +895,6 @@ function Checkout() {
                     </div>
                   </div>
 
-                  {/* ✅ SAVED ADDRESSES DROPDOWN */}
                   {savedAddresses.length > 0 && (
                     <div className="mb-6 relative">
                       <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -1133,7 +1136,6 @@ function Checkout() {
                     </div>
                   )}
 
-                  {/* ✅✅✅ CONTINUE BUTTON — HAMESHA VISIBLE */}
                   <button
                     onClick={handleContinueToDelivery}
                     className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition-all"
@@ -1143,7 +1145,6 @@ function Checkout() {
                 </div>
               )}
 
-              {/* STEP 2 — DELIVERY */}
               {step === 2 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1207,7 +1208,6 @@ function Checkout() {
                 </div>
               )}
 
-              {/* STEP 3 — PAYMENT */}
               {step === 3 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1275,7 +1275,6 @@ function Checkout() {
               )}
             </div>
 
-            {/* ORDER SUMMARY SIDEBAR */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-3xl shadow-lg border border-pink-100 p-6 lg:sticky lg:top-24">
                 <div className="flex items-center gap-2 mb-4">
@@ -1345,7 +1344,6 @@ function Checkout() {
                   ))}
                 </div>
 
-                {/* COUPON */}
                 <div className="mb-4">
                   <div className="flex gap-2">
                     <input
@@ -1375,7 +1373,6 @@ function Checkout() {
                   </div>
                 </div>
 
-                {/* SUMMARY */}
                 <div className="space-y-2.5 text-sm border-t border-pink-100 pt-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
@@ -1412,7 +1409,6 @@ function Checkout() {
                   </p>
                 </div>
 
-                {/* DELIVERY ADDRESS + EXPECTED DATE */}
                 {formData.address && (
                   <div className="mt-4 p-3 bg-pink-50 rounded-xl border border-pink-100">
                     <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
