@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
 import SkeletonCard from '../components/SkeletonCard';
 import SkeletonBanner from '../components/SkeletonBanner';
 import ProductCard from '../components/ProductCard';
-// ✅ Safe cache helpers (quota-safe)
+// ✅ Naye utils.js ke saath — TTL cache (quota-safe + auto-expire)
 import { setCacheWithTTL, getCacheWithTTL } from '../lib/utils';
 
 // ============ Newsletter Section ============
@@ -110,7 +110,7 @@ function Home() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Load products (quota-safe cache)
+  // ✅ Load products (TTL cache — 1 minute, quota-safe)
   useEffect(() => {
     const abortController = new AbortController();
 
@@ -118,7 +118,7 @@ function Home() {
       try {
         setLoading(true);
 
-        // ✅ Safe read with TTL (1 minute)
+        // ✅ Safe read with TTL — auto-expire handled
         const cached = getCacheWithTTL(sessionStorage, 'products_cache');
         if (cached) {
           const productsArray = Array.isArray(cached) ? cached : (cached.data || []);
@@ -135,7 +135,7 @@ function Home() {
         const data = await response.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
 
-        // ✅ Safe write with TTL (quota-safe, auto-cleanup)
+        // ✅ Safe write with TTL (60 sec) — quota exceeded par auto-cleanup
         setCacheWithTTL(sessionStorage, 'products_cache', data, 60 * 1000);
 
         setProducts(productsArray);
@@ -153,13 +153,13 @@ function Home() {
     return () => abortController.abort();
   }, [API_URL]);
 
-  // ✅ Load banners (quota-safe cache)
+  // ✅ Load banners (TTL cache — 2 minutes, quota-safe)
   useEffect(() => {
     const abortController = new AbortController();
 
     const loadBanners = async () => {
       try {
-        // ✅ Safe read with TTL (2 minutes)
+        // ✅ Safe read with TTL
         const cached = getCacheWithTTL(sessionStorage, 'banners_cache');
         if (cached) {
           setBanners(cached);
@@ -174,7 +174,7 @@ function Home() {
         const data = await response.json();
         setBanners(data);
 
-        // ✅ Safe write with TTL
+        // ✅ Safe write with TTL (2 min)
         setCacheWithTTL(sessionStorage, 'banners_cache', data, 2 * 60 * 1000);
       } catch (error) {
         if (error.name !== 'AbortError') {
