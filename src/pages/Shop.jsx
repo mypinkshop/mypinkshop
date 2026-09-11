@@ -516,14 +516,14 @@ function Shop() {
               🛍️
             </div>
             <div className="relative z-10">
-              <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-xs font-bold px-3 py-1.5 rounded-full mb-3">
+              <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-650 text-xs font-bold px-3 py-1.5 rounded-full mb-3">
                 ✨ SHOP THE COLLECTION ✨
               </span>
               <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">
-                Find Your <span className="text-pink-600">Perfect</span> Pick
+                Find Your <span className="text-pink-750">Perfect</span> Pick
               </h1>
               <p className="text-gray-600 text-sm sm:text-base">
-                {products.length}+ products • Free shipping above ₹499
+                • Free shipping above ₹499
               </p>
             </div>
           </div>
