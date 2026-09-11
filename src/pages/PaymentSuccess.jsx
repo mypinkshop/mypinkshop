@@ -13,8 +13,11 @@ const PaymentSuccess = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
+  const MAX_RETRIES = 6; // ✅ 6 retries
+  const RETRY_DELAY = 5000; // ✅ 5 seconds
+
   const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState('verifying');
+  const [status, setStatus] = useState('verifying'); // verifying | success | pending | failed
   const [orderData, setOrderData] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -46,7 +49,7 @@ const PaymentSuccess = () => {
         if (cancelled) return;
 
         const verifyData = await verifyRes.json();
-        console.log('Verify response:', verifyData);
+        console.log(`Verify [attempt ${retryCount + 1}]:`, verifyData);
 
         // ✅ SUCCESS
         if (verifyData.success && verifyData.data?.verified) {
@@ -67,63 +70,134 @@ const PaymentSuccess = () => {
         }
 
         // ⏳ PENDING — retry
-        if (verifyData.data?.status === 'pending' && retryCount < 3) {
-          console.log(`Pending... retry ${retryCount + 1}/3`);
+        if (verifyData.data?.status === 'pending' && retryCount < MAX_RETRIES) {
           timeoutId = setTimeout(() => {
             if (!cancelled) setRetryCount(c => c + 1);
-          }, 3000);
+          }, RETRY_DELAY);
           return;
         }
 
-        // ❌ Truly FAILED
+        // ⏳ After all retries — still pending → show "Processing" NOT "Failed"
+        if (verifyData.data?.status === 'pending') {
+          setStatus('pending');
+          setIsLoading(false);
+          return;
+        }
+
+        // ❌ Truly FAILED (PhonePe ne khud FAILED bola)
         setStatus('failed');
         setIsLoading(false);
-        toast.error('Payment verification failed');
+        toast.error('Payment failed');
       } catch (error) {
         if (cancelled) return;
         console.error('Verification error:', error);
 
-        // Network error par bhi retry
-        if (retryCount < 3) {
+        if (retryCount < MAX_RETRIES) {
           timeoutId = setTimeout(() => {
             if (!cancelled) setRetryCount(c => c + 1);
-          }, 3000);
+          }, RETRY_DELAY);
           return;
         }
 
-        setStatus('failed');
+        // Network error ke baad bhi "Pending" dikhao (Failed nahi)
+        setStatus('pending');
         setIsLoading(false);
-        toast.error('Something went wrong');
       }
     };
 
     verifyPayment();
 
-    // ✅ Cleanup — component unmount ho toh timeout clear + fetch cancel
     return () => {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [merchantTransactionId, retryCount]);
 
+  // ============================================================
   // 🔄 VERIFYING
+  // ============================================================
   if (status === 'verifying' || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
           <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500 text-lg">Verifying Payment...</p>
+          <p className="text-gray-700 text-lg font-semibold">Verifying Payment...</p>
           <p className="text-gray-400 text-sm mt-2">
             {retryCount > 0
-              ? `Checking with PhonePe... (${retryCount}/3)`
+              ? `Confirming with PhonePe... (${retryCount}/${MAX_RETRIES})`
               : "Please wait, don't close this page"}
           </p>
+          {retryCount > 2 && (
+            <p className="text-xs text-gray-400 mt-3 px-4">
+              PhonePe sometimes takes a few moments to confirm. Please be patient.
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
+  // ============================================================
+  // ⏳ PENDING (NEW STATE — not failed!)
+  // ============================================================
+  if (status === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-white flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-amber-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-8 text-center">
+            <div className="w-20 h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
+              <svg className="w-10 h-10 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Payment Processing</h1>
+            <p className="text-amber-100 mt-2 text-sm">We're confirming your payment with PhonePe</p>
+          </div>
+
+          <div className="p-8">
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-6">
+              <p className="text-sm text-gray-700 text-center leading-relaxed">
+                📱 <strong>Don't worry!</strong> Your payment is being verified.
+                <br />
+                <br />
+                It may take up to <strong>5 minutes</strong>. We'll update your order automatically once confirmed.
+                <br />
+                <br />
+                <span className="text-xs text-gray-500">
+                  Check your order status anytime in <strong>My Orders</strong>.
+                </span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Link
+                to="/profile?tab=orders"
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-semibold text-center hover:shadow-lg transition-all"
+              >
+                📦 Check My Orders
+              </Link>
+              <Link
+                to="/shop"
+                className="w-full bg-white border-2 border-pink-200 text-pink-600 py-3.5 rounded-xl font-semibold text-center hover:bg-pink-50 transition-all"
+              >
+                Continue Shopping
+              </Link>
+            </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-xs text-gray-400">
+                Need help? <Link to="/contact" className="text-pink-500 hover:underline">Contact Support</Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
   // ❌ FAILED
+  // ============================================================
   if (status === 'failed') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-rose-50 to-white flex items-center justify-center px-4">
@@ -171,7 +245,9 @@ const PaymentSuccess = () => {
     );
   }
 
+  // ============================================================
   // ✅ SUCCESS
+  // ============================================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
