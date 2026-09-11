@@ -1,5 +1,6 @@
 // src/lib/utils.js
 // Frontend-only storage helpers — quota-safe + TTL cache
+// ✅ AGGRESSIVE cleanup — kabhi quota full nahi hoga
 
 const CACHE_PREFIXES = [
   'product_',
@@ -33,6 +34,10 @@ const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTO_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_FLAG_KEY = 'last_auto_cleanup_v2';
 
+// ✅ Max items allowed per cache prefix — auto-trim
+const MAX_PRODUCT_CACHE = 30; // sirf 30 products cache honge
+const MAX_CACHE_ITEMS = 100; // total cache items limit
+
 function isProtectedKey(key) {
   if (!key) return false;
   return PROTECTED_PREFIXES.some(p => key === p || key.startsWith(p));
@@ -44,10 +49,19 @@ function isCacheKey(key) {
   return CACHE_PREFIXES.some(p => key === p || key.startsWith(p));
 }
 
+// ============================================================
+// ✅ SAFE SET ITEM — Aggressive 4-step cleanup
+// ============================================================
 export function safeSetItem(storage, key, value, options = {}) {
   const { protected: isProtected = false } = options;
+
+  // ✅ STEP 0: Pehle try karo normal
   try {
     storage.setItem(key, value);
+    // ✅ Save hone ke baad — agar key cache type hai toh count check karo
+    if (isCacheKey(key)) {
+      enforceCacheLimit(storage);
+    }
     return true;
   } catch (e) {
     const isQuota =
@@ -61,24 +75,32 @@ export function safeSetItem(storage, key, value, options = {}) {
       return false;
     }
 
-    console.warn('⚠️ Storage quota exceeded. Starting smart cleanup...');
-    removeExpiredCache(storage);
-    const removed = removeOldestCache(storage, 10);
+    console.warn('⚠️ Storage quota exceeded. Starting aggressive cleanup...');
 
+    // ✅ STEP 1: Expired cache delete
+    const expired = removeExpiredCache(storage);
+
+    // ✅ STEP 2: Prefix-specific trim (products, banners, etc.)
+    const trimmed = trimPerPrefix(storage, 20);
+
+    // ✅ STEP 3: Retry
     try {
       storage.setItem(key, value);
-      console.log(`✅ Saved after cleanup (freed ${removed} items)`);
+      console.log(`✅ Saved after cleanup (expired: ${expired}, trimmed: ${trimmed})`);
       return true;
     } catch (e2) {
+      // ✅ STEP 4: NUCLEAR — sab cache delete (protected safe)
       if (!isProtected) {
-        console.warn('⚠️ Still full. Clearing all cache...');
-        clearAllCache(storage);
+        console.warn('⚠️ Still full. CLEARING ALL CACHE...');
+        const cleared = clearAllCache(storage);
+        console.log(`🧹 Cleared ${cleared} cache items`);
+
         try {
           storage.setItem(key, value);
           console.log('✅ Saved after full cache clear');
           return true;
         } catch (e3) {
-          console.error('❌ Storage completely full. Save skipped.');
+          console.error('❌ Storage completely full. Cannot save.');
           return false;
         }
       }
@@ -88,6 +110,103 @@ export function safeSetItem(storage, key, value, options = {}) {
   }
 }
 
+// ============================================================
+// ✅ Enforce max cache limit (auto-trim on every save)
+// ============================================================
+function enforceCacheLimit(storage) {
+  try {
+    // ✅ Count total cache items
+    let cacheCount = 0;
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (isCacheKey(k)) cacheCount++;
+    }
+
+    // ✅ Agar limit cross ho gayi — oldest delete
+    if (cacheCount > MAX_CACHE_ITEMS) {
+      const toRemove = cacheCount - MAX_CACHE_ITEMS + 10; // 10 extra margin
+      removeOldestCache(storage, toRemove);
+      console.log(`🧹 Auto-trimmed ${toRemove} cache items`);
+    }
+
+    // ✅ Prefix-specific limit (products)
+    const productKeys = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k && k.startsWith('product_prod_')) productKeys.push(k);
+    }
+
+    if (productKeys.length > MAX_PRODUCT_CACHE) {
+      const toRemove = productKeys.length - MAX_PRODUCT_CACHE;
+      // Oldest products hatao
+      const withTs = productKeys.map(k => {
+        try {
+          const raw = storage.getItem(k);
+          if (raw && raw.startsWith('{"v":')) {
+            const parsed = JSON.parse(raw);
+            return { key: k, t: parsed.t || 0 };
+          }
+        } catch {}
+        return { key: k, t: 0 };
+      }).sort((a, b) => a.t - b.t);
+
+      for (let i = 0; i < toRemove; i++) {
+        storage.removeItem(withTs[i].key);
+      }
+      console.log(`🧹 Trimmed ${toRemove} product cache items`);
+    }
+  } catch (e) {
+    console.warn('Enforce limit error:', e);
+  }
+}
+
+// ============================================================
+// ✅ Trim per-prefix (aggressive)
+// ============================================================
+function trimPerPrefix(storage, keepPerPrefix = 20) {
+  try {
+    const prefixGroups = {};
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (!isCacheKey(k)) continue;
+
+      // Prefix nikaalo (first word before _)
+      const prefix = k.split('_')[0];
+      if (!prefixGroups[prefix]) prefixGroups[prefix] = [];
+      prefixGroups[prefix].push(k);
+    }
+
+    let removed = 0;
+    for (const [prefix, keys] of Object.entries(prefixGroups)) {
+      if (keys.length <= keepPerPrefix) continue;
+
+      // Oldest first
+      const withTs = keys.map(k => {
+        try {
+          const raw = storage.getItem(k);
+          if (raw && raw.startsWith('{"v":')) {
+            const parsed = JSON.parse(raw);
+            return { key: k, t: parsed.t || 0 };
+          }
+        } catch {}
+        return { key: k, t: 0 };
+      }).sort((a, b) => a.t - b.t);
+
+      const toRemove = keys.length - keepPerPrefix;
+      for (let i = 0; i < toRemove; i++) {
+        storage.removeItem(withTs[i].key);
+        removed++;
+      }
+    }
+    return removed;
+  } catch {
+    return 0;
+  }
+}
+
+// ============================================================
+// ✅ SAFE GET ITEM
+// ============================================================
 export function safeGetItem(storage, key, parseJson = false) {
   try {
     const raw = storage.getItem(key);
@@ -103,6 +222,9 @@ export function safeGetItem(storage, key, parseJson = false) {
   }
 }
 
+// ============================================================
+// ✅ SAFE REMOVE ITEM
+// ============================================================
 export function safeRemoveItem(storage, key) {
   try {
     storage.removeItem(key);
@@ -112,6 +234,9 @@ export function safeRemoveItem(storage, key) {
   }
 }
 
+// ============================================================
+// ✅ CACHE WITH TTL
+// ============================================================
 export function setCacheWithTTL(storage, key, value, ttlMs = CACHE_MAX_AGE_MS) {
   const payload = JSON.stringify({
     v: value,
@@ -137,6 +262,9 @@ export function getCacheWithTTL(storage, key) {
   }
 }
 
+// ============================================================
+// ✅ REMOVE EXPIRED CACHE
+// ============================================================
 function removeExpiredCache(storage) {
   let removed = 0;
   const now = Date.now();
@@ -166,6 +294,9 @@ function removeExpiredCache(storage) {
   return removed;
 }
 
+// ============================================================
+// ✅ REMOVE OLDEST CACHE (LRU)
+// ============================================================
 function removeOldestCache(storage, count = 10) {
   const entries = [];
   const now = Date.now();
@@ -196,6 +327,9 @@ function removeOldestCache(storage, count = 10) {
   return removed;
 }
 
+// ============================================================
+// ✅ AUTO CLEANUP — app start par
+// ============================================================
 export function runAutoCleanup(storage = localStorage) {
   try {
     const last = storage.getItem(CLEANUP_FLAG_KEY);
@@ -206,17 +340,23 @@ export function runAutoCleanup(storage = localStorage) {
     }
 
     const expired = removeExpiredCache(storage);
-    const oldest = removeOldestCache(storage, 20);
+    const oldest = removeOldestCache(storage, 30);
+
+    // ✅ Prefix-specific trim
+    const trimmed = trimPerPrefix(storage, 20);
 
     storage.setItem(CLEANUP_FLAG_KEY, String(now));
-    console.log(`✅ Auto-cleanup done (expired: ${expired}, oldest: ${oldest})`);
-    return { expired, oldest };
+    console.log(`✅ Auto-cleanup (expired: ${expired}, oldest: ${oldest}, trimmed: ${trimmed})`);
+    return { expired, oldest, trimmed };
   } catch (e) {
     console.warn('Cleanup error:', e);
     return { error: true };
   }
 }
 
+// ============================================================
+// ✅ CLEAR ALL CACHE (protected safe)
+// ============================================================
 export function clearAllCache(storage = localStorage) {
   const keys = [];
   for (let i = 0; i < storage.length; i++) {
@@ -238,6 +378,9 @@ export function clearAllStorage(storage = localStorage) {
   }
 }
 
+// ============================================================
+// ✅ STORAGE HEALTH CHECK
+// ============================================================
 export function getStorageUsage(storage = localStorage) {
   let total = 0;
   let cacheBytes = 0;
@@ -274,6 +417,9 @@ export function getStorageUsage(storage = localStorage) {
   };
 }
 
+// ============================================================
+// ✅ INIT — app start par call karo
+// ============================================================
 export function initStorageManager() {
   if (typeof window === 'undefined') return;
   try {
