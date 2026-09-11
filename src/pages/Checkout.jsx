@@ -10,12 +10,9 @@ import toast from 'react-hot-toast';
 
 function Checkout() {
   const { cart, cartTotal, clearCart, removeFromCart, updateQuantity } = useCart();
-  const { user, logout, token: authToken } = useAuth();
+  const { user, logout, token } = useAuth();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
-
-  // ✅ Token — auth context OR localStorage
-  const token = authToken || localStorage.getItem('token') || localStorage.getItem('adminToken');
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -144,7 +141,7 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL]);
 
-  // ✅✅✅ LOAD ADDRESSES FROM BOTH BACKEND + LOCALSTORAGE
+  // ✅✅✅ LOAD ADDRESSES — token dependency REMOVED to prevent infinite loop
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) {
       navigate('/cart');
@@ -220,7 +217,9 @@ function Checkout() {
     if (user) {
       setFormData((prev) => ({ ...prev, email: user.email, fullName: user.name || '' }));
     }
-  }, [cart.length, navigate, orderPlaced, user, token, API_URL]);
+    // ✅ `token` dependency se HATA DIYA — infinite loop fix
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.length, navigate, orderPlaced, user, API_URL]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -435,7 +434,6 @@ function Checkout() {
     setIsPlacingOrder(true);
     setOrderTotal(total);
 
-    // ✅ Sirf tab save karo jab naya address ho
     if (formData.saveAddress && !isEditing && !selectedAddress) {
       saveNewAddress();
     }
@@ -492,7 +490,6 @@ function Checkout() {
         throw new Error('Order ID missing from server response');
       }
 
-      // ✅ Backend sync sirf naye address pe
       if (formData.saveAddress && !selectedAddress && !isEditing) {
         fetch(`${API_URL}/api/users/addresses`, {
           method: 'POST',
@@ -848,7 +845,6 @@ function Checkout() {
                     </div>
                   </div>
 
-                  {/* ✅ SAVED ADDRESSES DROPDOWN */}
                   {savedAddresses.length > 0 && (
                     <div className="mb-6 relative">
                       <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -1376,7 +1372,7 @@ function Checkout() {
                   </p>
                 </div>
 
-                {/* ✅ DELIVERY ADDRESS + EXPECTED DATE */}
+                {/* DELIVERY ADDRESS + EXPECTED DATE */}
                 {formData.address && (
                   <div className="mt-4 p-3 bg-pink-50 rounded-xl border border-pink-100">
                     <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
@@ -1388,7 +1384,6 @@ function Checkout() {
                     </p>
                     <p className="text-xs text-gray-600">📞 {formData.phone}</p>
 
-                    {/* ✅ Expected Delivery Date */}
                     {formData.pincode && formData.pincode.length === 6 && (
                       <div className="mt-2 pt-2 border-t border-pink-200">
                         <p className="text-xs font-bold text-green-700 flex items-center gap-1">
