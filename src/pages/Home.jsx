@@ -10,26 +10,50 @@ import toast from 'react-hot-toast';
 import SkeletonCard from '../components/SkeletonCard';
 import SkeletonBanner from '../components/SkeletonBanner';
 import ProductCard from '../components/ProductCard';
-// ✅ Naye utils.js ke saath — TTL cache (quota-safe + auto-expire)
 import { setCacheWithTTL, getCacheWithTTL } from '../lib/utils';
 
-// ============ Newsletter Section ============
+// ============================================================
+// ✅ NEWSLETTER
+// ============================================================
 const NewsletterSection = () => (
   <section className="py-16 bg-gradient-to-r from-pink-600 to-rose-600 text-white">
     <div className="max-w-2xl mx-auto text-center px-4">
       <h2 className="text-3xl font-bold mb-2">Join the Pink Club</h2>
       <p className="text-white/80 mb-6">Subscribe to get 15% off on your first order + exclusive updates</p>
-      <form onSubmit={(e) => { e.preventDefault(); const email = e.target.email.value; if (email) { toast.success('Thanks for subscribing!'); e.target.reset(); } }} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-        <input type="email" name="email" placeholder="Your email address" className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none" required />
-        <button type="submit" className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105">Subscribe</button>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const email = e.target.email.value;
+          if (email) {
+            toast.success('Thanks for subscribing! 💖');
+            e.target.reset();
+          }
+        }}
+        className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+      >
+        <input
+          type="email"
+          name="email"
+          placeholder="Your email address"
+          className="flex-1 px-5 py-3 rounded-full text-gray-900 focus:outline-none"
+          required
+        />
+        <button
+          type="submit"
+          className="bg-white text-pink-600 px-6 py-3 rounded-full font-semibold hover:shadow-lg transition hover:scale-105"
+        >
+          Subscribe
+        </button>
       </form>
     </div>
   </section>
 );
 
-// ============ Footer Section ============
+// ============================================================
+// ✅ FOOTER
+// ============================================================
 const FooterSection = () => (
-  <footer className="bg-gray-900 text-gray-400 py-12">
+  <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
         <div>
@@ -56,8 +80,8 @@ const FooterSection = () => (
           <ul className="space-y-2 text-sm">
             <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
             <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-            <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-            <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+            <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+            <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
           </ul>
         </div>
         <div>
@@ -78,7 +102,96 @@ const FooterSection = () => (
   </footer>
 );
 
-// ============ HOME COMPONENT ============
+// ============================================================
+// ✅ TRUST BADGES
+// ============================================================
+const TrustBadges = () => (
+  <section className="bg-white border-y border-pink-100">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+        {[
+          { icon: '🚚', title: 'Free Shipping', sub: 'On orders above ₹499' },
+          { icon: '💵', title: 'COD Available', sub: 'Pay at your doorstep' },
+          { icon: '↩️', title: 'Easy Returns', sub: '7-day on unused products' },
+          { icon: '🔒', title: 'Secure Payment', sub: '100% safe & trusted' },
+        ].map((badge, idx) => (
+          <div key={idx} className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-3 text-center sm:text-left">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-pink-100 to-rose-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <span className="text-xl sm:text-2xl">{badge.icon}</span>
+            </div>
+            <div>
+              <p className="font-bold text-gray-800 text-xs sm:text-sm">{badge.title}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500">{badge.sub}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+// ============================================================
+// ✅ SUBCATEGORY ROW (Amazon-style horizontal scroll)
+// ============================================================
+const SubcategoryRow = ({ title, icon, products, linkAll }) => {
+  if (!products || products.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-3xl p-4 sm:p-6 border border-pink-100 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-gray-800 text-base sm:text-lg flex items-center gap-2">
+          <span className="text-xl sm:text-2xl">{icon}</span> {title}
+        </h3>
+        <Link
+          to={linkAll}
+          className="text-xs sm:text-sm text-pink-600 font-semibold hover:underline whitespace-nowrap"
+        >
+          View All →
+        </Link>
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        {products.slice(0, 6).map((product) => (
+          <Link
+            key={product._id || product.id}
+            to={`/product/${product._id || product.id}`}
+            className="flex-shrink-0 w-36 sm:w-44 group"
+          >
+            <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl overflow-hidden aspect-square mb-2 border border-pink-100 group-hover:shadow-md transition">
+              {product.images?.[0] ? (
+                <img
+                  src={product.images[0]}
+                  alt={product.name}
+                  className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-4xl">
+                  {icon}
+                </div>
+              )}
+            </div>
+            <h4 className="text-xs font-semibold text-gray-800 line-clamp-2 mb-1 group-hover:text-pink-600 transition">
+              {product.name}
+            </h4>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-bold text-pink-600">₹{product.price}</span>
+              {product.originalPrice && product.originalPrice > product.price && (
+                <span className="text-[10px] text-gray-400 line-through">
+                  ₹{product.originalPrice}
+                </span>
+              )}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// ✅ MAIN HOME COMPONENT
+// ============================================================
 function Home() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
@@ -97,7 +210,7 @@ function Home() {
     makeup: false,
     hair: false,
     clothing: false,
-    accessories: false
+    accessories: false,
   });
 
   const sectionRefs = {
@@ -105,12 +218,12 @@ function Home() {
     makeup: useRef(null),
     hair: useRef(null),
     clothing: useRef(null),
-    accessories: useRef(null)
+    accessories: useRef(null),
   };
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Load products (TTL cache — 1 minute, quota-safe)
+  // Load products
   useEffect(() => {
     const abortController = new AbortController();
 
@@ -118,7 +231,6 @@ function Home() {
       try {
         setLoading(true);
 
-        // ✅ Safe read with TTL — auto-expire handled
         const cached = getCacheWithTTL(sessionStorage, 'products_cache');
         if (cached) {
           const productsArray = Array.isArray(cached) ? cached : (cached.data || []);
@@ -128,20 +240,18 @@ function Home() {
         }
 
         const response = await fetch(`${API_URL}/api/products`, {
-          signal: abortController.signal
+          signal: abortController.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
 
-        // ✅ Safe write with TTL (60 sec) — quota exceeded par auto-cleanup
         setCacheWithTTL(sessionStorage, 'products_cache', data, 60 * 1000);
-
         setProducts(productsArray);
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error("Error loading products:", error);
+          console.error('Error loading products:', error);
           setProducts([]);
         }
       } finally {
@@ -153,13 +263,12 @@ function Home() {
     return () => abortController.abort();
   }, [API_URL]);
 
-  // ✅ Load banners (TTL cache — 2 minutes, quota-safe)
+  // Load banners
   useEffect(() => {
     const abortController = new AbortController();
 
     const loadBanners = async () => {
       try {
-        // ✅ Safe read with TTL
         const cached = getCacheWithTTL(sessionStorage, 'banners_cache');
         if (cached) {
           setBanners(cached);
@@ -167,18 +276,16 @@ function Home() {
         }
 
         const response = await fetch(`${API_URL}/api/banners/active`, {
-          signal: abortController.signal
+          signal: abortController.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
         setBanners(data);
-
-        // ✅ Safe write with TTL (2 min)
         setCacheWithTTL(sessionStorage, 'banners_cache', data, 2 * 60 * 1000);
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error("Error loading banners:", error);
+          console.error('Error loading banners:', error);
           setBanners([]);
         }
       }
@@ -204,7 +311,7 @@ function Home() {
     fetchSponsoredProducts();
   }, [API_URL]);
 
-  // ✅ Fetch Banner Ads
+  // Fetch banner ads
   useEffect(() => {
     const fetchBannerAds = async () => {
       try {
@@ -237,7 +344,7 @@ function Home() {
     }
   }, [banners]);
 
-  // Auto slide carousel
+  // Auto slide
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -257,7 +364,7 @@ function Home() {
         const observer = new IntersectionObserver(
           (entries) => {
             if (entries[0]?.isIntersecting) {
-              setVisibleSections(prev => ({ ...prev, [key]: true }));
+              setVisibleSections((prev) => ({ ...prev, [key]: true }));
               observer.disconnect();
             }
           },
@@ -269,25 +376,25 @@ function Home() {
     });
 
     return () => {
-      observers.forEach(obs => obs.disconnect());
+      observers.forEach((obs) => obs.disconnect());
     };
   }, [products.length]);
 
-  // Handlers
   const handleSearch = useCallback(() => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   }, [searchQuery, navigate]);
 
-  const handleKeyPress = useCallback((e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  }, [handleSearch]);
+  const handleKeyPress = useCallback(
+    (e) => {
+      if (e.key === 'Enter') handleSearch();
+    },
+    [handleSearch]
+  );
 
-  // Product slices
-  const productSlices = useMemo(() => {
+  // ✅ Compute product slices + subcategory groups
+  const productData = useMemo(() => {
     if (!products.length) {
       return {
         newArrivals: [],
@@ -295,45 +402,99 @@ function Home() {
         makeupProducts: [],
         hairProducts: [],
         clothingProducts: [],
-        accessoriesProducts: []
+        accessoriesProducts: [],
+        skincareSubcats: {},
+        makeupSubcats: {},
+        hairSubcats: {},
+        clothingSubcats: {},
+        accessoriesSubcats: {},
       };
     }
 
+    const byCategory = (cat) =>
+      products.filter(
+        (p) =>
+          (p.mainCategory || p.category || '').toLowerCase() === cat.toLowerCase() &&
+          p.status === 'active'
+      );
+
+    const groupBySub = (arr) => {
+      const grouped = {};
+      arr.forEach((p) => {
+        const sub = p.subCategory || p.subcategory || 'Other';
+        if (!grouped[sub]) grouped[sub] = [];
+        grouped[sub].push(p);
+      });
+      return grouped;
+    };
+
+    const skincare = byCategory('skincare');
+    const makeup = byCategory('makeup');
+    const hair = byCategory('hair');
+    const clothing = byCategory('clothing');
+    const accessories = byCategory('accessories');
+
     return {
-      newArrivals: products.filter(p => p.isNew).length > 0
-        ? products.filter(p => p.isNew).slice(0, 4)
-        : [...products].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 4),
-      skincareProducts: products.filter(p => p.mainCategory === 'Skincare' || p.category === 'Skincare').slice(0, 4),
-      makeupProducts: products.filter(p => p.mainCategory === 'Makeup' || p.category === 'Makeup').slice(0, 4),
-      hairProducts: products.filter(p => p.mainCategory === 'Hair' || p.category === 'Hair').slice(0, 4),
-      clothingProducts: products.filter(p => p.mainCategory === 'Clothing' || p.category === 'Clothing').slice(0, 4),
-      accessoriesProducts: products.filter(p => p.mainCategory === 'Accessories' || p.category === 'Accessories').slice(0, 4)
+      newArrivals:
+        products.filter((p) => p.isNew).length > 0
+          ? products.filter((p) => p.isNew).slice(0, 8)
+          : [...products]
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .slice(0, 8),
+      skincareProducts: skincare.slice(0, 8),
+      makeupProducts: makeup.slice(0, 8),
+      hairProducts: hair.slice(0, 8),
+      clothingProducts: clothing.slice(0, 8),
+      accessoriesProducts: accessories.slice(0, 8),
+      skincareSubcats: groupBySub(skincare),
+      makeupSubcats: groupBySub(makeup),
+      hairSubcats: groupBySub(hair),
+      clothingSubcats: groupBySub(clothing),
+      accessoriesSubcats: groupBySub(accessories),
     };
   }, [products]);
 
-  const { newArrivals, skincareProducts, makeupProducts, hairProducts, clothingProducts, accessoriesProducts } = productSlices;
+  const {
+    newArrivals,
+    skincareProducts,
+    makeupProducts,
+    hairProducts,
+    clothingProducts,
+    accessoriesProducts,
+    skincareSubcats,
+    makeupSubcats,
+    hairSubcats,
+    clothingSubcats,
+    accessoriesSubcats,
+  } = productData;
 
-  const navLinks = useMemo(() => [
-    { name: 'All', link: '/shop' },
-    { name: 'Skincare', link: '/skincare' },
-    { name: 'Makeup', link: '/makeup' },
-    { name: 'Hair', link: '/hair' },
-    { name: 'Clothing', link: '/clothing' },
-    { name: 'Accessories', link: '/accessories' },
-    { name: 'Sale 🔥', link: '/shop?offer=sale' },
-    { name: 'New Arrivals', link: '/shop?sort=newest' },
-    { name: 'Bestsellers', link: '/shop?sort=bestseller' },
-  ], []);
+  const navLinks = useMemo(
+    () => [
+      { name: 'All', link: '/shop' },
+      { name: 'Skincare', link: '/skincare' },
+      { name: 'Makeup', link: '/makeup' },
+      { name: 'Hair', link: '/hair' },
+      { name: 'Clothing', link: '/clothing' },
+      { name: 'Accessories', link: '/accessories' },
+      { name: 'Sale 🔥', link: '/shop?offer=sale' },
+      { name: 'New Arrivals', link: '/shop?sort=newest' },
+      { name: 'Bestsellers', link: '/shop?sort=bestseller' },
+    ],
+    []
+  );
 
-  const categories = useMemo(() => [
-    { name: 'Skincare', image: '🧴', link: '/skincare' },
-    { name: 'Makeup', image: '💄', link: '/makeup' },
-    { name: 'Hair', image: '💇‍♀️', link: '/hair' },
-    { name: 'Clothing', image: '👗', link: '/clothing' },
-    { name: 'Accessories', image: '👜', link: '/accessories' },
-  ], []);
+  const categories = useMemo(
+    () => [
+      { name: 'Skincare', image: '🧴', link: '/skincare', bg: 'from-pink-100 to-rose-100' },
+      { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-100 to-pink-100' },
+      { name: 'Hair', image: '💇‍♀️', link: '/hair', bg: 'from-pink-100 to-amber-100' },
+      { name: 'Clothing', image: '👗', link: '/clothing', bg: 'from-rose-100 to-pink-100' },
+      { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-100 to-rose-100' },
+    ],
+    []
+  );
 
-  // Skeleton Loading
+  // ============ SKELETON LOADING ============
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
@@ -359,65 +520,22 @@ function Home() {
             </div>
           </div>
         </header>
-        <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
-                <div key={i} className="h-5 bg-gray-200 rounded w-16 sm:w-20 animate-pulse"></div>
-              ))}
-            </div>
-          </div>
-        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <SkeletonBanner />
         </div>
-        <section className="py-12 sm:py-16">
+        <section className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-8">
-              <div className="h-8 bg-gray-200 rounded w-48 mx-auto animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-32 mx-auto mt-2 animate-pulse"></div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
-              {[1, 2, 3, 4, 5].map(i => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="bg-gray-200 rounded-2xl h-32 animate-pulse"></div>
               ))}
             </div>
           </div>
         </section>
-        <section className="py-12 bg-white">
+        <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <SkeletonCard key={i} />
-              ))}
-            </div>
-          </div>
-        </section>
-        <section className="py-12 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <SkeletonCard key={i} />
-              ))}
-            </div>
-          </div>
-        </section>
-        <section className="py-12 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center mb-6">
-              <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
@@ -427,6 +545,7 @@ function Home() {
     );
   }
 
+  // ============ MAIN RENDER ============
   return (
     <>
       <Helmet>
@@ -438,6 +557,7 @@ function Home() {
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
+        {/* ============ HEADER ============ */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -446,7 +566,9 @@ function Home() {
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    MyPinkShop
+                  </h1>
                   <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
                 </div>
               </Link>
@@ -463,7 +585,7 @@ function Home() {
                   />
                   <button
                     onClick={handleSearch}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                   >
                     <span className="hidden sm:inline">Search</span>
                     <span className="sm:hidden">🔍</span>
@@ -472,37 +594,55 @@ function Home() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                <button
+                  onClick={() => navigate('/wishlist')}
+                  className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
+                >
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                      {wishlistCount}
+                    </span>
+                  )}
                 </button>
 
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                      {cartCount}
+                    </span>
+                  )}
                 </Link>
 
-                {user ? <Avatar user={user} onLogout={logout} /> :
+                {user ? (
+                  <Avatar user={user} onLogout={logout} />
+                ) : (
                   <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
-                }
+                )}
               </div>
             </div>
           </div>
         </header>
 
+        {/* ============ NAV LINKS ============ */}
         <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-4 sm:gap-6 lg:gap-8 overflow-x-auto py-3 scrollbar-hide">
               {navLinks.map((item, idx) => (
-                <Link key={idx} to={item.link} className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors">
+                <Link
+                  key={idx}
+                  to={item.link}
+                  className="text-sm font-medium text-gray-600 hover:text-pink-500 whitespace-nowrap transition-colors"
+                >
                   {item.name}
                 </Link>
               ))}
@@ -510,17 +650,21 @@ function Home() {
           </div>
         </div>
 
+        {/* ============ HERO BANNER / CAROUSEL ============ */}
         {banners.length > 0 ? (
           <div className="relative overflow-hidden group">
-            <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
+            <div
+              className="flex transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${currentBanner * 100}%)` }}
+            >
               {banners.map((banner, idx) => (
-                <Link key={banner.id} to={banner.link} className="w-full flex-shrink-0">
+                <Link key={banner.id} to={banner.link || '/shop'} className="w-full flex-shrink-0">
                   <div className="relative">
                     {banner.images && banner.images[0] ? (
                       <img
                         src={banner.images[0]}
                         alt={banner.title}
-                        loading={idx === 0 ? "eager" : "lazy"}
+                        loading={idx === 0 ? 'eager' : 'lazy'}
                         decoding="async"
                         className="w-full h-[250px] sm:h-[350px] md:h-[450px] object-cover"
                       />
@@ -535,8 +679,14 @@ function Home() {
                     {banner.showTextOverlay !== false && (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
                         <div className="text-center text-white px-4">
-                          {banner.title && <h2 className="text-2xl sm:text-4xl font-bold mb-2 drop-shadow-lg">{banner.title}</h2>}
-                          {banner.subtitle && <p className="text-sm sm:text-lg mb-4 drop-shadow">{banner.subtitle}</p>}
+                          {banner.title && (
+                            <h2 className="text-2xl sm:text-4xl font-bold mb-2 drop-shadow-lg">
+                              {banner.title}
+                            </h2>
+                          )}
+                          {banner.subtitle && (
+                            <p className="text-sm sm:text-lg mb-4 drop-shadow">{banner.subtitle}</p>
+                          )}
                           {banner.buttonText && (
                             <button className="bg-white text-pink-600 px-6 py-2 rounded-full font-semibold hover:scale-105 transition-all shadow-lg">
                               {banner.buttonText}
@@ -552,11 +702,21 @@ function Home() {
 
             {banners.length > 1 && (
               <>
-                <button onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)} className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                <button
+                  onClick={() => setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length)}
+                  className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
-                <button onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)} className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                <button
+                  onClick={() => setCurrentBanner((prev) => (prev + 1) % banners.length)}
+                  className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </>
             )}
@@ -564,7 +724,13 @@ function Home() {
             {banners.length > 1 && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                 {banners.map((_, idx) => (
-                  <button key={idx} onClick={() => setCurrentBanner(idx)} className={`h-1.5 rounded-full transition-all duration-300 ${currentBanner === idx ? 'w-6 bg-white' : 'w-3 bg-white/50'}`} />
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentBanner(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      currentBanner === idx ? 'w-6 bg-white' : 'w-3 bg-white/50'
+                    }`}
+                  />
                 ))}
               </div>
             )}
@@ -573,15 +739,30 @@ function Home() {
           <div className="bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200">
             <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16">
               <div className="text-center">
-                <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">✨ Summer Sale ✨</span>
-                <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-4">Glow Up <span className="text-pink-500">This Summer</span></h1>
-                <p className="text-gray-600 text-base sm:text-lg mb-6">Discover our premium skincare, makeup, and fashion collection.</p>
-                <Link to="/shop" className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all">Shop Now →</Link>
+                <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
+                  ✨ Summer Sale ✨
+                </span>
+                <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-4">
+                  Glow Up <span className="text-pink-500">This Summer</span>
+                </h1>
+                <p className="text-gray-600 text-base sm:text-lg mb-6">
+                  Discover our premium skincare, makeup, and fashion collection.
+                </p>
+                <Link
+                  to="/shop"
+                  className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all"
+                >
+                  Shop Now →
+                </Link>
               </div>
             </div>
           </div>
         )}
 
+        {/* ============ TRUST BADGES ============ */}
+        <TrustBadges />
+
+        {/* ============ CATEGORIES ============ */}
         <section className="py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8">
@@ -590,7 +771,11 @@ function Home() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
               {categories.map((cat, idx) => (
-                <Link key={idx} to={cat.link} className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-100 to-rose-100 p-6 text-center hover:shadow-xl transition-all hover:-translate-y-1">
+                <Link
+                  key={idx}
+                  to={cat.link}
+                  className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.bg} p-6 text-center hover:shadow-xl transition-all hover:-translate-y-1 border border-pink-100`}
+                >
                   <div className="w-16 h-16 mx-auto bg-white/80 rounded-full flex items-center justify-center text-3xl mb-3 group-hover:scale-110 transition shadow-md">
                     {cat.image}
                   </div>
@@ -602,7 +787,7 @@ function Home() {
           </div>
         </section>
 
-        {/* ✅ BANNER ADS SECTION */}
+        {/* ============ BANNER ADS ============ */}
         {bannerAds.length > 0 && (
           <section className="py-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -655,7 +840,37 @@ function Home() {
           </section>
         )}
 
-        {/* ✅ SPONSORED PRODUCTS SECTION */}
+        {/* ============ NEW ARRIVALS ============ */}
+        {newArrivals.length > 0 && (
+          <section className="py-12 bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  🆕 New Arrivals
+                </h2>
+                <Link to="/shop?sort=newest" className="text-pink-500 text-sm font-semibold hover:underline">
+                  View All →
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {newArrivals.map((product) => (
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                    wishlistContext={wishlist}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ============ SPONSORED PRODUCTS ============ */}
         {sponsoredProducts.length > 0 && (
           <section className="py-12 bg-gradient-to-r from-blue-50 to-purple-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -665,7 +880,7 @@ function Home() {
                 <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">Ads</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {sponsoredProducts.map(product => (
+                {sponsoredProducts.map((product) => (
                   <div key={product._id} className="relative">
                     <div className="absolute top-3 left-3 z-10 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
                       <span>📢</span> Sponsored
@@ -686,31 +901,7 @@ function Home() {
           </section>
         )}
 
-        {newArrivals.length > 0 && (
-          <section className="py-12 bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">🆕 New Arrivals</h2>
-                <Link to="/shop?sort=newest" className="text-pink-500 text-sm hover:underline">View All →</Link>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                {newArrivals.map(product => (
-                  <ProductCard
-                    key={product._id}
-                    product={product}
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                    wishlistContext={wishlist}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
+        {/* ============ SKINCARE SECTION ============ */}
         {skincareProducts.length > 0 && (
           <section ref={sectionRefs.skincare} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -719,26 +910,50 @@ function Home() {
                   <span className="text-3xl">🧴</span>
                   <h2 className="text-2xl font-bold text-gray-800">Skincare</h2>
                 </div>
-                <Link to="/skincare" className="text-pink-500 text-sm hover:underline">View All →</Link>
+                <Link to="/skincare" className="text-pink-500 text-sm font-semibold hover:underline">
+                  View All →
+                </Link>
               </div>
+
               {visibleSections.skincare ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {skincareProducts.map(product => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      addToCart={addToCart}
-                      isInWishlist={isInWishlist}
-                      addToWishlist={addToWishlist}
-                      removeFromWishlist={removeFromWishlist}
-                      user={user}
-                      wishlistContext={wishlist}
-                    />
-                  ))}
-                </div>
+                <>
+                  {/* Subcategory rows */}
+                  {Object.keys(skincareSubcats).length > 1 && (
+                    <div className="space-y-4 mb-6">
+                      {Object.entries(skincareSubcats)
+                        .sort((a, b) => b[1].length - a[1].length)
+                        .slice(0, 4)
+                        .map(([sub, prods]) => (
+                          <SubcategoryRow
+                            key={sub}
+                            title={sub}
+                            icon="🧴"
+                            products={prods}
+                            linkAll={`/shop?category=skincare&sub=${encodeURIComponent(sub)}`}
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  {/* All products grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {skincareProducts.slice(0, 8).map((product) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1, 2, 3, 4].map(i => (
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -747,6 +962,7 @@ function Home() {
           </section>
         )}
 
+        {/* ============ MAKEUP SECTION ============ */}
         {makeupProducts.length > 0 && (
           <section ref={sectionRefs.makeup} className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -755,26 +971,48 @@ function Home() {
                   <span className="text-3xl">💄</span>
                   <h2 className="text-2xl font-bold text-gray-800">Makeup</h2>
                 </div>
-                <Link to="/makeup" className="text-pink-500 text-sm hover:underline">View All →</Link>
+                <Link to="/makeup" className="text-pink-500 text-sm font-semibold hover:underline">
+                  View All →
+                </Link>
               </div>
+
               {visibleSections.makeup ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {makeupProducts.map(product => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      addToCart={addToCart}
-                      isInWishlist={isInWishlist}
-                      addToWishlist={addToWishlist}
-                      removeFromWishlist={removeFromWishlist}
-                      user={user}
-                      wishlistContext={wishlist}
-                    />
-                  ))}
-                </div>
+                <>
+                  {Object.keys(makeupSubcats).length > 1 && (
+                    <div className="space-y-4 mb-6">
+                      {Object.entries(makeupSubcats)
+                        .sort((a, b) => b[1].length - a[1].length)
+                        .slice(0, 4)
+                        .map(([sub, prods]) => (
+                          <SubcategoryRow
+                            key={sub}
+                            title={sub}
+                            icon="💄"
+                            products={prods}
+                            linkAll={`/shop?category=makeup&sub=${encodeURIComponent(sub)}`}
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {makeupProducts.slice(0, 8).map((product) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1, 2, 3, 4].map(i => (
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-gray-100 rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -783,6 +1021,7 @@ function Home() {
           </section>
         )}
 
+        {/* ============ HAIR SECTION ============ */}
         {hairProducts.length > 0 && (
           <section ref={sectionRefs.hair} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -791,26 +1030,48 @@ function Home() {
                   <span className="text-3xl">💇‍♀️</span>
                   <h2 className="text-2xl font-bold text-gray-800">Hair Care</h2>
                 </div>
-                <Link to="/hair" className="text-pink-500 text-sm hover:underline">View All →</Link>
+                <Link to="/hair" className="text-pink-500 text-sm font-semibold hover:underline">
+                  View All →
+                </Link>
               </div>
+
               {visibleSections.hair ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {hairProducts.map(product => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      addToCart={addToCart}
-                      isInWishlist={isInWishlist}
-                      addToWishlist={addToWishlist}
-                      removeFromWishlist={removeFromWishlist}
-                      user={user}
-                      wishlistContext={wishlist}
-                    />
-                  ))}
-                </div>
+                <>
+                  {Object.keys(hairSubcats).length > 1 && (
+                    <div className="space-y-4 mb-6">
+                      {Object.entries(hairSubcats)
+                        .sort((a, b) => b[1].length - a[1].length)
+                        .slice(0, 4)
+                        .map(([sub, prods]) => (
+                          <SubcategoryRow
+                            key={sub}
+                            title={sub}
+                            icon="💇‍♀️"
+                            products={prods}
+                            linkAll={`/shop?category=hair&sub=${encodeURIComponent(sub)}`}
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {hairProducts.slice(0, 8).map((product) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1, 2, 3, 4].map(i => (
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -819,6 +1080,7 @@ function Home() {
           </section>
         )}
 
+        {/* ============ CLOTHING SECTION ============ */}
         {clothingProducts.length > 0 && (
           <section ref={sectionRefs.clothing} className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -827,26 +1089,48 @@ function Home() {
                   <span className="text-3xl">👗</span>
                   <h2 className="text-2xl font-bold text-gray-800">Clothing</h2>
                 </div>
-                <Link to="/clothing" className="text-pink-500 text-sm hover:underline">View All →</Link>
+                <Link to="/clothing" className="text-pink-500 text-sm font-semibold hover:underline">
+                  View All →
+                </Link>
               </div>
+
               {visibleSections.clothing ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {clothingProducts.map(product => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      addToCart={addToCart}
-                      isInWishlist={isInWishlist}
-                      addToWishlist={addToWishlist}
-                      removeFromWishlist={removeFromWishlist}
-                      user={user}
-                      wishlistContext={wishlist}
-                    />
-                  ))}
-                </div>
+                <>
+                  {Object.keys(clothingSubcats).length > 1 && (
+                    <div className="space-y-4 mb-6">
+                      {Object.entries(clothingSubcats)
+                        .sort((a, b) => b[1].length - a[1].length)
+                        .slice(0, 4)
+                        .map(([sub, prods]) => (
+                          <SubcategoryRow
+                            key={sub}
+                            title={sub}
+                            icon="👗"
+                            products={prods}
+                            linkAll={`/shop?category=clothing&sub=${encodeURIComponent(sub)}`}
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {clothingProducts.slice(0, 8).map((product) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1, 2, 3, 4].map(i => (
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-gray-100 rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -855,6 +1139,7 @@ function Home() {
           </section>
         )}
 
+        {/* ============ ACCESSORIES SECTION ============ */}
         {accessoriesProducts.length > 0 && (
           <section ref={sectionRefs.accessories} className="py-12 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -863,26 +1148,48 @@ function Home() {
                   <span className="text-3xl">👜</span>
                   <h2 className="text-2xl font-bold text-gray-800">Accessories</h2>
                 </div>
-                <Link to="/accessories" className="text-pink-500 text-sm hover:underline">View All →</Link>
+                <Link to="/accessories" className="text-pink-500 text-sm font-semibold hover:underline">
+                  View All →
+                </Link>
               </div>
+
               {visibleSections.accessories ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {accessoriesProducts.map(product => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      addToCart={addToCart}
-                      isInWishlist={isInWishlist}
-                      addToWishlist={addToWishlist}
-                      removeFromWishlist={removeFromWishlist}
-                      user={user}
-                      wishlistContext={wishlist}
-                    />
-                  ))}
-                </div>
+                <>
+                  {Object.keys(accessoriesSubcats).length > 1 && (
+                    <div className="space-y-4 mb-6">
+                      {Object.entries(accessoriesSubcats)
+                        .sort((a, b) => b[1].length - a[1].length)
+                        .slice(0, 4)
+                        .map(([sub, prods]) => (
+                          <SubcategoryRow
+                            key={sub}
+                            title={sub}
+                            icon="👜"
+                            products={prods}
+                            linkAll={`/shop?category=accessories&sub=${encodeURIComponent(sub)}`}
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {accessoriesProducts.slice(0, 8).map((product) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1, 2, 3, 4].map(i => (
+                  {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
                   ))}
                 </div>
@@ -891,6 +1198,7 @@ function Home() {
           </section>
         )}
 
+        {/* ============ NEWSLETTER + FOOTER ============ */}
         <Suspense fallback={<div className="h-64 bg-pink-600" />}>
           <NewsletterSection />
         </Suspense>
