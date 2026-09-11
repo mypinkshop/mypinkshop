@@ -329,7 +329,7 @@ function MyOrders() {
   // ============ LOADING SKELETON ============
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white">
         <OfferBanner />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
@@ -361,7 +361,7 @@ function MyOrders() {
         <link rel="canonical" href="https://www.mypinkshop.com/my-orders" />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white">
         <OfferBanner />
 
         {/* ============ HEADER ============ */}
