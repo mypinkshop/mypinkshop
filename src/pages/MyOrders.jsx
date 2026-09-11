@@ -142,17 +142,20 @@ function MyOrders() {
     }
   };
 
-  // ============ STATUS HELPERS ============
+  // ============ STATUS HELPERS (SAB PINK GRADIENT) ============
   const getStatusConfig = (status) => {
+    // ✅ Sab status pe SAME pink gradient — brand consistency
+    const PINK_GRADIENT = 'from-pink-500 to-rose-500';
+
     const configs = {
-      delivered: { label: 'Delivered', icon: '✓', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', gradient: 'from-emerald-500 to-emerald-600' },
-      shipped: { label: 'Shipped', icon: '🚚', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500', gradient: 'from-blue-500 to-blue-600' },
-      confirmed: { label: 'Confirmed', icon: '📋', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500', gradient: 'from-purple-500 to-purple-600' },
-      processing: { label: 'Processing', icon: '⏳', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500', gradient: 'from-amber-500 to-amber-600' },
-      pending: { label: 'Processing', icon: '⏳', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500', gradient: 'from-amber-500 to-amber-600' },
-      cancelled: { label: 'Cancelled', icon: '✕', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500', gradient: 'from-rose-500 to-rose-600' },
-      failed: { label: 'Failed', icon: '✕', bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500', gradient: 'from-rose-500 to-rose-600' },
-      refunded: { label: 'Refunded', icon: '↩', bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', dot: 'bg-gray-500', gradient: 'from-gray-500 to-gray-600' },
+      delivered: { label: 'Delivered', icon: '✓', gradient: PINK_GRADIENT },
+      shipped: { label: 'Shipped', icon: '🚚', gradient: PINK_GRADIENT },
+      confirmed: { label: 'Confirmed', icon: '📋', gradient: PINK_GRADIENT },
+      processing: { label: 'Processing', icon: '⏳', gradient: PINK_GRADIENT },
+      pending: { label: 'Processing', icon: '⏳', gradient: PINK_GRADIENT },
+      cancelled: { label: 'Cancelled', icon: '✕', gradient: PINK_GRADIENT },
+      failed: { label: 'Failed', icon: '✕', gradient: PINK_GRADIENT },
+      refunded: { label: 'Refunded', icon: '↩', gradient: PINK_GRADIENT },
     };
     return configs[status] || configs.pending;
   };
@@ -456,17 +459,17 @@ function MyOrders() {
               onClick={() => setFilterStatus('delivered')}
               className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'delivered'
-                  ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-200'
+                  ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
                   : 'bg-white border border-pink-100'
               }`}
             >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'delivered' ? 'text-emerald-100' : 'text-gray-400'}`}>Delivered</span>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'delivered' ? 'text-pink-100' : 'text-gray-400'}`}>Delivered</span>
                   <span className={`text-2xl ${filterStatus === 'delivered' ? '' : 'opacity-60'}`}>✅</span>
                 </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'delivered' ? 'text-white' : 'text-emerald-600'}`}>{deliveredOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'delivered' ? 'text-emerald-100' : 'text-gray-500'}`}>Completed</p>
+                <p className={`text-3xl font-bold ${filterStatus === 'delivered' ? 'text-white' : 'text-pink-600'}`}>{deliveredOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'delivered' ? 'text-pink-100' : 'text-gray-500'}`}>Completed</p>
               </div>
             </button>
 
@@ -474,17 +477,17 @@ function MyOrders() {
               onClick={() => setFilterStatus('pending')}
               className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'pending'
-                  ? 'bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg shadow-amber-200'
+                  ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
                   : 'bg-white border border-pink-100'
               }`}
             >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'pending' ? 'text-amber-100' : 'text-gray-400'}`}>In Progress</span>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'pending' ? 'text-pink-100' : 'text-gray-400'}`}>In Progress</span>
                   <span className={`text-2xl ${filterStatus === 'pending' ? '' : 'opacity-60'}`}>⏳</span>
                 </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'pending' ? 'text-white' : 'text-amber-600'}`}>{pendingOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'pending' ? 'text-amber-100' : 'text-gray-500'}`}>Active</p>
+                <p className={`text-3xl font-bold ${filterStatus === 'pending' ? 'text-white' : 'text-pink-600'}`}>{pendingOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'pending' ? 'text-pink-100' : 'text-gray-500'}`}>Active</p>
               </div>
             </button>
 
@@ -492,17 +495,17 @@ function MyOrders() {
               onClick={() => setFilterStatus('cancelled')}
               className={`group relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
                 filterStatus === 'cancelled'
-                  ? 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-lg shadow-rose-200'
+                  ? 'bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200'
                   : 'bg-white border border-pink-100'
               }`}
             >
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'cancelled' ? 'text-rose-100' : 'text-gray-400'}`}>Cancelled</span>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${filterStatus === 'cancelled' ? 'text-pink-100' : 'text-gray-400'}`}>Cancelled</span>
                   <span className={`text-2xl ${filterStatus === 'cancelled' ? '' : 'opacity-60'}`}>✕</span>
                 </div>
-                <p className={`text-3xl font-bold ${filterStatus === 'cancelled' ? 'text-white' : 'text-rose-600'}`}>{cancelledOrders}</p>
-                <p className={`text-xs mt-1 ${filterStatus === 'cancelled' ? 'text-rose-100' : 'text-gray-500'}`}>Failed/Cancelled</p>
+                <p className={`text-3xl font-bold ${filterStatus === 'cancelled' ? 'text-white' : 'text-pink-600'}`}>{cancelledOrders}</p>
+                <p className={`text-xs mt-1 ${filterStatus === 'cancelled' ? 'text-pink-100' : 'text-gray-500'}`}>Failed/Cancelled</p>
               </div>
             </button>
           </div>
@@ -567,7 +570,7 @@ function MyOrders() {
                       isCancelled ? 'border-rose-100' : isDelivered ? 'border-emerald-100' : 'border-pink-100'
                     }`}
                   >
-                    {/* ✅ PREMIUM GRADIENT HEADER */}
+                    {/* ✅ PREMIUM PINK GRADIENT HEADER (Same as Payment Success) */}
                     <div className={`bg-gradient-to-r ${statusConfig.gradient} px-5 sm:px-6 py-4`}>
                       <div className="flex flex-wrap justify-between items-center gap-3">
                         <div className="flex flex-wrap items-center gap-5 sm:gap-8">
@@ -713,11 +716,11 @@ function MyOrders() {
                 ) : (
                   <div className="space-y-6">
                     {/* Timeline */}
-                    <div className="relative pl-8 space-y-6 before:absolute before:left-3 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-emerald-300 before:via-pink-200 before:to-gray-200">
+                    <div className="relative pl-8 space-y-6 before:absolute before:left-3 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-pink-300 before:via-pink-200 before:to-gray-200">
 
                       {/* Step 1 */}
                       <div className="relative">
-                        <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-emerald-100">
+                        <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-pink-100">
                           ✓
                         </div>
                         <p className="font-semibold text-gray-800 text-sm">Order Placed</p>
@@ -728,7 +731,7 @@ function MyOrders() {
                       <div className="relative">
                         <div className={`absolute -left-8 top-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ring-4 shadow-md ${
                           ['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status)
-                            ? 'bg-emerald-500 text-white ring-emerald-100'
+                            ? 'bg-pink-500 text-white ring-pink-100'
                             : 'bg-gray-200 text-gray-500 ring-gray-100'
                         }`}>
                           {['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status) ? '✓' : '•'}
@@ -757,7 +760,7 @@ function MyOrders() {
                         ))
                       ) : (
                         <div className="relative">
-                          <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-amber-400 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-amber-100">
+                          <div className="absolute -left-8 top-0 w-6 h-6 rounded-full bg-pink-400 text-white flex items-center justify-center text-xs shadow-md ring-4 ring-pink-100">
                             ⏳
                           </div>
                           <p className="font-semibold text-gray-600 text-sm">Preparing Shipment</p>
