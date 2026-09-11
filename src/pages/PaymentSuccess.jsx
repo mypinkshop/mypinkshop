@@ -13,17 +13,31 @@ const PaymentSuccess = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  const MAX_RETRIES = 6; // ✅ 6 retries
-  const RETRY_DELAY = 5000; // ✅ 5 seconds
+  // ✅ Token check — user logged in hai ya nahi
+  const token =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('token') || localStorage.getItem('auth_token')
+      : null;
+
+  const MAX_RETRIES = 6;
+  const RETRY_DELAY = 5000;
 
   const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState('verifying'); // verifying | success | pending | failed
+  const [status, setStatus] = useState('verifying'); // verifying | success | pending | failed | guest
   const [orderData, setOrderData] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    // ✅ Agar user logged in nahi hai → guest mode
+    if (!token) {
+      setStatus('guest');
+      setIsLoading(false);
+      return;
+    }
+
     if (!merchantTransactionId) {
       setStatus('failed');
+      setIsLoading(false);
       toast.error('Invalid payment session');
       return;
     }
@@ -33,10 +47,6 @@ const PaymentSuccess = () => {
 
     const verifyPayment = async () => {
       try {
-        const token =
-          localStorage.getItem('token') ||
-          localStorage.getItem('auth_token');
-
         const verifyRes = await fetch(`${API_URL}/api/payments/verify`, {
           method: 'POST',
           headers: {
@@ -72,19 +82,18 @@ const PaymentSuccess = () => {
         // ⏳ PENDING — retry
         if (verifyData.data?.status === 'pending' && retryCount < MAX_RETRIES) {
           timeoutId = setTimeout(() => {
-            if (!cancelled) setRetryCount(c => c + 1);
+            if (!cancelled) setRetryCount((c) => c + 1);
           }, RETRY_DELAY);
           return;
         }
 
-        // ⏳ After all retries — still pending → show "Processing" NOT "Failed"
         if (verifyData.data?.status === 'pending') {
           setStatus('pending');
           setIsLoading(false);
           return;
         }
 
-        // ❌ Truly FAILED (PhonePe ne khud FAILED bola)
+        // ❌ Truly FAILED
         setStatus('failed');
         setIsLoading(false);
         toast.error('Payment failed');
@@ -94,12 +103,11 @@ const PaymentSuccess = () => {
 
         if (retryCount < MAX_RETRIES) {
           timeoutId = setTimeout(() => {
-            if (!cancelled) setRetryCount(c => c + 1);
+            if (!cancelled) setRetryCount((c) => c + 1);
           }, RETRY_DELAY);
           return;
         }
 
-        // Network error ke baad bhi "Pending" dikhao (Failed nahi)
         setStatus('pending');
         setIsLoading(false);
       }
@@ -111,7 +119,45 @@ const PaymentSuccess = () => {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [merchantTransactionId, retryCount]);
+  }, [merchantTransactionId, retryCount, token]);
+
+  // ============================================================
+  // ✅ GUEST — user logged in nahi hai
+  // PhonePe jaisa clean success message
+  // ============================================================
+  if (status === 'guest') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-white flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-pink-100 overflow-hidden">
+          <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-8 text-center">
+            <div className="w-20 h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-4 shadow-lg">
+              <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Payment Successful!</h1>
+            <p className="text-pink-100 mt-2 text-sm">Thank you for your payment</p>
+          </div>
+
+          <div className="p-8 text-center">
+            <p className="text-gray-600 mb-4 text-base font-medium">
+              🎉 Your payment has been received successfully.
+            </p>
+            <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+              Please check your orders on the device where you placed the order.
+            </p>
+
+            <Link
+              to="/"
+              className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+            >
+              Go to Homepage
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ============================================================
   // 🔄 VERIFYING
@@ -138,7 +184,7 @@ const PaymentSuccess = () => {
   }
 
   // ============================================================
-  // ⏳ PENDING (NEW STATE — not failed!)
+  // ⏳ PENDING
   // ============================================================
   if (status === 'pending') {
     return (
