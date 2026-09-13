@@ -33,7 +33,7 @@ function Cart() {
   const subtotal = cartTotal();
   const FREE_SHIPPING_THRESHOLD = freeShippingThreshold;
 
-  // Fetch coupons & shipping
+  // ✅ Fetch coupons & shipping
   useEffect(() => {
     const fetchCouponsAndShipping = async () => {
       try {
@@ -81,7 +81,7 @@ function Cart() {
     fetchCouponsAndShipping();
   }, [cart, API_URL]);
 
-  // Live shipping
+  // ✅ Live shipping
   useEffect(() => {
     const fetchLiveShipping = async () => {
       try {
@@ -330,17 +330,19 @@ function Cart() {
             <div className="flex items-center gap-2 text-sm">
               <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
               <span className="text-gray-400">/</span>
-              <span className="text-pink-600 font-medium">Cart</span>
+              <span className="text-pink-600 font-bold">Cart</span>
             </div>
           </div>
 
           <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex items-center justify-center">
-            <div className="bg-white rounded-3xl p-8 sm:p-12 max-w-md mx-auto border border-pink-100 shadow-xl text-center">
+            <div className="bg-white rounded-3xl p-8 sm:p-12 max-w-md mx-auto border-2 border-pink-100 shadow-xl text-center">
               <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center">
                 <span className="text-6xl animate-bounce">🛒</span>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">Your cart is empty</h2>
-              <p className="text-gray-500 mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                Your cart is empty
+              </h2>
+              <p className="text-gray-500 mb-8 font-medium">
                 Looks like you haven't added anything to your cart yet.
               </p>
               <Link
@@ -352,13 +354,10 @@ function Cart() {
             </div>
           </div>
 
-          {/* Footer */}
           <footer className="bg-gray-900 text-gray-400 py-12 mt-auto">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center pt-2">
-                <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-                <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-              </div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
             </div>
           </footer>
         </div>
@@ -461,21 +460,21 @@ function Cart() {
           <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Home</Link>
             <span className="text-gray-400 whitespace-nowrap">/</span>
-            <span className="text-pink-600 font-medium whitespace-nowrap">Cart</span>
+            <span className="text-pink-600 font-bold whitespace-nowrap">Cart</span>
           </div>
         </div>
 
         {/* FREE SHIPPING PROGRESS BAR */}
         {shipping > 0 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
-            <div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 rounded-2xl p-4">
+            <div className="bg-gradient-to-r from-pink-50 to-rose-50 border-2 border-pink-200 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <p className="text-sm font-bold text-gray-800 flex items-center gap-2">
                   🚚 Add <span className="text-pink-600">₹{remainingForFree}</span> more for FREE shipping!
                 </p>
-                <p className="text-xs text-pink-600 font-semibold">Free shipping on ₹{FREE_SHIPPING_THRESHOLD}+</p>
+                <p className="text-xs text-pink-600 font-bold">Free on ₹{FREE_SHIPPING_THRESHOLD}+</p>
               </div>
-              <div className="w-full bg-pink-100 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-pink-200 rounded-full h-2.5 overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-500"
                   style={{ width: `${freeShippingProgress}%` }}
@@ -487,7 +486,7 @@ function Cart() {
 
         {shipping === 0 && subtotal > 0 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4 flex items-center gap-2">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-4 flex items-center gap-3">
               <span className="text-2xl">🎉</span>
               <p className="text-sm font-bold text-green-700">
                 Yay! You've unlocked FREE shipping on this order.
@@ -496,21 +495,21 @@ function Cart() {
           </div>
         )}
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex flex-wrap items-center gap-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 lg:pb-16 flex-1 w-full">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 flex flex-wrap items-center gap-3">
             <span>🛒</span> Shopping Cart
-            <span className="text-sm font-normal text-gray-500">
-              ({cart.reduce((sum, i) => sum + i.quantity, 0)} items)
+            <span className="text-sm font-normal text-gray-600 bg-pink-100 px-3 py-1 rounded-full">
+              {cart.reduce((sum, i) => sum + i.quantity, 0)} items
             </span>
           </h1>
 
           <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
             {/* CART ITEMS */}
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 space-y-4">
               {cart.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white rounded-2xl border border-pink-100 p-4 shadow-sm hover:shadow-md transition"
+                  className="bg-white rounded-2xl border-2 border-pink-100 p-4 shadow-sm hover:shadow-md hover:border-pink-300 transition"
                 >
                   <div className="flex gap-4">
                     {/* Image */}
@@ -519,13 +518,13 @@ function Cart() {
                         <img
                           src={item.image}
                           alt={item.name}
-                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border border-pink-100 bg-white hover:scale-105 transition-transform"
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-pink-100 bg-white hover:scale-105 transition-transform"
                           loading="lazy"
                           decoding="async"
                           onError={() => handleImageError(item.id)}
                         />
                       ) : (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl flex items-center justify-center text-3xl border border-pink-100">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl flex items-center justify-center text-3xl border-2 border-pink-100">
                           {item.emoji || '✨'}
                         </div>
                       )}
@@ -540,13 +539,13 @@ function Cart() {
                       </Link>
 
                       {item.vendorId && (
-                        <p className="text-[10px] text-purple-500 mt-0.5 font-medium">
+                        <p className="text-[10px] text-purple-600 mt-0.5 font-bold">
                           🛍️ Vendor Product
                         </p>
                       )}
 
                       {item.variationName && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-600 mt-1 font-medium">
                           {item.variationName}
                           {item.variationSecondary && ` - ${item.variationSecondary}`}
                         </p>
@@ -562,8 +561,8 @@ function Cart() {
                       </div>
 
                       {/* Quantity + Remove */}
-                      <div className="flex items-center justify-between mt-3 gap-2">
-                        <div className="flex items-center gap-1 bg-pink-50 border border-pink-200 rounded-full p-1">
+                      <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
+                        <div className="flex items-center gap-1 bg-pink-50 border-2 border-pink-200 rounded-full p-1">
                           <button
                             onClick={() =>
                               handleUpdateQuantity(item.id, item.quantity - 1, item.stock)
@@ -587,7 +586,7 @@ function Cart() {
 
                         <button
                           onClick={() => handleRemoveItem(item.id, item.name)}
-                          className="text-xs text-red-500 hover:text-red-700 transition flex items-center gap-1 font-medium"
+                          className="text-xs text-red-500 hover:text-red-700 transition flex items-center gap-1 font-bold"
                         >
                           🗑️ Remove
                         </button>
@@ -607,8 +606,8 @@ function Cart() {
 
             {/* ORDER SUMMARY */}
             <div className="lg:w-96">
-              <div className="bg-white rounded-3xl border border-pink-100 p-6 lg:sticky lg:top-24 shadow-lg">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 pb-3 border-b border-pink-100 flex items-center gap-2">
+              <div className="bg-white rounded-3xl border-2 border-pink-100 p-6 lg:sticky lg:top-24 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 pb-3 border-b-2 border-pink-100 flex items-center gap-2">
                   <span>📋</span> Order Summary
                 </h3>
 
@@ -625,7 +624,7 @@ function Cart() {
                         <div className="flex flex-col items-start">
                           <span className="font-bold">Discount ({appliedCoupon?.code})</span>
                           {appliedCoupon?.isVendorCoupon && appliedCoupon?.vendorName && (
-                            <span className="text-[10px] text-purple-600 font-normal">
+                            <span className="text-[10px] text-purple-600 font-medium">
                               🛍️ On {appliedCoupon.vendorName} products only
                             </span>
                           )}
@@ -675,7 +674,7 @@ function Cart() {
                               <button
                                 key={idx}
                                 onClick={() => setCouponCode(c.code)}
-                                className="w-full text-left px-3 py-2 border border-dashed border-pink-300 rounded-xl hover:border-pink-500 hover:bg-pink-50 transition group flex flex-col"
+                                className="w-full text-left px-3 py-2 border-2 border-dashed border-pink-300 rounded-xl hover:border-pink-500 hover:bg-pink-50 transition group flex flex-col"
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -688,7 +687,7 @@ function Cart() {
                                         : `₹${c.discountValue} OFF`}
                                     </span>
                                   </div>
-                                  <span className="text-[10px] text-pink-500 group-hover:underline font-semibold">
+                                  <span className="text-[10px] text-pink-500 group-hover:underline font-bold">
                                     Apply →
                                   </span>
                                 </div>
@@ -700,7 +699,7 @@ function Cart() {
                     </div>
                   )}
 
-                  <div className="flex justify-between text-gray-700 pt-2 border-t border-pink-100">
+                  <div className="flex justify-between text-gray-700 pt-2 border-t-2 border-pink-100">
                     <span>Shipping</span>
                     <span
                       className={
@@ -730,15 +729,15 @@ function Cart() {
                 <div className="grid grid-cols-3 gap-2 mt-4">
                   <div className="text-center">
                     <div className="text-lg">🔒</div>
-                    <p className="text-[10px] text-gray-500 font-medium">Secure</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Secure</p>
                   </div>
                   <div className="text-center">
                     <div className="text-lg">💳</div>
-                    <p className="text-[10px] text-gray-500 font-medium">UPI/Card/COD</p>
+                    <p className="text-[10px] text-gray-500 font-bold">UPI/Card/COD</p>
                   </div>
                   <div className="text-center">
                     <div className="text-lg">🚚</div>
-                    <p className="text-[10px] text-gray-500 font-medium">Free ₹499+</p>
+                    <p className="text-[10px] text-gray-500 font-bold">Free ₹499+</p>
                   </div>
                 </div>
               </div>
@@ -747,10 +746,10 @@ function Cart() {
         </div>
 
         {/* MOBILE STICKY CHECKOUT BAR */}
-        <div className="lg:hidden sticky bottom-0 left-0 right-0 bg-white border-t-2 border-pink-200 shadow-2xl p-3 z-40">
-          <div className="flex items-center justify-between gap-3">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t-2 border-pink-200 shadow-2xl p-3 z-40">
+          <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
             <div>
-              <p className="text-[10px] text-gray-500 font-medium">Total</p>
+              <p className="text-[10px] text-gray-500 font-bold">Total</p>
               <p className="text-xl font-bold text-pink-600">₹{finalTotal}</p>
             </div>
             <button
