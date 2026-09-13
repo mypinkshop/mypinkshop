@@ -40,8 +40,25 @@ function ForgotPassword() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('✅ Password reset link sent to your email!');
-        toast.success('Reset link sent! Check your inbox 📧');
+        const whatsappSent = data.channels?.whatsapp === true;
+        const emailSent = data.channels?.email === true;
+
+        let successMsg = '✅ Reset link sent!';
+        let toastMsg = 'Reset link sent!';
+
+        if (emailSent && whatsappSent) {
+          successMsg = '✅ Reset link sent to your email & WhatsApp!';
+          toastMsg = 'Reset link sent! Check email 📧 & WhatsApp 📱';
+        } else if (whatsappSent) {
+          successMsg = '✅ Reset link sent to your WhatsApp!';
+          toastMsg = 'Reset link sent! Check WhatsApp 📱';
+        } else if (emailSent) {
+          successMsg = '✅ Reset link sent to your email!';
+          toastMsg = 'Reset link sent! Check your inbox 📧';
+        }
+
+        setMessage(successMsg);
+        toast.success(toastMsg);
         setEmail('');
       } else {
         setError(data.error || '❌ Something went wrong');
@@ -69,7 +86,7 @@ function ForgotPassword() {
     <>
       <Helmet>
         <title>Forgot Password - Reset Your Password | MyPinkShop</title>
-        <meta name="description" content="Forgot your password? Enter your email address to receive a password reset link. Regain access to your MyPinkShop account and continue shopping." />
+        <meta name="description" content="Forgot your password? Enter your email address to receive a password reset link on email and WhatsApp. Regain access to your MyPinkShop account and continue shopping." />
         <link rel="canonical" href="https://www.mypinkshop.com/forgot-password" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
@@ -175,6 +192,7 @@ function ForgotPassword() {
                   <div className="space-y-5">
                     {[
                       { icon: '📧', title: 'Email Reset Link', sub: 'Sent instantly to your inbox' },
+                      { icon: '📱', title: 'WhatsApp Link', sub: 'Get it on WhatsApp too' },
                       { icon: '🔒', title: '100% Secure', sub: 'Encrypted & private process' },
                       { icon: '⚡', title: 'Quick Recovery', sub: 'Takes less than a minute' },
                       { icon: '💌', title: 'Spam-Free', sub: 'Check spam just in case' },
@@ -204,14 +222,19 @@ function ForgotPassword() {
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Forgot Password?</h1>
                   <p className="text-gray-500 text-sm mt-1">
-                    Enter your email to reset your password
+                    Enter your email — we'll send the link to your email & WhatsApp
                   </p>
                 </div>
 
                 {message && (
-                  <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                    <span>✓</span> {message}
-                  </div>
+                  <>
+                    <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-3 text-sm flex items-center gap-2">
+                      <span>✓</span> {message}
+                    </div>
+                    <p className="text-xs text-gray-500 mb-4 text-center">
+                      📱 Didn't get it on WhatsApp? Make sure your phone number is verified in your account.
+                    </p>
+                  </>
                 )}
 
                 {error && (
@@ -234,7 +257,7 @@ function ForgotPassword() {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1.5">
-                      We'll send a password reset link to this email
+                      We'll send a password reset link to this email & WhatsApp
                     </p>
                   </div>
 
@@ -334,8 +357,8 @@ function ForgotPassword() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
+                  <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
                 </ul>
