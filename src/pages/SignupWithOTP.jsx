@@ -4,12 +4,12 @@ import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
-import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import toast from 'react-hot-toast';
 
 function SignupWithOTP() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,14 +22,14 @@ function SignupWithOTP() {
   });
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState('');
-  const [sentOtp, setSentOtp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Handle search
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
@@ -37,9 +37,7 @@ function SignupWithOTP() {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
+    if (e.key === 'Enter') handleSearch();
   };
 
   useEffect(() => {
@@ -57,85 +55,133 @@ function SignupWithOTP() {
     setError('');
   };
 
+  // ========== SEND OTP ==========
   const sendOTP = async () => {
-    if (!formData.mobile || formData.mobile.length < 10) {
-      setError('Please enter a valid 10-digit mobile number');
+    const cleanMobile = formData.mobile.replace(/\D/g, '');
+    const cleanEmail = formData.email.toLowerCase().trim();
+
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Please enter your full name.');
       return false;
     }
-    
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return false;
+    }
+
+    if (!cleanMobile || cleanMobile.length < 10) {
+      setError('Please enter a valid 10-digit WhatsApp number.');
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.');
+      return false;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return false;
+    }
+
     setLoading(true);
-    
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setSentOtp(generatedOtp);
-    
-    console.log(`📱 OTP for ${formData.mobile}: ${generatedOtp}`);
-    alert(`✨ Your OTP is: ${generatedOtp}\n\n(Use this OTP to verify your mobile number)`);
-    
-    setLoading(false);
-    setResendTimer(30);
-    return true;
+    setError('');
+
+    try {
+      const response = await fetch(`${API_URL}/api/otp/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          phone: cleanMobile,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setResendTimer(30);
+        toast.success(data.message || 'OTP sent successfully');
+        return true;
+      } else {
+        setError(data.error || 'Unable to send OTP. Please try again.');
+        return false;
+      }
+    } catch (err) {
+      console.error('Send OTP error:', err);
+      setError('Something went wrong. Please check your connection and try again.');
+      return false;
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ========== VERIFY OTP AND CREATE ACCOUNT ==========
   const verifyOTP = async () => {
-    if (otp !== sentOtp) {
-      setError('Invalid OTP. Please try again.');
+    if (otp.length !== 6) {
+      setError('Please enter the 6-digit OTP.');
       return;
     }
-    
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-    
-    if (!formData.name.trim()) {
-      setError('Please enter your full name');
-      return;
-    }
-    
-    if (!formData.email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-    
+
+    const cleanEmail = formData.email.toLowerCase().trim();
+    const cleanMobile = formData.mobile.replace(/\D/g, '');
+
     setLoading(true);
-    
-    const newUser = {
-      id: Date.now(),
-      name: formData.name,
-      email: formData.email,
-      mobile: formData.mobile,
-      password: formData.password,
-      mobileVerified: true,
-      emailVerified: false,
-      role: 'customer',
-      createdAt: new Date().toISOString(),
-    };
-    
-    const existingCustomers = JSON.parse(localStorage.getItem('registeredCustomers') || '[]');
-    
-    const userExists = existingCustomers.some(u => u.email === formData.email || u.mobile === formData.mobile);
-    
-    if (userExists) {
-      setError('Customer account already exists with this email or mobile. Please login.');
+    setError('');
+
+    try {
+      // Step 1: Verify OTP
+      const verifyRes = await fetch(`${API_URL}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          otp: otp,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok || !verifyData.success) {
+        setError(verifyData.error || 'Invalid OTP. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Register user with password
+      const registerRes = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: cleanEmail,
+          phone: cleanMobile,
+          password: formData.password,
+          role: 'customer',
+        }),
+      });
+
+      const registerData = await registerRes.json();
+
+      if (registerRes.ok && registerData.success) {
+        toast.success('Account created successfully! Please sign in.');
+        navigate('/login');
+      } else if (registerData.error?.toLowerCase().includes('exist')) {
+        setError('An account with this email already exists. Please login.');
+        setLoading(false);
+      } else {
+        // OTP verified but register failed — still redirect to login
+        toast.success('Account verified! Please sign in.');
+        navigate('/login');
+      }
+    } catch (err) {
+      console.error('Verify error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-      return;
     }
-    
-    existingCustomers.push(newUser);
-    localStorage.setItem('registeredCustomers', JSON.stringify(existingCustomers));
-    
-    localStorage.setItem('user', JSON.stringify(newUser));
-    localStorage.setItem('isLoggedIn', 'true');
-    
-    setTimeout(() => {
-      setLoading(false);
-      navigate('/');
-    }, 1000);
   };
 
   const handleSendOTP = async (e) => {
@@ -154,10 +200,12 @@ function SignupWithOTP() {
   const resendOTP = async () => {
     if (resendTimer > 0) return;
     setError('');
-    await sendOTP();
+    const sent = await sendOTP();
+    if (sent) {
+      toast.success('OTP resent successfully');
+    }
   };
 
-  // SEO Schema
   const generateBreadcrumbSchema = () => ({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -176,7 +224,7 @@ function SignupWithOTP() {
     <>
       <Helmet>
         <title>Create Customer Account - Sign Up | MyPinkShop</title>
-        <meta name="description" content="Create your MyPinkShop customer account to enjoy exclusive offers, track orders, save wishlist items, and get 10% off on your first order. Sign up with mobile OTP verification." />
+        <meta name="description" content="Create your MyPinkShop customer account to enjoy exclusive offers, track orders, save wishlist items. Sign up with WhatsApp OTP verification." />
         <meta name="keywords" content="sign up, create account, customer registration, mypinkshop signup, new account, register" />
         <link rel="canonical" href="https://www.mypinkshop.com/signup" />
         <meta property="og:title" content="Create Customer Account - Sign Up | MyPinkShop" />
@@ -192,11 +240,10 @@ function SignupWithOTP() {
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-        
-        {/* Dynamic Offer Banner */}
+
         <OfferBanner />
 
-        {/* Premium Header */}
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -212,15 +259,15 @@ function SignupWithOTP() {
 
               <div className="flex-1 max-w-md lg:max-w-2xl">
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Search for products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
                     className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
                   />
-                  <button 
+                  <button
                     onClick={handleSearch}
                     className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                   >
@@ -237,7 +284,7 @@ function SignupWithOTP() {
                   </svg>
                   {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
                 </Link>
-                
+
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -249,7 +296,7 @@ function SignupWithOTP() {
           </div>
         </header>
 
-        {/* Breadcrumb */}
+        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -261,21 +308,20 @@ function SignupWithOTP() {
         <main className="flex-1 flex items-center justify-center py-12 sm:py-16 px-4">
           <div className="max-w-md w-full">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
-              
+
               {step === 1 ? (
-                // Step 1: Signup Form
                 <>
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                       <span className="text-white text-2xl">📝</span>
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club! 🎀</h1>
-                    <p className="text-gray-500 text-sm mt-1">Create your customer account with mobile verification</p>
+                    <p className="text-gray-500 text-sm mt-1">Create your customer account with WhatsApp verification</p>
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>⚠️</span> {error}
+                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
                     </div>
                   )}
 
@@ -304,21 +350,21 @@ function SignupWithOTP() {
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
                         required
                       />
-                      <p className="text-xs text-gray-400 mt-1">Note: Same email can be used for vendor account separately</p>
+                      <p className="text-xs text-gray-400 mt-1">OTP will be sent to this email</p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number *</label>
                       <input
                         type="tel"
                         name="mobile"
                         value={formData.mobile}
                         onChange={handleChange}
-                        placeholder="10-digit mobile number"
+                        placeholder="10-digit WhatsApp number"
                         className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
                         required
                       />
-                      <p className="text-xs text-gray-400 mt-1">We'll send OTP to verify your number</p>
+                      <p className="text-xs text-gray-400 mt-1">OTP will be sent to this WhatsApp number</p>
                     </div>
 
                     <div>
@@ -376,7 +422,7 @@ function SignupWithOTP() {
                           Sending OTP...
                         </span>
                       ) : (
-                        'Continue with Mobile OTP →'
+                        'Continue with WhatsApp OTP →'
                       )}
                     </button>
                   </form>
@@ -413,21 +459,26 @@ function SignupWithOTP() {
                   </p>
                 </>
               ) : (
-                // Step 2: OTP Verification
                 <>
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                       <span className="text-white text-2xl">🔐</span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Verify Your Mobile</h1>
-                    <p className="text-gray-500 text-sm mt-1">
-                      We've sent a 6-digit OTP to <span className="font-semibold text-pink-600">{formData.mobile}</span>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Verify Your WhatsApp Number</h1>
+                    <p className="text-gray-500 text-sm mt-2">
+                      We've sent a 6-digit OTP to WhatsApp number
+                    </p>
+                    <p className="font-semibold text-pink-600 text-sm mt-1">
+                      +91 {formData.mobile}
+                    </p>
+                    <p className="text-xs text-pink-500 mt-2">
+                      Sent via WhatsApp and Email
                     </p>
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>⚠️</span> {error}
+                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
                     </div>
                   )}
 
@@ -469,8 +520,8 @@ function SignupWithOTP() {
                         onClick={resendOTP}
                         disabled={resendTimer > 0}
                         className={`text-sm transition ${
-                          resendTimer > 0 
-                            ? 'text-gray-400 cursor-not-allowed' 
+                          resendTimer > 0
+                            ? 'text-gray-400 cursor-not-allowed'
                             : 'text-pink-600 hover:underline'
                         }`}
                       >
@@ -496,7 +547,6 @@ function SignupWithOTP() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
