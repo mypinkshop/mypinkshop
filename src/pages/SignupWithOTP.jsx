@@ -20,10 +20,12 @@ function SignupWithOTP() {
     password: '',
     confirmPassword: '',
   });
-  const [step, setStep] = useState(1);
   const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -53,37 +55,21 @@ function SignupWithOTP() {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
+    // Agar mobile number change hua toh OTP reset kar do
+    if (e.target.name === 'mobile') {
+      setOtpSent(false);
+      setOtpVerified(false);
+      setOtp('');
+    }
   };
 
-  // ========== SEND OTP ==========
-  const sendOTP = async () => {
+  // ========== SEND OTP (sirf WhatsApp) ==========
+  const handleSendOTP = async () => {
     const cleanMobile = formData.mobile.replace(/\D/g, '');
-    const cleanEmail = formData.email.toLowerCase().trim();
-
-    // Validation
-    if (!formData.name.trim()) {
-      setError('Please enter your full name.');
-      return false;
-    }
-
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setError('Please enter a valid email address.');
-      return false;
-    }
 
     if (!cleanMobile || cleanMobile.length < 10) {
       setError('Please enter a valid 10-digit WhatsApp number.');
-      return false;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match.');
-      return false;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return false;
+      return;
     }
 
     setLoading(true);
@@ -94,7 +80,7 @@ function SignupWithOTP() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: cleanEmail,
+          email: `${cleanMobile}@phone.mypinkshop.com`,
           phone: cleanMobile,
         }),
       });
@@ -102,55 +88,102 @@ function SignupWithOTP() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        setOtpSent(true);
         setResendTimer(30);
-        toast.success(data.message || 'OTP sent successfully');
-        return true;
+        toast.success(data.message || 'OTP sent to your WhatsApp.');
       } else {
         setError(data.error || 'Unable to send OTP. Please try again.');
-        return false;
       }
     } catch (err) {
       console.error('Send OTP error:', err);
       setError('Something went wrong. Please check your connection and try again.');
-      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  // ========== VERIFY OTP AND CREATE ACCOUNT ==========
-  const verifyOTP = async () => {
+  // ========== VERIFY OTP ==========
+  const handleVerifyOTP = async () => {
     if (otp.length !== 6) {
       setError('Please enter the 6-digit OTP.');
       return;
     }
 
-    const cleanEmail = formData.email.toLowerCase().trim();
     const cleanMobile = formData.mobile.replace(/\D/g, '');
+
+    setVerifying(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_URL}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: `${cleanMobile}@phone.mypinkshop.com`,
+          otp: otp,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setOtpVerified(true);
+        toast.success('WhatsApp number verified successfully.');
+      } else {
+        setError(data.error || 'Invalid OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('Verify error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // ========== RESEND OTP ==========
+  const handleResendOTP = async () => {
+    if (resendTimer > 0) return;
+    setError('');
+    await handleSendOTP();
+  };
+
+  // ========== FINAL SIGNUP ==========
+  const handleSignup = async (e) => {
+    e.preventDefault();
+
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
+
+    if (!formData.email.trim() || !formData.email.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!otpVerified) {
+      setError('Please verify your WhatsApp number first.');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    const cleanMobile = formData.mobile.replace(/\D/g, '');
+    const cleanEmail = formData.email.toLowerCase().trim();
 
     setLoading(true);
     setError('');
 
     try {
-      // Step 1: Verify OTP
-      const verifyRes = await fetch(`${API_URL}/api/otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          otp: otp,
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-
-      if (!verifyRes.ok || !verifyData.success) {
-        setError(verifyData.error || 'Invalid OTP. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      // Step 2: Register user with password
       const registerRes = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,40 +202,15 @@ function SignupWithOTP() {
         toast.success('Account created successfully! Please sign in.');
         navigate('/login');
       } else if (registerData.error?.toLowerCase().includes('exist')) {
-        setError('An account with this email already exists. Please login.');
-        setLoading(false);
+        setError('An account with this email or WhatsApp number already exists. Please login.');
       } else {
-        // OTP verified but register failed — still redirect to login
-        toast.success('Account verified! Please sign in.');
-        navigate('/login');
+        setError(registerData.error || 'Unable to create account. Please try again.');
       }
     } catch (err) {
-      console.error('Verify error:', err);
+      console.error('Signup error:', err);
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSendOTP = async (e) => {
-    e.preventDefault();
-    setError('');
-    const sent = await sendOTP();
-    if (sent) setStep(2);
-  };
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setError('');
-    await verifyOTP();
-  };
-
-  const resendOTP = async () => {
-    if (resendTimer > 0) return;
-    setError('');
-    const sent = await sendOTP();
-    if (sent) {
-      toast.success('OTP resent successfully');
     }
   };
 
@@ -309,217 +317,126 @@ function SignupWithOTP() {
           <div className="max-w-md w-full">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-pink-100 p-6 sm:p-8">
 
-              {step === 1 ? (
-                <>
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                      <span className="text-white text-2xl">📝</span>
-                    </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club! 🎀</h1>
-                    <p className="text-gray-500 text-sm mt-1">Create your customer account with WhatsApp verification</p>
-                  </div>
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <span className="text-white text-2xl">📝</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Join the Pink Club! 🎀</h1>
+                <p className="text-gray-500 text-sm mt-1">Create your account with WhatsApp verification</p>
+              </div>
 
-                  {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
-                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
-                    </div>
-                  )}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                  <span className="mt-0.5">⚠️</span> <span>{error}</span>
+                </div>
+              )}
 
-                  <form onSubmit={handleSendOTP} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="Enter your full name"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                        required
-                      />
-                    </div>
+              <form onSubmit={handleSignup} className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Enter your full name"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    required
+                  />
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="Enter your email"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                        required
-                      />
-                      <p className="text-xs text-gray-400 mt-1">OTP will be sent to this email</p>
-                    </div>
+                {/* Email Address (record only) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your email"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Email will be used for order updates. Verify later from your profile.</p>
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number *</label>
-                      <input
-                        type="tel"
-                        name="mobile"
-                        value={formData.mobile}
-                        onChange={handleChange}
-                        placeholder="10-digit WhatsApp number"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
-                        required
-                      />
-                      <p className="text-xs text-gray-400 mt-1">OTP will be sent to this WhatsApp number</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          name="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                          placeholder="Create a password (min 6 characters)"
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-10"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition"
-                        >
-                          {showPassword ? '🙈' : '👁️'}
-                        </button>
+                {/* WhatsApp Number with inline Send OTP button */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number *</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      name="mobile"
+                      value={formData.mobile}
+                      onChange={handleChange}
+                      placeholder="10-digit WhatsApp number"
+                      disabled={otpVerified}
+                      className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition disabled:bg-gray-100 disabled:text-gray-500"
+                      required
+                    />
+                    {!otpVerified ? (
+                      <button
+                        type="button"
+                        onClick={handleSendOTP}
+                        disabled={loading || !formData.mobile || formData.mobile.replace(/\D/g, '').length < 10}
+                        className="px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-medium rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {loading ? (
+                          <span className="flex items-center gap-1">
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Sending...
+                          </span>
+                        ) : otpSent ? (
+                          'Resend OTP'
+                        ) : (
+                          'Send OTP'
+                        )}
+                      </button>
+                    ) : (
+                      <div className="px-4 py-2.5 bg-green-50 text-green-600 text-sm font-medium rounded-xl flex items-center gap-1 whitespace-nowrap">
+                        <span>✓</span> Verified
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          name="confirmPassword"
-                          value={formData.confirmPassword}
-                          onChange={handleChange}
-                          placeholder="Re-enter your password"
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-10"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition"
-                        >
-                          {showConfirmPassword ? '🙈' : '👁️'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
-                    >
-                      {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Sending OTP...
-                        </span>
-                      ) : (
-                        'Continue with WhatsApp OTP →'
-                      )}
-                    </button>
-                  </form>
-
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-200"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-3 bg-white text-gray-500">Already have an account?</span>
-                    </div>
+                    )}
                   </div>
-
-                  <Link
-                    to="/login"
-                    className="block w-full text-center border-2 border-pink-500 bg-transparent text-pink-600 font-medium py-2.5 rounded-xl hover:bg-pink-50 transition-all"
-                  >
-                    Sign In
-                  </Link>
-
-                  <div className="mt-4 text-center">
-                    <p className="text-xs text-gray-400">
-                      Want to sell with us?{' '}
-                      <Link to="/vendor/register" className="text-pink-600 hover:underline font-medium">
-                        Register as Vendor →
-                      </Link>
-                    </p>
-                  </div>
-
-                  <p className="text-center text-xs text-gray-400 mt-4">
-                    By creating an account, you agree to MyPinkShop's{' '}
-                    <Link to="/terms" className="text-pink-600 hover:underline">Terms</Link> and{' '}
-                    <Link to="/privacy" className="text-pink-600 hover:underline">Privacy</Link>.
+                  <p className="text-xs text-gray-400 mt-1">
+                    {otpVerified
+                      ? 'WhatsApp number verified successfully'
+                      : otpSent
+                      ? 'OTP sent to your WhatsApp. Enter it below.'
+                      : 'OTP will be sent to this WhatsApp number'}
                   </p>
-                </>
-              ) : (
-                <>
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                      <span className="text-white text-2xl">🔐</span>
-                    </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Verify Your WhatsApp Number</h1>
-                    <p className="text-gray-500 text-sm mt-2">
-                      We've sent a 6-digit OTP to WhatsApp number
-                    </p>
-                    <p className="font-semibold text-pink-600 text-sm mt-1">
-                      +91 {formData.mobile}
-                    </p>
-                    <p className="text-xs text-pink-500 mt-2">
-                      Sent via WhatsApp and Email
-                    </p>
-                  </div>
+                </div>
 
-                  {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
-                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleVerifyOTP} className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
-                        Enter OTP
-                      </label>
+                {/* OTP Input — only shown after OTP is sent */}
+                {otpSent && !otpVerified && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP *</label>
+                    <div className="flex gap-2">
                       <input
                         type="text"
                         value={otp}
                         onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                         maxLength="6"
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 text-center text-2xl tracking-[0.5em] font-mono"
-                        placeholder="000000"
+                        placeholder="6-digit OTP"
+                        className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 text-center text-xl tracking-[0.3em] font-mono"
                         autoFocus
-                        required
                       />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading || otp.length !== 6}
-                      className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
-                    >
-                      {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Creating Account...
-                        </span>
-                      ) : (
-                        'Verify & Create Account'
-                      )}
-                    </button>
-
-                    <div className="text-center">
                       <button
                         type="button"
-                        onClick={resendOTP}
+                        onClick={handleVerifyOTP}
+                        disabled={verifying || otp.length !== 6}
+                        className="px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-medium rounded-xl hover:shadow-lg transition-all disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {verifying ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                    </div>
+                    <div className="flex justify-end mt-1">
+                      <button
+                        type="button"
+                        onClick={handleResendOTP}
                         disabled={resendTimer > 0}
-                        className={`text-sm transition ${
+                        className={`text-xs transition ${
                           resendTimer > 0
                             ? 'text-gray-400 cursor-not-allowed'
                             : 'text-pink-600 hover:underline'
@@ -528,25 +445,108 @@ function SignupWithOTP() {
                         {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
                       </button>
                     </div>
+                  </div>
+                )}
 
+                {/* Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Create a password (min 6 characters)"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-10"
+                      required
+                    />
                     <button
                       type="button"
-                      onClick={() => {
-                        setStep(1);
-                        setOtp('');
-                        setError('');
-                      }}
-                      className="w-full text-center text-gray-500 hover:text-pink-600 text-sm transition flex items-center justify-center gap-1 mt-2"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition"
                     >
-                      <span>←</span> Back to signup
+                      {showPassword ? '🙈' : '👁️'}
                     </button>
-                  </form>
-                </>
-              )}
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Re-enter your password"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition"
+                    >
+                      {showConfirmPassword ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !otpVerified}
+                  className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Creating Account...
+                    </span>
+                  ) : !otpVerified ? (
+                    'Verify WhatsApp First'
+                  ) : (
+                    'Create Account'
+                  )}
+                </button>
+              </form>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-3 bg-white text-gray-500">Already have an account?</span>
+                </div>
+              </div>
+
+              <Link
+                to="/login"
+                className="block w-full text-center border-2 border-pink-500 bg-transparent text-pink-600 font-medium py-2.5 rounded-xl hover:bg-pink-50 transition-all"
+              >
+                Sign In
+              </Link>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-gray-400">
+                  Want to sell with us?{' '}
+                  <Link to="/vendor/register" className="text-pink-600 hover:underline font-medium">
+                    Register as Vendor →
+                  </Link>
+                </p>
+              </div>
+
+              <p className="text-center text-xs text-gray-400 mt-4">
+                By creating an account, you agree to MyPinkShop's{' '}
+                <Link to="/terms" className="text-pink-600 hover:underline">Terms</Link> and{' '}
+                <Link to="/privacy" className="text-pink-600 hover:underline">Privacy</Link>.
+              </p>
             </div>
           </div>
         </main>
 
+        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
