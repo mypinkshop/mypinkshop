@@ -15,11 +15,16 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetSent, setResetSent] = useState(false);
   const [showSuggestion, setShowSuggestion] = useState(false);
 
-  // OTP flow
+  // ========== FORGOT PASSWORD STATE ==========
+  const [resetMethod, setResetMethod] = useState('email'); // 'email' | 'phone'
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetPhone, setResetPhone] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetChannels, setResetChannels] = useState({ email: false, whatsapp: false });
+
+  // ========== OTP FLOW STATE ==========
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpEmail, setOtpEmail] = useState('');
@@ -36,7 +41,6 @@ function Login() {
   const isEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
   const isPhone = (val) => /^[0-9]{10}$/.test(val.replace(/\D/g, ''));
   const isPhoneInput = isPhone(identifier.replace(/\D/g, '')) && !isEmail(identifier);
-  const inputIsEmail = isEmail(identifier);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -200,20 +204,41 @@ function Login() {
     }
   };
 
+  // ============================================================
+  // FORGOT PASSWORD — दोनों options (Email OR WhatsApp)
+  // ============================================================
   const handleForgotPassword = async (e) => {
     e.preventDefault();
-    if (!resetEmail) {
-      setError('Please enter your email address.');
-      return;
+
+    // Validation — method के हिसाब से input check करें
+    if (resetMethod === 'email') {
+      if (!resetEmail || !isEmail(resetEmail)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+    } else {
+      const cleanPhone = resetPhone.replace(/\D/g, '');
+      if (!isPhone(cleanPhone)) {
+        setError('Please enter a valid 10-digit WhatsApp number.');
+        return;
+      }
     }
 
     setLoading(true);
     setError('');
+
     try {
+      // दोनों methods के लिए same backend endpoint
+      // Backend email से user ढूँढेगा, फिर email + WhatsApp भेजेगा
+      const payload =
+        resetMethod === 'email'
+          ? { email: resetEmail.trim().toLowerCase() }
+          : { phone: resetPhone.replace(/\D/g, '') };
+
       const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -221,7 +246,21 @@ function Login() {
       if (response.ok) {
         setResetSent(true);
         setError('');
-        toast.success('Password reset link sent to your email.');
+
+        const emailSent = data.channels?.email === true;
+        const whatsappSent = data.channels?.whatsapp === true;
+        setResetChannels({ email: emailSent, whatsapp: whatsappSent });
+
+        // Dynamic toast message — कौन-कौन से channel पर भेजा
+        let toastMsg = 'Reset link sent!';
+        if (emailSent && whatsappSent) {
+          toastMsg = 'Reset link sent to your email & WhatsApp 📧📱';
+        } else if (whatsappSent) {
+          toastMsg = 'Reset link sent to your WhatsApp 📱';
+        } else if (emailSent) {
+          toastMsg = 'Reset link sent to your email 📧';
+        }
+        toast.success(toastMsg);
       } else {
         setError(data.error || 'Unable to send reset link. Please try again.');
       }
@@ -230,6 +269,17 @@ function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Reset form को initial state में लाएँ
+  const resetForgotPasswordForm = () => {
+    setShowForgotPassword(false);
+    setError('');
+    setResetSent(false);
+    setResetEmail('');
+    setResetPhone('');
+    setResetMethod('email');
+    setResetChannels({ email: false, whatsapp: false });
   };
 
   const redirectUser = (user) => {
@@ -263,7 +313,7 @@ function Login() {
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100">
         <OfferBanner />
 
-        {/* HEADER */}
+        {/* ================= HEADER ================= */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -326,7 +376,7 @@ function Login() {
           </div>
         </header>
 
-        {/* BREADCRUMB */}
+        {/* ================= BREADCRUMB ================= */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -335,7 +385,7 @@ function Login() {
           </div>
         </div>
 
-        {/* MAIN */}
+        {/* ================= MAIN ================= */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
 
@@ -380,7 +430,9 @@ function Login() {
             {/* RIGHT — FORM */}
             <div className="w-full max-w-md mx-auto lg:mx-0">
 
-              {/* ========== OTP SCREEN ========== */}
+              {/* ============================================================ */}
+              {/* OTP SCREEN                                                    */}
+              {/* ============================================================ */}
               {showOTP ? (
                 <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
@@ -457,7 +509,9 @@ function Login() {
                   </form>
                 </div>
               ) : !showForgotPassword ? (
-                /* ========== MAIN LOGIN FORM ========== */
+                /* ============================================================ */
+                /* MAIN LOGIN FORM                                              */
+                /* ============================================================ */
                 <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -473,7 +527,6 @@ function Login() {
                     </div>
                   )}
 
-                  {/* Suggestion box — wrong password par */}
                   {showSuggestion && (
                     <div className="bg-pink-50 border border-pink-200 text-pink-700 p-4 rounded-xl mb-4 text-sm">
                       <p className="font-semibold mb-2">💡 Try another way to sign in:</p>
@@ -487,7 +540,7 @@ function Login() {
                           }}
                           className="block w-full text-left text-pink-600 hover:text-pink-800 font-medium transition"
                         >
-                          → Forgot Password? Reset via email
+                          → Forgot Password? Reset via email or WhatsApp
                         </button>
                         <p className="text-gray-600 text-xs">
                           Or enter your WhatsApp number above to sign in with OTP.
@@ -497,7 +550,6 @@ function Login() {
                   )}
 
                   <form onSubmit={isPhoneInput ? handleSendOTP : handlePasswordLogin} className="space-y-5">
-                    {/* Input — email or phone */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                         Email Address / WhatsApp Number
@@ -519,7 +571,6 @@ function Login() {
                       </p>
                     </div>
 
-                    {/* Password field — sirf tab dikhega jab email ho */}
                     {!isPhoneInput && (
                       <div>
                         <div className="flex justify-between items-center mb-1.5">
@@ -553,7 +604,6 @@ function Login() {
                       </div>
                     )}
 
-                    {/* Button — email par "Sign In", phone par "Send OTP" */}
                     <button
                       type="submit"
                       disabled={loading}
@@ -604,70 +654,176 @@ function Login() {
                   </div>
                 </div>
               ) : (
-                /* ========== FORGOT PASSWORD ========== */
+                /* ============================================================ */
+                /* FORGOT PASSWORD — EMAIL + WHATSAPP दोनों OPTIONS              */
+                /* ============================================================ */
                 <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                       <span className="text-white text-3xl">🔐</span>
                     </div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reset Password</h1>
-                    <p className="text-gray-500 text-sm mt-1">We'll send you a link to reset it</p>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Choose how you want to receive the reset link
+                    </p>
                   </div>
 
-                  {resetSent && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>✓</span> Reset link sent. Please check your email.
+                  {/* ============ SUCCESS STATE ============ */}
+                  {resetSent ? (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl text-sm">
+                        <p className="font-semibold mb-2 flex items-center gap-2">
+                          <span>✓</span> Reset link sent successfully!
+                        </p>
+                        <ul className="text-xs space-y-1 ml-5 list-disc">
+                          {resetChannels.email && <li>📧 Check your <strong>Email inbox</strong></li>}
+                          {resetChannels.whatsapp && <li>📱 Check your <strong>WhatsApp messages</strong></li>}
+                          <li>⏰ Link expires in <strong>30 minutes</strong></li>
+                          <li>📁 Also check <strong>spam folder</strong> (email)</li>
+                        </ul>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={resetForgotPasswordForm}
+                        className="w-full text-center border-2 border-pink-500 bg-transparent text-pink-600 font-bold py-3 rounded-xl hover:bg-pink-50 transition-all"
+                      >
+                        ← Back to Sign In
+                      </button>
                     </div>
+                  ) : (
+                    /* ============ INPUT STATE ============ */
+                    <>
+                      {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                          <span className="mt-0.5">⚠️</span> <span>{error}</span>
+                        </div>
+                      )}
+
+                      {/* ============ METHOD TOGGLE (Email / WhatsApp) ============ */}
+                      <div className="flex gap-2 p-1 bg-pink-50 rounded-2xl mb-5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetMethod('email');
+                            setError('');
+                          }}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                            resetMethod === 'email'
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                              : 'text-gray-600 hover:text-pink-600'
+                          }`}
+                        >
+                          📧 Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetMethod('phone');
+                            setError('');
+                          }}
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                            resetMethod === 'phone'
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                              : 'text-gray-600 hover:text-pink-600'
+                          }`}
+                        >
+                          📱 WhatsApp
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleForgotPassword} className="space-y-5">
+                        {/* ============ EMAIL INPUT ============ */}
+                        {resetMethod === 'email' ? (
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                              Email Address
+                            </label>
+                            <input
+                              type="email"
+                              value={resetEmail}
+                              onChange={(e) => {
+                                setResetEmail(e.target.value);
+                                setError('');
+                              }}
+                              className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm"
+                              placeholder="Enter your registered email"
+                              required
+                              autoFocus
+                            />
+                            <p className="text-xs text-gray-500 mt-1.5">
+                              📧 Reset link will be sent to this email
+                              <br />
+                              📱 If your WhatsApp number is registered, you'll get it there too
+                            </p>
+                          </div>
+                        ) : (
+                          /* ============ PHONE INPUT ============ */
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                              WhatsApp Number
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">
+                                +91
+                              </span>
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                value={resetPhone}
+                                onChange={(e) => {
+                                  setResetPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                                  setError('');
+                                }}
+                                className="w-full pl-14 pr-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm tracking-wide"
+                                placeholder="9876543210"
+                                maxLength={10}
+                                required
+                                autoFocus
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1.5">
+                              📱 Reset link will be sent to this WhatsApp number
+                              <br />
+                              🔒 Make sure this number is registered with your account
+                            </p>
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold py-3.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+                        >
+                          {loading ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Sending...
+                            </span>
+                          ) : resetMethod === 'email' ? (
+                            'Send Reset Link via Email 📧'
+                          ) : (
+                            'Send Reset Link via WhatsApp 📱'
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={resetForgotPasswordForm}
+                          className="w-full text-center text-gray-600 hover:text-pink-600 text-sm font-medium transition"
+                        >
+                          ← Back to Sign In
+                        </button>
+                      </form>
+                    </>
                   )}
-
-                  {error && !resetSent && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
-                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleForgotPassword} className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm"
-                        placeholder="Enter your registered email"
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold py-3.5 rounded-xl hover:shadow-lg transition-all disabled:opacity-50"
-                    >
-                      {loading ? 'Sending...' : 'Send Reset Link'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowForgotPassword(false);
-                        setError('');
-                        setResetSent(false);
-                      }}
-                      className="w-full text-center text-gray-600 hover:text-pink-600 text-sm font-medium transition"
-                    >
-                      ← Back to Sign In
-                    </button>
-                  </form>
                 </div>
               )}
             </div>
           </div>
         </main>
 
-        {/* FOOTER */}
+        {/* ================= FOOTER ================= */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -702,8 +858,8 @@ function Login() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
+                  <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
                   <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
                 </ul>
