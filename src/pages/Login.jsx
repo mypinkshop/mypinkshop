@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContext';
@@ -8,7 +8,7 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 
 function Login() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -18,12 +18,24 @@ function Login() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
+  // OTP flow
+  const [showOTP, setShowOTP] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpPhone, setOtpPhone] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
   const { login } = useAuth();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
+  // Check karo input email hai ya phone
+  const isEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  const isPhone = (val) => /^[0-9]{10}$/.test(val.replace(/\D/g, ''));
+  const isPhoneInput = isPhone(identifier.replace(/\D/g, '')) && !isEmail(identifier);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -35,10 +47,15 @@ function Login() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  // ========== EMAIL + PASSWORD LOGIN ==========
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('❌ Please enter email and password');
+    if (!identifier || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
+    if (!isEmail(identifier)) {
+      setError('Please enter a valid email address.');
       return;
     }
 
@@ -49,28 +66,131 @@ function Login() {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: identifier, password }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success && data.token) {
         login(data.token, data.user);
-        toast.success('Welcome back! 💖');
-
-        if (data.user?.role === 'admin') {
-          navigate('/admin/dashboard');
-        } else if (data.user?.role === 'vendor') {
-          navigate('/vendor/dashboard');
-        } else {
-          navigate('/');
-        }
+        toast.success('Welcome back!');
+        redirectUser(data.user);
       } else {
-        setError(data.error || data.message || '❌ Invalid email or password.');
+        setError(data.error || data.message || 'Invalid email or password.');
       }
     } catch (err) {
-      console.error('Password login error:', err);
-      setError('❌ Network issue. Please check your connection and try again.');
+      console.error('Login error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ========== PHONE + OTP LOGIN ==========
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+
+    const cleanPhone = identifier.replace(/\D/g, '');
+
+    if (!isPhone(cleanPhone)) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const dummyEmail = `${cleanPhone}@phone.mypinkshop.com`;
+
+      const response = await fetch(`${API_URL}/api/otp/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: dummyEmail,
+          phone: cleanPhone,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setOtpPhone(cleanPhone);
+        setOtpEmail(dummyEmail);
+        setShowOTP(true);
+        setResendTimer(30);
+        toast.success('OTP sent to WhatsApp and Email');
+      } else {
+        setError(data.error || 'Failed to send OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('OTP send error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    if (otp.length !== 6) {
+      setError('Please enter the 6-digit OTP.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpEmail, otp }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.token) {
+        login(data.token, data.user);
+        toast.success('Welcome back!');
+        redirectUser(data.user);
+      } else {
+        setError(data.error || 'Invalid OTP. Please try again.');
+      }
+    } catch (err) {
+      console.error('OTP verify error:', err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendTimer > 0) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_URL}/api/otp/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: otpEmail,
+          phone: otpPhone,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setResendTimer(30);
+        toast.success('OTP resent to WhatsApp and Email');
+      } else {
+        setError(data.error || 'Failed to resend OTP.');
+      }
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -79,7 +199,7 @@ function Login() {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     if (!resetEmail) {
-      setError('❌ Please enter your email address');
+      setError('Please enter your email address.');
       return;
     }
 
@@ -97,14 +217,24 @@ function Login() {
       if (response.ok) {
         setResetSent(true);
         setError('');
-        toast.success('Reset link sent to your email! 📧');
+        toast.success('Password reset link sent to your email');
       } else {
-        setError(data.error || 'Failed to send reset link');
+        setError(data.error || 'Failed to send reset link.');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const redirectUser = (user) => {
+    if (user?.role === 'admin') {
+      navigate('/admin/dashboard');
+    } else if (user?.role === 'vendor') {
+      navigate('/vendor/dashboard');
+    } else {
+      navigate('/');
     }
   };
 
@@ -120,8 +250,8 @@ function Login() {
   return (
     <>
       <Helmet>
-        <title>Login to MyPinkShop - Your Beauty & Fashion Store</title>
-        <meta name="description" content="Login to your MyPinkShop account to track orders, manage wishlist, and enjoy exclusive offers." />
+        <title>Login - MyPinkShop</title>
+        <meta name="description" content="Login to your MyPinkShop account." />
         <link rel="canonical" href="https://www.mypinkshop.com/login" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
@@ -134,11 +264,11 @@ function Login() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
                     MyPinkShop
                   </h1>
                   <p className="text-[9px] sm:text-[10px] text-pink-500 font-semibold tracking-wider">FOR THE GIRLIES ✨</p>
@@ -201,29 +331,26 @@ function Login() {
           </div>
         </div>
 
-        {/* MAIN CONTENT */}
+        {/* MAIN */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
 
-            {/* LEFT — BENEFITS (Desktop only) */}
+            {/* LEFT — BENEFITS */}
             <div className="hidden lg:block">
               <div className="bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600 rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute inset-0 opacity-10 text-[300px] flex items-center justify-center pointer-events-none select-none">
                   💖
                 </div>
-
                 <div className="relative z-10">
                   <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full mb-6">
                     ✨ MEMBER BENEFITS
                   </span>
-
                   <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight">
                     Welcome to the <br />Pink Club 💕
                   </h2>
                   <p className="text-pink-100 mb-8 text-lg">
                     10,000+ happy customers trust us for their beauty needs
                   </p>
-
                   <div className="space-y-5">
                     {[
                       { icon: '🎁', title: 'Exclusive Offers', sub: 'Extra 10% off on first order' },
@@ -242,93 +369,160 @@ function Login() {
                       </div>
                     ))}
                   </div>
-
-                  <div className="mt-8 pt-6 border-t border-white/20">
-                    <div className="flex items-center gap-3">
-                      <div className="flex -space-x-2">
-                        {['💖', '💕', '💗', '💝'].map((emoji, i) => (
-                          <div key={i} className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-sm shadow-md border-2 border-pink-500">
-                            {emoji}
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-sm text-pink-100">
-                        <strong className="text-white">10K+</strong> women love us
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT — LOGIN FORM */}
+            {/* RIGHT — FORM */}
             <div className="w-full max-w-md mx-auto lg:mx-0">
-              {!showForgotPassword ? (
-                <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
 
-                  {/* Mobile hero */}
+              {/* ========== OTP SCREEN ========== */}
+              {showOTP ? (
+                <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                      <span className="text-white text-3xl">✨</span>
+                      <span className="text-white text-3xl">🔐</span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome Back!</h1>
-                    <p className="text-gray-500 text-sm mt-1">Sign in to continue shopping</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Verify OTP</h1>
+                    <p className="text-gray-500 text-sm mt-2">We've sent a 6-digit code to</p>
+                    <p className="text-gray-800 font-semibold text-sm mt-1">+91 {otpPhone}</p>
+                    <p className="text-xs text-pink-500 mt-2">Sent via WhatsApp and Email</p>
                   </div>
 
-                  {/* Error */}
                   {error && (
                     <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
                       <span>⚠️</span> <span>{error}</span>
                     </div>
                   )}
 
-                  <form onSubmit={handlePasswordLogin} className="space-y-5">
+                  <form onSubmit={handleVerifyOTP} className="space-y-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Email Address
+                        Enter OTP
                       </label>
                       <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm"
-                        placeholder="you@example.com"
+                        type="text"
+                        inputMode="numeric"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-center text-2xl tracking-[12px] font-bold"
+                        placeholder="------"
+                        maxLength={6}
+                        autoFocus
                         required
                       />
                     </div>
 
+                    <button
+                      type="submit"
+                      disabled={loading || otp.length !== 6}
+                      className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold py-3.5 rounded-xl hover:shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Verifying...
+                        </span>
+                      ) : (
+                        'Verify and Sign In'
+                      )}
+                    </button>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOTP(false);
+                          setOtp('');
+                          setError('');
+                        }}
+                        className="text-gray-600 hover:text-pink-600 font-medium transition"
+                      >
+                        ← Change number
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResendOTP}
+                        disabled={resendTimer > 0 || loading}
+                        className="text-pink-600 hover:text-pink-700 font-medium transition disabled:text-gray-400"
+                      >
+                        {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : !showForgotPassword ? (
+                /* ========== MAIN LOGIN FORM ========== */
+                <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
+                  <div className="text-center mb-6">
+                    <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      <span className="text-white text-3xl">✨</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome Back</h1>
+                    <p className="text-gray-500 text-sm mt-1">Sign in to continue shopping</p>
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
+                      <span>⚠️</span> <span>{error}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={isPhoneInput ? handleSendOTP : handlePasswordLogin} className="space-y-5">
+                    {/* Input — email or phone */}
                     <div>
-                      <div className="flex justify-between items-center mb-1.5">
-                        <label className="block text-sm font-semibold text-gray-700">
-                          Password
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setShowForgotPassword(true)}
-                          className="text-xs text-pink-600 hover:underline font-medium"
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-12 text-sm"
-                          placeholder="Enter your password"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition text-lg"
-                        >
-                          {showPassword ? '👁️' : '🔒'}
-                        </button>
-                      </div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Email Address / Mobile Number
+                      </label>
+                      <input
+                        type="text"
+                        value={identifier}
+                        onChange={(e) => {
+                          setIdentifier(e.target.value);
+                          setError('');
+                        }}
+                        className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm"
+                        placeholder="you@example.com or 9876543210"
+                        required
+                      />
                     </div>
 
+                    {/* Password field — sirf tab dikhega jab email ho */}
+                    {!isPhoneInput && (
+                      <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="block text-sm font-semibold text-gray-700">
+                            Password
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-xs text-pink-600 hover:underline font-medium"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition pr-12 text-sm"
+                            placeholder="Enter your password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-pink-500 transition text-lg"
+                          >
+                            {showPassword ? '👁️' : '🔒'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Button — email par "Sign In", phone par "Send OTP" */}
                     <button
                       type="submit"
                       disabled={loading}
@@ -337,10 +531,12 @@ function Login() {
                       {loading ? (
                         <span className="flex items-center justify-center gap-2">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Signing in...
+                          {isPhoneInput ? 'Sending OTP...' : 'Signing in...'}
                         </span>
+                      ) : isPhoneInput ? (
+                        'Send OTP'
                       ) : (
-                        'Sign In ✨'
+                        'Sign In'
                       )}
                     </button>
                   </form>
@@ -361,7 +557,6 @@ function Login() {
                     Create your account
                   </Link>
 
-                  {/* Trust badges mobile */}
                   <div className="mt-6 pt-6 border-t border-pink-100 grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-xl mb-1">🔒</div>
@@ -378,6 +573,7 @@ function Login() {
                   </div>
                 </div>
               ) : (
+                /* ========== FORGOT PASSWORD ========== */
                 <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -389,7 +585,7 @@ function Login() {
 
                   {resetSent && (
                     <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>✓</span> Reset link sent! Check your email.
+                      <span>✓</span> Reset link sent. Please check your email.
                     </div>
                   )}
 
@@ -429,9 +625,9 @@ function Login() {
                         setError('');
                         setResetSent(false);
                       }}
-                      className="w-full text-center text-gray-600 hover:text-pink-600 text-sm font-medium transition flex items-center justify-center gap-1"
+                      className="w-full text-center text-gray-600 hover:text-pink-600 text-sm font-medium transition"
                     >
-                      <span>←</span> Back to Sign In
+                      ← Back to Sign In
                     </button>
                   </form>
                 </div>
