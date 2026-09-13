@@ -509,87 +509,133 @@ function Cart() {
               {cart.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white rounded-2xl border-2 border-pink-100 p-4 shadow-sm hover:shadow-md hover:border-pink-300 transition"
+                  className="group bg-white rounded-3xl border-2 border-pink-100 hover:border-pink-300 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                 >
-                  <div className="flex gap-4">
-                    {/* Image */}
-                    <Link to={`/product/${item.id}`} className="block flex-shrink-0">
+                  {/* Top gradient accent */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500" />
+
+                  <div className="flex gap-4 pt-1">
+                    {/* Image — SAME SIZE, object-contain (uncropped) */}
+                    <Link
+                      to={`/product/${item.id}`}
+                      className="block flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 hover:border-pink-300 flex items-center justify-center p-2 transition-all shadow-sm"
+                    >
                       {item.image && !imgErrors[item.id] ? (
                         <img
                           src={item.image}
                           alt={item.name}
-                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-pink-100 bg-white hover:scale-105 transition-transform"
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
                           decoding="async"
                           onError={() => handleImageError(item.id)}
                         />
                       ) : (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl flex items-center justify-center text-3xl border-2 border-pink-100">
-                          {item.emoji || '✨'}
-                        </div>
+                        <div className="text-3xl">{item.emoji || '✨'}</div>
                       )}
                     </Link>
 
                     {/* Info */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      {/* Brand / Vendor badge */}
+                      {item.vendorId ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded-full w-fit mb-1">
+                          🛍️ Vendor
+                        </span>
+                      ) : item.brand ? (
+                        <p className="text-[10px] sm:text-xs font-bold text-pink-600 uppercase tracking-wider mb-1">
+                          {item.brand}
+                        </p>
+                      ) : null}
+
+                      {/* Product name */}
                       <Link to={`/product/${item.id}`}>
-                        <h3 className="font-bold text-gray-900 hover:text-pink-600 transition line-clamp-2 text-sm sm:text-base">
+                        <h3 className="font-bold text-gray-900 hover:text-pink-600 transition line-clamp-2 text-sm sm:text-base mb-1">
                           {item.name}
                         </h3>
                       </Link>
 
-                      {item.vendorId && (
-                        <p className="text-[10px] text-purple-600 mt-0.5 font-bold">
-                          🛍️ Vendor Product
-                        </p>
-                      )}
-
+                      {/* Variation */}
                       {item.variationName && (
-                        <p className="text-xs text-gray-600 mt-1 font-medium">
+                        <p className="text-xs text-gray-500 font-medium mb-1">
+                          <span className="text-gray-400">Option:</span>{' '}
                           {item.variationName}
-                          {item.variationSecondary && ` - ${item.variationSecondary}`}
+                          {item.variationSecondary && ` • ${item.variationSecondary}`}
                         </p>
                       )}
 
-                      <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        <span className="text-lg font-bold text-pink-600">₹{item.price}</span>
+                      {/* Price */}
+                      <div className="flex items-baseline gap-2 flex-wrap mt-1">
+                        <span className="text-lg font-bold text-pink-600">
+                          ₹{item.price.toLocaleString()}
+                        </span>
                         {item.originalPrice && item.originalPrice > item.price && (
-                          <span className="text-xs text-gray-400 line-through">
-                            ₹{item.originalPrice}
-                          </span>
+                          <>
+                            <span className="text-xs text-gray-400 line-through">
+                              ₹{item.originalPrice.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">
+                              {Math.round(
+                                ((item.originalPrice - item.price) / item.originalPrice) * 100
+                              )}
+                              % OFF
+                            </span>
+                          </>
                         )}
                       </div>
 
                       {/* Quantity + Remove */}
                       <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
-                        <div className="flex items-center gap-1 bg-pink-50 border-2 border-pink-200 rounded-full p-1">
+                        {/* Premium quantity selector */}
+                        <div className="flex items-center gap-0 bg-gradient-to-r from-pink-50 to-rose-50 border-2 border-pink-200 rounded-full overflow-hidden shadow-sm">
                           <button
                             onClick={() =>
                               handleUpdateQuantity(item.id, item.quantity - 1, item.stock)
                             }
-                            className="w-7 h-7 rounded-full hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center"
+                            className="w-7 h-7 hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center text-base"
                           >
                             −
                           </button>
-                          <span className="w-8 text-center font-bold text-sm text-gray-800">
+                          <span className="w-8 text-center font-bold text-sm text-gray-900 bg-white h-7 flex items-center justify-center border-x-2 border-pink-200">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() =>
                               handleUpdateQuantity(item.id, item.quantity + 1, item.stock)
                             }
-                            className="w-7 h-7 rounded-full hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center"
+                            className="w-7 h-7 hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center text-base"
                           >
                             +
                           </button>
                         </div>
 
+                        {/* Remove button */}
                         <button
                           onClick={() => handleRemoveItem(item.id, item.name)}
-                          className="text-xs text-red-500 hover:text-red-700 transition flex items-center gap-1 font-bold"
+                          className="flex items-center gap-1 text-xs text-rose-500 hover:text-white hover:bg-rose-500 transition-all font-bold px-2.5 py-1 rounded-full border-2 border-rose-200 hover:border-rose-500"
                         >
-                          🗑️ Remove
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                          Remove
                         </button>
+                      </div>
+
+                      {/* Mobile subtotal */}
+                      <div className="sm:hidden mt-2 pt-2 border-t border-pink-100 flex justify-between items-center">
+                        <span className="text-xs text-gray-500 font-medium">Item Total:</span>
+                        <span className="text-sm font-bold text-pink-600">
+                          ₹{(item.price * item.quantity).toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   </div>
