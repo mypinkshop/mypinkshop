@@ -55,7 +55,6 @@ function SignupWithOTP() {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
-    // Agar mobile number change hua toh OTP reset kar do
     if (e.target.name === 'mobile') {
       setOtpSent(false);
       setOtpVerified(false);
@@ -151,7 +150,6 @@ function SignupWithOTP() {
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    // Validation
     if (!formData.name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -251,7 +249,6 @@ function SignupWithOTP() {
 
         <OfferBanner />
 
-        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -304,7 +301,6 @@ function SignupWithOTP() {
           </div>
         </header>
 
-        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -346,7 +342,7 @@ function SignupWithOTP() {
                   />
                 </div>
 
-                {/* Email Address (record only) */}
+                {/* Email Address (record only, no OTP) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
                   <input
@@ -361,7 +357,7 @@ function SignupWithOTP() {
                   <p className="text-xs text-gray-400 mt-1">Email will be used for order updates. Verify later from your profile.</p>
                 </div>
 
-                {/* WhatsApp Number with inline Send OTP button */}
+                {/* WhatsApp Number + inline Send OTP */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number *</label>
                   <div className="flex gap-2">
@@ -408,7 +404,7 @@ function SignupWithOTP() {
                   </p>
                 </div>
 
-                {/* OTP Input — only shown after OTP is sent */}
+                {/* OTP Input (only after OTP sent) */}
                 {otpSent && !otpVerified && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Enter OTP *</label>
@@ -494,6 +490,7 @@ function SignupWithOTP() {
                   </div>
                 </div>
 
+                {/* Submit */}
                 <button
                   type="submit"
                   disabled={loading || !otpVerified}
@@ -546,7 +543,6 @@ function SignupWithOTP() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 py-8 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-wrap justify-center gap-6 text-xs mb-4">
