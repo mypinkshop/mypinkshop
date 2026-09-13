@@ -17,6 +17,7 @@ function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [showSuggestion, setShowSuggestion] = useState(false);
 
   // OTP flow
   const [showOTP, setShowOTP] = useState(false);
@@ -32,10 +33,10 @@ function Login() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // Check karo input email hai ya phone
   const isEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
   const isPhone = (val) => /^[0-9]{10}$/.test(val.replace(/\D/g, ''));
   const isPhoneInput = isPhone(identifier.replace(/\D/g, '')) && !isEmail(identifier);
+  const inputIsEmail = isEmail(identifier);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -50,6 +51,8 @@ function Login() {
   // ========== EMAIL + PASSWORD LOGIN ==========
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
+    setShowSuggestion(false);
+
     if (!identifier || !password) {
       setError('Please enter your email and password.');
       return;
@@ -76,11 +79,12 @@ function Login() {
         toast.success('Welcome back!');
         redirectUser(data.user);
       } else {
-        setError(data.error || data.message || 'Invalid email or password.');
+        setError(data.error || data.message || 'Invalid email or password. Please try again.');
+        setShowSuggestion(true);
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Something went wrong. Please try again.');
+      setError('Something went wrong. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -93,7 +97,7 @@ function Login() {
     const cleanPhone = identifier.replace(/\D/g, '');
 
     if (!isPhone(cleanPhone)) {
-      setError('Please enter a valid 10-digit mobile number.');
+      setError('Please enter a valid 10-digit WhatsApp number.');
       return;
     }
 
@@ -119,13 +123,13 @@ function Login() {
         setOtpEmail(dummyEmail);
         setShowOTP(true);
         setResendTimer(30);
-        toast.success('OTP sent to WhatsApp and Email');
+        toast.success(data.message || 'OTP sent to your WhatsApp.');
       } else {
-        setError(data.error || 'Failed to send OTP. Please try again.');
+        setError(data.error || 'Unable to send OTP. Please try again.');
       }
     } catch (err) {
       console.error('OTP send error:', err);
-      setError('Something went wrong. Please try again.');
+      setError('Something went wrong. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -185,9 +189,9 @@ function Login() {
 
       if (response.ok && data.success) {
         setResendTimer(30);
-        toast.success('OTP resent to WhatsApp and Email');
+        toast.success(data.message || 'OTP resent to your WhatsApp.');
       } else {
-        setError(data.error || 'Failed to resend OTP.');
+        setError(data.error || 'Unable to resend OTP. Please try again.');
       }
     } catch (err) {
       setError('Something went wrong. Please try again.');
@@ -217,9 +221,9 @@ function Login() {
       if (response.ok) {
         setResetSent(true);
         setError('');
-        toast.success('Password reset link sent to your email');
+        toast.success('Password reset link sent to your email.');
       } else {
-        setError(data.error || 'Failed to send reset link.');
+        setError(data.error || 'Unable to send reset link. Please try again.');
       }
     } catch (err) {
       setError('Something went wrong. Please try again.');
@@ -386,12 +390,12 @@ function Login() {
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Verify OTP</h1>
                     <p className="text-gray-500 text-sm mt-2">We've sent a 6-digit code to</p>
                     <p className="text-gray-800 font-semibold text-sm mt-1">+91 {otpPhone}</p>
-                    <p className="text-xs text-pink-500 mt-2">Sent via WhatsApp and Email</p>
+                    <p className="text-xs text-pink-500 mt-2">Sent via WhatsApp</p>
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>⚠️</span> <span>{error}</span>
+                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
                     </div>
                   )}
 
@@ -464,8 +468,31 @@ function Login() {
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>⚠️</span> <span>{error}</span>
+                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
+                    </div>
+                  )}
+
+                  {/* Suggestion box — wrong password par */}
+                  {showSuggestion && (
+                    <div className="bg-pink-50 border border-pink-200 text-pink-700 p-4 rounded-xl mb-4 text-sm">
+                      <p className="font-semibold mb-2">💡 Try another way to sign in:</p>
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowForgotPassword(true);
+                            setShowSuggestion(false);
+                            setError('');
+                          }}
+                          className="block w-full text-left text-pink-600 hover:text-pink-800 font-medium transition"
+                        >
+                          → Forgot Password? Reset via email
+                        </button>
+                        <p className="text-gray-600 text-xs">
+                          Or enter your WhatsApp number above to sign in with OTP.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -473,7 +500,7 @@ function Login() {
                     {/* Input — email or phone */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Email Address / Mobile Number
+                        Email Address / WhatsApp Number
                       </label>
                       <input
                         type="text"
@@ -481,11 +508,15 @@ function Login() {
                         onChange={(e) => {
                           setIdentifier(e.target.value);
                           setError('');
+                          setShowSuggestion(false);
                         }}
                         className="w-full px-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm"
                         placeholder="you@example.com or 9876543210"
                         required
                       />
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Email → Sign in with password &nbsp;|&nbsp; WhatsApp Number → Get OTP
+                      </p>
                     </div>
 
                     {/* Password field — sirf tab dikhega jab email ho */}
@@ -590,8 +621,8 @@ function Login() {
                   )}
 
                   {error && !resetSent && (
-                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
-                      <span>⚠️</span> {error}
+                    <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
+                      <span className="mt-0.5">⚠️</span> <span>{error}</span>
                     </div>
                   )}
 
