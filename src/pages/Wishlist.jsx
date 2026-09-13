@@ -14,7 +14,7 @@ function Wishlist() {
   const { wishlist, removeFromWishlist, fetchWishlist, clearWishlist } = useWishlist();
   const { addToCart, cartCount } = useCart();
   const { user, logout, token } = useAuth();
-  
+
   const [loading, setLoading] = useState(true);
   const [movingProduct, setMovingProduct] = useState(null);
   const [removingProduct, setRemovingProduct] = useState(null);
@@ -27,7 +27,6 @@ function Wishlist() {
   const getGuestWishlist = useCallback(() => {
     try {
       const saved = localStorage.getItem('guestWishlist');
-      console.log('🟢 getGuestWishlist - Raw:', saved);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -42,29 +41,18 @@ function Wishlist() {
 
   // ============ GUEST: Save to localStorage ============
   const saveGuestWishlist = useCallback((data) => {
-    console.log('🟢 saveGuestWishlist - Saving:', data);
     localStorage.setItem('guestWishlist', JSON.stringify(data));
-    const saved = localStorage.getItem('guestWishlist');
-    console.log('🟢 saveGuestWishlist - Verified:', saved);
   }, []);
 
   // ============ LOAD WISHLIST ============
   const loadWishlist = useCallback(async () => {
-    console.log('🟢 loadWishlist - Starting...');
-    
     if (user && token) {
-      // Logged in user
-      console.log('🟢 loadWishlist - Logged in user');
       if (fetchWishlist) {
         const data = await fetchWishlist();
-        console.log('🟢 loadWishlist - Fetched:', data?.length || 0, 'items');
         setDisplayWishlist(data || []);
       }
     } else {
-      // ✅ GUEST: Directly from localStorage - IGNORE CONTEXT
-      console.log('🟢 loadWishlist - Guest user - Using localStorage ONLY');
       const data = getGuestWishlist();
-      console.log('🟢 loadWishlist - Got:', data.length, 'items');
       setDisplayWishlist(data);
     }
     setLoading(false);
@@ -72,17 +60,14 @@ function Wishlist() {
 
   // ============ MOUNT ============
   useEffect(() => {
-    console.log('🟢 useEffect - Mount');
     setIsGuest(!user || !token);
     loadWishlist();
   }, []);
 
   // ============ UPDATE ON CONTEXT CHANGE (ONLY FOR LOGGED IN) ============
   useEffect(() => {
-    // ✅ ONLY for logged in users - Guest mode IGNORE context
     if (user && token && !loading) {
       const data = Array.isArray(wishlist) ? [...wishlist] : [];
-      console.log('🟢 useEffect - Context changed for logged in user:', data.length, 'items');
       setDisplayWishlist(data);
     }
   }, [wishlist, user, token, loading]);
@@ -90,40 +75,29 @@ function Wishlist() {
   // ============ HANDLE: Remove Single Item ============
   const handleRemoveItem = async (productId) => {
     if (!productId) return;
-    
-    console.log('🟢 handleRemoveItem - Removing:', productId);
+
     setRemovingProduct(productId);
-    
+
     try {
       if (user && token) {
-        // Logged in user
-        console.log('🟢 handleRemoveItem - Logged in user');
         await removeFromWishlist(productId);
         const data = await fetchWishlist();
         setDisplayWishlist(data || []);
         toast.success('Removed from wishlist ❌');
       } else {
-        // ✅ GUEST: Manually update localStorage and state
-        console.log('🟢 handleRemoveItem - Guest user');
         const currentList = getGuestWishlist();
-        const updatedList = currentList.filter(p => (p._id !== productId && p.id !== productId));
-        
-        console.log('🟢 handleRemoveItem - Before:', currentList.length, 'items');
-        console.log('🟢 handleRemoveItem - After:', updatedList.length, 'items');
-        
-        // ✅ Update state
+        const updatedList = currentList.filter(
+          (p) => p._id !== productId && p.id !== productId
+        );
         setDisplayWishlist(updatedList);
-        
-        // ✅ Save to localStorage
         saveGuestWishlist(updatedList);
-        
         toast.success('Removed from wishlist ❌');
       }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to remove from wishlist');
     }
-    
+
     setTimeout(() => setRemovingProduct(null), 300);
   };
 
@@ -131,45 +105,37 @@ function Wishlist() {
   const handleMoveToCart = async (product) => {
     const productId = product._id || product.id;
     if (!productId) return;
-    
-    console.log('🟢 handleMoveToCart - Moving:', productId);
+
     setMovingProduct(productId);
-    
+
     addToCart({
       id: productId,
       name: product.name || 'Product',
       price: product.price || 0,
       quantity: 1,
       image: product.images?.[0] || product.image || '',
-      stock: product.stock || 10
+      stock: product.stock || 10,
     });
-    
+
     toast.success('Added to cart! 🛒');
-    
+
     try {
       if (user && token) {
-        // Logged in user
-        console.log('🟢 handleMoveToCart - Logged in user');
         await removeFromWishlist(productId);
         const data = await fetchWishlist();
         setDisplayWishlist(data || []);
       } else {
-        // ✅ GUEST: Manually update localStorage and state
-        console.log('🟢 handleMoveToCart - Guest user');
         const currentList = getGuestWishlist();
-        const updatedList = currentList.filter(p => (p._id !== productId && p.id !== productId));
-        
-        console.log('🟢 handleMoveToCart - Before:', currentList.length, 'items');
-        console.log('🟢 handleMoveToCart - After:', updatedList.length, 'items');
-        
+        const updatedList = currentList.filter(
+          (p) => p._id !== productId && p.id !== productId
+        );
         setDisplayWishlist(updatedList);
         saveGuestWishlist(updatedList);
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Failed to remove from wishlist');
     }
-    
+
     setTimeout(() => setMovingProduct(null), 500);
   };
 
@@ -179,24 +145,20 @@ function Wishlist() {
       toast.error('Wishlist is already empty');
       return;
     }
-    
+
     if (!confirm('Are you sure you want to clear your entire wishlist?')) {
       return;
     }
-    
+
     setIsClearing(true);
-    
+
     try {
       if (user && token) {
-        // Logged in user
-        console.log('🟢 handleClearAll - Logged in user');
         await clearWishlist();
         const data = await fetchWishlist();
         setDisplayWishlist(data || []);
         toast.success('Wishlist cleared 🗑️');
       } else {
-        // ✅ GUEST: Clear localStorage and state
-        console.log('🟢 handleClearAll - Guest user');
         setDisplayWishlist([]);
         saveGuestWishlist([]);
         toast.success('Wishlist cleared 🗑️');
@@ -205,7 +167,7 @@ function Wishlist() {
       console.error('Error:', error);
       toast.error('Failed to clear wishlist');
     }
-    
+
     setIsClearing(false);
   };
 
@@ -216,7 +178,7 @@ function Wishlist() {
         await navigator.share({
           title: 'My Wishlist 💖',
           text: `Check out my wishlist on MyPinkShop! ${displayWishlist.length} items ✨`,
-          url: window.location.href
+          url: window.location.href,
         });
       } else {
         await navigator.clipboard.writeText(window.location.href);
@@ -244,31 +206,23 @@ function Wishlist() {
 
   // ============ SKELETON LOADER ============
   const SkeletonCard = () => (
-    <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 p-4 animate-pulse">
-      <div className="aspect-square bg-gray-200 rounded-lg mb-4"></div>
+    <div className="bg-white rounded-2xl border-2 border-pink-100 p-4 animate-pulse">
+      <div className="aspect-square bg-gray-200 rounded-xl mb-4"></div>
       <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
       <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
       <div className="h-5 bg-gray-200 rounded w-1/3 mb-3"></div>
-      <div className="h-9 bg-gray-200 rounded-full w-full"></div>
+      <div className="h-10 bg-gray-200 rounded-xl w-full"></div>
     </div>
   );
 
   // ============ SEO ============
   const generateBreadcrumbSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.mypinkshop.com" },
-      { "@type": "ListItem", "position": 2, "name": "Wishlist", "item": "https://www.mypinkshop.com/wishlist" }
-    ]
-  });
-
-  const generateOrganizationSchema = () => ({
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "MyPinkShop",
-    "url": "https://www.mypinkshop.com",
-    "logo": "https://www.mypinkshop.com/logo.png"
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.mypinkshop.com' },
+      { '@type': 'ListItem', position: 2, name: 'Wishlist', item: 'https://www.mypinkshop.com/wishlist' },
+    ],
   });
 
   const wishlistCount = displayWishlist.length;
@@ -281,13 +235,13 @@ function Wishlist() {
         <Helmet>
           <title>Loading Wishlist - MyPinkShop</title>
         </Helmet>
-        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+        <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="mb-6">
               <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
@@ -304,14 +258,13 @@ function Wishlist() {
         <meta name="description" content={`View and manage your wishlist at MyPinkShop. ${wishlistCount || 0} items saved.`} />
         <link rel="canonical" href="https://www.mypinkshop.com/wishlist" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
-        <script type="application/ld+json">{JSON.stringify(generateOrganizationSchema())}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100">
         <OfferBanner />
 
         {/* HEADER */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
               <Link to="/" className="flex items-center gap-2 shrink-0 group">
@@ -319,24 +272,28 @@ function Wishlist() {
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+                    MyPinkShop
+                  </h1>
+                  <p className="text-[9px] sm:text-[10px] text-pink-500 font-semibold tracking-wider">
+                    FOR THE GIRLIES ✨
+                  </p>
                 </div>
               </Link>
 
               <div className="flex-1 max-w-md lg:max-w-2xl">
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Search for products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-gray-50"
+                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border-2 border-pink-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-white"
                   />
-                  <button 
+                  <button
                     onClick={handleSearch}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 sm:py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
                   >
                     <span className="hidden sm:inline">Search</span>
                     <span className="sm:hidden">🔍</span>
@@ -350,29 +307,29 @@ function Wishlist() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                   {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
                       {wishlistCount}
                     </span>
                   )}
                 </Link>
-                
+
                 <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
                       {cartCount}
                     </span>
                   )}
                 </Link>
-                
+
                 {user ? (
                   <Avatar user={user} onLogout={logout} />
                 ) : (
                   <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a7 7 0 11-14 0 7 7 0 0114 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
                 )}
@@ -386,26 +343,35 @@ function Wishlist() {
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
             <span className="text-gray-400">/</span>
-            <span className="text-pink-600 font-medium">Wishlist</span>
+            <span className="text-pink-600 font-bold">Wishlist</span>
           </div>
         </div>
 
         {/* EMPTY STATE */}
         {wishlistCount === 0 ? (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-12 max-w-md mx-auto border border-pink-100 shadow-sm">
-              <div className="text-6xl mb-6">🤍</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-3">Your wishlist is empty</h2>
-              <p className="text-gray-500 mb-6">Save your favorite items here!</p>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div className="bg-white rounded-3xl p-12 sm:p-16 max-w-md mx-auto border-2 border-pink-100 shadow-lg text-center">
+              <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center">
+                <span className="text-6xl">🤍</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                Your wishlist is empty
+              </h2>
+              <p className="text-gray-500 mb-6">
+                Save your favorite items here and shop them later!
+              </p>
               {isGuest && (
-                <p className="text-sm text-gray-500 mb-4">
-                  💡 Your wishlist is saved locally. 
-                  <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
+                <p className="text-sm text-gray-600 mb-4 bg-pink-50 rounded-xl p-3 font-medium">
+                  💡 Your wishlist is saved locally.{' '}
+                  <Link to="/login" className="text-pink-600 font-bold hover:underline">
+                    Login
+                  </Link>{' '}
+                  to save it permanently!
                 </p>
               )}
-              <Link 
-                to="/shop" 
-                className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+              <Link
+                to="/shop"
+                className="inline-block bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3.5 rounded-full font-bold hover:shadow-lg transition-all transform hover:-translate-y-1"
               >
                 Start Shopping →
               </Link>
@@ -413,40 +379,43 @@ function Wishlist() {
           </div>
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            
+
             {/* HEADER WITH ACTIONS */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-                  My Wishlist 🤍 ({wishlistCount} {wishlistCount === 1 ? 'item' : 'items'})
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  My Wishlist 🤍
+                  <span className="text-sm font-normal text-gray-500 bg-pink-100 px-3 py-1 rounded-full">
+                    {wishlistCount} {wishlistCount === 1 ? 'item' : 'items'}
+                  </span>
                 </h1>
                 {isGuest && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    💡 Your wishlist is saved locally. 
-                    <Link to="/login" className="text-pink-500 ml-1 hover:underline">Login</Link> to save it permanently!
+                  <p className="text-sm text-gray-600 mt-2 bg-pink-50 rounded-xl p-3 font-medium inline-block">
+                    💡 Saved locally.{' '}
+                    <Link to="/login" className="text-pink-600 font-bold hover:underline">
+                      Login
+                    </Link>{' '}
+                    to save permanently!
                   </p>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={handleShare}
-                  className="group relative px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-medium shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2 overflow-hidden"
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-bold shadow-md hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
                 >
-                  <span className="relative z-10 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                    </svg>
-                    Share
-                  </span>
-                  <span className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Share
                 </button>
-                
+
                 {wishlistCount > 1 && (
                   <button
                     onClick={handleClearAll}
                     disabled={isClearing}
-                    className="group relative px-5 py-2.5 bg-white border-2 border-red-200 text-red-500 rounded-full text-sm font-medium hover:bg-red-50 hover:border-red-400 transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                    className="px-5 py-2.5 bg-white border-2 border-rose-200 text-rose-600 rounded-full text-sm font-bold hover:bg-rose-50 hover:border-rose-400 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
                     {isClearing ? (
                       <>
@@ -470,40 +439,52 @@ function Wishlist() {
             </div>
 
             {/* PRODUCT GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
               {displayWishlist.map((product, index) => {
                 const productId = product._id || product.id;
                 const isMoving = movingProduct === productId;
                 const isRemoving = removingProduct === productId;
-                
+                const mrp = product.originalPrice || product.mrp || product.original_price;
+                const price = product.price || 0;
+                const discountPercent =
+                  mrp && mrp > price
+                    ? Math.round(((mrp - price) / mrp) * 100)
+                    : 0;
+
                 return (
-                  <div 
-                    key={productId || index} 
-                    className={`group bg-white/80 backdrop-blur-sm rounded-xl border border-pink-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${
+                  <div
+                    key={productId || index}
+                    className={`group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 border-pink-100 flex flex-col ${
                       isRemoving ? 'opacity-50 scale-95' : ''
                     }`}
                   >
-                    <Link to={`/product/${productId}`}>
+                    <Link to={`/product/${productId}`} className="block">
                       <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50">
-                        {(product.images?.[0] || product.image) ? (
-                          <img 
-                            src={product.images?.[0] || product.image} 
-                            alt={product.name || 'Product'} 
-                            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        {product.images?.[0] || product.image ? (
+                          <img
+                            src={product.images?.[0] || product.image}
+                            alt={product.name || 'Product'}
+                            className="w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500"
                             loading="lazy"
                             decoding="async"
-                            width="400"
-                            height="400"
                             onError={(e) => {
                               e.target.src = 'https://placehold.co/400x400/pink/white?text=Product';
                             }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300 bg-pink-100">
+                          <div className="w-full h-full flex items-center justify-center text-6xl">
                             🛍️
                           </div>
                         )}
-                        
+
+                        {/* Discount badge */}
+                        {discountPercent > 0 && (
+                          <div className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full shadow-md">
+                            {discountPercent}% OFF
+                          </div>
+                        )}
+
+                        {/* Remove button */}
                         <button
                           onClick={(e) => {
                             e.preventDefault();
@@ -511,58 +492,64 @@ function Wishlist() {
                             handleRemoveItem(productId);
                           }}
                           disabled={isRemoving || isMoving}
-                          className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center hover:bg-red-50 hover:scale-110 transition-all duration-200 z-10 disabled:opacity-50"
+                          className="absolute top-3 right-3 w-9 h-9 bg-white/95 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center hover:bg-red-50 hover:scale-110 transition-all border border-pink-100 disabled:opacity-50 z-10"
                           aria-label="Remove from wishlist"
                         >
                           {isRemoving ? (
-                            <span className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></span>
+                            <span className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></span>
                           ) : (
-                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <span className="text-base">❤️</span>
                           )}
                         </button>
                       </div>
                     </Link>
-                    
-                    <div className="p-4">
+
+                    <div className="p-3 sm:p-4 flex flex-col flex-1">
+                      {product.brand && (
+                        <p className="text-[10px] sm:text-xs font-semibold text-pink-600 uppercase tracking-wider mb-1">
+                          {product.brand}
+                        </p>
+                      )}
+
                       <Link to={`/product/${productId}`}>
-                        <h3 className="font-semibold text-gray-800 text-sm sm:text-base line-clamp-2 hover:text-pink-500 transition min-h-[48px]">
+                        <h3 className="font-semibold text-gray-800 text-xs sm:text-sm line-clamp-2 hover:text-pink-600 transition min-h-[2.5rem]">
                           {product.name || 'Product'}
                         </h3>
                       </Link>
-                      
-                      <div className="flex items-center gap-1 mt-1">
-                        <div className="flex text-yellow-500 text-xs">
-                          {'★'.repeat(Math.floor(product.rating || 4))}
-                          {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-                        </div>
-                        <span className="text-xs text-gray-400">({product.rating || 4})</span>
+
+                      <div className="flex items-center gap-1.5 mt-2 mb-2">
+                        <span className="bg-green-50 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          {product.rating || 4.5} <span className="text-yellow-500">★</span>
+                        </span>
                       </div>
-                      
-                      <div className="mt-2">
-                        <span className="text-lg font-bold text-pink-600">₹{product.price || 0}</span>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="text-xs text-gray-400 line-through ml-2">₹{product.originalPrice}</span>
+
+                      <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+                        <span className="text-base sm:text-lg font-bold text-pink-600">
+                          ₹{price.toLocaleString()}
+                        </span>
+                        {mrp && mrp > price && (
+                          <span className="text-xs text-gray-400 line-through">
+                            ₹{mrp.toLocaleString()}
+                          </span>
                         )}
                       </div>
-                      
+
                       <button
                         onClick={() => handleMoveToCart(product)}
                         disabled={isMoving || isRemoving}
-                        className={`w-full mt-3 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
+                        className={`w-full mt-auto py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-1 ${
                           isMoving
                             ? 'bg-green-500 text-white'
-                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95'
+                            : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-[1.02]'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {isMoving ? (
-                          <span className="flex items-center justify-center gap-2">
+                          <>
                             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                             Adding...
-                          </span>
+                          </>
                         ) : (
-                          'Move to Cart 🛒'
+                          <>🛒 Move to Cart</>
                         )}
                       </button>
                     </div>
@@ -570,11 +557,11 @@ function Wishlist() {
                 );
               })}
             </div>
-            
+
             <div className="text-center mt-12">
-              <Link 
-                to="/shop" 
-                className="inline-flex items-center gap-2 text-pink-500 hover:text-pink-600 font-medium transition group"
+              <Link
+                to="/shop"
+                className="inline-flex items-center gap-2 text-pink-600 hover:text-pink-700 font-bold transition group"
               >
                 <span className="group-hover:-translate-x-1 transition">←</span> Continue Shopping
               </Link>
@@ -582,8 +569,35 @@ function Wishlist() {
           </div>
         )}
 
+        {/* TRUST BADGES */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100 border-2 border-pink-200 rounded-3xl p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { icon: '🚚', title: 'Free Shipping', sub: 'On orders ₹499+' },
+                { icon: '💵', title: 'COD Available', sub: 'Pay on delivery' },
+                { icon: '↩️', title: 'Easy Returns', sub: '7-day return' },
+                { icon: '🔒', title: 'Secure', sub: '100% trusted' },
+              ].map((badge, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-col sm:flex-row items-center sm:items-start gap-2 text-center sm:text-left bg-white rounded-2xl p-3 shadow-sm"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                    <span className="text-lg">{badge.icon}</span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-xs">{badge.title}</p>
+                    <p className="text-[10px] text-gray-500 font-medium">{badge.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* FOOTER */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+        <footer className="bg-gray-900 text-gray-400 py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
               <div>
@@ -610,8 +624,8 @@ function Wishlist() {
                 <ul className="space-y-2 text-sm">
                   <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
                   <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping-info" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns-policy" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
                 </ul>
               </div>
               <div>
