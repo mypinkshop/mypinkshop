@@ -97,6 +97,31 @@ const VariationSelectWithSearch = ({
   );
 };
 
+// ✅ Helper: JSON string ko safely parse karo
+const safeParseJSON = (val, fallback = []) => {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === 'object') return val;
+  if (typeof val === 'string' && val.trim()) {
+    try {
+      const parsed = JSON.parse(val);
+      return parsed;
+    } catch {
+      // Agar JSON nahi hai to newline se split karo
+      return val.split('\n').filter(b => b.trim());
+    }
+  }
+  return fallback;
+};
+
+// ✅ Helper: description string ko array of bullets mein convert karo
+const stringToBullets = (desc) => {
+  if (Array.isArray(desc)) return desc.filter(b => b && String(b).trim());
+  if (typeof desc === 'string' && desc.trim()) {
+    return desc.split('\n').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 function AdminEditProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -121,7 +146,8 @@ function AdminEditProduct() {
     'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'The Face Shop', 
     'Lakmé', 'MyGlamm', 'Plum', 'Wow Skin Science', 'Biotique', 
     'Forest Essentials', 'Kama Ayurveda', 'Mcaffeine', 'St.Botanica',
-    'Loreal Paris', 'Maybelline', 'Clinique', 'Estee Lauder', 'Huda Beauty', 'MAC'
+    'Loreal Paris', 'Maybelline', 'Clinique', 'Estee Lauder', 'Huda Beauty', 'MAC',
+    'SKINQ'
   ]);
   
   const [customSubCategories, setCustomSubCategories] = useState({
@@ -198,7 +224,7 @@ function AdminEditProduct() {
 
   const variationAttrs = getVariationAttributes();
 
-  // Load product data from API
+  // ✅ FIXED: Load product data from API with nested + snake_case handling
   useEffect(() => {
     const loadProduct = async () => {
       try {
@@ -215,43 +241,42 @@ function AdminEditProduct() {
 
         if (!response.ok) throw new Error('Failed to load product');
 
-        const product = await response.json();
-        console.log('📦 Loaded product data:', product);
+        const rawData = await response.json();
+        console.log('📦 RAW API RESPONSE:', rawData);
 
-        // Safe description handling
-        let descriptionArray = [];
-        if (Array.isArray(product.description)) {
-          descriptionArray = product.description.filter(b => b && String(b).trim());
-        } else if (typeof product.description === 'string' && product.description.trim()) {
-          descriptionArray = product.description.split('\n').filter(b => b.trim());
-        }
+        // ✅ CRITICAL FIX: Handle nested { success, data } structure
+        const product = rawData.data || rawData.product || rawData;
 
-        // Safe keyFeatures handling
-        const keyFeaturesArray = Array.isArray(product.keyFeatures)
-          ? product.keyFeatures.filter(f => f && String(f).trim())
-          : [];
+        console.log('✅ PRODUCT USED:', product);
 
-        // Safe specifications handling
-        const specsObj =
-          (product.productDetails && typeof product.productDetails === 'object' && !Array.isArray(product.productDetails))
-            ? product.productDetails
-            : (product.specifications && typeof product.specifications === 'object' && !Array.isArray(product.specifications))
-              ? product.specifications
-              : {};
+        // ✅ Description - string with \n ya array
+        const descriptionArray = stringToBullets(product.description || product.about_this_item || product.aboutThisItem);
 
-        // Safe images handling
+        // ✅ Key Features - JSON string parse karo
+        const keyFeaturesArray = safeParseJSON(product.key_features || product.keyFeatures, []);
+
+        // ✅ Specifications - backend mein nahi hai, empty rakho
+        const specsObj = product.productDetails || product.specifications || {};
+
+        // ✅ Images - array of URLs
         const imagesArray = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+
+        // ✅ Concerns - JSON string parse karo
+        const concernsArray = safeParseJSON(product.concerns, []);
+
+        // ✅ Hair Concerns
+        const hairConcernsArray = safeParseJSON(product.hair_concerns || product.hairConcerns, []);
 
         setFormData({
           name: product.name || '',
           brand: product.brand || '',
-          category: product.mainCategory || product.category || '',
-          subCategory: product.mainCategory ? (product.category || '') : '',
+          category: product.main_category || product.mainCategory || product.category || '',
+          subCategory: product.sub_category || product.subCategory || product.subcategory || '',
           price: product.price || '',
-          originalPrice: product.originalPrice || '',
+          originalPrice: product.original_price || product.originalPrice || '',
           stock: product.stock || '',
           description: descriptionArray,
-          shortDescription: product.shortDescription || '',
+          shortDescription: product.short_description || product.shortDescription || '',
           keyFeatures: keyFeaturesArray,
           specifications: specsObj,
           images: imagesArray,
@@ -259,32 +284,31 @@ function AdminEditProduct() {
           weight: product.weight || '',
           dimensions: product.dimensions || '',
           tax: product.tax || 5,
-          metaTitle: product.metaTitle || '',
-          metaDescription: product.metaDescription || '',
-          metaKeywords: product.metaKeywords || '',
+          metaTitle: product.meta_title || product.metaTitle || '',
+          metaDescription: product.meta_description || product.metaDescription || '',
+          metaKeywords: product.meta_keywords || product.metaKeywords || '',
           slug: product.slug || '',
-          skinType: product.skinType || 'all',
-          concerns: Array.isArray(product.concerns) ? product.concerns : [],
+          skinType: product.skin_type || product.skinType || 'all',
+          concerns: concernsArray,
           ingredients: product.ingredients || '',
           finish: product.finish || '',
           coverage: product.coverage || '',
           shade: product.shade || '',
-          hairType: product.hairType || 'all',
-          hairConcerns: Array.isArray(product.hairConcerns) ? product.hairConcerns : [],
+          hairType: product.hair_type || product.hairType || 'all',
+          hairConcerns: hairConcernsArray,
           fabric: product.fabric || '',
           material: product.material || '',
           gender: product.gender || 'unisex'
         });
 
-        // Load variations
-        if (Array.isArray(product.variations) && product.variations.length > 0) {
-          setVariations(product.variations);
-        } else if (Array.isArray(product.variants) && product.variants.length > 0) {
-          setVariations(product.variants);
+        // ✅ Variations load
+        const productVariations = product.variations || product.variants || [];
+        if (Array.isArray(productVariations) && productVariations.length > 0) {
+          setVariations(productVariations);
         }
 
       } catch (error) {
-        console.error('Error loading product:', error);
+        console.error('❌ Error loading product:', error);
         alert('Failed to load product. Please try again.');
       } finally {
         setLoading(false);
