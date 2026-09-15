@@ -64,7 +64,8 @@ const VariationSelectWithSearch = ({
       <div className="relative">
         <input
           type="text"
-          value={searchTerm}
+          value={searchTerm || value || ''}
+          onFocus={() => setSearchTerm(value || '')}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder={placeholder}
           className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400"
@@ -215,27 +216,45 @@ function AdminEditProduct() {
         if (!response.ok) throw new Error('Failed to load product');
 
         const product = await response.json();
+        console.log('📦 Loaded product data:', product);
 
+        // Safe description handling
         let descriptionArray = [];
         if (Array.isArray(product.description)) {
-          descriptionArray = product.description;
-        } else if (typeof product.description === 'string' && product.description) {
+          descriptionArray = product.description.filter(b => b && String(b).trim());
+        } else if (typeof product.description === 'string' && product.description.trim()) {
           descriptionArray = product.description.split('\n').filter(b => b.trim());
         }
+
+        // Safe keyFeatures handling
+        const keyFeaturesArray = Array.isArray(product.keyFeatures)
+          ? product.keyFeatures.filter(f => f && String(f).trim())
+          : [];
+
+        // Safe specifications handling
+        const specsObj =
+          (product.productDetails && typeof product.productDetails === 'object' && !Array.isArray(product.productDetails))
+            ? product.productDetails
+            : (product.specifications && typeof product.specifications === 'object' && !Array.isArray(product.specifications))
+              ? product.specifications
+              : {};
+
+        // Safe images handling
+        const imagesArray = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
 
         setFormData({
           name: product.name || '',
           brand: product.brand || '',
           category: product.mainCategory || product.category || '',
-          subCategory: product.category || '',
+          subCategory: product.mainCategory ? (product.category || '') : '',
           price: product.price || '',
           originalPrice: product.originalPrice || '',
           stock: product.stock || '',
           description: descriptionArray,
           shortDescription: product.shortDescription || '',
-          keyFeatures: product.keyFeatures || [],
-          specifications: product.productDetails || product.specifications || {},
-          images: product.images || [],
+          keyFeatures: keyFeaturesArray,
+          specifications: specsObj,
+          images: imagesArray,
           sku: product.sku || '',
           weight: product.weight || '',
           dimensions: product.dimensions || '',
@@ -245,21 +264,22 @@ function AdminEditProduct() {
           metaKeywords: product.metaKeywords || '',
           slug: product.slug || '',
           skinType: product.skinType || 'all',
-          concerns: product.concerns || [],
+          concerns: Array.isArray(product.concerns) ? product.concerns : [],
           ingredients: product.ingredients || '',
           finish: product.finish || '',
           coverage: product.coverage || '',
           shade: product.shade || '',
           hairType: product.hairType || 'all',
-          hairConcerns: product.hairConcerns || [],
+          hairConcerns: Array.isArray(product.hairConcerns) ? product.hairConcerns : [],
           fabric: product.fabric || '',
           material: product.material || '',
           gender: product.gender || 'unisex'
         });
 
-        if (product.variations && product.variations.length > 0) {
+        // Load variations
+        if (Array.isArray(product.variations) && product.variations.length > 0) {
           setVariations(product.variations);
-        } else if (product.variants && product.variants.length > 0) {
+        } else if (Array.isArray(product.variants) && product.variants.length > 0) {
           setVariations(product.variants);
         }
 
@@ -272,13 +292,18 @@ function AdminEditProduct() {
     };
 
     if (id) loadProduct();
-  }, [id, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     const savedBrands = localStorage.getItem('brandsList');
-    if (savedBrands) setBrands(JSON.parse(savedBrands));
+    if (savedBrands) {
+      try { setBrands(JSON.parse(savedBrands)); } catch (e) { /* ignore */ }
+    }
     const savedSubCategories = localStorage.getItem('customSubCategories');
-    if (savedSubCategories) setCustomSubCategories(JSON.parse(savedSubCategories));
+    if (savedSubCategories) {
+      try { setCustomSubCategories(JSON.parse(savedSubCategories)); } catch (e) { /* ignore */ }
+    }
   }, []);
 
   const saveBrands = (updatedBrands) => {
@@ -490,6 +515,7 @@ function AdminEditProduct() {
       alert(`✅ ${uploadedUrls.length} image(s) uploaded!`);
     }
     setUploadingImages(false);
+    e.target.value = '';
   };
 
   const removeImage = (index) => {
@@ -543,7 +569,7 @@ function AdminEditProduct() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     
     if (!formData.name) return alert('Enter product name');
     if (!formData.brand) return alert('Select brand');
@@ -675,7 +701,7 @@ function AdminEditProduct() {
 
         <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
           <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
               
               {/* Basic Information */}
               <div className="border-b border-gray-200 pb-4">
@@ -688,10 +714,22 @@ function AdminEditProduct() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand *</label>
                     <div className="relative">
-                      <input type="text" placeholder="Type brand name..." value={formData.brand} onChange={(e) => { setFormData({...formData, brand: e.target.value}); setBrandSearch(e.target.value); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
-                      {brandSearch && (
+                      <input 
+                        type="text" 
+                        placeholder="Type brand name..." 
+                        value={formData.brand} 
+                        onFocus={() => setBrandSearch(formData.brand || '')}
+                        onChange={(e) => { 
+                          setFormData({...formData, brand: e.target.value}); 
+                          setBrandSearch(e.target.value); 
+                        }} 
+                        className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" 
+                      />
+                      {brandSearch && filteredBrands.length > 0 && (
                         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
-                          {filteredBrands.slice(0, 10).map(b => (<button key={b} type="button" onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm">{b}</button>))}
+                          {filteredBrands.slice(0, 10).map(b => (
+                            <button key={b} type="button" onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm">{b}</button>
+                          ))}
                           <button type="button" onClick={() => setShowAddBrand(true)} className="w-full text-left px-3 sm:px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 border-t font-medium">+ Add new brand "{brandSearch}"</button>
                         </div>
                       )}
@@ -699,7 +737,13 @@ function AdminEditProduct() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Category *</label>
-                    <select name="category" value={formData.category} onChange={handleChange} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white" required>
+                    <select 
+                      name="category" 
+                      value={formData.category} 
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: '' })}
+                      className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white" 
+                      required
+                    >
                       <option value="">Select Category</option>
                       {Object.keys(categories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
@@ -734,14 +778,23 @@ function AdminEditProduct() {
               <div className="border-b border-gray-200 pb-4">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">📸 Product Images</h2>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-pink-400 transition">
-                  <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 justify-center">
-                    {formData.images.map((img, idx) => (
-                      <div key={idx} className="relative w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden shadow-sm">
-                        <img src={img} className="w-full h-full object-cover" alt="Product" />
-                        <button type="button" onClick={() => removeImage(idx)} className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600">✕</button>
-                      </div>
-                    ))}
-                  </div>
+                  {Array.isArray(formData.images) && formData.images.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 justify-center">
+                      {formData.images.map((img, idx) => (
+                        <div key={idx} className="relative w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden shadow-sm">
+                          <img 
+                            src={img} 
+                            className="w-full h-full object-cover" 
+                            alt={`Product ${idx + 1}`}
+                            onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=No+Image'; }}
+                          />
+                          <button type="button" onClick={() => removeImage(idx)} className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm mb-4">No images uploaded yet</p>
+                  )}
                   <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" />
                   <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600 hover:bg-pink-50 transition text-sm font-medium">
                     <IconUpload /> {uploadingImages ? 'Uploading...' : 'Choose Images'}
@@ -818,7 +871,12 @@ function AdminEditProduct() {
                             {variationAttrs.secondary && <td className="px-3 py-2">{v.secondaryName || '-'}</td>}
                             <td className="px-3 py-2">
                               {v.image ? (
-                                <img src={v.image} className="w-8 h-8 object-cover rounded" alt="variation" />
+                                <img 
+                                  src={v.image} 
+                                  className="w-8 h-8 object-cover rounded" 
+                                  alt="variation"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
                               ) : (
                                 <span className="text-gray-400 text-xs">No image</span>
                               )}
@@ -838,9 +896,9 @@ function AdminEditProduct() {
                       <tfoot className="bg-gray-50">
                         <tr className="border-t border-gray-200">
                           <td colSpan={variationAttrs.secondary ? 4 : 3} className="px-3 py-2 font-medium">Total</td>
-                          <td className="px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + (Number(v.price) || 0), 0)}</td>
                           <td className="px-3 py-2 text-right"></td>
-                          <td className="px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td>
+                          <td className="px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + (Number(v.stock) || 0), 0)}</td>
                           <td></td>
                         </tr>
                       </tfoot>
