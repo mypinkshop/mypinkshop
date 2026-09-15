@@ -62,13 +62,13 @@ function AdminSidebar() {
         const token = localStorage.getItem('adminToken');
         if (!token) return;
         
-        const response = await fetch(`${API_URL}/api/orders/all`, {
+        // ✅ FIX: ?limit=100 add kiya taaki response chhota rahe
+        const response = await fetch(`${API_URL}/api/orders/all?limit=100`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
           const responseData = await response.json();
-          // ✅ FIX: Agar response { success: true, data: [...] } hai, toh data array nikaalo
           const allOrders = Array.isArray(responseData) ? responseData : (responseData.data || []);
           
           // ✅ SIRF 'pending' status wale orders count karo
@@ -99,7 +99,7 @@ function AdminSidebar() {
     { name: 'Categories', icon: '📁', path: '/admin/categories', badge: null },
     
     // Sales
-    { name: 'Orders', icon: '🛒', path: '/admin/orders', badge: pendingOrderCount > 0 ? pendingOrderCount : null }, // ✅ SIRF PENDING COUNT
+    { name: 'Orders', icon: '🛒', path: '/admin/orders', badge: pendingOrderCount > 0 ? pendingOrderCount : null },
     { name: 'Customers', icon: '👥', path: '/admin/customers', badge: null },
     { name: 'Payments', icon: '💳', path: '/admin/payments', badge: null },
     
@@ -248,7 +248,6 @@ function AdminSidebar() {
             <h1 className="font-bold text-white text-lg">MyPinkShop</h1>
           </div>
           <div className="flex items-center gap-2">
-            {/* Notification badge on mobile header */}
             {unreadNotifications > 0 && (
               <div className="relative">
                 <span className="text-xl">🔔</span>
