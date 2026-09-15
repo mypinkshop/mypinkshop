@@ -1,8 +1,7 @@
-// AdminDashboard.js - Complete Optimized File with All Fixes & Improvements
-
+// AdminDashboard.js - Complete Fixed File
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast'; // ✅ IMPORT ADD KIYA
+import toast from 'react-hot-toast';
 import AdminSidebar from './components/AdminSidebar';
 
 function AdminDashboard() {
@@ -30,7 +29,6 @@ function AdminDashboard() {
   const [activeOffer, setActiveOffer] = useState(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
-  // Notification State
   const [notificationForm, setNotificationForm] = useState({
     title: '',
     message: '',
@@ -44,9 +42,37 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Get token from localStorage
-  const getToken = () => {
-    return localStorage.getItem('adminToken');
+  const getToken = () => localStorage.getItem('adminToken');
+
+  // ✅ Helper: Safe array extraction
+  const safeArray = (responseData) => {
+    if (Array.isArray(responseData)) return responseData;
+    if (responseData && Array.isArray(responseData.data)) return responseData.data;
+    if (responseData && Array.isArray(responseData.products)) return responseData.products;
+    if (responseData && Array.isArray(responseData.users)) return responseData.users;
+    if (responseData && Array.isArray(responseData.vendors)) return responseData.vendors;
+    if (responseData && Array.isArray(responseData.orders)) return responseData.orders;
+    return [];
+  };
+
+  // ✅ Helper: Get order total (backend uses total_amount)
+  const getOrderTotal = (order) => {
+    return Number(order.total_amount || order.total || order.amount || 0);
+  };
+
+  // ✅ Helper: Get order date
+  const getOrderDate = (order) => {
+    return order.created_at || order.createdAt || order.date || order.orderDate || null;
+  };
+
+  // ✅ Helper: Parse SQLite date
+  const parseDate = (dateStr) => {
+    if (!dateStr) return new Date(0);
+    try {
+      return new Date(dateStr.replace(' ', 'T'));
+    } catch {
+      return new Date(0);
+    }
   };
 
   // ✅ Check auth on mount
@@ -58,7 +84,7 @@ function AdminDashboard() {
     }
   }, [navigate]);
 
-  // Load dashboard data when period changes
+  // ✅ Load dashboard data when period changes
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -68,9 +94,9 @@ function AdminDashboard() {
     loadDashboardData();
     loadActiveOffer();
     loadUnreadNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod]);
 
-  // Load unread notifications count
   const loadUnreadNotifications = async () => {
     try {
       const token = getToken();
@@ -79,7 +105,6 @@ function AdminDashboard() {
       });
       if (response.ok) {
         const data = await response.json();
-        // ✅ FIX: backend wraps as { success, data: { count } }
         setUnreadNotifications(data.data?.count ?? data.count ?? 0);
       }
     } catch (error) {
@@ -87,13 +112,11 @@ function AdminDashboard() {
     }
   };
 
-  // Load active offer
   const loadActiveOffer = async () => {
     try {
       const response = await fetch(`${API_URL}/api/offers/active-offer`);
       if (response.ok) {
         const data = await response.json();
-        // ✅ FIX: backend wraps as { success, data: offer|null }
         setActiveOffer(data.data ?? data);
       }
     } catch (error) {
@@ -101,7 +124,7 @@ function AdminDashboard() {
     }
   };
 
-  // Main dashboard data loader with Promise.all for performance
+  // ✅ Main dashboard data loader
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -113,92 +136,116 @@ function AdminDashboard() {
         return;
       }
 
-      // ✅ FIX: Use correct admin endpoints
-      const [productsRes, ordersRes, vendorsRes] = await Promise.all([
+      // ✅ Fetch all data in parallel — with correct endpoints
+      const [productsRes, ordersRes, vendorsRes, usersRes] = await Promise.all([
         fetch(`${API_URL}/api/products`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`${API_URL}/api/orders/all`, {
+        fetch(`${API_URL}/api/orders/all?limit=500`, {   // ✅ limit added
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${API_URL}/api/admin/vendors`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        })
+        }).catch(() => null),
+        fetch(`${API_URL}/api/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => null)
       ]);
 
-      // Parse responses with safe fallbacks
-      let productsData = [];
-      let ordersData = [];
-      let vendorsData = [];
+      // ✅ Safe parse
+      let allProducts = [];
+      let allOrders = [];
+      let allVendors = [];
+      let allUsers = [];
 
       try {
-        const pData = await productsRes.json();
-        // ✅ FIX: Agar response { success: false } hai, toh empty array return karo
-        productsData = (pData && pData.success !== false && Array.isArray(pData.data)) ? pData.data : (Array.isArray(pData) ? pData : []);
+        if (productsRes && productsRes.ok) {
+          const pData = await productsRes.json();
+          allProducts = safeArray(pData);
+        }
       } catch (e) { console.error('Products parse error:', e); }
 
       try {
-        const oData = await ordersRes.json();
-        // ✅ FIX: Agar response { success: false } hai, toh empty array return karo
-        ordersData = (oData && oData.success !== false && Array.isArray(oData.data)) ? oData.data : (Array.isArray(oData) ? oData : []);
+        if (ordersRes && ordersRes.ok) {
+          const oData = await ordersRes.json();
+          allOrders = safeArray(oData);
+        }
       } catch (e) { console.error('Orders parse error:', e); }
 
       try {
-        const vData = await vendorsRes.json();
-        // ✅ FIX: Agar response { success: false } hai, toh empty array return karo
-        vendorsData = (vData && vData.success !== false && Array.isArray(vData.data)) ? vData.data : (Array.isArray(vData) ? vData : []);
+        if (vendorsRes && vendorsRes.ok) {
+          const vData = await vendorsRes.json();
+          allVendors = safeArray(vData);
+        }
       } catch (e) { console.error('Vendors parse error:', e); }
 
-      // ✅ Ensure arrays
-      const allProducts = Array.isArray(productsData) ? productsData : [];
-      const allOrders = Array.isArray(ordersData) ? ordersData : [];
-      const allVendors = Array.isArray(vendorsData) ? vendorsData : [];
+      try {
+        if (usersRes && usersRes.ok) {
+          const uData = await usersRes.json();
+          allUsers = safeArray(uData);
+        }
+      } catch (e) { console.error('Users parse error:', e); }
+
+      console.log('📊 Dashboard data:', {
+        products: allProducts.length,
+        orders: allOrders.length,
+        vendors: allVendors.length,
+        users: allUsers.length
+      });
 
       // Products calculations
-      const approvedProducts = allProducts.filter(p => p.adminApproved === true && p.status === 'active');
-      const pendingProducts = allProducts.filter(p => p.adminApproved !== true);
-      const lowStockProducts = approvedProducts.filter(p => (p.stock || 0) < 10 && (p.stock || 0) > 0);
+      const approvedProducts = allProducts.filter(p => 
+        (p.adminApproved === true || p.admin_approved === 1) && 
+        (p.status === 'active' || p.is_active === 1)
+      );
+      const pendingProducts = allProducts.filter(p => 
+        p.adminApproved !== true && p.admin_approved !== 1
+      );
+      const lowStockProducts = approvedProducts.filter(p => {
+        const stock = Number(p.stock || 0);
+        return stock > 0 && stock < 10;
+      });
 
-      // Orders calculations
-      const totalRevenue = allOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+      // Orders calculations — using total_amount
+      const totalRevenue = allOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
       const totalOrders = allOrders.length;
 
       // Today's sales
       const today = new Date().toISOString().split('T')[0];
       const todayOrders = allOrders.filter(order => {
-        const orderDate = order.createdAt || order.date || order.orderDate;
-        return orderDate?.split('T')[0] === today;
+        const orderDate = getOrderDate(order);
+        if (!orderDate) return false;
+        return orderDate.split('T')[0] === today || orderDate.split(' ')[0] === today;
       });
-      const todaySales = todayOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+      const todaySales = todayOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
 
-      // Monthly growth calculation
+      // Monthly growth
       const now = new Date();
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       
       const lastMonthOrders = allOrders.filter(order => {
-        const date = new Date(order.createdAt || order.date || order.orderDate);
+        const date = parseDate(getOrderDate(order));
         return date >= lastMonthStart && date < thisMonthStart;
       });
       const thisMonthOrders = allOrders.filter(order => {
-        const date = new Date(order.createdAt || order.date || order.orderDate);
+        const date = parseDate(getOrderDate(order));
         return date >= thisMonthStart;
       });
       
-      const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
-      const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0);
+      const lastMonthRevenue = lastMonthOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+      const thisMonthRevenue = thisMonthOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
       const monthlyGrowth = lastMonthRevenue > 0 
         ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1) 
         : thisMonthRevenue > 0 ? 100 : 0;
 
-      // Average order value
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-      // Category sales from products
+      // Category sales
       const categoryMap = {};
       approvedProducts.forEach(p => {
         const cat = p.mainCategory || p.category || 'Other';
-        categoryMap[cat] = (categoryMap[cat] || 0) + (p.price || 0);
+        categoryMap[cat] = (categoryMap[cat] || 0) + (Number(p.price) || 0);
       });
       const categorySalesList = Object.entries(categoryMap)
         .map(([name, sales]) => ({ name, sales }))
@@ -206,50 +253,47 @@ function AdminDashboard() {
         .slice(0, 5);
       setCategorySales(categorySalesList);
 
-      // Top products by sales (from orders)
+      // Top products
       const productSalesMap = {};
       allOrders.forEach(order => {
         const items = order.items || order.products || [];
+        if (!Array.isArray(items)) return;
         items.forEach(item => {
-          const productId = item.productId || item.id || item._id;
+          const productId = item.product_id || item.productId || item.id || item._id;
           if (productId) {
-            const product = approvedProducts.find(p => p._id === productId || p.id === productId);
+            const product = approvedProducts.find(p => (p._id || p.id) === productId);
             if (product) {
-              productSalesMap[productId] = {
-                ...product,
-                totalSold: (productSalesMap[productId]?.totalSold || 0) + (item.quantity || 1)
-              };
+              productSalesMap[productId] = productSalesMap[productId] || { ...product, totalSold: 0 };
+              productSalesMap[productId].totalSold += (item.quantity || 1);
             }
           }
         });
       });
       
-      const topProductsList = Object.values(productSalesMap)
+      let topProductsList = Object.values(productSalesMap)
         .sort((a, b) => (b.totalSold || 0) - (a.totalSold || 0))
         .slice(0, 5);
       
       if (topProductsList.length === 0) {
-        const fallbackProducts = [...approvedProducts]
+        topProductsList = [...approvedProducts]
           .sort((a, b) => (b.stock || 0) - (a.stock || 0))
           .slice(0, 5)
           .map(p => ({ ...p, totalSold: 0 }));
-        setTopProducts(fallbackProducts);
-      } else {
-        setTopProducts(topProductsList);
       }
+      setTopProducts(topProductsList);
 
-      // Sales chart data based on selected period
+      // Sales chart data
       let salesChartData = [];
       if (selectedPeriod === 'weekly') {
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         salesChartData = days.map((day, idx) => {
           const dayOrders = allOrders.filter(order => {
-            const date = new Date(order.createdAt || order.date || order.orderDate);
+            const date = parseDate(getOrderDate(order));
             return date.getDay() === idx;
           });
           return {
             name: day,
-            sales: dayOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0),
+            sales: dayOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
             orders: dayOrders.length
           };
         });
@@ -257,12 +301,12 @@ function AdminDashboard() {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         salesChartData = months.map((month, idx) => {
           const monthOrders = allOrders.filter(order => {
-            const date = new Date(order.createdAt || order.date || order.orderDate);
+            const date = parseDate(getOrderDate(order));
             return date.getMonth() === idx && date.getFullYear() === now.getFullYear();
           });
           return {
             name: month,
-            sales: monthOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0),
+            sales: monthOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
             orders: monthOrders.length
           };
         });
@@ -270,52 +314,51 @@ function AdminDashboard() {
         const years = ['2023', '2024', '2025', '2026'];
         salesChartData = years.map((year, idx) => {
           const yearOrders = allOrders.filter(order => {
-            const date = new Date(order.createdAt || order.date || order.orderDate);
+            const date = parseDate(getOrderDate(order));
             return date.getFullYear() === (2023 + idx);
           });
           return {
             name: year,
-            sales: yearOrders.reduce((sum, order) => sum + (order.total || order.amount || 0), 0),
+            sales: yearOrders.reduce((sum, order) => sum + getOrderTotal(order), 0),
             orders: yearOrders.length
           };
         });
       }
       setSalesData(salesChartData);
 
-      // Recent orders (last 5)
+      // Recent orders
       const recentOrdersList = allOrders
-        .sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.date || a.orderDate || 0);
-          const dateB = new Date(b.createdAt || b.date || b.orderDate || 0);
-          return dateB - dateA;
-        })
+        .slice()
+        .sort((a, b) => parseDate(getOrderDate(b)) - parseDate(getOrderDate(a)))
         .slice(0, 5)
         .map(order => ({
-          id: order.orderId || order.id || 'ORD-' + Date.now(),
-          customer: order.customerEmail || order.customerName || order.customer?.email || 'Guest',
-          amount: order.total || order.amount || 0,
+          id: order.order_number || order.id || 'N/A',
+          customer: order.user_id || order.customerEmail || order.customer_name || 'Customer',
+          amount: getOrderTotal(order),
           status: order.status || 'pending',
-          date: order.createdAt || order.date || order.orderDate || new Date().toISOString()
+          date: getOrderDate(order)
         }));
       setRecentOrders(recentOrdersList);
 
-      // ✅ Calculate pending vendors
-      const pendingVendors = allVendors.filter(v => v.status === 'pending' || v.vendorStatus === 'pending').length;
+      // Pending vendors
+      const pendingVendors = allVendors.filter(v => 
+        v.status === 'pending' || v.vendorStatus === 'pending'
+      ).length;
 
       // Update stats
       setStats({
         totalRevenue,
         totalOrders,
         totalProducts: approvedProducts.length,
-        totalVendors: allVendors.length || 0,
-        totalCustomers: 0,
+        totalVendors: allVendors.length,
+        totalCustomers: allUsers.length,
         pendingVendors: pendingVendors,
         pendingProducts: pendingProducts.length,
         lowStockProducts: lowStockProducts.length,
         todaySales,
         todayOrders: todayOrders.length,
         monthlyGrowth: Number(monthlyGrowth),
-        conversionRate: (totalOrders / (stats.totalCustomers || 1) * 100).toFixed(1),
+        conversionRate: allUsers.length > 0 ? ((totalOrders / allUsers.length) * 100).toFixed(1) : '0.0',
         avgOrderValue: Math.round(avgOrderValue)
       });
 
@@ -328,9 +371,8 @@ function AdminDashboard() {
         message: 'Failed to load dashboard data. Please refresh.'
       });
     }
-  }, [selectedPeriod, API_URL]);
+  }, [selectedPeriod, API_URL, navigate]);
 
-  // Send Notification Function
   const sendNotification = async () => {
     if (!notificationForm.title.trim() || !notificationForm.message.trim()) {
       setNotificationStatus({
@@ -386,7 +428,6 @@ function AdminDashboard() {
     }
   };
 
-  // Get status color
   const getStatusColor = (status) => {
     const statusMap = {
       'delivered': 'bg-green-100 text-green-700',
@@ -399,7 +440,6 @@ function AdminDashboard() {
     return statusMap[status?.toLowerCase()] || 'bg-gray-100 text-gray-700';
   };
 
-  // Handle card clicks
   const handleCardClick = (type) => {
     const routes = {
       products: '/admin/products',
@@ -412,7 +452,6 @@ function AdminDashboard() {
     navigate(routes[type] || '/admin');
   };
 
-  // Refresh data
   const handleRefresh = () => {
     loadDashboardData();
     loadActiveOffer();
@@ -426,11 +465,8 @@ function AdminDashboard() {
     }, 3000);
   };
 
-  // Calculate max sales for chart
   const maxSales = Math.max(...salesData.map(d => d.sales), 1);
-  const allCustomersCount = stats.totalCustomers || 1;
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
@@ -494,7 +530,6 @@ function AdminDashboard() {
 
         <div className="p-3 sm:p-4 lg:p-6 xl:p-8">
           
-          {/* Notification Status Alert */}
           {notificationStatus && (
             <div className={`mb-4 p-3 rounded-xl ${
               notificationStatus.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' :
@@ -505,7 +540,6 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* Active Offer Banner */}
           {activeOffer && (
             <div className="mb-6 bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 rounded-2xl p-4 text-white shadow-lg animate-pulse">
               <div className="flex justify-between items-center flex-wrap gap-4">
@@ -763,7 +797,7 @@ function AdminDashboard() {
             </div>
           </div>
 
-          {/* Alerts Section */}
+          {/* Alerts */}
           {(stats.pendingVendors > 0 || stats.pendingProducts > 0 || stats.lowStockProducts > 0) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
               {stats.pendingVendors > 0 && (
@@ -843,7 +877,7 @@ function AdminDashboard() {
             </Link>
           </div>
 
-          {/* Notification Section - Send Notification */}
+          {/* Notification Section */}
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-pink-100 p-4 sm:p-6 shadow-sm">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span className="text-xl">🔔</span> Send Notification to Users
@@ -930,7 +964,6 @@ function AdminDashboard() {
             </button>
           </div>
 
-          {/* Footer */}
           <div className="mt-6 text-center text-xs text-gray-400 border-t border-pink-100 pt-4">
             <p>© 2026 PinkShop Admin Panel | All Rights Reserved</p>
             <p className="mt-1">Dashboard v2.0 - Real-time Store Management</p>
