@@ -1,7 +1,7 @@
 // AdminNotifications.jsx - Full page for notifications management
 
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
 
@@ -19,34 +19,57 @@ function AdminNotifications() {
     type: 'system'
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  // ✅ FIX: Vite env syntax
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  const getToken = () => localStorage.getItem('adminToken');
+
+  // ✅ Helper: Safe array extraction
+  const safeArray = (responseData, ...keys) => {
+    if (Array.isArray(responseData)) return responseData;
+    if (responseData && typeof responseData === 'object') {
+      for (const key of keys) {
+        if (Array.isArray(responseData[key])) return responseData[key];
+      }
+      if (Array.isArray(responseData.data)) return responseData.data;
+      if (Array.isArray(responseData.notifications)) return responseData.notifications;
+    }
+    return [];
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = getToken();
     if (!token) {
       navigate('/admin/login');
       return;
     }
     fetchSentNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const fetchSentNotifications = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('adminToken');
+      const token = getToken();
       const response = await fetch(`${API_URL}/api/notifications/admin/sent`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      setNotifications(data || []);
+      // ✅ FIX: handle { success, data } wrapper
+      setNotifications(safeArray(data, 'notifications', 'data'));
     } catch (error) {
       console.error('Fetch notifications error:', error);
       toast.error('Failed to load notifications');
@@ -62,9 +85,14 @@ function AdminNotifications() {
       return;
     }
 
+    if (form.userType === 'specific' && !form.userId.trim()) {
+      toast.error('Please enter user ID');
+      return;
+    }
+
     try {
       setSending(true);
-      const token = localStorage.getItem('adminToken');
+      const token = getToken();
       
       const response = await fetch(`${API_URL}/api/notifications/send`, {
         method: 'POST',
@@ -81,15 +109,22 @@ function AdminNotifications() {
         })
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
+
       const data = await response.json();
       
       if (response.ok) {
-        toast.success(`✅ Notification sent to ${data.count || 0} users!`);
+        const count = data.count || data.data?.count || 0;
+        toast.success(`✅ Notification sent to ${count} users!`);
         setForm({ title: '', message: '', userType: 'all', userId: '', type: 'system' });
         fetchSentNotifications();
         setSelectedTab('sent');
       } else {
-        toast.error('❌ Failed: ' + (data.message || 'Unknown error'));
+        toast.error('❌ Failed: ' + (data.message || data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Send notification error:', error);
@@ -100,9 +135,9 @@ function AdminNotifications() {
   };
 
   const deleteNotification = async (id) => {
-    if (!confirm('Delete this notification?')) return;
+    if (!window.confirm('Delete this notification?')) return;
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = getToken();
       const response = await fetch(`${API_URL}/api/notifications/admin/${id}`, {
         method: 'DELETE',
         headers: { 
@@ -110,10 +145,19 @@ function AdminNotifications() {
           'Content-Type': 'application/json'
         }
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+        return;
+      }
       
       if (response.ok) {
-        setNotifications(notifications.filter(n => n._id !== id));
+        setNotifications(notifications.filter(n => (n._id || n.id) !== id));
         toast.success('✅ Notification deleted');
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.message || data.error || 'Failed to delete');
       }
     } catch (error) {
       console.error('Delete error:', error);
@@ -264,40 +308,46 @@ function AdminNotifications() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {notifications.map((notif) => (
-                    <div key={notif._id} className="bg-white border border-pink-100 rounded-xl p-4 hover:shadow-md transition">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">
-                              {notif.type === 'order' ? '🛒' : 
-                               notif.type === 'promo' ? '🏷️' : 
-                               notif.type === 'offer' ? '🎉' : '⚙️'}
-                            </span>
-                            <h4 className="font-semibold text-gray-800">{notif.title}</h4>
-                            <span className="text-xs text-gray-400 ml-2">
-                              {new Date(notif.createdAt).toLocaleDateString()}
-                            </span>
+                  {notifications.map((notif) => {
+                    const notifId = notif._id || notif.id;
+                    const createdAt = notif.createdAt || notif.created_at;
+                    return (
+                      <div key={notifId} className="bg-white border border-pink-100 rounded-xl p-4 hover:shadow-md transition">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xl">
+                                {notif.type === 'order' ? '🛒' : 
+                                 notif.type === 'promo' ? '🏷️' : 
+                                 notif.type === 'offer' ? '🎉' : '⚙️'}
+                              </span>
+                              <h4 className="font-semibold text-gray-800">{notif.title}</h4>
+                              {createdAt && (
+                                <span className="text-xs text-gray-400 ml-2">
+                                  {new Date(createdAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">{notif.message}</p>
+                            <div className="flex items-center gap-4 mt-2 flex-wrap">
+                              <span className="text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full">
+                                👥 {notif.userCount || notif.user_count || 0} users
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                Sent by: {notif.sentBy || notif.sent_by || 'Admin'}
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">{notif.message}</p>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full">
-                              👥 {notif.userCount || 0} users
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              Sent by: {notif.sentBy || 'Admin'}
-                            </span>
-                          </div>
+                          <button
+                            onClick={() => deleteNotification(notifId)}
+                            className="text-red-400 hover:text-red-600 transition"
+                          >
+                            🗑️
+                          </button>
                         </div>
-                        <button
-                          onClick={() => deleteNotification(notif._id)}
-                          className="text-red-400 hover:text-red-600 transition"
-                        >
-                          🗑️
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
