@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
 // ============================================
 // AMAZON IMPORTER COMPONENT
 // ============================================
@@ -10,7 +12,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   const [loading, setLoading] = useState(false);
   const [importedProducts, setImportedProducts] = useState([]);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
 
   const garbageWords = [
@@ -67,16 +68,11 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   };
 
   const addUrlField = () => {
-    if (urls.length < 20) {
-      setUrls([...urls, '']);
-    } else {
-      toast.error('Maximum 20 URLs allowed');
-    }
+    if (urls.length < 20) setUrls([...urls, '']);
+    else toast.error('Maximum 20 URLs allowed');
   };
 
-  const removeUrlField = (index) => {
-    setUrls(urls.filter((_, i) => i !== index));
-  };
+  const removeUrlField = (index) => setUrls(urls.filter((_, i) => i !== index));
 
   const updateUrl = (index, value) => {
     const newUrls = [...urls];
@@ -85,7 +81,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
   };
 
   const fetchAllProducts = async () => {
-    const validUrls = urls.filter(url => url.trim());
+    const validUrls = urls.filter(u => u.trim());
     if (validUrls.length === 0) {
       toast.error('Please enter at least one Amazon URL');
       return;
@@ -110,15 +106,14 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
         if (data.success) {
           const detectedCat = detectCategoryFromName(data.scraped.name);
           const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
-          
-          results.push({ 
-            ...data.scraped, 
+          results.push({
+            ...data.scraped,
             originalUrl: url,
             detectedCategory: detectedCat,
             detectedSubCategory: detectedSub
           });
         } else {
-          results.push({ error: data.error, originalUrl: url });
+          results.push({ error: data.error || 'Unknown error', originalUrl: url });
         }
       } catch (error) {
         results.push({ error: error.message, originalUrl: url });
@@ -131,7 +126,6 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 
   const importToForm = (product) => {
     let descriptionArray = [];
-    
     if (Array.isArray(product.description)) {
       descriptionArray = product.description.filter(item => !isGarbage(item));
     } else if (typeof product.description === 'string') {
@@ -140,23 +134,22 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
         .map(item => cleanText(item))
         .filter(item => !isGarbage(item));
     }
-    
     descriptionArray = [...new Set(descriptionArray)].slice(0, 15);
-    
+
     const keyFeaturesArray = (Array.isArray(product.keyFeatures) ? product.keyFeatures : [])
       .filter(item => !isGarbage(item))
       .slice(0, 10);
-    
-    let metaTitle = `${product.name}`;
-    if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
-    metaTitle = `${metaTitle} | Lowest Price on MyPinkShop`;
+
+    let metaTitle = product.name || '';
+    if (product.brand) metaTitle += ` - ${product.brand}`;
+    metaTitle += ' | Lowest Price on MyPinkShop';
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-    
+
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ` online at lowest price with free delivery. Shop now at MyPinkShop.`;
+    metaDescription += ' online at lowest price with free delivery. Shop now at MyPinkShop.';
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-    
+
     const autoKeywords = [
       product.brand,
       ...keyFeaturesArray.slice(0, 5),
@@ -165,10 +158,10 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       'MyPinkShop'
     ].filter(Boolean);
     const metaKeywords = [...new Set(autoKeywords)].join(', ');
-    
+
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
-    
+
     setFormData(prev => ({
       ...prev,
       productName: product.name,
@@ -180,9 +173,9 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       aboutThisItem: descriptionArray,
       productHighlights: keyFeaturesArray,
       images: product.images || [],
-      metaTitle: metaTitle,
-      metaDescription: metaDescription,
-      metaKeywords: metaKeywords,
+      metaTitle,
+      metaDescription,
+      metaKeywords,
       category: detectedCategory,
       subCategory: detectedSubCategory,
       weight: product.weight || '',
@@ -190,9 +183,9 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       skinType: product.skinType || 'all',
       concerns: product.concerns || []
     }));
-    
+
     if (product.images && product.images.length > 0) setImages(product.images);
-    
+
     if (product.variations && product.variations.length > 0) {
       const formattedVariations = product.variations.map((v, idx) => ({
         id: Date.now() + idx,
@@ -206,7 +199,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       }));
       setVariations(formattedVariations);
     }
-    
+
     toast.success(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''}`);
     if (onProductImported) onProductImported();
   };
@@ -218,7 +211,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
         <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full">Multi-URL Support</span>
       </h3>
       <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Amazon product URLs (Up to 20 URLs)</p>
-      
+
       <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
         {urls.map((url, idx) => (
           <div key={idx} className="flex gap-2">
@@ -230,14 +223,12 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
               className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 bg-white text-sm"
             />
             {urls.length > 1 && (
-              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">
-                ✕
-              </button>
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">✕</button>
             )}
           </div>
         ))}
       </div>
-      
+
       <div className="flex flex-wrap gap-3 mb-4">
         <button onClick={addUrlField} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-xs sm:text-sm">
           ➕ Add Another ({urls.length}/20)
@@ -246,7 +237,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
           {loading ? '⏳ Fetching...' : '🔍 Fetch All'}
         </button>
       </div>
-      
+
       {importedProducts.length > 0 && (
         <div className="mt-4 border-t border-gray-100 pt-4">
           <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Fetched Products ({importedProducts.length})</h4>
@@ -288,7 +279,6 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
   const [loading, setLoading] = useState(false);
   const [importedProducts, setImportedProducts] = useState([]);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
 
   const garbageWords = [
@@ -344,16 +334,11 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
   };
 
   const addUrlField = () => {
-    if (urls.length < 20) {
-      setUrls([...urls, '']);
-    } else {
-      toast.error('Maximum 20 URLs allowed');
-    }
+    if (urls.length < 20) setUrls([...urls, '']);
+    else toast.error('Maximum 20 URLs allowed');
   };
 
-  const removeUrlField = (index) => {
-    setUrls(urls.filter((_, i) => i !== index));
-  };
+  const removeUrlField = (index) => setUrls(urls.filter((_, i) => i !== index));
 
   const updateUrl = (index, value) => {
     const newUrls = [...urls];
@@ -362,7 +347,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
   };
 
   const fetchAllProducts = async () => {
-    const validUrls = urls.filter(url => url.trim());
+    const validUrls = urls.filter(u => u.trim());
     if (validUrls.length === 0) {
       toast.error('Please enter at least one Flipkart URL');
       return;
@@ -387,15 +372,14 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
         if (data.success) {
           const detectedCat = detectCategoryFromName(data.scraped.name);
           const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
-          
-          results.push({ 
-            ...data.scraped, 
+          results.push({
+            ...data.scraped,
             originalUrl: url,
             detectedCategory: detectedCat,
             detectedSubCategory: detectedSub
           });
         } else {
-          results.push({ error: data.error, originalUrl: url });
+          results.push({ error: data.error || 'Unknown error', originalUrl: url });
         }
       } catch (error) {
         results.push({ error: error.message, originalUrl: url });
@@ -408,7 +392,6 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
 
   const importToForm = (product) => {
     let descriptionArray = [];
-    
     if (Array.isArray(product.description)) {
       descriptionArray = product.description.filter(item => !isGarbage(item));
     } else if (typeof product.description === 'string') {
@@ -417,37 +400,36 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
         .map(item => cleanText(item))
         .filter(item => !isGarbage(item));
     }
-    
     descriptionArray = [...new Set(descriptionArray)].slice(0, 15);
-    
+
     const keyFeaturesArray = (Array.isArray(product.keyFeatures) ? product.keyFeatures : [])
       .filter(item => !isGarbage(item))
       .slice(0, 10);
-    
-    let metaTitle = `${product.name}`;
-    if (product.brand) metaTitle = `${product.name} - ${product.brand}`;
-    metaTitle = `${metaTitle} | MyPinkShop`;
+
+    let metaTitle = product.name || '';
+    if (product.brand) metaTitle += ` - ${product.brand}`;
+    metaTitle += ' | MyPinkShop';
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-    
+
     let metaDescription = `Buy ${product.name}`;
     if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ` online at best price. Shop now at MyPinkShop.`;
+    metaDescription += ' online at best price. Shop now at MyPinkShop.';
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-    
+
+    const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
+    const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
+
     const autoKeywords = [
       product.brand,
       ...keyFeaturesArray.slice(0, 5),
-      product.detectedCategory,
-      product.detectedSubCategory,
+      detectedCategory,
+      detectedSubCategory,
       'online shopping',
       'best price',
       'MyPinkShop'
     ].filter(Boolean);
     const metaKeywords = [...new Set(autoKeywords)].join(', ');
-    
-    const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
-    const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
-    
+
     setFormData(prev => ({
       ...prev,
       productName: product.name,
@@ -459,9 +441,9 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       aboutThisItem: descriptionArray,
       productHighlights: keyFeaturesArray,
       images: product.images || [],
-      metaTitle: metaTitle,
-      metaDescription: metaDescription,
-      metaKeywords: metaKeywords,
+      metaTitle,
+      metaDescription,
+      metaKeywords,
       category: detectedCategory,
       subCategory: detectedSubCategory,
       weight: product.weight || '',
@@ -469,9 +451,9 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       skinType: product.skinType || 'all',
       concerns: product.concerns || []
     }));
-    
+
     if (product.images && product.images.length > 0) setImages(product.images);
-    
+
     if (product.variations && product.variations.length > 0) {
       const formattedVariations = product.variations.map((v, idx) => ({
         id: Date.now() + idx,
@@ -485,7 +467,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       }));
       setVariations(formattedVariations);
     }
-    
+
     toast.success(`✅ Imported! Category: ${detectedCategory} ${detectedSubCategory ? '| Sub: ' + detectedSubCategory : ''}`);
     if (onProductImported) onProductImported();
   };
@@ -497,7 +479,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
         <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full">Multi-URL Support</span>
       </h3>
       <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Flipkart product URLs (Up to 20 URLs)</p>
-      
+
       <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
         {urls.map((url, idx) => (
           <div key={idx} className="flex gap-2">
@@ -509,14 +491,12 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
               className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 bg-white text-sm"
             />
             {urls.length > 1 && (
-              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">
-                ✕
-              </button>
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">✕</button>
             )}
           </div>
         ))}
       </div>
-      
+
       <div className="flex flex-wrap gap-3 mb-4">
         <button onClick={addUrlField} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-xs sm:text-sm">
           ➕ Add Another ({urls.length}/20)
@@ -525,7 +505,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
           {loading ? '⏳ Fetching...' : '🔍 Fetch All'}
         </button>
       </div>
-      
+
       {importedProducts.length > 0 && (
         <div className="mt-4 border-t border-gray-100 pt-4">
           <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Fetched Products ({importedProducts.length})</h4>
@@ -555,7 +535,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
           </div>
         </div>
       )}
-      
+
       <div className="mt-3 p-2 sm:p-3 bg-yellow-50 rounded-lg">
         <p className="text-xs text-yellow-600">💡 Tip: Category, SubCategory, SEO tags auto-detected!</p>
       </div>
@@ -566,21 +546,15 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
 // ============================================
 // VARIATION SELECT WITH SEARCH AND CUSTOM INPUT
 // ============================================
-const VariationSelectWithSearch = ({ 
-  label, 
-  options, 
-  value, 
-  onChange, 
-  placeholder = "Select or type..." 
-}) => {
+const VariationSelectWithSearch = ({ label, options, value, onChange, placeholder = "Select or type..." }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customValue, setCustomValue] = useState('');
-  
-  const filteredOptions = options.filter(opt => 
+
+  const filteredOptions = options.filter(opt =>
     opt.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
+
   const handleSelect = (selectedValue) => {
     if (selectedValue === '__CUSTOM__') {
       setIsCustomMode(true);
@@ -591,7 +565,7 @@ const VariationSelectWithSearch = ({
       setIsCustomMode(false);
     }
   };
-  
+
   const handleSaveCustom = () => {
     if (customValue.trim()) {
       onChange(customValue.trim());
@@ -600,7 +574,7 @@ const VariationSelectWithSearch = ({
       setSearchTerm('');
     }
   };
-  
+
   if (isCustomMode) {
     return (
       <div>
@@ -620,7 +594,7 @@ const VariationSelectWithSearch = ({
       </div>
     );
   }
-  
+
   return (
     <div>
       <label className="block text-sm font-medium mb-1.5">{label}</label>
@@ -660,7 +634,7 @@ const VariationSelectWithSearch = ({
 };
 
 // ============================================
-// MAIN ADMIN ADD PRODUCT COMPONENT (FULL ORIGINAL 1800+ LINES UNCUT VERSION)
+// MAIN ADMIN ADD PRODUCT COMPONENT
 // ============================================
 function AdminAddProduct() {
   const navigate = useNavigate();
@@ -672,37 +646,37 @@ function AdminAddProduct() {
   const [newSubCategory, setNewSubCategory] = useState('');
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
-  
-  // 🔥 Permanent Pre-Generated SEO Product ID matching actual links exactly (`prod_...`)
+
+  // Permanent Pre-Generated SEO Product ID
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
   const [brands, setBrands] = useState([
-    'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'The Face Shop', 
-    'Lakmé', 'MyGlamm', 'Plum', 'Wow Skin Science', 'Biotique', 
+    'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'The Face Shop',
+    'Lakmé', 'MyGlamm', 'Plum', 'Wow Skin Science', 'Biotique',
     'Forest Essentials', 'Kama Ayurveda', 'Mcaffeine', 'St.Botanica',
     'Loreal Paris', 'Maybelline', 'Clinique', 'Estee Lauder', 'Huda Beauty', 'MAC', 'Richfem'
   ]);
-  
+
   const [customSubCategories, setCustomSubCategories] = useState({
     Skincare: [], Makeup: [], Hair: [], Clothing: [], Accessories: []
   });
-  
+
   const [activeTab, setActiveTab] = useState('manual');
-  
+
   const [seoData, setSeoData] = useState({
     metaTitle: '', metaDescription: '', metaKeywords: '', slug: ''
   });
-  
+
   const [formData, setFormData] = useState({
     productName: '', brand: '', category: '', subCategory: '', images: [],
-    mrp: '', sellingPrice: '', tax: 18, sku: '', fullDescription: [], keyFeatures: [],
+    mrp: '', sellingPrice: '', tax: 18, sku: '', stock: 10, fullDescription: [], keyFeatures: [],
     weight: '', dimensions: '',
     skinType: 'all', concerns: [], ingredients: '',
     finish: '', coverage: '', shade: '',
     hairType: 'all', hairConcerns: [],
     fabric: '', material: '', gender: 'unisex'
   });
-  
+
   const [variations, setVariations] = useState([]);
   const [variationModalOpen, setVariationModalOpen] = useState(false);
   const [editingVariation, setEditingVariation] = useState(null);
@@ -710,23 +684,32 @@ function AdminAddProduct() {
     name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {}
   });
 
+  const [currentBullet, setCurrentBullet] = useState('');
+  const [keyFeature, setKeyFeature] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
+
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  // 🔥 SEO META TAG GENERATOR WITH EXACT `prod_...` URL BINDING (FIXED: No product name in URL slug)
+  // SEO META TAG GENERATOR
   useEffect(() => {
-    let metaTitle = formData.productName ? `${formData.productName} ${formData.brand ? `- ${formData.brand}` : ''} | Lowest Price on MyPinkShop` : 'Add New Product | MyPinkShop';
+    let metaTitle = formData.productName
+      ? `${formData.productName} ${formData.brand ? `- ${formData.brand}` : ''} | Lowest Price on MyPinkShop`
+      : 'Add New Product | MyPinkShop';
     if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-    
-    let metaDescription = formData.productName ? `Buy ${formData.productName} online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!` : 'Add products to your store.';
+
+    let metaDescription = formData.productName
+      ? `Buy ${formData.productName} online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!`
+      : 'Add products to your store.';
     if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-    
+
     const autoKeywords = [
       formData.brand, formData.category, formData.subCategory,
-      ...formData.keyFeatures.slice(0, 5), 'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
+      ...formData.keyFeatures.slice(0, 5),
+      'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
     ].filter(Boolean);
     const metaKeywords = [...new Set(autoKeywords)].join(', ');
 
-    // 🔥 Exact match slug to productId only (No name prefix)
     setSeoData({ metaTitle, metaDescription, metaKeywords, slug: productId });
   }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
 
@@ -779,18 +762,18 @@ function AdminAddProduct() {
   };
 
   const getVariationAttributes = () => {
-    switch(formData.category) {
-      case 'Skincare': 
+    switch (formData.category) {
+      case 'Skincare':
         return { type: 'Size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic'] };
-      case 'Makeup': 
+      case 'Makeup':
         return { type: 'Shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry'], secondary: 'Finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'] };
-      case 'Hair': 
+      case 'Hair':
         return { type: 'Size', options: ['100ml', '200ml', '300ml', '500ml', '1L'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free'] };
-      case 'Clothing': 
+      case 'Clothing':
         return { type: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'], secondary: 'Color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey'] };
-      case 'Accessories': 
+      case 'Accessories':
         return { type: 'Size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable'], secondary: 'Color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor'] };
-      default: 
+      default:
         return { type: 'Variant', options: ['Default'], secondary: null, secondaryOptions: [] };
     }
   };
@@ -866,8 +849,11 @@ function AdminAddProduct() {
       toast.error(`Please select ${variationAttrs.type}`);
       return;
     }
-    
-    const existingIndex = variations.findIndex(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
+
+    const existingIndex = variations.findIndex(
+      v => v.name === variationForm.name && (v.secondaryName || '') === (variationForm.attributes.secondary || '')
+    );
+
     const newVariation = {
       id: editingVariation?.id || Date.now(),
       name: variationForm.name,
@@ -879,7 +865,7 @@ function AdminAddProduct() {
       image: variationForm.image || '',
       attributes: variationForm.attributes || {}
     };
-    
+
     if (editingVariation) {
       const updated = [...variations];
       updated[variations.findIndex(v => v.id === editingVariation.id)] = newVariation;
@@ -900,14 +886,14 @@ function AdminAddProduct() {
 
   const editVariation = (variation) => {
     setEditingVariation(variation);
-    setVariationForm({ 
-      name: variation.name, 
-      price: variation.price, 
+    setVariationForm({
+      name: variation.name,
+      price: variation.price,
       mrp: variation.mrp || variation.price * 1.2,
-      stock: variation.stock, 
-      sku: variation.sku, 
+      stock: variation.stock,
+      sku: variation.sku,
       image: variation.image || '',
-      attributes: { secondary: variation.secondaryName || '' } 
+      attributes: { secondary: variation.secondaryName || '' }
     });
     setVariationModalOpen(true);
   };
@@ -921,10 +907,10 @@ function AdminAddProduct() {
   const uploadVariationImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const formDataImg = new FormData();
     formDataImg.append('images', file);
-    
+
     try {
       const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_URL}/api/upload`, {
@@ -935,7 +921,7 @@ function AdminAddProduct() {
       const data = await response.json();
       const imageUrl = data.data?.url || data.url;
       if (imageUrl) {
-        setVariationForm({ ...variationForm, image: imageUrl });
+        setVariationForm(prev => ({ ...prev, image: imageUrl }));
         toast.success('✅ Image uploaded!');
       }
     } catch (error) {
@@ -944,12 +930,6 @@ function AdminAddProduct() {
   };
 
   const setImages = (images) => setFormData(prev => ({ ...prev, images }));
-
-  const [currentBullet, setCurrentBullet] = useState('');
-  const [keyFeature, setKeyFeature] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [uploadingImages, setUploadingImages] = useState(false);
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   const uploadImageToBackend = async (file) => {
     const token = localStorage.getItem('adminToken');
@@ -965,9 +945,9 @@ function AdminAddProduct() {
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
       return data.data?.url || data.url;
-    } catch (error) { 
+    } catch (error) {
       console.error("Upload Error:", error);
-      throw error; 
+      throw error;
     }
   };
 
@@ -975,44 +955,42 @@ function AdminAddProduct() {
     const files = Array.from(e.target.files);
     if (formData.images.length + files.length > 5) {
       toast.error('Maximum 5 images allowed');
-      alert('Maximum 5 images allowed');
       return;
     }
     setUploadingImages(true);
     const uploadedUrls = [];
     for (const file of files) {
-      if (file.size > 5 * 1024 * 1024) { 
-        toast.error(`${file.name} is larger than 5MB`); 
-        alert(`${file.name} is larger than 5MB`);
-        continue; 
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} is larger than 5MB`);
+        continue;
       }
       try {
         const url = await uploadImageToBackend(file);
-        if (url) {
-          uploadedUrls.push(url);
-        }
-      } catch (error) { 
-        toast.error(`Failed: ${file.name}`); 
+        if (url) uploadedUrls.push(url);
+      } catch (error) {
+        toast.error(`Failed: ${file.name}`);
       }
     }
     if (uploadedUrls.length) {
-      setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
       toast.success(`✅ ${uploadedUrls.length} image(s) uploaded successfully!`);
     }
     setUploadingImages(false);
+    // Reset file input so same file can be uploaded again
+    e.target.value = '';
   };
 
-  const removeImage = (index) => setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
+  const removeImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
 
   const addBulletPoint = () => {
     const text = currentBullet.trim();
     if (text) {
-      setFormData({ ...formData, fullDescription: [...formData.fullDescription, text] });
+      setFormData(prev => ({ ...prev, fullDescription: [...prev.fullDescription, text] }));
       setCurrentBullet('');
     }
   };
 
-  const removeBulletPoint = (index) => setFormData({ ...formData, fullDescription: formData.fullDescription.filter((_, i) => i !== index) });
+  const removeBulletPoint = (index) => setFormData(prev => ({ ...prev, fullDescription: prev.fullDescription.filter((_, i) => i !== index) }));
 
   const addKeyFeature = () => {
     if (keyFeature.trim()) {
@@ -1020,17 +998,17 @@ function AdminAddProduct() {
         toast.error('Max 10 features');
         return;
       }
-      setFormData({ ...formData, keyFeatures: [...formData.keyFeatures, keyFeature.trim()] });
+      setFormData(prev => ({ ...prev, keyFeatures: [...prev.keyFeatures, keyFeature.trim()] }));
       setKeyFeature('');
     }
   };
 
-  const removeKeyFeature = (index) => setFormData({ ...formData, keyFeatures: formData.keyFeatures.filter((_, i) => i !== index) });
+  const removeKeyFeature = (index) => setFormData(prev => ({ ...prev, keyFeatures: prev.keyFeatures.filter((_, i) => i !== index) }));
 
   const handleAddNewBrand = () => {
     if (newBrand.trim() && !brands.includes(newBrand.trim())) {
       saveBrands([...brands, newBrand.trim()]);
-      setFormData({ ...formData, brand: newBrand.trim() });
+      setFormData(prev => ({ ...prev, brand: newBrand.trim() }));
       setNewBrand('');
       setShowAddBrand(false);
       toast.success(`✅ Brand "${newBrand.trim()}" added!`);
@@ -1044,7 +1022,7 @@ function AdminAddProduct() {
   const currentSubCategories = getCurrentSubCategories();
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
-  // 🔥 STRICT VALIDATION WITH TOAST & ALERT
+  // STRICT VALIDATION
   const validateAndProceed = (targetStep) => {
     if (targetStep > 1) {
       if (!formData.productName.trim()) {
@@ -1091,59 +1069,60 @@ function AdminAddProduct() {
 
     setLoading(true);
     const token = localStorage.getItem('adminToken');
-    if (!token) { 
-      toast.error('❌ Session expired. Please log in again.'); 
+    if (!token) {
+      toast.error('❌ Session expired. Please log in again.');
       alert('❌ Session expired. Please log in again.');
-      setLoading(false); return; 
+      setLoading(false);
+      return;
     }
 
     const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
     const finalSku = formData.sku || generateSKU();
 
     const productData = {
-      id: productId, // ✅ SEO ID MATCH (prod_...)
-      name: formData.productName, 
-      brand: formData.brand, 
+      id: productId,
+      name: formData.productName,
+      brand: formData.brand,
       category: formData.subCategory,
       mainCategory: formData.category,
-      subCategory: formData.subCategory, 
-      subcategory: formData.subCategory, 
+      subCategory: formData.subCategory,
+      subcategory: formData.subCategory,
       price: parseFloat(formData.sellingPrice),
       originalPrice: parseFloat(formData.mrp) || parseFloat(formData.sellingPrice) * 1.2,
-      tax: parseFloat(formData.tax) || 18, 
-      stock: totalStock > 0 ? totalStock : (formData.stock || 10), 
+      tax: parseFloat(formData.tax) || 18,
+      stock: totalStock > 0 ? totalStock : (parseInt(formData.stock) || 10),
       sku: finalSku,
-      images: formData.images, 
-      description: formData.fullDescription, 
+      images: formData.images,
+      description: formData.fullDescription,
       keyFeatures: formData.keyFeatures,
       weight: formData.weight,
       dimensions: formData.dimensions,
-      skinType: formData.skinType, 
-      concerns: formData.concerns, 
+      skinType: formData.skinType,
+      concerns: formData.concerns,
       ingredients: formData.ingredients,
-      finish: formData.finish, 
-      coverage: formData.coverage, 
+      finish: formData.finish,
+      coverage: formData.coverage,
       shade: formData.shade,
-      hairType: formData.hairType, 
-      hairConcerns: formData.hairConcerns, 
+      hairType: formData.hairType,
+      hairConcerns: formData.hairConcerns,
       fabric: formData.fabric,
-      material: formData.material, 
-      gender: formData.gender, 
-      variations: variations, 
+      material: formData.material,
+      gender: formData.gender,
+      variations: variations,
       hasVariations: variations.length > 0,
-      metaTitle: seoData.metaTitle, 
+      metaTitle: seoData.metaTitle,
       metaDescription: seoData.metaDescription,
-      metaKeywords: seoData.metaKeywords, 
-      slug: productId, // ✅ SEO URL MATCH (prod_...)
-      status: 'active', 
-      adminApproved: true, 
-      isNew: true, 
+      metaKeywords: seoData.metaKeywords,
+      slug: productId,
+      status: 'active',
+      adminApproved: true,
+      isNew: true,
       rating: 4.8
     };
 
     try {
       const response = await fetch(`${API_URL}/api/products/create`, {
-        method: 'POST', 
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(productData)
       });
@@ -1153,10 +1132,12 @@ function AdminAddProduct() {
       }
       toast.success('🎉 Product published successfully & optimized for Google SEO!');
       navigate('/admin/inventory');
-    } catch (error) { 
-      toast.error(`❌ Failed: ${error.message}`); 
+    } catch (error) {
+      toast.error(`❌ Failed: ${error.message}`);
       alert(`❌ Failed: ${error.message}`);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const IconBack = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
@@ -1164,7 +1145,7 @@ function AdminAddProduct() {
   const IconPlus = () => (<svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 
   const renderCategorySpecificFields = () => {
-    switch(formData.category) {
+    switch (formData.category) {
       case 'Skincare':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
@@ -1172,7 +1153,7 @@ function AdminAddProduct() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Skin Type</label>
-                <select value={formData.skinType} onChange={(e) => setFormData({...formData, skinType: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                <select value={formData.skinType} onChange={(e) => setFormData({ ...formData, skinType: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                   <option value="all">All Skin Types</option>
                   <option value="oily">Oily</option>
                   <option value="dry">Dry</option>
@@ -1182,7 +1163,7 @@ function AdminAddProduct() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Key Ingredients</label>
-                <input type="text" value={formData.ingredients} onChange={(e) => setFormData({...formData, ingredients: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Vitamin C, Hyaluronic Acid" />
+                <input type="text" value={formData.ingredients} onChange={(e) => setFormData({ ...formData, ingredients: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Vitamin C, Hyaluronic Acid" />
               </div>
             </div>
             <div>
@@ -1190,7 +1171,10 @@ function AdminAddProduct() {
               <div className="flex flex-wrap gap-2 sm:gap-3">
                 {skinConcerns.map(c => (
                   <label key={c} className="flex items-center gap-1.5 text-sm">
-                    <input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...formData.concerns, c] : formData.concerns.filter(cn => cn !== c); setFormData({...formData, concerns: updated}); }} />
+                    <input type="checkbox" checked={formData.concerns.includes(c)} onChange={(e) => {
+                      const updated = e.target.checked ? [...formData.concerns, c] : formData.concerns.filter(cn => cn !== c);
+                      setFormData({ ...formData, concerns: updated });
+                    }} />
                     <span className="text-gray-600">{c}</span>
                   </label>
                 ))}
@@ -1198,7 +1182,7 @@ function AdminAddProduct() {
             </div>
           </div>
         );
-        
+
       case 'Makeup':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
@@ -1206,11 +1190,11 @@ function AdminAddProduct() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Shade / Color</label>
-                <input type="text" value={formData.shade} onChange={(e) => setFormData({...formData, shade: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Ruby Red" />
+                <input type="text" value={formData.shade} onChange={(e) => setFormData({ ...formData, shade: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Ruby Red" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Finish</label>
-                <select value={formData.finish} onChange={(e) => setFormData({...formData, finish: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                <select value={formData.finish} onChange={(e) => setFormData({ ...formData, finish: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                   <option value="">Select Finish</option>
                   {makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
@@ -1218,14 +1202,14 @@ function AdminAddProduct() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Coverage</label>
-              <select value={formData.coverage} onChange={(e) => setFormData({...formData, coverage: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+              <select value={formData.coverage} onChange={(e) => setFormData({ ...formData, coverage: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                 <option value="">Select Coverage</option>
                 {makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
         );
-        
+
       case 'Hair':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
@@ -1233,7 +1217,7 @@ function AdminAddProduct() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Hair Type</label>
-                <select value={formData.hairType} onChange={(e) => setFormData({...formData, hairType: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                <select value={formData.hairType} onChange={(e) => setFormData({ ...formData, hairType: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                   {hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
                 </select>
               </div>
@@ -1242,7 +1226,10 @@ function AdminAddProduct() {
                 <div className="flex flex-wrap gap-2 sm:gap-3">
                   {hairConcernsList.map(c => (
                     <label key={c} className="flex items-center gap-1.5 text-sm">
-                      <input type="checkbox" onChange={(e) => { const updated = e.target.checked ? [...(formData.hairConcerns || []), c] : (formData.hairConcerns || []).filter(cn => cn !== c); setFormData({...formData, hairConcerns: updated}); }} />
+                      <input type="checkbox" checked={(formData.hairConcerns || []).includes(c)} onChange={(e) => {
+                        const updated = e.target.checked ? [...(formData.hairConcerns || []), c] : (formData.hairConcerns || []).filter(cn => cn !== c);
+                        setFormData({ ...formData, hairConcerns: updated });
+                      }} />
                       <span className="text-gray-600">{c}</span>
                     </label>
                   ))}
@@ -1251,7 +1238,7 @@ function AdminAddProduct() {
             </div>
           </div>
         );
-        
+
       case 'Clothing':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
@@ -1259,11 +1246,11 @@ function AdminAddProduct() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Fabric / Material</label>
-                <input type="text" value={formData.fabric} onChange={(e) => setFormData({...formData, fabric: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Cotton, Silk, Polyester" />
+                <input type="text" value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Cotton, Silk, Polyester" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
-                <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                   <option value="unisex">Unisex</option>
                   <option value="men">Men</option>
                   <option value="women">Women</option>
@@ -1273,7 +1260,7 @@ function AdminAddProduct() {
             </div>
           </div>
         );
-        
+
       case 'Accessories':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
@@ -1281,11 +1268,11 @@ function AdminAddProduct() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Material</label>
-                <input type="text" value={formData.material} onChange={(e) => setFormData({...formData, material: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Silver, Gold, Leather" />
+                <input type="text" value={formData.material} onChange={(e) => setFormData({ ...formData, material: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Silver, Gold, Leather" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
-                <select value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                   <option value="unisex">Unisex</option>
                   <option value="men">Men</option>
                   <option value="women">Women</option>
@@ -1295,7 +1282,7 @@ function AdminAddProduct() {
             </div>
           </div>
         );
-        
+
       default:
         return null;
     }
@@ -1353,16 +1340,18 @@ function AdminAddProduct() {
                 <div className="space-y-4 sm:space-y-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Product Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={formData.productName} onChange={(e) => setFormData({...formData, productName: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Vitamin C Serum" />
+                    <input type="text" value={formData.productName} onChange={(e) => setFormData({ ...formData, productName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Vitamin C Serum" />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand <span className="text-red-500">*</span></label>
                     <div className="relative">
-                      <input type="text" placeholder="Type brand name..." value={formData.brand} onChange={(e) => { setFormData({...formData, brand: e.target.value}); setBrandSearch(e.target.value); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                      <input type="text" placeholder="Type brand name..." value={formData.brand} onChange={(e) => { setFormData({ ...formData, brand: e.target.value }); setBrandSearch(e.target.value); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
                       {brandSearch && (
                         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
-                          {filteredBrands.slice(0, 10).map(b => (<button key={b} type="button" onClick={() => { setFormData({...formData, brand: b}); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm transition">{b}</button>))}
+                          {filteredBrands.slice(0, 10).map(b => (
+                            <button key={b} type="button" onClick={() => { setFormData({ ...formData, brand: b }); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm transition">{b}</button>
+                          ))}
                           <button type="button" onClick={() => setShowAddBrand(true)} className="w-full text-left px-3 sm:px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 transition border-t font-medium">+ Add new brand "{brandSearch}"</button>
                         </div>
                       )}
@@ -1372,7 +1361,7 @@ function AdminAddProduct() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-                      <select value={formData.category} onChange={(e) => { setFormData({...formData, category: e.target.value, subCategory: ''}); setShowAddSubCategory(false); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                      <select value={formData.category} onChange={(e) => { setFormData({ ...formData, category: e.target.value, subCategory: '' }); setShowAddSubCategory(false); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
                         <option value="">Select Category</option>
                         {Object.keys(subCategoriesOptions).map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
@@ -1380,7 +1369,7 @@ function AdminAddProduct() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Sub Category <span className="text-red-500">*</span></label>
                       <div className="flex gap-2">
-                        <select value={formData.subCategory} onChange={(e) => setFormData({...formData, subCategory: e.target.value})} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm disabled:bg-gray-100 bg-white" disabled={!formData.category}>
+                        <select value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm disabled:bg-gray-100 bg-white" disabled={!formData.category}>
                           <option value="">Select Sub Category</option>
                           {currentSubCategories.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -1393,18 +1382,19 @@ function AdminAddProduct() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU</label>
                       <div className="flex gap-2">
-                        <input type="text" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Auto-generated" />
-                        <button onClick={() => setFormData({...formData, sku: generateSKU()})} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap">🔄</button>
+                        <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Auto-generated" />
+                        <button onClick={() => setFormData({ ...formData, sku: generateSKU() })} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap">🔄</button>
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Weight / Dimensions</label>
-                      <input type="text" value={formData.weight} onChange={(e) => setFormData({...formData, weight: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., 250g or 10x10x5 cm" />
+                      <input type="text" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., 250g or 10x10x5 cm" />
                     </div>
                   </div>
-
                 </div>
-                <div className="flex justify-end mt-6"><button onClick={() => validateAndProceed(2)} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue →</button></div>
+                <div className="flex justify-end mt-6">
+                  <button onClick={() => validateAndProceed(2)} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue →</button>
+                </div>
               </div>
             )}
 
@@ -1428,7 +1418,10 @@ function AdminAddProduct() {
             {showAddSubCategory && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddSubCategory(false)}>
                 <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
-                  <div className="p-4 sm:p-5 border-b border-gray-200"><h3 className="font-semibold text-gray-800">Add New Sub-Category</h3><p className="text-xs text-gray-500 mt-1">For: {formData.category}</p></div>
+                  <div className="p-4 sm:p-5 border-b border-gray-200">
+                    <h3 className="font-semibold text-gray-800">Add New Sub-Category</h3>
+                    <p className="text-xs text-gray-500 mt-1">For: {formData.category}</p>
+                  </div>
                   <div className="p-4 sm:p-5">
                     <input type="text" value={newSubCategory} onChange={(e) => setNewSubCategory(e.target.value)} placeholder={`Enter ${formData.category} sub-category`} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" autoFocus />
                     <div className="flex gap-3 mt-5">
@@ -1452,8 +1445,10 @@ function AdminAddProduct() {
                       </div>
                     ))}
                   </div>
-                  <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" />
-                  <label htmlFor="imageUpload" className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600 hover:bg-pink-50 transition text-sm font-medium"><IconUpload /> {uploadingImages ? 'Uploading...' : 'Choose Images'}</label>
+                  <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" disabled={uploadingImages} />
+                  <label htmlFor="imageUpload" className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600 hover:bg-pink-50 transition text-sm font-medium ${uploadingImages ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <IconUpload /> {uploadingImages ? 'Uploading...' : 'Choose Images'}
+                  </label>
                   <p className="text-xs text-gray-400 mt-3">Upload up to 5 images (max 5MB each)</p>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
@@ -1467,9 +1462,18 @@ function AdminAddProduct() {
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">💰 Pricing</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">MRP</label><input type="number" value={formData.mrp} onChange={(e) => setFormData({...formData, mrp: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 999" /></div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price <span className="text-red-500">*</span></label><input type="number" value={formData.sellingPrice} onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 499" /></div>
-                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Tax (GST) %</label><input type="number" value={formData.tax} onChange={(e) => setFormData({...formData, tax: e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" /></div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">MRP</label>
+                    <input type="number" value={formData.mrp} onChange={(e) => setFormData({ ...formData, mrp: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 999" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price <span className="text-red-500">*</span></label>
+                    <input type="number" value={formData.sellingPrice} onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 499" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax (GST) %</label>
+                    <input type="number" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                  </div>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
                   <button onClick={() => validateAndProceed(2)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
@@ -1481,7 +1485,7 @@ function AdminAddProduct() {
             {step === 4 && (
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">✨ Product Details & Variations</h2>
-                
+
                 {/* About this item */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">About this item <span className="text-xs text-gray-400 ml-2">(Bullet points)</span></label>
@@ -1504,7 +1508,11 @@ function AdminAddProduct() {
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Product Highlights <span className="text-xs text-gray-400 ml-2">(Max 10)</span></label>
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {formData.keyFeatures.map((f, i) => <span key={i} className="bg-green-50 text-green-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm flex items-center gap-1 border border-green-200">✓ {f}<button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button></span>)}
+                    {formData.keyFeatures.map((f, i) => (
+                      <span key={i} className="bg-green-50 text-green-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm flex items-center gap-1 border border-green-200">
+                        ✓ {f}<button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button>
+                      </span>
+                    ))}
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addKeyFeature()} placeholder="e.g., 100% Vegan" className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
@@ -1536,7 +1544,7 @@ function AdminAddProduct() {
                       )}
                     </div>
                   </div>
-                  
+
                   {!formData.category ? (
                     <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first to add variations</p></div>
                   ) : variations.length === 0 ? (
@@ -1559,7 +1567,9 @@ function AdminAddProduct() {
                         <tbody className="divide-y divide-gray-100">
                           {variations.map(v => (
                             <tr key={v.id} className="hover:bg-pink-50/30 cursor-pointer transition" onClick={() => setExpandedVariationId(expandedVariationId === v.id ? null : v.id)}>
-                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedVariationIds.includes(v.id)} onChange={() => toggleSelectVariation(v.id)} /></td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" checked={selectedVariationIds.includes(v.id)} onChange={() => toggleSelectVariation(v.id)} />
+                              </td>
                               <td className="px-3 py-2 font-medium">{v.name}</td>
                               {variationAttrs.secondary && <td className="px-3 py-2">{v.secondaryName || '-'}</td>}
                               <td className="px-3 py-2">
@@ -1606,19 +1616,39 @@ function AdminAddProduct() {
                           return (
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs text-gray-500">{variationAttrs.type}</label><p className="font-semibold">{v.name}</p></div>
-                                {variationAttrs.secondary && <div><label className="text-xs text-gray-500">{variationAttrs.secondary}</label><p className="font-semibold">{v.secondaryName || '-'}</p></div>}
+                                <div>
+                                  <label className="text-xs text-gray-500">{variationAttrs.type}</label>
+                                  <p className="font-semibold">{v.name}</p>
+                                </div>
+                                {variationAttrs.secondary && (
+                                  <div>
+                                    <label className="text-xs text-gray-500">{variationAttrs.secondary}</label>
+                                    <p className="font-semibold">{v.secondaryName || '-'}</p>
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <label className="text-xs text-gray-500">Variation Image</label>
                                 {v.image ? <img src={v.image} className="w-24 h-24 object-cover rounded-lg border mt-1" alt="variation" /> : <p className="text-gray-400 text-sm mt-1">No image uploaded</p>}
                               </div>
                               <div className="grid grid-cols-3 gap-4">
-                                <div><label className="text-xs text-gray-500">Price</label><p className="text-lg font-bold text-pink-600">₹{v.price}</p></div>
-                                <div><label className="text-xs text-gray-500">MRP</label><p className="text-sm text-gray-400 line-through">₹{v.mrp}</p></div>
-                                <div><label className="text-xs text-gray-500">Stock</label><p className="text-lg">{v.stock}</p></div>
+                                <div>
+                                  <label className="text-xs text-gray-500">Price</label>
+                                  <p className="text-lg font-bold text-pink-600">₹{v.price}</p>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500">MRP</label>
+                                  <p className="text-sm text-gray-400 line-through">₹{v.mrp}</p>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500">Stock</label>
+                                  <p className="text-lg">{v.stock}</p>
+                                </div>
                               </div>
-                              <div><label className="text-xs text-gray-500">SKU</label><p className="text-xs font-mono bg-gray-100 p-2 rounded">{v.sku}</p></div>
+                              <div>
+                                <label className="text-xs text-gray-500">SKU</label>
+                                <p className="text-xs font-mono bg-gray-100 p-2 rounded">{v.sku}</p>
+                              </div>
                             </div>
                           );
                         })()}
@@ -1635,26 +1665,26 @@ function AdminAddProduct() {
                         <h3 className="text-lg font-semibold">{editingVariation ? 'Edit' : 'Add New'} {variationAttrs.type}</h3>
                         <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
                       </div>
-                      
+
                       <div className="p-5 space-y-4">
-                        <VariationSelectWithSearch 
+                        <VariationSelectWithSearch
                           label={`${variationAttrs.type} *`}
                           options={variationAttrs.options}
                           value={variationForm.name}
-                          onChange={(val) => setVariationForm({...variationForm, name: val})}
+                          onChange={(val) => setVariationForm(prev => ({ ...prev, name: val }))}
                           placeholder={`Search or type custom ${variationAttrs.type.toLowerCase()}...`}
                         />
-                        
+
                         {variationAttrs.secondary && (
-                          <VariationSelectWithSearch 
+                          <VariationSelectWithSearch
                             label={variationAttrs.secondary}
                             options={variationAttrs.secondaryOptions}
                             value={variationForm.attributes.secondary || ''}
-                            onChange={(val) => setVariationForm({...variationForm, attributes: {...variationForm.attributes, secondary: val}})}
+                            onChange={(val) => setVariationForm(prev => ({ ...prev, attributes: { ...prev.attributes, secondary: val } }))}
                             placeholder={`Search or type custom ${variationAttrs.secondary.toLowerCase()}...`}
                           />
                         )}
-                        
+
                         {/* Variation Image Upload */}
                         <div>
                           <label className="block text-sm font-medium mb-1.5">Variation Image</label>
@@ -1662,7 +1692,7 @@ function AdminAddProduct() {
                             {variationForm.image ? (
                               <div className="relative">
                                 <img src={variationForm.image} className="w-16 h-16 object-cover rounded border" alt="variation" />
-                                <button onClick={() => setVariationForm({...variationForm, image: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                                <button onClick={() => setVariationForm(prev => ({ ...prev, image: '' }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
                               </div>
                             ) : (
                               <div className="flex-1">
@@ -1675,14 +1705,26 @@ function AdminAddProduct() {
                           </div>
                           <p className="text-xs text-gray-400 mt-1">Upload image for this variation (like shade swatch or size)</p>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-3">
-                          <div><label className="block text-sm font-medium mb-1.5">Selling Price *</label><input type="number" value={variationForm.price} onChange={(e) => setVariationForm({...variationForm, price: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="499" /></div>
-                          <div><label className="block text-sm font-medium mb-1.5">MRP</label><input type="number" value={variationForm.mrp} onChange={(e) => setVariationForm({...variationForm, mrp: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="599" /></div>
-                          <div><label className="block text-sm font-medium mb-1.5">Stock *</label><input type="number" value={variationForm.stock} onChange={(e) => setVariationForm({...variationForm, stock: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="10" /></div>
-                          <div><label className="block text-sm font-medium mb-1.5">SKU</label><input type="text" value={variationForm.sku} onChange={(e) => setVariationForm({...variationForm, sku: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Auto-generated" /></div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">Selling Price *</label>
+                            <input type="number" value={variationForm.price} onChange={(e) => setVariationForm(prev => ({ ...prev, price: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="499" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">MRP</label>
+                            <input type="number" value={variationForm.mrp} onChange={(e) => setVariationForm(prev => ({ ...prev, mrp: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="599" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">Stock *</label>
+                            <input type="number" value={variationForm.stock} onChange={(e) => setVariationForm(prev => ({ ...prev, stock: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="10" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">SKU</label>
+                            <input type="text" value={variationForm.sku} onChange={(e) => setVariationForm(prev => ({ ...prev, sku: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Auto-generated" />
+                          </div>
                         </div>
-                        
+
                         <div className="flex gap-3 pt-4">
                           <button onClick={() => setVariationModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
                           <button onClick={saveVariation} className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg font-medium hover:shadow-md transition">{editingVariation ? 'Update' : 'Add'}</button>
@@ -1708,21 +1750,20 @@ function AdminAddProduct() {
                 <div className="space-y-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title</label>
-                    <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({...seoData, metaTitle: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({ ...seoData, metaTitle: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description</label>
-                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({...seoData, metaDescription: e.target.value})} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({ ...seoData, metaDescription: e.target.value })} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords</label>
-                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({...seoData, metaKeywords: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="keyword1, keyword2, keyword3" />
+                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({ ...seoData, metaKeywords: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="keyword1, keyword2, keyword3" />
                   </div>
-                  
+
                   <div className="p-4 bg-blue-50 rounded-xl">
                     <h3 className="text-sm font-semibold text-gray-800 mb-1">📱 Google Search & URL Preview</h3>
                     <p className="text-blue-600 text-sm font-medium truncate">{seoData.metaTitle}</p>
-                    {/* 🔥 EXACT MATCH URL: https://www.mypinkshop.com/product/prod_... (No product name prefix) */}
                     <p className="text-green-700 text-xs font-mono break-all">https://www.mypinkshop.com/product/{productId}</p>
                     <p className="text-gray-600 text-xs mt-1 line-clamp-2">{seoData.metaDescription}</p>
                   </div>
@@ -1730,7 +1771,9 @@ function AdminAddProduct() {
 
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-4 border-t">
                   <button onClick={() => validateAndProceed(4)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
-                  <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-2 rounded-lg font-medium shadow-md hover:shadow-lg disabled:opacity-50 text-sm">{loading ? 'Publishing...' : '✓ Publish & Rank on Google'}</button>
+                  <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-2 rounded-lg font-medium shadow-md hover:shadow-lg disabled:opacity-50 text-sm">
+                    {loading ? 'Publishing...' : '✓ Publish & Rank on Google'}
+                  </button>
                 </div>
               </div>
             )}
