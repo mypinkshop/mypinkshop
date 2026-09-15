@@ -30,7 +30,7 @@ function AdminReports() {
     period: ''
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -39,16 +39,17 @@ function AdminReports() {
       return;
     }
     loadReportData(token);
-  }, [navigate, dateRange, reportType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, dateRange]);
 
-  // ✅ Load report data from backend
+  // ✅ Load report data from backend — FIXED
   const loadReportData = async (token) => {
     try {
       setLoading(true);
       setError('');
 
-      // 1. Load orders for sales report
-      const ordersRes = await fetch(`${API_URL}/api/orders`, {
+      // ✅ 1. Load ALL orders (admin endpoint) — NOT /api/orders
+      const ordersRes = await fetch(`${API_URL}/api/orders/all?limit=500`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -63,11 +64,13 @@ function AdminReports() {
 
       let allOrders = [];
       if (ordersRes.ok) {
-        allOrders = await ordersRes.json();
-        allOrders = Array.isArray(allOrders) ? allOrders : [];
+        const ordersData = await ordersRes.json();
+        // ✅ Handle both { success, data: [...] } and direct array
+        allOrders = Array.isArray(ordersData) ? ordersData : (ordersData.data || []);
+        if (!Array.isArray(allOrders)) allOrders = [];
       }
 
-      // 2. Load products for inventory report
+      // ✅ 2. Load products for inventory report
       const productsRes = await fetch(`${API_URL}/api/products`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -78,7 +81,8 @@ function AdminReports() {
       let allProducts = [];
       if (productsRes.ok) {
         const productsData = await productsRes.json();
-        allProducts = productsData.products || productsData || [];
+        allProducts = productsData.products || productsData.data || productsData || [];
+        if (!Array.isArray(allProducts)) allProducts = [];
       }
 
       // Process data
@@ -95,29 +99,33 @@ function AdminReports() {
 
   // ✅ Process report data
   const processReportData = (allOrders, allProducts) => {
+    // Safety: Ensure arrays
+    if (!Array.isArray(allOrders)) allOrders = [];
+    if (!Array.isArray(allProducts)) allProducts = [];
+
     // Filter orders by date range
     const filteredOrders = filterOrdersByDateRange(allOrders, dateRange);
 
     // Calculate Sales Data
     const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered' || o.status === 'confirmed');
-    const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (o.total || o.amount || 0), 0);
+    const totalRevenue = deliveredOrders.reduce((sum, o) => sum + (o.total_amount || o.total || o.amount || 0), 0);
     const totalOrders = filteredOrders.length;
     const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
     // Calculate top selling products
     const productSales = {};
     filteredOrders.forEach(order => {
-      if (order.items) {
+      if (Array.isArray(order.items)) {
         order.items.forEach(item => {
-          const id = item.productId || item._id || item.id || 'unknown';
+          const id = item.product_id || item.productId || item._id || item.id || 'unknown';
           productSales[id] = productSales[id] || { 
-            name: item.name || 'Unknown', 
+            name: item.product_name || item.name || 'Unknown', 
             quantity: 0, 
             revenue: 0, 
             price: item.price || 0 
           };
           productSales[id].quantity += (item.quantity || 1);
-          productSales[id].revenue += (item.price * (item.quantity || 1));
+          productSales[id].revenue += ((item.price || 0) * (item.quantity || 1));
         });
       }
     });
@@ -128,9 +136,10 @@ function AdminReports() {
     // Calculate daily sales
     const dailySalesMap = {};
     filteredOrders.forEach(order => {
-      const date = order.createdAt?.split('T')[0] || order.date;
+      const rawDate = order.created_at || order.createdAt || order.date;
+      const date = rawDate?.split('T')[0]?.split(' ')[0];
       if (date) {
-        dailySalesMap[date] = (dailySalesMap[date] || 0) + (order.total || order.amount || 0);
+        dailySalesMap[date] = (dailySalesMap[date] || 0) + (order.total_amount || order.total || order.amount || 0);
       }
     });
     const dailySales = Object.entries(dailySalesMap)
@@ -164,10 +173,10 @@ function AdminReports() {
     });
 
     // Calculate Tax Data
-    const totalTax = deliveredOrders.reduce((sum, o) => sum + (o.tax || o.total * 0.18 || 0), 0);
-    const gst5 = deliveredOrders.reduce((sum, o) => sum + ((o.total || 0) * 0.05), 0);
-    const gst12 = deliveredOrders.reduce((sum, o) => sum + ((o.total || 0) * 0.12), 0);
-    const gst18 = deliveredOrders.reduce((sum, o) => sum + ((o.total || 0) * 0.18), 0);
+    const totalTax = deliveredOrders.reduce((sum, o) => sum + (o.tax_amount || o.tax || (o.total_amount || 0) * 0.18 || 0), 0);
+    const gst5 = deliveredOrders.reduce((sum, o) => sum + ((o.total_amount || 0) * 0.05), 0);
+    const gst12 = deliveredOrders.reduce((sum, o) => sum + ((o.total_amount || 0) * 0.12), 0);
+    const gst18 = deliveredOrders.reduce((sum, o) => sum + ((o.total_amount || 0) * 0.18), 0);
     const period = getDateRangeText(dateRange);
 
     setTaxData({
@@ -180,6 +189,7 @@ function AdminReports() {
   };
 
   const filterOrdersByDateRange = (orders, range) => {
+    if (!Array.isArray(orders)) return [];
     const now = new Date();
     let startDate;
 
@@ -206,7 +216,9 @@ function AdminReports() {
     }
 
     return orders.filter(order => {
-      const orderDate = new Date(order.createdAt || order.date);
+      const rawDate = order.created_at || order.createdAt || order.date;
+      if (!rawDate) return false;
+      const orderDate = new Date(rawDate.replace(' ', 'T'));
       return orderDate >= startDate;
     });
   };
@@ -523,9 +535,13 @@ function AdminReports() {
               <h3 className="font-semibold text-gray-800 mb-4">Stock Distribution</h3>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div className="flex h-3 rounded-full overflow-hidden">
-                  <div className="bg-green-500" style={{ width: `${(inventoryData.inStock / inventoryData.totalSKUs) * 100}%` }}></div>
-                  <div className="bg-yellow-500" style={{ width: `${(inventoryData.lowStock / inventoryData.totalSKUs) * 100}%` }}></div>
-                  <div className="bg-red-500" style={{ width: `${(inventoryData.outOfStock / inventoryData.totalSKUs) * 100}%` }}></div>
+                  {inventoryData.totalSKUs > 0 && (
+                    <>
+                      <div className="bg-green-500" style={{ width: `${(inventoryData.inStock / inventoryData.totalSKUs) * 100}%` }}></div>
+                      <div className="bg-yellow-500" style={{ width: `${(inventoryData.lowStock / inventoryData.totalSKUs) * 100}%` }}></div>
+                      <div className="bg-red-500" style={{ width: `${(inventoryData.outOfStock / inventoryData.totalSKUs) * 100}%` }}></div>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex justify-center gap-6 mt-4 text-xs">
@@ -554,7 +570,7 @@ function AdminReports() {
                         <tr key={idx} className="hover:bg-yellow-50/30 transition">
                           <td className="px-5 py-3 font-medium text-gray-800">{product.name}</td>
                           <td className="px-5 py-3 text-right font-semibold text-yellow-600">{product.stock}</td>
-                          <td className="px-5 py-3 text-gray-500">{product.category || 'N/A'}</td>
+                          <td className="px-5 py-3 text-gray-500">{product.category || product.mainCategory || 'N/A'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -603,7 +619,7 @@ function AdminReports() {
                     <span className="font-medium">₹{taxData.gst5.toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${(taxData.gst5 / taxData.totalTax) * 100}%` }}></div>
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${taxData.totalTax > 0 ? (taxData.gst5 / taxData.totalTax) * 100 : 0}%` }}></div>
                   </div>
                 </div>
                 <div>
@@ -612,7 +628,7 @@ function AdminReports() {
                     <span className="font-medium">₹{taxData.gst12.toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(taxData.gst12 / taxData.totalTax) * 100}%` }}></div>
+                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${taxData.totalTax > 0 ? (taxData.gst12 / taxData.totalTax) * 100 : 0}%` }}></div>
                   </div>
                 </div>
                 <div>
@@ -621,7 +637,7 @@ function AdminReports() {
                     <span className="font-medium">₹{taxData.gst18.toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-pink-500 h-2 rounded-full" style={{ width: `${(taxData.gst18 / taxData.totalTax) * 100}%` }}></div>
+                    <div className="bg-pink-500 h-2 rounded-full" style={{ width: `${taxData.totalTax > 0 ? (taxData.gst18 / taxData.totalTax) * 100 : 0}%` }}></div>
                   </div>
                 </div>
               </div>
