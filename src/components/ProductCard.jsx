@@ -72,10 +72,8 @@ function ProductCard({
       stock: product.stock
     });
     
-    // ✅ Button permanently "Go to Cart" ho jayega
     setIsAdded(true);
     
-    // ✅ Toast with "Go to Cart" button
     toast.success((t) => (
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium">Added to cart! 🛒</span>
@@ -148,6 +146,11 @@ function ProductCard({
   const productId = product._id || product.id;
   const isOutOfStock = product.stock === 0;
 
+  // ✅ MRP aur discount calculate karo (backend se original_price aata hai)
+  const price = product.price || product.sellingPrice || 0;
+  const mrp = product.original_price || product.originalPrice || product.mrp || product.comparePrice || 0;
+  const discountPercent = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-pink-100">
       <Link to={`/product/${productId}`}>
@@ -174,9 +177,10 @@ function ProductCard({
             </div>
           )}
           
-          {product.badge && (
-            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
-              {product.badge}
+          {/* ✅ Discount Badge (top-left) */}
+          {discountPercent > 0 && (
+            <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-md z-10">
+              {discountPercent}% OFF
             </span>
           )}
           
@@ -186,7 +190,6 @@ function ProductCard({
             </span>
           )}
           
-          {/* ✅ Out of Stock Overlay */}
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">
@@ -212,13 +215,14 @@ function ProductCard({
           <span className="text-xs text-gray-400">({product.rating || 4})</span>
         </div>
         
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-bold text-pink-600">₹{product.price}</span>
-          {product.originalPrice && product.originalPrice > product.price && (
+        {/* ✅ Price + MRP + Discount */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className="text-lg font-bold text-pink-600">₹{price.toLocaleString()}</span>
+          {mrp > price && (
             <>
-              <span className="text-xs text-gray-400 line-through">₹{product.originalPrice}</span>
-              <span className="text-xs text-green-500">
-                {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% off
+              <span className="text-xs text-gray-400 line-through">₹{mrp.toLocaleString()}</span>
+              <span className="text-xs text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded">
+                {discountPercent}% off
               </span>
             </>
           )}
@@ -226,7 +230,6 @@ function ProductCard({
         
         <div className="flex gap-2">
           {isAdded ? (
-            // ✅ PERMANENT "Go to Cart" Button - Jab tak user manually navigate nahi karta
             <button 
               onClick={handleGoToCart}
               className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg flex items-center justify-center gap-1"
