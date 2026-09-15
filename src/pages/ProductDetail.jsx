@@ -257,10 +257,11 @@ function ProductDetail() {
   };
 
   const getCurrentMrp = () => {
-    if (selectedVariation?.mrp) return selectedVariation.mrp;
-    return product?.originalPrice || product?.mrp || getCurrentPrice() * 1.2;
-  };
-
+  if (selectedVariation?.mrp) return selectedVariation.mrp;
+  // ✅ Backend snake_case bhejta hai
+  return product?.original_price ?? product?.originalPrice ?? product?.mrp ?? (getCurrentPrice() * 1.2);
+};
+  
   const getDiscountPercent = () => {
     const mrp = getCurrentMrp();
     const price = getCurrentPrice();
