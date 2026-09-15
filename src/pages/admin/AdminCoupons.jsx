@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,7 @@ function AdminCoupons() {
   const [processingId, setProcessingId] = useState(null);
   const [vendors, setVendors] = useState([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
+
   const [formData, setFormData] = useState({
     code: '',
     discount: '',
@@ -25,26 +26,41 @@ function AdminCoupons() {
     usageLimit: '',
     description: '',
     status: 'active',
-    vendorId: '' // ✅ New field
+    vendorId: ''
   });
 
-  const API_URL = 'https://api.mypinkshop.com/api';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  const getToken = () => localStorage.getItem('adminToken') || localStorage.getItem('token');
+
+  // ✅ Helper: Safe array extraction
+  const safeArray = (responseData, ...keys) => {
+    if (Array.isArray(responseData)) return responseData;
+    if (responseData && typeof responseData === 'object') {
+      for (const key of keys) {
+        if (Array.isArray(responseData[key])) return responseData[key];
+      }
+      if (Array.isArray(responseData.data)) return responseData.data;
+    }
+    return [];
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    const token = getToken();
     if (!token) {
       navigate('/admin/login');
       return;
     }
-    loadCoupons(token);
-    loadVendors(token);
+    loadCoupons();
+    loadVendors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  // ✅ Load vendors for dropdown
-  const loadVendors = async (token) => {
+  // ✅ Load vendors
+  const loadVendors = async () => {
     try {
       setLoadingVendors(true);
-      const res = await fetch(`${API_URL}/admin/vendors`, {
+      const token = getToken();
+      const res = await fetch(`${API_URL}/api/admin/vendors`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -53,7 +69,8 @@ function AdminCoupons() {
 
       if (res.ok) {
         const data = await res.json();
-        setVendors(data.vendors || []);
+        // ✅ FIX: handle { success, data } and { vendors }
+        setVendors(safeArray(data, 'vendors', 'data'));
       }
     } catch (error) {
       console.error('Error loading vendors:', error);
@@ -62,12 +79,13 @@ function AdminCoupons() {
     }
   };
 
-  const loadCoupons = async (token) => {
+  const loadCoupons = async () => {
     try {
       setLoading(true);
       setError('');
+      const token = getToken();
 
-      const res = await fetch(`${API_URL}/coupons/all`, {
+      const res = await fetch(`${API_URL}/api/coupons/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -84,10 +102,11 @@ function AdminCoupons() {
       const data = await res.json();
 
       if (res.ok) {
-        setCoupons(data || []);
+        // ✅ FIX: handle { success, data } and direct array
+        setCoupons(safeArray(data, 'coupons', 'data'));
       } else {
-        setError(data.message || 'Failed to load coupons');
-        toast.error(data.message || 'Failed to load coupons');
+        setError(data.message || data.error || 'Failed to load coupons');
+        toast.error(data.message || data.error || 'Failed to load coupons');
         setCoupons([]);
       }
     } catch (err) {
@@ -101,11 +120,11 @@ function AdminCoupons() {
   };
 
   const saveCouponToAPI = async (couponData, isEdit = false) => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    const token = getToken();
     
     const url = isEdit 
-      ? `${API_URL}/coupons/update/${editingCoupon._id || editingCoupon.id}`
-      : `${API_URL}/coupons/create`;
+      ? `${API_URL}/api/coupons/update/${editingCoupon._id || editingCoupon.id}`
+      : `${API_URL}/api/coupons/create`;
     
     const method = isEdit ? 'PUT' : 'POST';
 
@@ -119,7 +138,7 @@ function AdminCoupons() {
       endDate: couponData.validTill || null,
       description: couponData.description || '',
       isActive: couponData.status === 'active',
-      vendorId: couponData.vendorId || null // ✅ Send vendorId
+      vendorId: couponData.vendorId || null
     };
 
     const res = await fetch(url, {
@@ -140,15 +159,15 @@ function AdminCoupons() {
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.message || 'Failed to save coupon');
+      throw new Error(data.message || data.error || 'Failed to save coupon');
     }
     return data;
   };
 
   const deleteCouponFromAPI = async (id) => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    const token = getToken();
     
-    const res = await fetch(`${API_URL}/coupons/delete/${id}`, {
+    const res = await fetch(`${API_URL}/api/coupons/delete/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -165,15 +184,15 @@ function AdminCoupons() {
 
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.message || 'Failed to delete coupon');
+      throw new Error(data.message || data.error || 'Failed to delete coupon');
     }
     return true;
   };
 
   const toggleCouponStatusAPI = async (id, currentStatus) => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    const token = getToken();
     
-    const res = await fetch(`${API_URL}/coupons/toggle/${id}`, {
+    const res = await fetch(`${API_URL}/api/coupons/toggle/${id}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -191,16 +210,17 @@ function AdminCoupons() {
 
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.message || 'Failed to toggle coupon');
+      throw new Error(data.message || data.error || 'Failed to toggle coupon');
     }
     return true;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
     if (name === 'code') {
       setFormData(prev => ({ ...prev, code: value.toUpperCase().replace(/[^A-Z0-9]/g, '') }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -226,7 +246,7 @@ function AdminCoupons() {
     try {
       await saveCouponToAPI(formData, !!editingCoupon);
       toast.success(editingCoupon ? '✅ Coupon updated successfully!' : '✅ Coupon created successfully!');
-      await loadCoupons(localStorage.getItem('adminToken') || localStorage.getItem('token'));
+      await loadCoupons();
       setShowModal(false);
       setEditingCoupon(null);
       resetForm();
@@ -261,11 +281,11 @@ function AdminCoupons() {
       type: coupon.discountType || coupon.type || 'percentage',
       minOrder: coupon.minOrderValue || coupon.minOrder,
       maxDiscount: coupon.maxDiscount || '',
-      validTill: coupon.endDate || coupon.validTill,
+      validTill: coupon.endDate?.split('T')[0] || coupon.validTill || '',
       usageLimit: coupon.usageLimit || '',
       description: coupon.description || '',
       status: coupon.isActive !== undefined ? (coupon.isActive ? 'active' : 'inactive') : coupon.status || 'active',
-      vendorId: coupon.vendorId || '' // ✅ Edit vendorId
+      vendorId: coupon.vendorId || ''
     });
     setShowModal(true);
   };
@@ -277,7 +297,7 @@ function AdminCoupons() {
     try {
       await deleteCouponFromAPI(id);
       toast.success('🗑️ Coupon deleted successfully!');
-      await loadCoupons(localStorage.getItem('adminToken') || localStorage.getItem('token'));
+      await loadCoupons();
     } catch (err) {
       console.error('Error deleting coupon:', err);
       toast.error(err.message || 'Failed to delete coupon');
@@ -291,7 +311,7 @@ function AdminCoupons() {
     try {
       await toggleCouponStatusAPI(id, currentStatus);
       toast.success(`Coupon ${currentStatus ? 'deactivated' : 'activated'}!`);
-      await loadCoupons(localStorage.getItem('adminToken') || localStorage.getItem('token'));
+      await loadCoupons();
     } catch (err) {
       console.error('Error toggling coupon:', err);
       toast.error(err.message || 'Failed to toggle coupon');
@@ -330,15 +350,15 @@ function AdminCoupons() {
 
   const filteredCoupons = coupons.filter(c => {
     if (filterStatus !== 'all') {
+      const isActive = c.isActive !== undefined ? c.isActive : c.status === 'active';
       if (filterStatus === 'active') {
-        const isActive = c.isActive !== undefined ? c.isActive : c.status === 'active';
         if (!isActive || isExpired(c.endDate || c.validTill)) return false;
       }
       if (filterStatus === 'expired') {
         if (!isExpired(c.endDate || c.validTill)) return false;
       }
     }
-    if (searchTerm && !c.code.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (searchTerm && !c.code?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
 
@@ -411,7 +431,6 @@ function AdminCoupons() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
           
@@ -658,7 +677,6 @@ function AdminCoupons() {
                 </div>
               </div>
 
-              {/* ✅ VENDOR SELECTION */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Applicable On</label>
                 <select 
@@ -669,7 +687,7 @@ function AdminCoupons() {
                 >
                   <option value="">🌐 All Products (Sitewide)</option>
                   {vendors.map(vendor => (
-                    <option key={vendor._id} value={vendor._id}>
+                    <option key={vendor._id || vendor.id} value={vendor._id || vendor.id}>
                       🛍️ {vendor.brandName || vendor.name || vendor.storeName || vendor.email}
                     </option>
                   ))}
