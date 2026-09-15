@@ -21,8 +21,17 @@ function AdminOffers() {
     isActive: true
   });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  // ✅ FIX: Vite env syntax
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
+
+  // ✅ Helper: Safe array extraction
+  const safeArray = (responseData) => {
+    if (Array.isArray(responseData)) return responseData;
+    if (responseData && Array.isArray(responseData.data)) return responseData.data;
+    if (responseData && Array.isArray(responseData.offers)) return responseData.offers;
+    return [];
+  };
 
   // Load offers
   const loadOffers = async () => {
@@ -38,7 +47,8 @@ function AdminOffers() {
       }
       
       const data = await response.json();
-      setOffers(Array.isArray(data) ? data : []);
+      // ✅ FIX: Handle { success, data } wrapper
+      setOffers(safeArray(data));
     } catch (error) {
       console.error('Error loading offers:', error);
       setError('Failed to load offers');
@@ -50,14 +60,18 @@ function AdminOffers() {
   };
 
   useEffect(() => {
+    if (!token) {
+      toast.error('Session expired. Please login again.');
+      return;
+    }
     loadOffers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Create/Update offer
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
     if (!formData.title.trim()) {
       toast.error('Please enter offer title');
       return;
@@ -104,7 +118,7 @@ function AdminOffers() {
         resetForm();
         loadOffers();
       } else {
-        toast.error(data.error || 'Failed to save offer');
+        toast.error(data.error || data.message || 'Failed to save offer');
       }
     } catch (error) {
       console.error('Error saving offer:', error);
@@ -152,7 +166,7 @@ function AdminOffers() {
 
   // Delete offer
   const deleteOffer = async (id) => {
-    if (!confirm('Are you sure you want to delete this offer?')) return;
+    if (!window.confirm('Are you sure you want to delete this offer?')) return;
     
     setProcessingId(id);
     try {
@@ -209,6 +223,8 @@ function AdminOffers() {
     );
   }
 
+  const activeOffer = offers.find(o => o.isActive && o.type === 'top_banner');
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminSidebar />
@@ -232,10 +248,10 @@ function AdminOffers() {
         </div>
 
         {/* Active Offer Preview */}
-        {offers.some(o => o.isActive && o.type === 'top_banner') ? (
+        {activeOffer ? (
           <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white rounded-2xl p-4 mb-6 animate-pulse">
             <p className="text-center text-sm font-medium">
-              🔥 LIVE OFFER: {offers.find(o => o.isActive && o.type === 'top_banner')?.description}
+              🔥 LIVE OFFER: {activeOffer.description}
             </p>
           </div>
         ) : (
@@ -331,7 +347,7 @@ function AdminOffers() {
         </div>
       </div>
 
-      {/* Modal - Properly Centered */}
+      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
