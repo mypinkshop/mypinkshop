@@ -97,6 +97,7 @@ const FooterSection = () => (
       <div className="text-center pt-8 border-t border-gray-800">
         <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
         <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+        <p className="text-xs text-gray-500 mt-1">Legal Name: Altaf Ahmad Khan</p>
       </div>
     </div>
   </footer>
