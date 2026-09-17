@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useReviews } from '../context/ReviewContext';
 import { useAuth } from '../context/AuthContext';
 import QuickRating from './QuickRating';
-import RatingStars from './RatingStars';
-import RatingSummary from './RatingSummary';
 
 const ReviewSection = ({ productId }) => {
   const { user } = useAuth();
@@ -24,7 +22,6 @@ const ReviewSection = ({ productId }) => {
   
   // ===== STATES =====
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -33,7 +30,6 @@ const ReviewSection = ({ productId }) => {
   const [images, setImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [visibleCount, setVisibleCount] = useState(5);
@@ -41,7 +37,6 @@ const ReviewSection = ({ productId }) => {
   const [checkingEligibility, setCheckingEligibility] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
   const [expandedReviews, setExpandedReviews] = useState({});
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
   
   // ===== FETCH REVIEWS =====
   useEffect(() => {
@@ -50,7 +45,7 @@ const ReviewSection = ({ productId }) => {
       await fetchProductReviews(productId);
       setLoading(false);
     };
-    loadReviews();
+    if (productId) loadReviews();
   }, [productId, fetchProductReviews]);
   
   // ===== CHECK ELIGIBILITY =====
@@ -62,82 +57,64 @@ const ReviewSection = ({ productId }) => {
       }
       setCheckingEligibility(true);
       const result = await canUserReview(productId);
-      setCanReviewStatus(result);
+      setCanReviewStatus(result || {});
       setCheckingEligibility(false);
     };
     checkEligibility();
   }, [productId, user, canUserReview]);
   
   // ===== GET DATA =====
-  const reviews = getProductReviews(productId);
-  const averageRating = getAverageRating(productId);
-  const totalReviews = getReviewCount(productId);
-  const ratingCounts = getRatingDistribution(productId);
-  const ratingOnlyCount = getRatingOnlyCount(productId);
-  const reviewWithCommentCount = getReviewWithCommentCount(productId);
+  const reviews = getProductReviews(productId) || [];
+  const averageRating = getAverageRating(productId) || 0;
+  const totalReviews = getReviewCount(productId) || 0;
+  const ratingCounts = getRatingDistribution(productId) || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  const ratingOnlyCount = getRatingOnlyCount(productId) || 0;
+  const reviewWithCommentCount = getReviewWithCommentCount(productId) || 0;
   
   const canReview = user && canReviewStatus.canReview && !canReviewStatus.alreadyReviewed;
   
-  // Check if user has pending review
   const hasPendingReview = reviews.some(
-    r => r.userId?._id === user?.id && r.status === 'pending'
+    r => (r.userId === user?.id || r.user_id === user?.id) && r.status === 'pending'
   );
   
-  // ===== FILTER REVIEWS =====
+  // ===== FILTER =====
   const filteredReviews = reviews.filter(review => {
     if (filter === 'with_images') return review.images && review.images.length > 0;
     if (filter === 'rating_only') return review.isRatingOnly === true;
     if (filter === 'with_comment') return review.isRatingOnly === false && review.comment && review.comment.length > 0;
-    if (filter === '5') return review.rating === 5;
-    if (filter === '4') return review.rating === 4;
-    if (filter === '3') return review.rating === 3;
-    if (filter === '2') return review.rating === 2;
-    if (filter === '1') return review.rating === 1;
+    if (['5','4','3','2','1'].includes(filter)) return review.rating === parseInt(filter);
     return true;
   });
   
-  // ===== SORT REVIEWS =====
+  // ===== SORT =====
   const sortedReviews = [...filteredReviews].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.created_at);
+    const dateB = new Date(b.createdAt || b.created_at);
     switch(sortBy) {
-      case 'newest':
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      case 'oldest':
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      case 'helpful':
-        return (b.helpful || 0) - (a.helpful || 0);
-      case 'highest':
-        return b.rating - a.rating;
-      case 'lowest':
-        return a.rating - b.rating;
-      default:
-        return 0;
+      case 'newest': return dateB - dateA;
+      case 'oldest': return dateA - dateB;
+      case 'helpful': return (b.helpful || b.helpful_count || 0) - (a.helpful || a.helpful_count || 0);
+      case 'highest': return b.rating - a.rating;
+      case 'lowest': return a.rating - b.rating;
+      default: return 0;
     }
   });
   
-  // ===== PAGINATION =====
   const visibleReviews = sortedReviews.slice(0, visibleCount);
   const hasMore = visibleCount < sortedReviews.length;
-  
-  const loadMore = () => {
-    setVisibleCount(prev => prev + 5);
-  };
   
   // ===== IMAGE HANDLERS =====
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    
     const maxSize = 5 * 1024 * 1024;
-    const oversized = files.some(f => f.size > maxSize);
-    if (oversized) {
+    if (files.some(f => f.size > maxSize)) {
       alert('Each image must be less than 5MB');
       return;
     }
-    
     if (images.length + files.length > 5) {
       alert('Maximum 5 images allowed');
       return;
     }
-    
     setUploadingImages(true);
     try {
       const uploadedUrls = await uploadReviewMedia(files);
@@ -149,24 +126,13 @@ const ReviewSection = ({ productId }) => {
     }
   };
   
-  const removeImage = (index) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
+  const removeImage = (index) => setImages(images.filter((_, i) => i !== index));
   
   // ===== SUBMIT REVIEW =====
   const handleSubmitReview = async () => {
-    if (rating === 0) {
-      alert('Please select a rating');
-      return;
-    }
-    if (!comment.trim()) {
-      alert('Please enter your review');
-      return;
-    }
-    if (comment.length < 10) {
-      alert('Review must be at least 10 characters');
-      return;
-    }
+    if (rating === 0) return alert('Please select a rating');
+    if (!comment.trim()) return alert('Please enter your review');
+    if (comment.length < 10) return alert('Review must be at least 10 characters');
     
     setSubmitting(true);
     try {
@@ -178,7 +144,7 @@ const ReviewSection = ({ productId }) => {
         comment, 
         images, 
         [],
-        false // isRatingOnly = false (full review)
+        false
       );
       
       if (result.success) {
@@ -187,8 +153,7 @@ const ReviewSection = ({ productId }) => {
         setComment('');
         setImages([]);
         setShowReviewForm(false);
-        setReviewSubmitted(true);
-        setTimeout(() => setReviewSubmitted(false), 5000);
+        alert('✅ Review submitted! Awaiting admin approval.');
         await fetchProductReviews(productId);
       } else {
         alert(result.message);
@@ -200,18 +165,15 @@ const ReviewSection = ({ productId }) => {
     }
   };
   
-  // ===== MARK HELPFUL =====
+  // ===== HELPFUL =====
   const handleMarkHelpful = async (reviewId) => {
-    if (!user) {
-      alert('Please login to mark reviews as helpful');
-      return;
-    }
+    if (!user) return alert('Please login to mark reviews as helpful');
     await markHelpful(productId, reviewId);
   };
   
   // ===== DELETE OWN REVIEW =====
   const handleDeleteReview = async (reviewId) => {
-    if (!confirm('Are you sure you want to delete your review?')) return;
+    if (!window.confirm('Are you sure you want to delete your review?')) return;
     const success = await deleteOwnReview(reviewId, productId);
     if (success) {
       alert('Review deleted successfully');
@@ -221,181 +183,272 @@ const ReviewSection = ({ productId }) => {
     }
   };
   
-  // ===== TOGGLE EXPAND =====
   const toggleExpand = (reviewId) => {
-    setExpandedReviews(prev => ({
-      ...prev,
-      [reviewId]: !prev[reviewId]
-    }));
+    setExpandedReviews(prev => ({ ...prev, [reviewId]: !prev[reviewId] }));
   };
   
-  // ===== RATING SUBMITTED CALLBACK =====
-  const handleRatingSubmitted = async () => {
-    await fetchProductReviews(productId);
-  };
-  
-  // ===== LOADING =====
+  // ===== LOADING SKELETON =====
   if (loading && !reviews.length) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      <div className="space-y-4 animate-pulse">
+        <div className="h-40 bg-pink-50 rounded-3xl"></div>
+        <div className="h-32 bg-pink-50 rounded-3xl"></div>
+        <div className="h-32 bg-pink-50 rounded-3xl"></div>
       </div>
     );
   }
   
-  // ===== SUBMITTED =====
-  if (reviewSubmitted) {
+  // ===== EMPTY STATE =====
+  if (totalReviews === 0 && !canReview && !checkingEligibility) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-        <div className="text-5xl mb-3">📝</div>
-        <h3 className="text-lg font-semibold text-green-800 mb-2">Review Submitted!</h3>
-        <p className="text-green-700">Thank you for your review. It is now pending admin approval and will appear here once approved.</p>
+      <div className="bg-gradient-to-br from-pink-50 via-white to-rose-50 rounded-3xl p-12 text-center border-2 border-pink-100">
+        <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-pink-200 to-rose-200 rounded-full flex items-center justify-center shadow-lg">
+          <span className="text-5xl">💬</span>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">No Reviews Yet</h3>
+        <p className="text-gray-500 mb-6 max-w-md mx-auto">Be the first to share your experience with this product!</p>
       </div>
     );
   }
   
   return (
     <div className="space-y-8" id="reviews">
-      {/* ===== RATING SUMMARY ===== */}
-      <RatingSummary 
-        averageRating={averageRating}
-        totalReviews={totalReviews}
-        ratingCounts={ratingCounts}
-        onFilterChange={(rating) => {
-          if (rating) {
-            setFilter(rating.toString());
-          } else {
-            setFilter('all');
-          }
-        }}
-      />
       
-      {/* ===== STATS: Rating Only vs Full Reviews ===== */}
-      {totalReviews > 0 && (
-        <div className="flex flex-wrap gap-4 text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
-          <span>📊 {totalReviews} total ratings</span>
-          <span>•</span>
-          <span>⭐ {ratingOnlyCount} quick ratings</span>
-          <span>•</span>
-          <span>📝 {reviewWithCommentCount} written reviews</span>
+      {/* ==================== PREMIUM RATING SUMMARY ==================== */}
+      <div className="bg-gradient-to-br from-pink-50 via-white to-rose-50 rounded-3xl border-2 border-pink-100 overflow-hidden shadow-sm">
+        <div className="grid md:grid-cols-2 gap-6 p-6 sm:p-8">
+          
+          {/* LEFT — Average rating */}
+          <div className="flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-pink-200 pb-6 md:pb-0 md:pr-6">
+            <div className="text-6xl sm:text-7xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+              {averageRating.toFixed(1)}
+            </div>
+            <div className="flex gap-1 mt-3 mb-2">
+              {[1,2,3,4,5].map(star => (
+                <span key={star} className={`text-3xl ${star <= Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-200'}`}>
+                  ★
+                </span>
+              ))}
+            </div>
+            <p className="text-sm font-semibold text-gray-600">
+              Based on {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 mt-3 text-xs">
+              <span className="bg-white px-3 py-1 rounded-full border border-pink-200 text-pink-700 font-semibold">
+                ⭐ {ratingOnlyCount} Quick Ratings
+              </span>
+              <span className="bg-white px-3 py-1 rounded-full border border-pink-200 text-pink-700 font-semibold">
+                📝 {reviewWithCommentCount} Written
+              </span>
+            </div>
+          </div>
+          
+          {/* RIGHT — Distribution bars */}
+          <div className="space-y-2.5">
+            {[5, 4, 3, 2, 1].map(star => {
+              const count = ratingCounts[star] || 0;
+              const percent = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+              return (
+                <button
+                  key={star}
+                  onClick={() => setFilter(star.toString())}
+                  className="w-full flex items-center gap-3 group hover:bg-white/60 p-2 rounded-xl transition"
+                >
+                  <div className="flex items-center gap-1 w-16 flex-shrink-0">
+                    <span className="text-sm font-bold text-gray-700">{star}</span>
+                    <span className="text-yellow-400">★</span>
+                  </div>
+                  <div className="flex-1 bg-pink-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-pink-400 to-rose-500 rounded-full transition-all duration-500"
+                      style={{ width: `${percent}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-xs font-bold text-gray-600 w-12 text-right group-hover:text-pink-600 transition">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      )}
+      </div>
       
-      {/* ===== PENDING REVIEW BANNER ===== */}
+      {/* ==================== PENDING BANNER ==================== */}
       {hasPendingReview && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
-          <p className="text-yellow-700 text-sm">
-            ⏳ You have a pending review awaiting admin approval.
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+          <span className="text-2xl">⏳</span>
+          <p className="text-amber-800 text-sm font-medium">
+            You have a pending review awaiting admin approval. It will appear here once approved.
           </p>
         </div>
       )}
       
-      {/* ===== QUICK RATING + WRITE REVIEW BUTTONS ===== */}
-      {!checkingEligibility && canReview && !showReviewForm && (
-        <div className="flex flex-wrap items-center gap-4">
-          {/* ✅ Quick Rating Component */}
-          <QuickRating 
-            productId={productId}
-            onRatingSubmitted={handleRatingSubmitted}
-            buttonText="⭐ Rate Now"
-            showPopup={true}
-          />
-          
-          {/* ✅ Write Review Button */}
-          <button
-            onClick={() => setShowReviewForm(true)}
-            className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2.5 rounded-lg hover:shadow-lg transition text-sm font-medium"
-          >
-            ✍️ Write a Review
-          </button>
-        </div>
-      )}
-      
-      {/* ===== REVIEW FORM ===== */}
-      {showReviewForm && (
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Write Your Review</h3>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Your Rating *</label>
-            <RatingStars 
-              rating={rating}
-              size="2xl"
-              interactive={true}
-              onRatingChange={setRating}
+      {/* ==================== ACTION BAR ==================== */}
+      <div className="flex flex-wrap items-center gap-3">
+        {!checkingEligibility && canReview && !showReviewForm && (
+          <>
+            <QuickRating 
+              productId={productId}
+              onRatingSubmitted={() => fetchProductReviews(productId)}
+              buttonText="⭐ Quick Rate"
+              showPopup={true}
             />
+            <button
+              onClick={() => setShowReviewForm(true)}
+              className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-3 rounded-full hover:shadow-lg hover:scale-105 transition font-bold text-sm flex items-center gap-2"
+            >
+              ✍️ Write a Detailed Review
+            </button>
+          </>
+        )}
+        
+        {!user && (
+          <div className="text-sm text-gray-500 bg-pink-50 px-4 py-2 rounded-full">
+            💡 <a href="/login" className="text-pink-600 font-bold hover:underline">Login</a> to write a review
+          </div>
+        )}
+        
+        {canReviewStatus.reason === 'not_delivered' && user && (
+          <div className="text-sm text-gray-500 bg-pink-50 px-4 py-2 rounded-full">
+            📦 You can review this product after delivery
+          </div>
+        )}
+        
+        {canReviewStatus.reason === 'already_reviewed' && (
+          <div className="text-sm text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full font-medium">
+            ✓ You have already reviewed this product
+          </div>
+        )}
+      </div>
+      
+      {/* ==================== REVIEW FORM ==================== */}
+      {showReviewForm && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-pink-100 shadow-lg">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-gray-900">✍️ Write Your Review</h3>
+            <button 
+              onClick={() => setShowReviewForm(false)}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition"
+            >
+              ✕
+            </button>
           </div>
           
+          {/* Star rating */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-700 mb-3">
+              Your Rating <span className="text-pink-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              {[1,2,3,4,5].map(star => (
+                <button
+                  key={star}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  onClick={() => setRating(star)}
+                  className="text-5xl focus:outline-none transition-transform hover:scale-110"
+                >
+                  <span className={star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-200'}>
+                    ★
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Title */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Review Title (Optional)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Review Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Summarize your experience"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+              placeholder="e.g., Amazing product!"
+              className="w-full px-4 py-3 border-2 border-pink-200 rounded-2xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition"
               maxLength="100"
             />
           </div>
           
+          {/* Comment */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Your Review *</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Your Review <span className="text-pink-500">*</span>
+            </label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              rows="4"
-              placeholder="Share your experience with this product"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200"
+              rows="5"
+              placeholder="Share your experience with this product..."
+              className="w-full px-4 py-3 border-2 border-pink-200 rounded-2xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition resize-none"
+              maxLength="2000"
             />
             <p className="text-xs text-gray-400 mt-1">
-              {comment.length}/2000 characters {comment.length < 10 && comment.length > 0 && (
-                <span className="text-red-500"> (Minimum 10 characters)</span>
+              {comment.length}/2000 characters
+              {comment.length > 0 && comment.length < 10 && (
+                <span className="text-rose-500 ml-2 font-bold">Minimum 10 characters</span>
               )}
             </p>
           </div>
           
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Add Images (Optional, Max 5)</label>
+          {/* Images */}
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Add Photos <span className="text-gray-400 font-normal">(Max 5, up to 5MB each)</span>
+            </label>
             <div className="flex flex-wrap gap-3 mb-3">
               {images.map((img, idx) => (
-                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
+                <div key={idx} className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-pink-100 group">
                   <img src={img} alt={`Review ${idx}`} className="w-full h-full object-cover" />
                   <button 
                     onClick={() => removeImage(idx)} 
-                    className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition"
+                    className="absolute top-1 right-1 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-rose-600 shadow-md"
                   >
                     ✕
                   </button>
                 </div>
               ))}
+              {images.length < 5 && (
+                <>
+                  <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="reviewImageUpload" />
+                  <label 
+                    htmlFor="reviewImageUpload" 
+                    className={`w-24 h-24 border-2 border-dashed border-pink-300 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-pink-50 transition ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {uploadingImages ? (
+                      <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <span className="text-2xl text-pink-400">📸</span>
+                        <span className="text-[10px] text-pink-500 font-bold mt-1">Upload</span>
+                      </>
+                    )}
+                  </label>
+                </>
+              )}
             </div>
-            <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" id="reviewImageUpload" />
-            <label 
-              htmlFor="reviewImageUpload" 
-              className={`inline-block px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm ${uploadingImages ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {uploadingImages ? '📤 Uploading...' : '📸 Upload Images'}
-            </label>
-            <p className="text-xs text-gray-400 mt-1">Max 5 images, up to 5MB each</p>
           </div>
           
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-700 flex items-center gap-2">
-              <span>⏳</span> Your review will be reviewed by admin before being published.
+          {/* Info banner */}
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl flex items-start gap-3">
+            <span className="text-xl">ℹ️</span>
+            <p className="text-sm text-blue-800 font-medium">
+              Your review will be reviewed by our team before being published. This usually takes a few hours.
             </p>
           </div>
           
+          {/* Buttons */}
           <div className="flex gap-3">
             <button 
               onClick={handleSubmitReview} 
-              disabled={submitting || comment.length < 10} 
-              className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={submitting || rating === 0 || comment.length < 10} 
+              className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-3 rounded-full hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm"
             >
-              {submitting ? 'Submitting...' : 'Submit Review'}
+              {submitting ? '⏳ Submitting...' : '✓ Submit Review'}
             </button>
             <button 
               onClick={() => setShowReviewForm(false)} 
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="px-6 py-3 border-2 border-gray-200 rounded-full hover:bg-gray-50 transition font-bold text-sm text-gray-600"
             >
               Cancel
             </button>
@@ -403,213 +456,234 @@ const ReviewSection = ({ productId }) => {
         </div>
       )}
       
-      {/* ===== REVIEWS LIST ===== */}
-      <div className="space-y-4">
-        {/* Header with Sort */}
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Customer Reviews ({filteredReviews.length})
-          </h3>
-          <div className="flex gap-2 flex-wrap">
-            {/* Sort Dropdown */}
+      {/* ==================== REVIEWS LIST ==================== */}
+      {totalReviews > 0 && (
+        <div className="space-y-5">
+          
+          {/* Header */}
+          <div className="flex flex-wrap justify-between items-center gap-3">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              💬 Customer Reviews
+              <span className="text-sm font-medium text-gray-500 bg-pink-100 px-3 py-1 rounded-full">
+                {filteredReviews.length}
+              </span>
+            </h3>
+            
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-pink-500"
+              className="px-4 py-2 border-2 border-pink-200 rounded-full text-sm font-semibold focus:outline-none focus:border-pink-500 bg-white cursor-pointer"
             >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="helpful">Most Helpful</option>
-              <option value="highest">Highest Rating</option>
-              <option value="lowest">Lowest Rating</option>
+              <option value="newest">🆕 Newest First</option>
+              <option value="oldest">📅 Oldest First</option>
+              <option value="helpful">👍 Most Helpful</option>
+              <option value="highest">⭐ Highest Rating</option>
+              <option value="lowest">📉 Lowest Rating</option>
             </select>
           </div>
-        </div>
-        
-        {/* Filter Buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <button 
-            onClick={() => setFilter('all')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === 'all' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            All
-          </button>
-          <button 
-            onClick={() => setFilter('with_images')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === 'with_images' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            📷 With Images
-          </button>
-          <button 
-            onClick={() => setFilter('with_comment')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === 'with_comment' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            📝 With Comments
-          </button>
-          <button 
-            onClick={() => setFilter('rating_only')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === 'rating_only' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            ⭐ Quick Ratings
-          </button>
-          <button 
-            onClick={() => setFilter('5')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === '5' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            5 ★
-          </button>
-          <button 
-            onClick={() => setFilter('4')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === '4' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            4 ★
-          </button>
-          <button 
-            onClick={() => setFilter('3')} 
-            className={`px-3 py-1 rounded-full text-xs transition ${filter === '3' ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            3 ★
-          </button>
-        </div>
-        
-        {/* No Reviews */}
-        {filteredReviews.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <div className="text-5xl mb-3">📝</div>
-            <p className="text-gray-500">No reviews yet. Be the first to review!</p>
+          
+          {/* Filter pills */}
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { id: 'all', label: 'All', icon: '🌐' },
+              { id: 'with_images', label: 'With Photos', icon: '📷' },
+              { id: 'with_comment', label: 'With Comments', icon: '📝' },
+              { id: 'rating_only', label: 'Quick Ratings', icon: '⭐' },
+              { id: '5', label: '5★', icon: '' },
+              { id: '4', label: '4★', icon: '' },
+              { id: '3', label: '3★', icon: '' },
+            ].map(f => (
+              <button 
+                key={f.id}
+                onClick={() => setFilter(f.id)} 
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                  filter === f.id 
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md scale-105' 
+                    : 'bg-white border-2 border-pink-100 text-gray-600 hover:border-pink-300'
+                }`}
+              >
+                {f.icon} {f.label}
+              </button>
+            ))}
           </div>
-        ) : (
-          <>
-            {/* Review Cards */}
-            {visibleReviews.map((review) => {
-              const isExpanded = expandedReviews[review._id] || false;
-              const isLongComment = review.comment && review.comment.length > 200;
-              const isOwnReview = user && review.userId?._id === user.id;
-              const isRatingOnly = review.isRatingOnly === true;
-              
-              return (
-                <div key={review._id} className="bg-white rounded-xl p-5 border border-gray-100 hover:shadow-md transition">
-                  <div className="flex justify-between items-start flex-wrap gap-2 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <RatingStars rating={review.rating} size="sm" />
-                        
-                        {isRatingOnly && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            ⭐ Quick Rating
-                          </span>
-                        )}
-                        
-                        {review.isVerifiedPurchase && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            ✓ Verified
-                          </span>
-                        )}
-                        
-                        {review.status === 'pending' && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                            ⏳ Pending
-                          </span>
+          
+          {/* No reviews after filter */}
+          {filteredReviews.length === 0 ? (
+            <div className="text-center py-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl border-2 border-pink-100">
+              <div className="text-5xl mb-3">🔍</div>
+              <p className="text-gray-500 font-medium">No reviews match this filter</p>
+              <button 
+                onClick={() => setFilter('all')} 
+                className="mt-3 text-pink-600 font-bold text-sm hover:underline"
+              >
+                Clear filter
+              </button>
+            </div>
+          ) : (
+            <>
+              {visibleReviews.map((review) => {
+                const reviewId = review._id || review.id;
+                const userName = review.user_name || review.userId?.name || review.userName || 'Anonymous';
+                const userAvatar = review.user_avatar || review.userId?.avatar;
+                const reviewText = review.comment || review.review || '';
+                const createdAt = review.createdAt || review.created_at;
+                const helpful = review.helpful_count ?? review.helpful ?? 0;
+                const isExpanded = expandedReviews[reviewId] || false;
+                const isLongComment = reviewText.length > 250;
+                const isOwnReview = user && (review.userId === user.id || review.user_id === user.id);
+                const isRatingOnly = review.isRatingOnly === true || !reviewText;
+                const initial = userName.charAt(0).toUpperCase();
+                
+                return (
+                  <div 
+                    key={reviewId} 
+                    className="bg-white rounded-3xl p-5 sm:p-6 border-2 border-pink-100 hover:border-pink-200 hover:shadow-lg transition-all duration-300"
+                  >
+                    
+                    {/* Header */}
+                    <div className="flex items-start gap-4 mb-4">
+                      {/* Avatar */}
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0 overflow-hidden">
+                        {userAvatar ? (
+                          <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                        ) : (
+                          initial
                         )}
                       </div>
-                      {review.title && <h4 className="font-semibold text-gray-800">{review.title}</h4>}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <p className="font-bold text-gray-900 text-sm">{userName}</p>
+                          {isOwnReview && (
+                            <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
+                              YOU
+                            </span>
+                          )}
+                          {review.status === 'pending' && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">
+                              ⏳ PENDING
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Stars + date */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map(star => (
+                              <span key={star} className={`text-sm ${star <= review.rating ? 'text-yellow-400' : 'text-gray-200'}`}>
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-xs text-gray-400 font-medium">
+                            {createdAt ? new Date(createdAt).toLocaleDateString('en-IN', {
+                              day: 'numeric', month: 'short', year: 'numeric'
+                            }) : ''}
+                          </span>
+                          {isRatingOnly && (
+                            <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">
+                              ⭐ Quick
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-800">{review.userId?.name || 'Anonymous'}</p>
-                      <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Comment - Show only if not rating only */}
-                  {!isRatingOnly && review.comment && (
-                    <p className="text-gray-600 text-sm mb-3 leading-relaxed">
-                      {isLongComment && !isExpanded 
-                        ? `${review.comment.substring(0, 200)}...` 
-                        : review.comment
-                      }
-                      {isLongComment && (
-                        <button 
-                          onClick={() => toggleExpand(review._id)}
-                          className="text-pink-500 hover:text-pink-600 text-xs font-medium ml-1"
-                        >
-                          {isExpanded ? 'Show Less' : 'Read More'}
-                        </button>
-                      )}
-                    </p>
-                  )}
-                  
-                  {/* Images with Lightbox */}
-                  {review.images && review.images.length > 0 && (
-                    <div className="flex gap-2 mb-3 flex-wrap">
-                      {review.images.map((img, idx) => (
-                        <img 
-                          key={idx} 
-                          src={img} 
-                          alt={`Review ${idx}`} 
-                          className="w-20 h-20 rounded-lg object-cover border border-gray-200 cursor-pointer hover:opacity-80 transition hover:scale-105"
-                          onClick={() => setSelectedImage(img)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-4 flex-wrap">
-                    {!isRatingOnly && (
-                      <button 
-                        onClick={() => handleMarkHelpful(review._id)} 
-                        className="text-sm text-gray-500 hover:text-pink-600 transition flex items-center gap-1"
-                      >
-                        👍 Helpful ({review.helpful || 0})
-                      </button>
+                    
+                    {/* Title */}
+                    {review.title && (
+                      <h4 className="font-bold text-gray-900 text-base mb-2">{review.title}</h4>
                     )}
                     
-                    {isOwnReview && review.status === 'pending' && (
-                      <button
-                        onClick={() => handleDeleteReview(review._id)}
-                        className="text-sm text-red-500 hover:text-red-600 transition flex items-center gap-1"
-                      >
-                        🗑️ Delete
-                      </button>
+                    {/* Comment */}
+                    {!isRatingOnly && reviewText && (
+                      <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                        {isLongComment && !isExpanded 
+                          ? `${reviewText.substring(0, 250)}...` 
+                          : reviewText
+                        }
+                        {isLongComment && (
+                          <button 
+                            onClick={() => toggleExpand(reviewId)}
+                            className="text-pink-600 hover:text-pink-700 text-xs font-bold ml-2"
+                          >
+                            {isExpanded ? 'Show Less' : 'Read More'}
+                          </button>
+                        )}
+                      </p>
                     )}
+                    
+                    {/* Images */}
+                    {review.images && review.images.length > 0 && (
+                      <div className="flex gap-2 mb-4 flex-wrap">
+                        {review.images.map((img, idx) => (
+                          <img 
+                            key={idx} 
+                            src={img} 
+                            alt={`Review ${idx}`} 
+                            className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-pink-100 cursor-pointer hover:opacity-90 hover:scale-105 transition-all shadow-sm"
+                            onClick={() => setSelectedImage(img)}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Actions */}
+                    <div className="flex items-center gap-4 flex-wrap pt-3 border-t border-pink-50">
+                      {!isRatingOnly && (
+                        <button 
+                          onClick={() => handleMarkHelpful(reviewId)} 
+                          className="text-xs font-bold text-gray-500 hover:text-pink-600 transition flex items-center gap-1.5 bg-pink-50 hover:bg-pink-100 px-3 py-1.5 rounded-full"
+                        >
+                          👍 Helpful {helpful > 0 && `(${helpful})`}
+                        </button>
+                      )}
+                      
+                      {isOwnReview && review.status === 'pending' && (
+                        <button
+                          onClick={() => handleDeleteReview(reviewId)}
+                          className="text-xs font-bold text-rose-500 hover:text-rose-600 transition flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-full"
+                        >
+                          🗑️ Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            
-            {/* Load More Button */}
-            {hasMore && (
-              <button
-                onClick={loadMore}
-                className="w-full py-3 text-pink-600 hover:text-pink-700 text-sm font-medium border border-pink-200 rounded-lg hover:bg-pink-50 transition"
-              >
-                Load More Reviews ({visibleCount} of {sortedReviews.length})
-              </button>
-            )}
-          </>
-        )}
-      </div>
+                );
+              })}
+              
+              {/* Load More */}
+              {hasMore && (
+                <button
+                  onClick={() => setVisibleCount(prev => prev + 5)}
+                  className="w-full py-4 text-pink-600 hover:text-pink-700 text-sm font-bold border-2 border-pink-200 rounded-full hover:bg-pink-50 transition"
+                >
+                  Load More Reviews ({visibleCount} of {sortedReviews.length})
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
       
-      {/* ===== IMAGE LIGHTBOX ===== */}
+      {/* ==================== IMAGE LIGHTBOX ==================== */}
       {selectedImage && (
         <div 
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4"
           onClick={() => setSelectedImage(null)}
         >
-          <div className="relative max-w-[90%] max-h-[90%]">
-            <img 
-              src={selectedImage} 
-              alt="Review" 
-              className="max-w-full max-h-[90vh] rounded-lg object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button 
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-2 right-2 w-10 h-10 bg-white/20 hover:bg-white/40 rounded-full text-white text-2xl flex items-center justify-center transition"
-            >
-              ✕
-            </button>
-          </div>
+          <button 
+            onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 w-12 h-12 bg-white/20 hover:bg-white/40 rounded-full text-white text-2xl flex items-center justify-center transition z-10"
+          >
+            ✕
+          </button>
+          <img 
+            src={selectedImage} 
+            alt="Review" 
+            className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
