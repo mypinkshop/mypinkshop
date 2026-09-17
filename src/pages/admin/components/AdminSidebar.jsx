@@ -10,9 +10,8 @@ function AdminSidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  
-  // ✅ Sirf PENDING orders ka count
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);   // ✅ NEW
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
@@ -29,7 +28,7 @@ function AdminSidebar() {
     return () => window.removeEventListener('resize', checkScreen);
   }, []);
 
-  // ✅ Fetch unread notifications count
+  // ✅ Unread notifications count
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
@@ -42,7 +41,7 @@ function AdminSidebar() {
         
         if (response.ok) {
           const data = await response.json();
-          setUnreadNotifications(data.count || 0);
+          setUnreadNotifications(data.data?.count ?? data.count ?? 0);
         }
       } catch (error) {
         console.error('Error fetching notifications:', error);
@@ -50,19 +49,17 @@ function AdminSidebar() {
     };
 
     fetchUnreadCount();
-    // Refresh every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [API_URL]);
 
-  // ✅ Sirf PENDING orders ka count fetch karo (FIXED)
+  // ✅ Pending orders count
   useEffect(() => {
     const fetchPendingOrderCount = async () => {
       try {
         const token = localStorage.getItem('adminToken');
         if (!token) return;
         
-        // ✅ FIX: ?limit=100 add kiya taaki response chhota rahe
         const response = await fetch(`${API_URL}/api/orders/all?limit=100`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -70,8 +67,6 @@ function AdminSidebar() {
         if (response.ok) {
           const responseData = await response.json();
           const allOrders = Array.isArray(responseData) ? responseData : (responseData.data || []);
-          
-          // ✅ SIRF 'pending' status wale orders count karo
           setPendingOrderCount(allOrders.filter(order => order.status?.toLowerCase() === 'pending').length);
         }
       } catch (error) {
@@ -80,12 +75,37 @@ function AdminSidebar() {
     };
 
     fetchPendingOrderCount();
-    // Refresh har 30 second mein
     const interval = setInterval(fetchPendingOrderCount, 30000);
     return () => clearInterval(interval);
   }, [API_URL]);
 
-  // Complete menu items with all pages
+  // ✅ NEW: Pending reviews count
+  useEffect(() => {
+    const fetchPendingReviewCount = async () => {
+      try {
+        const token = localStorage.getItem('adminToken');
+        if (!token) return;
+
+        const response = await fetch(`${API_URL}/api/reviews/admin/stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const stats = data.data || data.stats || {};
+          setPendingReviewCount(stats.pending || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching pending reviews:', error);
+      }
+    };
+
+    fetchPendingReviewCount();
+    const interval = setInterval(fetchPendingReviewCount, 30000);
+    return () => clearInterval(interval);
+  }, [API_URL]);
+
+  // Complete menu items
   const menuItems = [
     // Main
     { name: 'Dashboard', icon: '📊', path: '/admin/dashboard', badge: null },
@@ -113,7 +133,7 @@ function AdminSidebar() {
     
     // Management
     { name: 'Notifications', icon: '🔔', path: '/admin/notifications', badge: unreadNotifications > 0 ? unreadNotifications : null },
-    { name: 'Reviews', icon: '⭐', path: '/admin/reviews', badge: null },
+    { name: 'Reviews', icon: '⭐', path: '/admin/reviews', badge: pendingReviewCount > 0 ? pendingReviewCount : null },   // ✅ NEW BADGE
     { name: 'Reports', icon: '📈', path: '/admin/reports', badge: null },
     { name: 'Settings', icon: '⚙️', path: '/admin/settings', badge: null },
   ];
@@ -178,8 +198,10 @@ function AdminSidebar() {
                 <>
                   <span className="text-sm font-medium flex-1">{item.name}</span>
                   {item.badge && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse ${
-                      item.name === 'Orders' ? 'bg-orange-500 text-white' : 'bg-red-500 text-white'
+                    <span className={`text-xs px-2 py-0.5 rounded-full min-w-[20px] text-center font-bold ${
+                      item.name === 'Orders' ? 'bg-orange-500 text-white animate-pulse' :
+                      item.name === 'Reviews' ? 'bg-purple-500 text-white animate-pulse' :
+                      'bg-red-500 text-white'
                     }`}>
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
@@ -227,7 +249,6 @@ function AdminSidebar() {
           {(!collapsed || isMobile) && <span className="text-sm font-medium">Logout</span>}
         </button>
         
-        {/* Version info */}
         {(!collapsed || isMobile) && (
           <p className="text-[10px] text-gray-500 text-center mt-3">v2.0.0</p>
         )}
@@ -239,7 +260,6 @@ function AdminSidebar() {
   if (isMobile) {
     return (
       <>
-        {/* Mobile Header */}
         <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-gray-900 to-gray-800 px-4 py-3 flex items-center justify-between shadow-lg md:hidden">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -248,11 +268,11 @@ function AdminSidebar() {
             <h1 className="font-bold text-white text-lg">MyPinkShop</h1>
           </div>
           <div className="flex items-center gap-2">
-            {unreadNotifications > 0 && (
+            {(unreadNotifications > 0 || pendingReviewCount > 0) && (
               <div className="relative">
                 <span className="text-xl">🔔</span>
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
-                  {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  {(unreadNotifications + pendingReviewCount) > 9 ? '9+' : (unreadNotifications + pendingReviewCount)}
                 </span>
               </div>
             )}
@@ -267,7 +287,6 @@ function AdminSidebar() {
           </div>
         </div>
 
-        {/* Mobile Drawer */}
         {mobileMenuOpen && (
           <>
             <div 
