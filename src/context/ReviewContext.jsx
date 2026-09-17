@@ -136,7 +136,7 @@ export const ReviewProvider = ({ children }) => {
           orderId,
           rating,
           title,
-          comment,
+          review: comment,  // ✅ rename
           images,
           videos,
           isRatingOnly
