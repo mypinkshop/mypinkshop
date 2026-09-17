@@ -3,7 +3,7 @@ import { useReviews } from '../context/ReviewContext';
 import { useAuth } from '../context/AuthContext';
 import QuickRating from './QuickRating';
 
-const ReviewSection = ({ productId }) => {
+const ReviewSection = ({ productId, onReviewSubmitted }) => {   // ✅ NEW prop
   const { user } = useAuth();
   const { 
     fetchProductReviews,
@@ -155,6 +155,8 @@ const ReviewSection = ({ productId }) => {
         setShowReviewForm(false);
         alert('✅ Review submitted! Awaiting admin approval.');
         await fetchProductReviews(productId);
+        // ✅ NEW: Parent ko notify karo taaki product rating refresh ho
+        if (onReviewSubmitted) onReviewSubmitted();
       } else {
         alert(result.message);
       }
@@ -178,6 +180,7 @@ const ReviewSection = ({ productId }) => {
     if (success) {
       alert('Review deleted successfully');
       await fetchProductReviews(productId);
+      if (onReviewSubmitted) onReviewSubmitted();   // ✅ NEW
     } else {
       alert('Failed to delete review');
     }
@@ -218,7 +221,6 @@ const ReviewSection = ({ productId }) => {
       <div className="bg-gradient-to-br from-pink-50 via-white to-rose-50 rounded-3xl border-2 border-pink-100 overflow-hidden shadow-sm">
         <div className="grid md:grid-cols-2 gap-6 p-6 sm:p-8">
           
-          {/* LEFT — Average rating */}
           <div className="flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-pink-200 pb-6 md:pb-0 md:pr-6">
             <div className="text-6xl sm:text-7xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
               {averageRating.toFixed(1)}
@@ -243,7 +245,6 @@ const ReviewSection = ({ productId }) => {
             </div>
           </div>
           
-          {/* RIGHT — Distribution bars */}
           <div className="space-y-2.5">
             {[5, 4, 3, 2, 1].map(star => {
               const count = ratingCounts[star] || 0;
@@ -274,7 +275,6 @@ const ReviewSection = ({ productId }) => {
         </div>
       </div>
       
-      {/* ==================== PENDING BANNER ==================== */}
       {hasPendingReview && (
         <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-2xl p-4 flex items-center gap-3">
           <span className="text-2xl">⏳</span>
@@ -284,13 +284,15 @@ const ReviewSection = ({ productId }) => {
         </div>
       )}
       
-      {/* ==================== ACTION BAR ==================== */}
       <div className="flex flex-wrap items-center gap-3">
         {!checkingEligibility && canReview && !showReviewForm && (
           <>
             <QuickRating 
               productId={productId}
-              onRatingSubmitted={() => fetchProductReviews(productId)}
+              onRatingSubmitted={() => {
+                fetchProductReviews(productId);
+                if (onReviewSubmitted) onReviewSubmitted();   // ✅ NEW
+              }}
               buttonText="⭐ Quick Rate"
               showPopup={true}
             />
@@ -322,7 +324,6 @@ const ReviewSection = ({ productId }) => {
         )}
       </div>
       
-      {/* ==================== REVIEW FORM ==================== */}
       {showReviewForm && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-pink-100 shadow-lg">
           <div className="flex justify-between items-center mb-6">
@@ -335,7 +336,6 @@ const ReviewSection = ({ productId }) => {
             </button>
           </div>
           
-          {/* Star rating */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-gray-700 mb-3">
               Your Rating <span className="text-pink-500">*</span>
@@ -357,7 +357,6 @@ const ReviewSection = ({ productId }) => {
             </div>
           </div>
           
-          {/* Title */}
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-2">Review Title</label>
             <input
@@ -370,7 +369,6 @@ const ReviewSection = ({ productId }) => {
             />
           </div>
           
-          {/* Comment */}
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Your Review <span className="text-pink-500">*</span>
@@ -391,7 +389,6 @@ const ReviewSection = ({ productId }) => {
             </p>
           </div>
           
-          {/* Images */}
           <div className="mb-6">
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Add Photos <span className="text-gray-400 font-normal">(Max 5, up to 5MB each)</span>
@@ -429,7 +426,6 @@ const ReviewSection = ({ productId }) => {
             </div>
           </div>
           
-          {/* Info banner */}
           <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl flex items-start gap-3">
             <span className="text-xl">ℹ️</span>
             <p className="text-sm text-blue-800 font-medium">
@@ -437,7 +433,6 @@ const ReviewSection = ({ productId }) => {
             </p>
           </div>
           
-          {/* Buttons */}
           <div className="flex gap-3">
             <button 
               onClick={handleSubmitReview} 
@@ -456,11 +451,9 @@ const ReviewSection = ({ productId }) => {
         </div>
       )}
       
-      {/* ==================== REVIEWS LIST ==================== */}
       {totalReviews > 0 && (
         <div className="space-y-5">
           
-          {/* Header */}
           <div className="flex flex-wrap justify-between items-center gap-3">
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               💬 Customer Reviews
@@ -482,7 +475,6 @@ const ReviewSection = ({ productId }) => {
             </select>
           </div>
           
-          {/* Filter pills */}
           <div className="flex gap-2 flex-wrap">
             {[
               { id: 'all', label: 'All', icon: '🌐' },
@@ -507,7 +499,6 @@ const ReviewSection = ({ productId }) => {
             ))}
           </div>
           
-          {/* No reviews after filter */}
           {filteredReviews.length === 0 ? (
             <div className="text-center py-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl border-2 border-pink-100">
               <div className="text-5xl mb-3">🔍</div>
@@ -539,10 +530,7 @@ const ReviewSection = ({ productId }) => {
                     key={reviewId} 
                     className="bg-white rounded-3xl p-5 sm:p-6 border-2 border-pink-100 hover:border-pink-200 hover:shadow-lg transition-all duration-300"
                   >
-                    
-                    {/* Header */}
                     <div className="flex items-start gap-4 mb-4">
-                      {/* Avatar */}
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0 overflow-hidden">
                         {userAvatar ? (
                           <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
@@ -566,7 +554,6 @@ const ReviewSection = ({ productId }) => {
                           )}
                         </div>
                         
-                        {/* Stars + date */}
                         <div className="flex items-center gap-3 flex-wrap">
                           <div className="flex gap-0.5">
                             {[1,2,3,4,5].map(star => (
@@ -589,12 +576,10 @@ const ReviewSection = ({ productId }) => {
                       </div>
                     </div>
                     
-                    {/* Title */}
                     {review.title && (
                       <h4 className="font-bold text-gray-900 text-base mb-2">{review.title}</h4>
                     )}
                     
-                    {/* Comment */}
                     {!isRatingOnly && reviewText && (
                       <p className="text-gray-700 text-sm leading-relaxed mb-3">
                         {isLongComment && !isExpanded 
@@ -612,7 +597,6 @@ const ReviewSection = ({ productId }) => {
                       </p>
                     )}
                     
-                    {/* Images */}
                     {review.images && review.images.length > 0 && (
                       <div className="flex gap-2 mb-4 flex-wrap">
                         {review.images.map((img, idx) => (
@@ -628,7 +612,6 @@ const ReviewSection = ({ productId }) => {
                       </div>
                     )}
                     
-                    {/* Actions */}
                     <div className="flex items-center gap-4 flex-wrap pt-3 border-t border-pink-50">
                       {!isRatingOnly && (
                         <button 
@@ -652,7 +635,6 @@ const ReviewSection = ({ productId }) => {
                 );
               })}
               
-              {/* Load More */}
               {hasMore && (
                 <button
                   onClick={() => setVisibleCount(prev => prev + 5)}
@@ -666,7 +648,6 @@ const ReviewSection = ({ productId }) => {
         </div>
       )}
       
-      {/* ==================== IMAGE LIGHTBOX ==================== */}
       {selectedImage && (
         <div 
           className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4"
