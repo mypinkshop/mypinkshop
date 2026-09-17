@@ -68,10 +68,11 @@ const FooterSection = () => (
           <h4 className="font-semibold text-white mb-4">Shop</h4>
           <ul className="space-y-2 text-sm">
             <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-            <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-            <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-            <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-            <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+            {/* Commented out - to be added after PhonePe approval */}
+            {/* <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li> */}
+            {/* <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li> */}
+            {/* <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li> */}
+            {/* <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li> */}
           </ul>
         </div>
         <div>
@@ -143,18 +144,18 @@ function Home() {
 
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
-    makeup: false,
-    hair: false,
-    clothing: false,
-    accessories: false,
+    // makeup: false,
+    // hair: false,
+    // clothing: false,
+    // accessories: false,
   });
 
   const sectionRefs = {
     skincare: useRef(null),
-    makeup: useRef(null),
-    hair: useRef(null),
-    clothing: useRef(null),
-    accessories: useRef(null),
+    // makeup: useRef(null),
+    // hair: useRef(null),
+    // clothing: useRef(null),
+    // accessories: useRef(null),
   };
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
@@ -322,16 +323,12 @@ function Home() {
     [handleSearch]
   );
 
-  // ✅ Simplified product slices — no subcategories
+  // ✅ Simplified product slices — only Skincare for now
   const productSlices = useMemo(() => {
     if (!products.length) {
       return {
         newArrivals: [],
         skincareProducts: [],
-        makeupProducts: [],
-        hairProducts: [],
-        clothingProducts: [],
-        accessoriesProducts: [],
       };
     }
 
@@ -350,30 +347,32 @@ function Home() {
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
               .slice(0, 8),
       skincareProducts: byCategory('skincare').slice(0, 8),
-      makeupProducts: byCategory('makeup').slice(0, 8),
-      hairProducts: byCategory('hair').slice(0, 8),
-      clothingProducts: byCategory('clothing').slice(0, 8),
-      accessoriesProducts: byCategory('accessories').slice(0, 8),
+      // Commented out - to be added after PhonePe approval
+      // makeupProducts: byCategory('makeup').slice(0, 8),
+      // hairProducts: byCategory('hair').slice(0, 8),
+      // clothingProducts: byCategory('clothing').slice(0, 8),
+      // accessoriesProducts: byCategory('accessories').slice(0, 8),
     };
   }, [products]);
 
   const {
     newArrivals,
     skincareProducts,
-    makeupProducts,
-    hairProducts,
-    clothingProducts,
-    accessoriesProducts,
+    // makeupProducts,
+    // hairProducts,
+    // clothingProducts,
+    // accessoriesProducts,
   } = productSlices;
 
   const navLinks = useMemo(
     () => [
       { name: 'All', link: '/shop' },
       { name: 'Skincare', link: '/skincare' },
-     // { name: 'Makeup', link: '/makeup' },
-    //  { name: 'Hair', link: '/hair' },
-   //   { name: 'Clothing', link: '/clothing' },
-    //  { name: 'Accessories', link: '/accessories' },
+      // Commented out - to be added after PhonePe approval
+      // { name: 'Makeup', link: '/makeup' },
+      // { name: 'Hair', link: '/hair' },
+      // { name: 'Clothing', link: '/clothing' },
+      // { name: 'Accessories', link: '/accessories' },
       { name: 'Sale 🔥', link: '/shop?offer=sale' },
       { name: 'New Arrivals', link: '/shop?sort=newest' },
       { name: 'Bestsellers', link: '/shop?sort=bestseller' },
@@ -384,10 +383,11 @@ function Home() {
   const categories = useMemo(
     () => [
       { name: 'Skincare', image: '🧴', link: '/skincare', bg: 'from-pink-200 to-rose-200' },
-     // { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-200 to-pink-200' },
-    //  { name: 'Hair', image: '💇‍♀️', link: '/hair', bg: 'from-pink-200 to-amber-200' },
-    //  { name: 'Clothing', image: '👗', link: '/clothing', bg: 'from-rose-200 to-pink-200' },
-     // { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-200 to-rose-200' },
+      // Commented out - to be added after PhonePe approval
+      // { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-200 to-pink-200' },
+      // { name: 'Hair', image: '💇‍♀️', link: '/hair', bg: 'from-pink-200 to-amber-200' },
+      // { name: 'Clothing', image: '👗', link: '/clothing', bg: 'from-rose-200 to-pink-200' },
+      // { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-200 to-rose-200' },
     ],
     []
   );
@@ -445,8 +445,8 @@ function Home() {
   return (
     <>
       <Helmet>
-        <title>MyPinkShop - Best Online Shopping for Skincare, Makeup & Fashion</title>
-        <meta name="description" content="Shop the latest skincare, makeup, hair care, clothing, and accessories at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available." />
+        <title>MyPinkShop - Best Online Shopping for Skincare & Beauty</title>
+        <meta name="description" content="Shop the latest skincare and beauty products at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available." />
         <link rel="canonical" href="https://www.mypinkshop.com" />
       </Helmet>
 
@@ -642,7 +642,7 @@ function Home() {
                   Glow Up <span className="text-pink-600">This Summer</span>
                 </h1>
                 <p className="text-gray-700 text-base sm:text-lg mb-6">
-                  Discover our premium skincare, makeup, and fashion collection.
+                  Discover our premium skincare collection.
                 </p>
                 <Link
                   to="/shop"
@@ -838,8 +838,10 @@ function Home() {
           </section>
         )}
 
-         {/* MAKEUP */}
-        {makeupProducts.length > 0 && (
+        {/* ============ COMMENTED OUT - TO BE ADDED AFTER PHONEPE APPROVAL ============ */}
+
+        {/* MAKEUP */}
+        {/* {makeupProducts.length > 0 && (
           <section ref={sectionRefs.makeup} className="py-12 bg-gradient-to-br from-purple-50 to-pink-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
@@ -847,7 +849,7 @@ function Home() {
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center shadow-md">
                     <span className="text-2xl">💄</span>
                   </div>
-                  {/* <h2 className="text-2xl font-bold text-gray-900">Makeup</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">Makeup</h2>
                 </div>
                 <Link to="/makeup" className="text-pink-600 text-sm font-bold hover:underline">
                   View All →
@@ -877,10 +879,10 @@ function Home() {
               )}
             </div>
           </section>
-        )}
+        )} */}
 
         {/* HAIR */}
-        {hairProducts.length > 0 && (
+        {/* {hairProducts.length > 0 && (
           <section ref={sectionRefs.hair} className="py-12 bg-gradient-to-br from-pink-50 to-amber-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
@@ -918,10 +920,10 @@ function Home() {
               )}
             </div>
           </section>
-        )}
+        )} */}
 
         {/* CLOTHING */}
-        {clothingProducts.length > 0 && (
+        {/* {clothingProducts.length > 0 && (
           <section ref={sectionRefs.clothing} className="py-12 bg-gradient-to-br from-rose-50 to-pink-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
@@ -959,10 +961,10 @@ function Home() {
               )}
             </div>
           </section>
-        )}
+        )} */}
 
         {/* ACCESSORIES */}
-        {accessoriesProducts.length > 0 && (
+        {/* {accessoriesProducts.length > 0 && (
           <section ref={sectionRefs.accessories} className="py-12 bg-gradient-to-br from-amber-50 to-rose-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
@@ -1000,7 +1002,9 @@ function Home() {
               )}
             </div>
           </section>
-        )}
+        )} */}
+
+        {/* ============ END COMMENTED OUT ============ */}
 
         <Suspense fallback={<div className="h-64 bg-pink-600" />}>
           <NewsletterSection />
