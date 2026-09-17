@@ -120,7 +120,7 @@ function ContactUs() {
     "logo": "https://www.mypinkshop.com/logo.png",
     "contactPoint": {
       "@type": "ContactPoint",
-      "telephone": "+91-1800-123-4567",
+      "telephone": "+918172927292",
       "contactType": "customer service",
       "email": "support@mypinkshop.com",
       "availableLanguage": "English"
