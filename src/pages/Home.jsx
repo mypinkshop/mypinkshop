@@ -370,10 +370,10 @@ function Home() {
     () => [
       { name: 'All', link: '/shop' },
       { name: 'Skincare', link: '/skincare' },
-      { name: 'Makeup', link: '/makeup' },
-      { name: 'Hair', link: '/hair' },
-      { name: 'Clothing', link: '/clothing' },
-      { name: 'Accessories', link: '/accessories' },
+     // { name: 'Makeup', link: '/makeup' },
+    //  { name: 'Hair', link: '/hair' },
+   //   { name: 'Clothing', link: '/clothing' },
+    //  { name: 'Accessories', link: '/accessories' },
       { name: 'Sale 🔥', link: '/shop?offer=sale' },
       { name: 'New Arrivals', link: '/shop?sort=newest' },
       { name: 'Bestsellers', link: '/shop?sort=bestseller' },
@@ -384,10 +384,10 @@ function Home() {
   const categories = useMemo(
     () => [
       { name: 'Skincare', image: '🧴', link: '/skincare', bg: 'from-pink-200 to-rose-200' },
-      { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-200 to-pink-200' },
-      { name: 'Hair', image: '💇‍♀️', link: '/hair', bg: 'from-pink-200 to-amber-200' },
-      { name: 'Clothing', image: '👗', link: '/clothing', bg: 'from-rose-200 to-pink-200' },
-      { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-200 to-rose-200' },
+     // { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-200 to-pink-200' },
+    //  { name: 'Hair', image: '💇‍♀️', link: '/hair', bg: 'from-pink-200 to-amber-200' },
+    //  { name: 'Clothing', image: '👗', link: '/clothing', bg: 'from-rose-200 to-pink-200' },
+     // { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-200 to-rose-200' },
     ],
     []
   );
@@ -838,7 +838,7 @@ function Home() {
           </section>
         )}
 
-        {/* MAKEUP */}
+         {/* MAKEUP */}
         {makeupProducts.length > 0 && (
           <section ref={sectionRefs.makeup} className="py-12 bg-gradient-to-br from-purple-50 to-pink-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -847,7 +847,7 @@ function Home() {
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center shadow-md">
                     <span className="text-2xl">💄</span>
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">Makeup</h2>
+                  {/* <h2 className="text-2xl font-bold text-gray-900">Makeup</h2>
                 </div>
                 <Link to="/makeup" className="text-pink-600 text-sm font-bold hover:underline">
                   View All →
