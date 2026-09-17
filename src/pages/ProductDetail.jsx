@@ -257,11 +257,11 @@ function ProductDetail() {
   };
 
   const getCurrentMrp = () => {
-  if (selectedVariation?.mrp) return selectedVariation.mrp;
-  // ✅ Backend snake_case bhejta hai
-  return product?.original_price ?? product?.originalPrice ?? product?.mrp ?? (getCurrentPrice() * 1.2);
-};
-  
+    if (selectedVariation?.mrp) return selectedVariation.mrp;
+    // ✅ Backend snake_case bhejta hai
+    return product?.original_price ?? product?.originalPrice ?? product?.mrp ?? (getCurrentPrice() * 1.2);
+  };
+
   const getDiscountPercent = () => {
     const mrp = getCurrentMrp();
     const price = getCurrentPrice();
@@ -368,8 +368,12 @@ function ProductDetail() {
     }
   };
 
+  // ✅ FIXED: Refresh product after review/rating submission with cache clear
   const handleRatingSubmitted = async () => {
     try {
+      // ✅ Cache clear karo taaki fresh rating/review count aaye
+      safeRemoveItem(sessionStorage, `product_${id}`);
+
       const response = await fetch(`${API_URL}/api/products/${id}`);
       if (response.ok) {
         const data = await response.json();
@@ -377,7 +381,7 @@ function ProductDetail() {
 
         if (productData && (productData._id || productData.id)) {
           setProduct(productData);
-          // ✅ Safe write (quota-safe)
+          // ✅ Fresh write
           setCacheWithTTL(sessionStorage, `product_${id}`, productData, 24 * 60 * 60 * 1000);
         }
       }
@@ -583,7 +587,6 @@ function ProductDetail() {
 
             {/* ============ LEFT — IMAGE GALLERY ============ */}
             <div className="lg:sticky lg:top-24 lg:self-start">
-              {/* Main Image */}
               <div className="relative bg-white rounded-3xl overflow-hidden shadow-lg border border-pink-100 aspect-square flex items-center justify-center group">
                 <img
                   src={getOptimizedImage(galleryImages[selectedImage] || productImages[0])}
@@ -593,7 +596,6 @@ function ProductDetail() {
                   onClick={() => setShowZoom(true)}
                 />
 
-                {/* Wishlist Button */}
                 <button
                   onClick={handleWishlistToggle}
                   className="absolute top-4 right-4 w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border border-pink-100"
@@ -601,27 +603,23 @@ function ProductDetail() {
                   <span className="text-2xl">{isInWishlist(product._id || product.id) ? '❤️' : '🤍'}</span>
                 </button>
 
-                {/* Discount Badge */}
                 {discountPercent > 0 && (
                   <div className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg">
                     {discountPercent}% OFF
                   </div>
                 )}
 
-                {/* Stock Badge */}
                 {isOutOfStock && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
                     <span className="bg-white text-gray-800 font-bold px-6 py-3 rounded-full">Out of Stock</span>
                   </div>
                 )}
 
-                {/* Zoom hint */}
                 <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-3 py-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition">
                   🔍 Click to zoom
                 </div>
               </div>
 
-              {/* Thumbnails */}
               {galleryImages.length > 1 && (
                 <div className="flex gap-3 mt-4 overflow-x-auto pb-2 scrollbar-hide">
                   {galleryImages.map((img, idx) => (
@@ -640,7 +638,6 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Trust Badges */}
               <div className="mt-6 grid grid-cols-3 gap-3">
                 <div className="bg-white rounded-2xl p-3 text-center border border-pink-100 shadow-sm">
                   <div className="text-2xl mb-1">🚚</div>
@@ -660,7 +657,6 @@ function ProductDetail() {
             {/* ============ RIGHT — PRODUCT INFO ============ */}
             <div className="space-y-5">
 
-              {/* Brand */}
               {product.brand && (
                 <Link
                   to={`/shop?brand=${encodeURIComponent(product.brand)}`}
@@ -670,12 +666,10 @@ function ProductDetail() {
                 </Link>
               )}
 
-              {/* Title */}
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">
                 {product.name}
               </h1>
 
-              {/* Rating */}
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1.5 bg-green-50 border border-green-100 rounded-lg px-2.5 py-1">
                   <span className="text-sm font-bold text-green-700">{product.rating || 4.5}</span>
@@ -691,13 +685,12 @@ function ProductDetail() {
                       productId={id}
                       onRatingSubmitted={handleRatingSubmitted}
                       buttonText="⭐ Rate this"
-                      enablePopup={true}
+                      showPopup={true}
                     />
                   </>
                 )}
               </div>
 
-              {/* Price Block */}
               <div className="bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-100 rounded-2xl p-5">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl sm:text-4xl font-bold text-pink-600">₹{currentPrice.toLocaleString()}</span>
@@ -718,7 +711,6 @@ function ProductDetail() {
                 <p className="text-xs text-gray-500 mt-1">Inclusive of all taxes</p>
               </div>
 
-              {/* Stock Status */}
               {isOutOfStock ? (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
                   <span className="text-red-500 text-lg">❌</span>
@@ -736,7 +728,6 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Variations */}
               {hasVariations && (
                 <div className="border-t border-pink-100 pt-5">
                   <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -781,7 +772,6 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Quantity */}
               {!isOutOfStock && (
                 <div className="border-t border-pink-100 pt-5">
                   <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -798,7 +788,6 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 pt-3">
                 <button
                   onClick={handleCartButtonClick}
@@ -826,7 +815,6 @@ function ProductDetail() {
                 </button>
               </div>
 
-              {/* Delivery Check */}
               <div className="border-t border-pink-100 pt-5">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                   <span>📍</span> Check Delivery
@@ -855,48 +843,46 @@ function ProductDetail() {
                 )}
               </div>
 
-              {/* ✅ Why Shop With Us */}
-<div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 rounded-2xl p-4">
-  <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-    <span>💖</span> Why Shop With Us
-  </h4>
-  <ul className="space-y-2.5 text-sm text-gray-700">
-    <li className="flex items-start gap-2">
-      <span className="text-green-500 mt-0.5 font-bold">✓</span>
-      <span><strong>100% Original Products</strong> — Sourced directly from brands</span>
-    </li>
-    <li className="flex items-start gap-2">
-      <span className="text-green-500 mt-0.5 font-bold">✓</span>
-      <span><strong>Easy 7-Day Returns</strong> on unused products with original packaging</span>
-    </li>
-    <li className="flex items-start gap-2">
-      <span className="text-green-500 mt-0.5 font-bold">✓</span>
-      <span><strong>Free Shipping</strong> on orders above ₹499</span>
-    </li>
-    <li className="flex items-start gap-2">
-      <span className="text-green-500 mt-0.5 font-bold">✓</span>
-      <span><strong>Secure Payments</strong> — UPI, Cards, COD, NetBanking available</span>
-    </li>
-    {discountPercent > 0 && (
-      <li className="flex items-start gap-2">
-        <span className="text-green-500 mt-0.5 font-bold">✓</span>
-        <span><strong>Best Price</strong> — {discountPercent}% off right now!</span>
-      </li>
-    )}
-  </ul>
-</div>
+              <div className="bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100 rounded-2xl p-4">
+                <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <span>💖</span> Why Shop With Us
+                </h4>
+                <ul className="space-y-2.5 text-sm text-gray-700">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5 font-bold">✓</span>
+                    <span><strong>100% Original Products</strong> — Sourced directly from brands</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5 font-bold">✓</span>
+                    <span><strong>Easy 7-Day Returns</strong> on unused products with original packaging</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5 font-bold">✓</span>
+                    <span><strong>Free Shipping</strong> on orders above ₹499</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5 font-bold">✓</span>
+                    <span><strong>Secure Payments</strong> — UPI, Cards, COD, NetBanking available</span>
+                  </li>
+                  {discountPercent > 0 && (
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-500 mt-0.5 font-bold">✓</span>
+                      <span><strong>Best Price</strong> — {discountPercent}% off right now!</span>
+                    </li>
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
 
           {/* ============ TABS SECTION ============ */}
           <div className="mt-16 bg-white rounded-3xl shadow-sm border border-pink-100 overflow-hidden">
-            {/* Tab Buttons */}
             <div className="flex gap-2 border-b border-pink-100 px-4 sm:px-6 pt-4 overflow-x-auto scrollbar-hide">
               {[
-                { id: 'description', label: '📖 About', icon: '' },
-                { id: 'features', label: '✨ Highlights', icon: '' },
-                { id: 'specifications', label: '📋 Specifications', icon: '' },
-                { id: 'reviews', label: '⭐ Reviews', icon: '' },
+                { id: 'description', label: '📖 About' },
+                { id: 'features', label: '✨ Highlights' },
+                { id: 'specifications', label: '📋 Specifications' },
+                { id: 'reviews', label: '⭐ Reviews' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -912,7 +898,6 @@ function ProductDetail() {
               ))}
             </div>
 
-            {/* Tab Content */}
             <div className="p-6 sm:p-8">
               {activeTab === 'description' && (
                 <div>
@@ -977,7 +962,8 @@ function ProductDetail() {
               {activeTab === 'reviews' && (
                 <div>
                   <h2 className="text-lg font-bold text-gray-800 mb-5">⭐ Customer Reviews</h2>
-                  <ReviewSection productId={id} />
+                  {/* ✅ Pass onReviewSubmitted callback */}
+                  <ReviewSection productId={id} onReviewSubmitted={handleRatingSubmitted} />
                 </div>
               )}
             </div>
@@ -995,7 +981,8 @@ function ProductDetail() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
                 {relatedProducts.map((rp) => {
                   const rpPrice = rp.price || rp.sellingPrice || 0;
-                  const rpMrp = rp.originalPrice || rp.mrp || 0;
+                  // ✅ FIX: original_price (snake_case) support
+                  const rpMrp = rp.original_price ?? rp.originalPrice ?? rp.mrp ?? 0;
                   const rpDiscount = rpMrp > rpPrice ? Math.round(((rpMrp - rpPrice) / rpMrp) * 100) : 0;
                   return (
                     <Link
@@ -1052,54 +1039,54 @@ function ProductDetail() {
           </div>
         )}
 
-       {/* ============ FOOTER ============ */}
-<footer className="bg-gray-900 text-gray-400 py-12">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">M</span>
+        {/* ============ FOOTER ============ */}
+        <footer className="bg-gray-900 text-gray-400 py-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">M</span>
+                  </div>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
+                </div>
+                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Shop</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Support</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
+              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+            </div>
           </div>
-          <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
-        </div>
-        <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
-      </div>
-      <div>
-        <h4 className="font-semibold text-white mb-4">Shop</h4>
-        <ul className="space-y-2 text-sm">
-          <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-          <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-          <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-          <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-          <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
-        </ul>
-      </div>
-      <div>
-        <h4 className="font-semibold text-white mb-4">Support</h4>
-        <ul className="space-y-2 text-sm">
-          <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-          <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-          <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-          <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
-        </ul>
-      </div>
-      <div>
-        <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-        <ul className="space-y-2 text-sm">
-          <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-          <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-          <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-          <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-        </ul>
-      </div>
-    </div>
-    <div className="text-center pt-8 border-t border-gray-800">
-      <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-      <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
-    </div>
-  </div>
-</footer>
+        </footer>
 
         <style>{`
           .scrollbar-hide::-webkit-scrollbar { display: none; }
