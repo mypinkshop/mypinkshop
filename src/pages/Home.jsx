@@ -98,6 +98,7 @@ const FooterSection = () => (
         <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
         <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
         <p className="text-xs text-gray-500 mt-1">Legal Name: Altaf Ahmad Khan</p>
+         <p className="text-xs text-gray-500 mt-1">Trade Name: Richfem</p>
       </div>
     </div>
   </footer>
