@@ -106,7 +106,6 @@ const safeParseJSON = (val, fallback = []) => {
       const parsed = JSON.parse(val);
       return parsed;
     } catch {
-      // Agar JSON nahi hai to newline se split karo
       return val.split('\n').filter(b => b.trim());
     }
   }
@@ -120,6 +119,39 @@ const stringToBullets = (desc) => {
     return desc.split('\n').map(s => s.trim()).filter(Boolean);
   }
   return [];
+};
+
+// ✅ Helper: backend ke naye variants ko admin ke purane format me convert karo
+const normalizeVariantsFromBackend = (rawVariants) => {
+  if (!Array.isArray(rawVariants)) return [];
+  return rawVariants.map((v, idx) => {
+    // Case 1: Backend naya format (option1/option2 objects)
+    if (v.option1 || v.option2) {
+      return {
+        id: v.id || `var_${idx}_${Date.now()}`,
+        name: v.option1?.value || '',
+        secondaryName: v.option2?.value || '',
+        price: Number(v.price) || 0,
+        mrp: Number(v.compareAtPrice || v.compare_at_price || v.mrp) || 0,
+        stock: Number(v.stock) || 0,
+        sku: v.sku || '',
+        image: v.image || '',
+        attributes: {},
+      };
+    }
+    // Case 2: Purana admin format (name/secondaryName)
+    return {
+      id: v.id || `var_${idx}_${Date.now()}`,
+      name: v.name || v.option1Value || '',
+      secondaryName: v.secondaryName || v.option2Value || '',
+      price: Number(v.price) || 0,
+      mrp: Number(v.mrp || v.compareAtPrice) || 0,
+      stock: Number(v.stock) || 0,
+      sku: v.sku || '',
+      image: v.image || '',
+      attributes: v.attributes || {},
+    };
+  });
 };
 
 function AdminEditProduct() {
@@ -224,7 +256,7 @@ function AdminEditProduct() {
 
   const variationAttrs = getVariationAttributes();
 
-  // ✅ FIXED: Load product data from API with nested + snake_case handling
+  // ✅ Load product with variants normalization
   useEffect(() => {
     const loadProduct = async () => {
       try {
@@ -244,27 +276,14 @@ function AdminEditProduct() {
         const rawData = await response.json();
         console.log('📦 RAW API RESPONSE:', rawData);
 
-        // ✅ CRITICAL FIX: Handle nested { success, data } structure
         const product = rawData.data || rawData.product || rawData;
-
         console.log('✅ PRODUCT USED:', product);
 
-        // ✅ Description - string with \n ya array
         const descriptionArray = stringToBullets(product.description || product.about_this_item || product.aboutThisItem);
-
-        // ✅ Key Features - JSON string parse karo
         const keyFeaturesArray = safeParseJSON(product.key_features || product.keyFeatures, []);
-
-        // ✅ Specifications - backend mein nahi hai, empty rakho
         const specsObj = product.productDetails || product.specifications || {};
-
-        // ✅ Images - array of URLs
         const imagesArray = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
-
-        // ✅ Concerns - JSON string parse karo
         const concernsArray = safeParseJSON(product.concerns, []);
-
-        // ✅ Hair Concerns
         const hairConcernsArray = safeParseJSON(product.hair_concerns || product.hairConcerns, []);
 
         setFormData({
@@ -301,10 +320,14 @@ function AdminEditProduct() {
           gender: product.gender || 'unisex'
         });
 
-        // ✅ Variations load
-        const productVariations = product.variations || product.variants || [];
-        if (Array.isArray(productVariations) && productVariations.length > 0) {
-          setVariations(productVariations);
+        // ✅ CRITICAL FIX: variants ko admin ke purane format me normalize karo
+        const rawVariants = product.variants || product.variations || [];
+        if (Array.isArray(rawVariants) && rawVariants.length > 0) {
+          const normalized = normalizeVariantsFromBackend(rawVariants);
+          setVariations(normalized);
+          console.log('✅ Variants normalized:', normalized);
+        } else {
+          setVariations([]);
         }
 
       } catch (error) {
@@ -473,8 +496,8 @@ function AdminEditProduct() {
         body: formDataImg
       });
       const data = await response.json();
-      if (data.url) {
-        setVariationForm({ ...variationForm, image: data.url });
+      if (data.url || data.data?.url) {
+        setVariationForm({ ...variationForm, image: data.url || data.data?.url });
         alert('✅ Image uploaded!');
       }
     } catch (error) {
@@ -518,7 +541,7 @@ function AdminEditProduct() {
       });
       if (!response.ok) throw new Error('Upload failed');
       const data = await response.json();
-      return data.url;
+      return data.url || data.data?.url;
     } catch (error) { throw error; }
   };
 
@@ -531,7 +554,7 @@ function AdminEditProduct() {
       if (file.size > 5 * 1024 * 1024) { alert(`${file.name} > 5MB`); continue; }
       try {
         const url = await uploadImageToBackend(file);
-        uploadedUrls.push(url);
+        if (url) uploadedUrls.push(url);
       } catch (error) { alert(`Failed: ${file.name}`); }
     }
     if (uploadedUrls.length) {
@@ -592,6 +615,9 @@ function AdminEditProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // ============================================================
+  // ✅ SUBMIT — NAYA FORMAT (variants) backend ko bhejo
+  // ============================================================
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     
@@ -611,16 +637,18 @@ function AdminEditProduct() {
 
     const finalSku = formData.sku || generateSKU();
 
-    const cleanVariations = variations.map(v => ({
+    // ✅ NAYA: admin ke purane format se backend ke naye variants format me convert karo
+    const attrs = getVariationAttributes();
+
+    const cleanVariants = variations.map(v => ({
       id: v.id,
-      name: v.name,
-      secondaryName: v.secondaryName || '',
-      price: Number(v.price),
-      mrp: Number(v.mrp) || Number(v.price) * 1.2,
-      stock: Number(v.stock),
       sku: v.sku || `VAR-${v.id}`,
+      option1Value: v.name || '',
+      option2Value: v.secondaryName || '',
+      price: Number(v.price) || 0,
+      compareAtPrice: Number(v.mrp) || Number(v.price) * 1.2 || 0,
+      stock: Number(v.stock) || 0,
       image: v.image || '',
-      attributes: v.attributes || {}
     }));
 
     const productData = {
@@ -628,6 +656,7 @@ function AdminEditProduct() {
       brand: formData.brand,
       category: formData.subCategory,
       mainCategory: formData.category,
+      subCategory: formData.subCategory,
       price: parseFloat(formData.price),
       originalPrice: parseFloat(formData.originalPrice) || parseFloat(formData.price) * 1.2,
       tax: parseFloat(formData.tax) || 5,
@@ -654,7 +683,13 @@ function AdminEditProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-      variations: cleanVariations,
+
+      // ✅ NAYA: variants format
+      hasVariations: cleanVariants.length > 0,
+      option1Name: attrs.type,
+      option2Name: attrs.secondary || '',
+      variants: cleanVariants,
+
       status: 'active'
     };
 
@@ -671,10 +706,10 @@ function AdminEditProduct() {
       const responseData = await response.json();
       
       if (!response.ok) {
-        throw new Error(responseData.error || 'Update failed');
+        throw new Error(responseData.error || responseData.message || 'Update failed');
       }
       
-      alert(`✅ Product updated successfully! ${cleanVariations.length} variations saved.`);
+      alert(`✅ Product updated successfully! ${cleanVariants.length} variants saved.`);
       navigate('/admin/inventory');
     } catch (error) {
       console.error('Update error:', error);
