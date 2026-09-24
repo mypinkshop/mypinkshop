@@ -403,6 +403,16 @@ function Checkout() {
           code: couponCode,
           cartTotal: subtotal,
           userId: user?._id || null,
+          // ✅ cartItems bhi bhejo (vendor coupons ke liye)
+          cartItems: cart.map((item) => ({
+            cartKey: item.cartKey,
+            id: item.id,
+            productId: item.id,
+            variantId: item.variantId || null,
+            vendorId: item.vendorId || null,
+            price: item.price,
+            quantity: item.quantity,
+          })),
         }),
       });
 
@@ -490,9 +500,16 @@ function Checkout() {
           price: item.price,
           quantity: item.quantity,
           image: item.image || null,
-          variationName: item.variationName || null,
-          variationSecondary: item.variationSecondary || null,
           vendorId: item.vendorId || null,
+          brand: item.brand || null,
+          // ✅ VARIANT FIELDS — backend ye expect karta hai
+          variantId: item.variantId || null,
+          variantSku: item.variantSku || null,
+          variantLabel: item.variantLabel || null,
+          size: item.size || null,
+          color: item.color || null,
+          option1Name: item.option1Name || null,
+          option2Name: item.option2Name || null,
         })),
         total: total,
         address: {
@@ -505,6 +522,7 @@ function Checkout() {
           country: formData.country || 'India',
         },
         paymentMethod: paymentMethod || 'cod',
+        discount: discount || 0,
       };
 
       const response = await fetch(`${API_URL}/api/orders`, {
@@ -525,19 +543,15 @@ function Checkout() {
 
       const result = data.data || data;
 
-      // ✅✅✅ CRITICAL FIX: Backend `orderId` (database id) priority 1
-      // Backend `orders.js` POST / returns: { order, orderId: id, orderNumber }
-      // ✅ `MPS-...` (order_number) priority 1
-const newOrderId =
-  result.orderNumber ||
-  result.order_number ||
-  result.order?.orderNumber ||
-  result.order?.order_number ||
-  result.orderId ||
-  result.order?.id ||
-  result.id;
+      const newOrderId =
+        result.orderNumber ||
+        result.order_number ||
+        result.order?.orderNumber ||
+        result.order?.order_number ||
+        result.orderId ||
+        result.order?.id ||
+        result.id;
 
-console.log('✅ newOrderId:', newOrderId);
       console.log('✅ newOrderId (for payment):', newOrderId);
 
       if (!newOrderId) {
@@ -600,6 +614,9 @@ console.log('✅ newOrderId:', newOrderId);
     }
     return 'Delivery available (4-5 business days)';
   };
+
+  // ✅ Total items count
+  const totalItemsCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   // ============================================================
   // ORDER PLACED SUCCESS
@@ -815,9 +832,9 @@ console.log('✅ newOrderId:', newOrderId);
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cart.length > 0 && (
+                  {totalItemsCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
-                      {cart.length}
+                      {totalItemsCount}
                     </span>
                   )}
                 </Link>
@@ -1284,19 +1301,19 @@ console.log('✅ newOrderId:', newOrderId);
                   <span className="text-xl">🛒</span>
                   <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
                   <span className="ml-auto text-xs bg-pink-100 text-pink-700 px-2.5 py-0.5 rounded-full font-bold">
-                    {cart.length} items
+                    {totalItemsCount} items
                   </span>
                 </div>
 
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
                   {cart.map((item) => (
-                    <div key={item.id} className="flex gap-3 pb-3 border-b border-pink-50">
-                      <div className="w-14 h-14 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-pink-100">
+                    <div key={item.cartKey} className="flex gap-3 pb-3 border-b border-pink-50">
+                      <div className="w-14 h-14 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-pink-100 p-1">
                         {item.image ? (
                           <img
                             src={item.image}
                             alt={item.name}
-                            className="w-12 h-12 rounded-lg object-cover"
+                            className="w-full h-full rounded-lg object-contain"
                           />
                         ) : (
                           <span className="text-2xl">🛍️</span>
@@ -1304,16 +1321,26 @@ console.log('✅ newOrderId:', newOrderId);
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-xs text-gray-800 truncate">{item.name}</p>
-                        {item.variationName && (
-                          <p className="text-[10px] text-gray-500">
-                            {item.variationName}
-                            {item.variationSecondary && ` • ${item.variationSecondary}`}
-                          </p>
+
+                        {/* ✅ VARIANT CHIPS */}
+                        {(item.size || item.color) && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.size && (
+                              <span className="text-[9px] bg-pink-100 text-pink-700 font-bold px-1.5 py-0.5 rounded">
+                                {item.option1Name || 'Size'}: {item.size}
+                              </span>
+                            )}
+                            {item.color && (
+                              <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded">
+                                {item.option2Name || 'Color'}: {item.color}
+                              </span>
+                            )}
+                          </div>
                         )}
 
                         <div className="flex items-center gap-2 mt-1">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(item.cartKey, item.quantity - 1)}
                             className="w-6 h-6 bg-pink-100 rounded text-pink-600 font-bold hover:bg-pink-200"
                           >
                             −
@@ -1322,7 +1349,7 @@ console.log('✅ newOrderId:', newOrderId);
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(item.cartKey, item.quantity + 1)}
                             className="w-6 h-6 bg-pink-100 rounded text-pink-600 font-bold hover:bg-pink-200"
                           >
                             +
@@ -1330,13 +1357,13 @@ console.log('✅ newOrderId:', newOrderId);
                         </div>
 
                         <p className="text-sm font-bold text-pink-600 mt-1">
-                          ₹{item.price * item.quantity}
+                          ₹{(item.price * item.quantity).toLocaleString()}
                         </p>
                       </div>
 
                       <button
                         onClick={() => {
-                          removeFromCart(item.id);
+                          removeFromCart(item.cartKey);
                           toast.success('Item removed');
                         }}
                         className="text-red-500 hover:text-red-700 text-xs self-start mt-1 font-bold"
