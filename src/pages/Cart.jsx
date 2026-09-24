@@ -37,9 +37,12 @@ function Cart() {
   useEffect(() => {
     const fetchCouponsAndShipping = async () => {
       try {
+        // ✅ cartKey use karo (ab), variant info bhi bhejo
         const cartItemsWithVendor = cart.map((item) => ({
+          cartKey: item.cartKey,
           id: item.id,
           productId: item.id,
+          variantId: item.variantId || null,
           vendorId: item.vendorId || null,
           price: item.price,
           quantity: item.quantity,
@@ -125,8 +128,9 @@ function Cart() {
     setTimeout(() => navigate('/checkout'), 500);
   };
 
-  const handleImageError = (itemId) => {
-    setImgErrors((prev) => ({ ...prev, [itemId]: true }));
+  // ✅ cartKey use karo
+  const handleImageError = (cartKey) => {
+    setImgErrors((prev) => ({ ...prev, [cartKey]: true }));
   };
 
   const handleSearch = () => {
@@ -139,9 +143,10 @@ function Cart() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  const handleUpdateQuantity = (id, newQuantity, stock) => {
+  // ✅ cartKey use karo
+  const handleUpdateQuantity = (cartKey, newQuantity, stock) => {
     if (newQuantity < 1) {
-      removeFromCart(id);
+      removeFromCart(cartKey);
       toast.success('Item removed from cart');
       return;
     }
@@ -149,12 +154,13 @@ function Cart() {
       toast.error('Not enough stock available');
       return;
     }
-    updateQuantity(id, newQuantity);
+    updateQuantity(cartKey, newQuantity);
   };
 
-  const handleRemoveItem = (id, name) => {
+  // ✅ cartKey use karo
+  const handleRemoveItem = (cartKey, name) => {
     if (window.confirm(`Remove "${name}" from cart?`)) {
-      removeFromCart(id);
+      removeFromCart(cartKey);
       toast.success('Item removed from cart');
     }
   };
@@ -168,9 +174,12 @@ function Cart() {
     setValidatingCoupon(true);
 
     try {
+      // ✅ cartKey + variantId bhejo
       const cartItemsWithVendor = cart.map((item) => ({
+        cartKey: item.cartKey,
         id: item.id,
         productId: item.id,
+        variantId: item.variantId || null,
         price: item.price,
         quantity: item.quantity,
         vendorId: item.vendorId || null,
@@ -508,26 +517,25 @@ function Cart() {
             <div className="flex-1 space-y-4">
               {cart.map((item) => (
                 <div
-                  key={item.id}
+                  key={item.cartKey}                                       // ✅ cartKey
                   className="group bg-white rounded-3xl border-2 border-pink-100 hover:border-pink-300 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                 >
-                  {/* Top gradient accent */}
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500" />
 
                   <div className="flex gap-4 pt-1">
-                    {/* Image — SAME SIZE, object-contain (uncropped) */}
+                    {/* Image */}
                     <Link
                       to={`/product/${item.id}`}
                       className="block flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 hover:border-pink-300 flex items-center justify-center p-2 transition-all shadow-sm"
                     >
-                      {item.image && !imgErrors[item.id] ? (
+                      {item.image && !imgErrors[item.cartKey] ? (        // ✅ cartKey
                         <img
                           src={item.image}
                           alt={item.name}
                           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
                           decoding="async"
-                          onError={() => handleImageError(item.id)}
+                          onError={() => handleImageError(item.cartKey)}   // ✅ cartKey
                         />
                       ) : (
                         <div className="text-3xl">{item.emoji || '✨'}</div>
@@ -536,7 +544,6 @@ function Cart() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0 flex flex-col">
-                      {/* Brand / Vendor badge */}
                       {item.vendorId ? (
                         <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded-full w-fit mb-1">
                           🛍️ Vendor
@@ -547,20 +554,26 @@ function Cart() {
                         </p>
                       ) : null}
 
-                      {/* Product name */}
                       <Link to={`/product/${item.id}`}>
                         <h3 className="font-bold text-gray-900 hover:text-pink-600 transition line-clamp-2 text-sm sm:text-base mb-1">
                           {item.name}
                         </h3>
                       </Link>
 
-                      {/* Variation */}
-                      {item.variationName && (
-                        <p className="text-xs text-gray-500 font-medium mb-1">
-                          <span className="text-gray-400">Option:</span>{' '}
-                          {item.variationName}
-                          {item.variationSecondary && ` • ${item.variationSecondary}`}
-                        </p>
+                      {/* ✅ VARIANT INFO — Size / Color */}
+                      {(item.size || item.color) && (
+                        <div className="flex flex-wrap gap-2 mb-1.5">
+                          {item.size && (
+                            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs bg-pink-50 text-pink-700 font-bold px-2 py-0.5 rounded-full border border-pink-200">
+                              {item.option1Name || 'Size'}: {item.size}
+                            </span>
+                          )}
+                          {item.color && (
+                            <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded-full border border-purple-200">
+                              {item.option2Name || 'Color'}: {item.color}
+                            </span>
+                          )}
+                        </div>
                       )}
 
                       {/* Price */}
@@ -585,11 +598,10 @@ function Cart() {
 
                       {/* Quantity + Remove */}
                       <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
-                        {/* Premium quantity selector */}
                         <div className="flex items-center gap-0 bg-gradient-to-r from-pink-50 to-rose-50 border-2 border-pink-200 rounded-full overflow-hidden shadow-sm">
                           <button
                             onClick={() =>
-                              handleUpdateQuantity(item.id, item.quantity - 1, item.stock)
+                              handleUpdateQuantity(item.cartKey, item.quantity - 1, item.stock)   // ✅
                             }
                             className="w-7 h-7 hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center text-base"
                           >
@@ -600,7 +612,7 @@ function Cart() {
                           </span>
                           <button
                             onClick={() =>
-                              handleUpdateQuantity(item.id, item.quantity + 1, item.stock)
+                              handleUpdateQuantity(item.cartKey, item.quantity + 1, item.stock)   // ✅
                             }
                             className="w-7 h-7 hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center text-base"
                           >
@@ -608,9 +620,8 @@ function Cart() {
                           </button>
                         </div>
 
-                        {/* Remove button */}
                         <button
-                          onClick={() => handleRemoveItem(item.id, item.name)}
+                          onClick={() => handleRemoveItem(item.cartKey, item.name)}             // ✅
                           className="flex items-center gap-1 text-xs text-rose-500 hover:text-white hover:bg-rose-500 transition-all font-bold px-2.5 py-1 rounded-full border-2 border-rose-200 hover:border-rose-500"
                         >
                           <svg
