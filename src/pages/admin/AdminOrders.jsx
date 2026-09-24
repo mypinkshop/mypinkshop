@@ -86,6 +86,14 @@ function AdminOrders() {
               brand: item.brand || item.product_brand || 'MyPinkShop',
               image: item.image || item.product_image || item.img,
               price: item.price || item.unit_price || 0,
+              // ✅ VARIANT FIELDS NORMALIZE
+              variantId: item.variantId || item.variant_id || null,
+              variantSku: item.variantSku || item.variant_sku || null,
+              variantLabel: item.variantLabel || item.variant_label || null,
+              size: item.size || null,
+              color: item.color || null,
+              option1Name: item.option1Name || item.option1_name || null,
+              option2Name: item.option2Name || item.option2_name || null,
             })),
           };
         });
@@ -260,14 +268,19 @@ function AdminOrders() {
     return true;
   });
 
-  // 📥 Export Filtered Orders to CSV with separate Brand & Product columns
+  // ✅ CSV export with variant columns for warehouse
   const exportToCSV = () => {
     if (filteredOrders.length === 0) {
       toast.error('No orders to export!');
       return;
     }
 
-    const headers = ['Order ID', 'Date', 'Customer Name', 'Phone', 'Address', 'Brand Name', 'Product Name & Qty', 'Total (INR)', 'Payment', 'Status'];
+    const headers = [
+      'Order ID', 'Date', 'Customer Name', 'Phone', 'Address',
+      'Brand Name', 'Product Name & Qty',
+      'Size', 'Color', 'SKU',
+      'Total (INR)', 'Payment', 'Status'
+    ];
     const rows = [];
 
     filteredOrders.forEach(order => {
@@ -281,6 +294,9 @@ function AdminOrders() {
           `"${getCustomerAddress(order).replace(/"/g, '""')}"`,
           `"${item.brand || 'MyPinkShop'}"`,
           `"${item.quantity}x ${item.name}"`,
+          `"${item.size || ''}"`,
+          `"${item.color || ''}"`,
+          `"${item.variantSku || ''}"`,
           order.total || 0,
           order.paymentMethod || 'COD',
           order.status || 'Pending'
@@ -296,7 +312,7 @@ function AdminOrders() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('📥 Orders exported successfully with separate brand/product columns!');
+    toast.success('📥 Orders exported with variants (Size, Color, SKU) for warehouse!');
   };
 
   const totalOrders = orders.length;
@@ -340,7 +356,7 @@ function AdminOrders() {
           <button 
             onClick={exportToCSV}
             className="bg-[#ff9900] hover:bg-[#fa9400] text-slate-900 px-3.5 py-1.5 rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5 shrink-0"
-            title="Download CSV with separate Brand & Product columns for Warehouse"
+            title="Download CSV with Size, Color, SKU for Warehouse"
           >
             <span>📥</span> Export CSV
           </button>
@@ -402,7 +418,7 @@ function AdminOrders() {
             </div>
           )}
 
-          {/* Orders Data Table with Separate Brand & Product Columns */}
+          {/* Orders Data Table */}
           <div className="bg-white rounded-b-xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -436,7 +452,6 @@ function AdminOrders() {
                             <p className="text-[11px] text-slate-600">📞 {getCustomerPhone(order)}</p>
                             <p className="text-[11px] text-slate-500 line-clamp-2">{getCustomerAddress(order)}</p>
                           </td>
-                          {/* Separate Brand Column */}
                           <td className="p-3 align-top">
                             <div className="space-y-1">
                               {order.items?.map((i, idx) => (
@@ -446,13 +461,32 @@ function AdminOrders() {
                               ))}
                             </div>
                           </td>
-                          {/* Separate Product Name Column */}
+                          {/* ✅ Product Name with variant chips */}
                           <td className="p-3 align-top">
-                            <div className="space-y-1 text-slate-800">
+                            <div className="space-y-1.5 text-slate-800">
                               {order.items?.map((i, idx) => (
-                                <p key={idx} className="font-medium line-clamp-2">
-                                  <span className="font-bold text-slate-900">{i.quantity}x</span> {i.name}
-                                </p>
+                                <div key={idx}>
+                                  <p className="font-medium line-clamp-2">
+                                    <span className="font-bold text-slate-900">{i.quantity}x</span> {i.name}
+                                  </p>
+                                  {(i.size || i.color) && (
+                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                      {i.size && (
+                                        <span className="text-[10px] bg-pink-50 text-pink-700 font-bold px-1.5 py-0.5 rounded border border-pink-200">
+                                          {i.option1Name || 'Size'}: {i.size}
+                                        </span>
+                                      )}
+                                      {i.color && (
+                                        <span className="text-[10px] bg-purple-50 text-purple-700 font-bold px-1.5 py-0.5 rounded border border-purple-200">
+                                          {i.option2Name || 'Color'}: {i.color}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {i.variantSku && (
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {i.variantSku}</p>
+                                  )}
+                                </div>
                               ))}
                             </div>
                           </td>
@@ -546,8 +580,30 @@ function AdminOrders() {
               <div className="border-t pt-2">
                 <p className="font-bold mb-1">Items Ordered:</p>
                 {selectedOrder.items?.map((item, idx) => (
-                  <div key={idx} className="flex justify-between py-1 border-b border-slate-100 gap-2">
-                    <span><strong className="text-amber-700">[{item.brand || 'MyPinkShop'}]</strong> {item.quantity}x {item.name}</span>
+                  <div key={idx} className="flex justify-between py-2 border-b border-slate-100 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p>
+                        <strong className="text-amber-700">[{item.brand || 'MyPinkShop'}]</strong> {item.quantity}x {item.name}
+                      </p>
+                      {/* ✅ VARIANT INFO */}
+                      {(item.size || item.color) && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.size && (
+                            <span className="text-[10px] bg-pink-50 text-pink-700 font-bold px-1.5 py-0.5 rounded border border-pink-200">
+                              {item.option1Name || 'Size'}: {item.size}
+                            </span>
+                          )}
+                          {item.color && (
+                            <span className="text-[10px] bg-purple-50 text-purple-700 font-bold px-1.5 py-0.5 rounded border border-purple-200">
+                              {item.option2Name || 'Color'}: {item.color}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {item.variantSku && (
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">SKU: {item.variantSku}</p>
+                      )}
+                    </div>
                     <span className="font-semibold shrink-0">₹{item.price * item.quantity}</span>
                   </div>
                 ))}
