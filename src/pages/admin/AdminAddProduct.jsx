@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
 // ============================================
-// AMAZON IMPORTER COMPONENT
+// AMAZON IMPORTER COMPONENT (UNTOUCHED)
 // ============================================
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -272,7 +272,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 };
 
 // ============================================
-// FLIPKART IMPORTER COMPONENT
+// FLIPKART IMPORTER COMPONENT (UNTOUCHED)
 // ============================================
 const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -976,7 +976,6 @@ function AdminAddProduct() {
       toast.success(`✅ ${uploadedUrls.length} image(s) uploaded successfully!`);
     }
     setUploadingImages(false);
-    // Reset file input so same file can be uploaded again
     e.target.value = '';
   };
 
@@ -1061,6 +1060,9 @@ function AdminAddProduct() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ============================================================
+  // ✅ SUBMIT PRODUCT — NAYA FORMAT (variants)
+  // ============================================================
   const submitProduct = async () => {
     if (!formData.productName.trim() || !formData.brand.trim() || !formData.category || !formData.subCategory || !formData.images.length || !formData.sellingPrice) {
       const msg = '❌ Please fill all mandatory fields across steps before publishing!';
@@ -1076,8 +1078,21 @@ function AdminAddProduct() {
       return;
     }
 
+    // ✅ Variation validation
+    if (variations.length > 0) {
+      const invalid = variations.find(v => !v.name || !v.price || v.stock === undefined);
+      if (invalid) {
+        toast.error(`❌ Variation "${invalid.name || 'Unknown'}" me price/stock missing hai`);
+        setLoading(false);
+        return;
+      }
+    }
+
     const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
     const finalSku = formData.sku || generateSKU();
+
+    // ✅ NAYA: variation attrs nikalo
+    const attrs = getVariationAttributes();
 
     const productData = {
       id: productId,
@@ -1108,8 +1123,21 @@ function AdminAddProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-      variations: variations,
+
+      // ✅ NAYA: variants format (backend isi ko expect karta hai)
       hasVariations: variations.length > 0,
+      option1Name: attrs.type,                  // "Size" ya "Shade"
+      option2Name: attrs.secondary || '',       // "Color" ya "Finish"
+      variants: variations.map(v => ({
+        sku: v.sku,
+        option1Value: v.name,                   // "M"
+        option2Value: v.secondaryName || '',    // "Red"
+        price: parseFloat(v.price) || 0,
+        compareAtPrice: parseFloat(v.mrp) || 0,
+        stock: parseInt(v.stock) || 0,
+        image: v.image || '',
+      })),
+
       metaTitle: seoData.metaTitle,
       metaDescription: seoData.metaDescription,
       metaKeywords: seoData.metaKeywords,
