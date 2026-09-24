@@ -87,10 +87,8 @@ const FooterSection = () => (
         <div>
           <h4 className="font-semibold text-white mb-4">Follow Us</h4>
           <ul className="space-y-2 text-sm">
-            <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-            <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-            <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-            <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+            <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+            <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
           </ul>
         </div>
       </div>
