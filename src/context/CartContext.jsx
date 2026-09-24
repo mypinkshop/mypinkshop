@@ -4,20 +4,32 @@ const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
 
+// ✅ Unique cart key generator (product + variant)
+const getCartItemKey = (product) => {
+  const productId = product.id || product._id;
+  const variantId = product.variantId || product.variant_id || '';
+  return variantId ? `${productId}::${variantId}` : productId;
+};
+
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const [cartCount, setCartCount] = useState(0);
   const [cartTotalAmount, setCartTotalAmount] = useState(0);
 
-  // ✅ Load cart from localStorage
+  // ✅ Load cart from localStorage (with migration)
   useEffect(() => {
     const savedCart = localStorage.getItem('pinkCart');
     if (savedCart) {
       try {
         const parsed = JSON.parse(savedCart);
-        setCart(parsed);
-        setCartCount(parsed.reduce((sum, i) => sum + i.quantity, 0));
-        setCartTotalAmount(parsed.reduce((sum, i) => sum + (i.price * i.quantity), 0));
+        // ✅ Purane items me cartKey add karo (migration)
+        const migrated = parsed.map(item => ({
+          ...item,
+          cartKey: item.cartKey || (item.variantId ? `${item.id}::${item.variantId}` : item.id),
+        }));
+        setCart(migrated);
+        setCartCount(migrated.reduce((sum, i) => sum + i.quantity, 0));
+        setCartTotalAmount(migrated.reduce((sum, i) => sum + (i.price * i.quantity), 0));
       } catch (e) {
         console.error('Error loading cart:', e);
       }
@@ -33,15 +45,17 @@ export const CartProvider = ({ children }) => {
     localStorage.setItem('pinkCart', JSON.stringify(cart));
   }, [cart]);
 
-  // ✅ Add to cart with proper image handling
+  // ✅ Add to cart with variants
   const addToCart = (product) => {
     const productId = product.id || product._id;
-    
+    const cartKey = getCartItemKey(product);
+
     setCart(prev => {
-      const existing = prev.find(i => i.id === productId);
-      
-      // ✅ Ensure image is properly captured
+      const existing = prev.find(i => i.cartKey === cartKey);
+
+      // ✅ Saare variant fields preserve karo
       const productToAdd = {
+        cartKey,
         id: productId,
         name: product.name || 'Product',
         price: product.price || 0,
@@ -52,53 +66,57 @@ export const CartProvider = ({ children }) => {
         stock: product.stock || 0,
         originalPrice: product.originalPrice || null,
         rating: product.rating || null,
+
+        // ✅ VARIANT FIELDS
+        variantId: product.variantId || null,
+        variantSku: product.variantSku || null,
+        variantImage: product.variantImage || null,
+        variantLabel: product.variantLabel || null,
+        size: product.size || null,
+        color: product.color || null,
+        option1Name: product.option1Name || null,
+        option2Name: product.option2Name || null,
       };
-      
+
       if (existing) {
-        // ✅ Check stock before increasing quantity
         const newQuantity = existing.quantity + (product.quantity || 1);
         if (existing.stock && newQuantity > existing.stock) {
-          return prev; // Not enough stock
+          return prev;
         }
-        return prev.map(i => 
-          i.id === productId 
-            ? { ...i, quantity: newQuantity } 
-            : i
+        return prev.map(i =>
+          i.cartKey === cartKey ? { ...i, quantity: newQuantity } : i
         );
       }
-      
+
       return [...prev, productToAdd];
     });
   };
 
-  // ✅ Remove from cart
-  const removeFromCart = (id) => {
-    setCart(prev => prev.filter(i => i.id !== id));
+  // ✅ Remove from cart (by cartKey)
+  const removeFromCart = (cartKey) => {
+    setCart(prev => prev.filter(i => i.cartKey !== cartKey));
   };
 
-  // ✅ Update quantity
-  const updateQuantity = (id, newQuantity) => {
+  // ✅ Update quantity (by cartKey)
+  const updateQuantity = (cartKey, newQuantity) => {
     if (newQuantity < 1) {
-      removeFromCart(id);
+      removeFromCart(cartKey);
       return;
     }
-    
-    setCart(prev => 
-      prev.map(i => 
-        i.id === id ? { ...i, quantity: newQuantity } : i
+    setCart(prev =>
+      prev.map(i =>
+        i.cartKey === cartKey ? { ...i, quantity: newQuantity } : i
       )
     );
   };
 
   // ✅ Increase quantity
-  const increaseQuantity = (id) => {
-    setCart(prev => 
+  const increaseQuantity = (cartKey) => {
+    setCart(prev =>
       prev.map(i => {
-        if (i.id === id) {
+        if (i.cartKey === cartKey) {
           const newQuantity = i.quantity + 1;
-          if (i.stock && newQuantity > i.stock) {
-            return i; // Not enough stock
-          }
+          if (i.stock && newQuantity > i.stock) return i;
           return { ...i, quantity: newQuantity };
         }
         return i;
@@ -107,18 +125,16 @@ export const CartProvider = ({ children }) => {
   };
 
   // ✅ Decrease quantity
-  const decreaseQuantity = (id) => {
-    setCart(prev => 
+  const decreaseQuantity = (cartKey) => {
+    setCart(prev =>
       prev.map(i => {
-        if (i.id === id) {
+        if (i.cartKey === cartKey) {
           const newQuantity = i.quantity - 1;
-          if (newQuantity < 1) {
-            return null; // Will be filtered out
-          }
+          if (newQuantity < 1) return null;
           return { ...i, quantity: newQuantity };
         }
         return i;
-      }).filter(Boolean) // Remove null items
+      }).filter(Boolean)
     );
   };
 
@@ -139,7 +155,7 @@ export const CartProvider = ({ children }) => {
   };
 
   return (
-    <CartContext.Provider value={{ 
+    <CartContext.Provider value={{
       cart,
       cartCount,
       cartTotalAmount,
