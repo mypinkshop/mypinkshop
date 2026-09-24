@@ -11,13 +11,43 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 import { setCacheWithTTL, getCacheWithTTL, safeRemoveItem } from '../lib/utils';
 
-// ✅ Image optimizer — ab crop nahi karega
+// ✅ Image optimizer — crop nahi karega
 const getOptimizedImage = (url) => {
   if (!url) return null;
   if (url.includes('amazon') || url.includes('media-amazon')) {
     return url.replace('_SL1500_.jpg', '_SL500_.jpg').replace('_SL1500_', '_SL500_');
   }
   return url;
+};
+
+// ✅ Size order (logical, Amazon jaisa)
+const SIZE_ORDER = {
+  'XXS': 1, 'XS': 2, 'S': 3, 'M': 4, 'L': 5, 'XL': 6, 'XXL': 7, '3XL': 8, '4XL': 9, '5XL': 10,
+  'Free Size': 11, 'One Size': 12, 'Adjustable': 13,
+};
+
+const getSizeOrder = (size) => {
+  if (!size) return 999;
+  const s = String(size).trim().toUpperCase();
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  if (SIZE_ORDER[s] !== undefined) return SIZE_ORDER[s];
+  const mlMatch = s.match(/^(\d+)\s*(ML|G|GM|KG|L)$/i);
+  if (mlMatch) return 100 + parseInt(mlMatch[1], 10);
+  return 500;
+};
+
+// ✅ Color order
+const COLOR_ORDER = {
+  'Black': 1, 'White': 2, 'Grey': 3, 'Navy': 4, 'Blue': 5, 'Red': 6,
+  'Pink': 7, 'Purple': 8, 'Green': 9, 'Yellow': 10, 'Orange': 11, 'Brown': 12,
+  'Gold': 13, 'Silver': 14, 'Rose Gold': 15, 'Multicolor': 16,
+};
+
+const getColorOrder = (color) => {
+  if (!color) return 999;
+  const c = String(color).trim();
+  const cap = c.charAt(0).toUpperCase() + c.slice(1).toLowerCase();
+  return COLOR_ORDER[cap] ?? 500;
 };
 
 function ProductDetail() {
@@ -42,7 +72,7 @@ function ProductDetail() {
   const [galleryImages, setGalleryImages] = useState([]);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // ✅ NEW: Variant selection state
+  // ✅ Variant selection state
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState('');
@@ -52,7 +82,7 @@ function ProductDetail() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
   // ============================================================
-  // ✅ Derive: variants, sizes, colors, selected variant
+  // DERIVED: variants, sizes, colors, selected variant
   // ============================================================
   const variants = useMemo(() => {
     return Array.isArray(product?.variants) ? product.variants : [];
@@ -60,17 +90,17 @@ function ProductDetail() {
 
   const hasVariants = variants.length > 0;
 
-  // Unique sizes (option1) — preserve order
+  // Unique sizes (logical order)
   const availableSizes = useMemo(() => {
     const set = new Set();
     variants.forEach(v => {
       const val = v.option1?.value;
       if (val) set.add(val);
     });
-    return [...set];
+    return [...set].sort((a, b) => getSizeOrder(a) - getSizeOrder(b));
   }, [variants]);
 
-  // Unique colors (option2) — with representative image
+  // Unique colors (with representative image)
   const availableColors = useMemo(() => {
     const map = new Map();
     variants.forEach(v => {
@@ -79,20 +109,18 @@ function ProductDetail() {
         map.set(val, {
           name: val,
           image: v.image || '',
-          // is color ka koi bhi variant in stock hai?
           inStock: variants.some(x => x.option2?.value === val && x.inStock),
         });
       } else if (val && map.has(val)) {
-        // agar pehle wale ka stock nahi tha, lekin ye wala in stock hai
         const existing = map.get(val);
         if (!existing.image && v.image) existing.image = v.image;
         if (v.inStock) existing.inStock = true;
       }
     });
-    return [...map.values()];
+    return [...map.values()].sort((a, b) => getColorOrder(a.name) - getColorOrder(b.name));
   }, [variants]);
 
-  // Selected variant (based on size + color)
+  // Selected variant
   const selectedVariant = useMemo(() => {
     if (!hasVariants) return null;
     return variants.find(v => {
@@ -102,7 +130,7 @@ function ProductDetail() {
     }) || null;
   }, [variants, selectedSize, selectedColor, hasVariants]);
 
-  // Current price/stock — variant se ya product se
+  // Current price/stock
   const getCurrentPrice = () => {
     if (selectedVariant?.price) return Number(selectedVariant.price);
     return Number(product?.price || product?.sellingPrice || 0);
@@ -130,21 +158,28 @@ function ProductDetail() {
   // ============================================================
   const updateGalleryForVariant = (variant, productImagesList) => {
     const arr = Array.isArray(productImagesList) ? productImagesList : [productImagesList];
-    if (!variant?.image) {
+
+    // ✅ Variant image blank → parent image fallback
+    const variantImg = variant?.image || arr[0] || '';
+
+    if (!variantImg) {
       setGalleryImages([...arr]);
       setSelectedImage(0);
+      setImageLoaded(false);
       return;
     }
-    const variantImg = variant.image;
-    // variant image ko pehle rakho, baaki parent images uske baad
+
+    // Variant image first, baaki parent images uske baad (duplicate avoid)
     const remaining = arr.filter(img => img !== variantImg);
-    setGalleryImages([variantImg, ...remaining]);
+    const newGallery = [variantImg, ...remaining];
+
+    setGalleryImages(newGallery);
     setSelectedImage(0);
     setImageLoaded(false);
   };
 
   // ============================================================
-  // Fetch product
+  // Fetch related products
   // ============================================================
   const fetchRelatedProducts = async (category) => {
     if (!category) return;
@@ -157,6 +192,9 @@ function ProductDetail() {
     } catch (e) { console.error(e); }
   };
 
+  // ============================================================
+  // Apply product data
+  // ============================================================
   const applyProduct = (p) => {
     setProduct(p);
     const imgs = p.images?.length ? p.images : [];
@@ -171,7 +209,7 @@ function ProductDetail() {
       setOption1Name(p.option1Name || 'Size');
       setOption2Name(p.option2Name || 'Color');
 
-      // First in-stock variant select karo (better UX)
+      // First in-stock variant select karo
       const firstInStock = vars.find(v => v.inStock) || vars[0];
       const s1 = firstInStock.option1?.value || '';
       const s2 = firstInStock.option2?.value || '';
@@ -179,7 +217,6 @@ function ProductDetail() {
       setSelectedColor(s2);
       setSelectedVariantId(firstInStock.id);
 
-      // Gallery variant ke hisaab se
       updateGalleryForVariant(firstInStock, imgs);
     } else {
       setSelectedSize('');
@@ -204,7 +241,7 @@ function ProductDetail() {
         const data = await res.json();
         const p = data.data || data;
         if (p && (p._id || p.id)) {
-          setCacheWithTTL(sessionStorage, `product_${id}`, p, 24 * 60 * 60 * 1000);
+          setCacheWithTTL(sessionStorage, `product_${id}`, p, 5 * 60 * 1000); // 5 min cache
           applyProduct(p);
         } else setProduct(null);
       } catch (e) { console.error(e); setProduct(null); }
@@ -220,7 +257,6 @@ function ProductDetail() {
   const handleSizeSelect = (size) => {
     setSelectedSize(size);
     setQuantity(1);
-    // us size ke saath jo color available ho, wo choose karo (agar current color nahi hai)
     const match = variants.find(v =>
       v.option1?.value === size && v.option2?.value === selectedColor
     );
@@ -229,7 +265,6 @@ function ProductDetail() {
       setSelectedVariantId(match.id);
       updateGalleryForVariant(match, product?.images || []);
     } else {
-      // current color is size me nahi — first available color le lo
       const anyMatch = variants.find(v => v.option1?.value === size && v.inStock)
         || variants.find(v => v.option1?.value === size);
       if (anyMatch) {
@@ -260,7 +295,6 @@ function ProductDetail() {
     }
   };
 
-  // Is size ke liye ye color available hai? (kisi bhi variant me)
   const isColorAvailableForSize = (size, color) => {
     return variants.some(v =>
       v.option1?.value === size &&
@@ -269,12 +303,10 @@ function ProductDetail() {
     );
   };
 
-  // Kya ye size ka koi bhi variant in stock hai?
   const isSizeAvailable = (size) => {
     return variants.some(v => v.option1?.value === size && v.inStock);
   };
 
-  // Kya ye color ka koi bhi variant in stock hai?
   const isColorAvailable = (color) => {
     return variants.some(v => v.option2?.value === color && v.inStock);
   };
@@ -384,7 +416,7 @@ function ProductDetail() {
         const data = await res.json();
         const p = data.data || data;
         if (p && (p._id || p.id)) {
-          setCacheWithTTL(sessionStorage, `product_${id}`, p, 24 * 60 * 60 * 1000);
+          setCacheWithTTL(sessionStorage, `product_${id}`, p, 5 * 60 * 1000);
           setProduct(p);
         }
       }
@@ -744,7 +776,7 @@ function ProductDetail() {
               )}
 
               {/* ============================================================ */}
-              {/* ✅ VARIANT SELECTORS — Size + Color (Amazon style) */}
+              {/* ✅ VARIANT SELECTORS — Size (with thumbnail) + Color */}
               {/* ============================================================ */}
               {hasVariants && (
                 <div className="pt-4 border-t border-gray-100 space-y-5">
@@ -766,20 +798,44 @@ function ProductDetail() {
                         {availableSizes.map((size) => {
                           const isSel = selectedSize === size;
                           const avail = isSizeAvailable(size);
+
+                          // ✅ Is size ka representative variant (with image)
+                          const sizeVariants = variants.filter(v => v.option1?.value === size);
+                          const variantWithImage = sizeVariants.find(v => v.image) || sizeVariants[0];
+                          const thumbImage = variantWithImage?.image || '';
+
                           return (
                             <button
                               key={size}
                               onClick={() => handleSizeSelect(size)}
                               disabled={!avail}
-                              className={`min-w-[48px] px-4 py-2.5 rounded-lg border-2 text-sm font-bold transition-all ${
+                              className={`relative flex flex-col items-center justify-center gap-1 min-w-[58px] px-2 py-2 rounded-lg border-2 transition-all ${
                                 isSel
                                   ? 'bg-gray-900 text-white border-gray-900 shadow-md'
                                   : !avail
-                                  ? 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50 line-through'
-                                  : 'border-gray-300 text-gray-700 hover:border-pink-500 hover:text-pink-600'
+                                  ? 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'
+                                  : 'border-gray-300 text-gray-700 hover:border-pink-500 hover:text-pink-600 bg-white'
                               }`}
                             >
-                              {size}
+                              {/* ✅ Thumbnail — sirf tab jab variant image ho */}
+                              {variantWithImage?.image ? (
+                                <img
+                                  src={getOptimizedImage(thumbImage)}
+                                  alt={size}
+                                  className={`w-8 h-8 rounded object-cover ${!avail ? 'opacity-40 grayscale' : ''}`}
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : null}
+
+                              <span className={`text-xs font-bold ${!avail ? 'line-through' : ''}`}>
+                                {size}
+                              </span>
+
+                              {!avail && (
+                                <span className="absolute top-0 right-0 w-4 h-4 bg-gray-400 rounded-full flex items-center justify-center text-white text-[8px]">
+                                  ✕
+                                </span>
+                              )}
                             </button>
                           );
                         })}
