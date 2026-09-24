@@ -860,8 +860,7 @@ function Login() {
                 <ul className="space-y-2 text-sm">
                   <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
                   <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                
                 </ul>
               </div>
             </div>
