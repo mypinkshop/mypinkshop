@@ -525,6 +525,7 @@ function ProductDetail() {
   const savings = currentMrp > currentPrice ? Math.round(currentMrp - currentPrice) : 0;
   const rating = Number(product.rating || 0);
   const reviewCount = Number(product.review_count || product.reviewCount || 0);
+  const mainImageSrc = galleryImages[selectedImage] || productImages[0] || '';
 
   return (
     <>
@@ -625,6 +626,7 @@ function ProductDetail() {
             {/* LEFT: IMAGE GALLERY */}
             <div className="lg:col-span-7 lg:sticky lg:top-20 lg:self-start">
               <div className="flex flex-col-reverse md:flex-row gap-4">
+                {/* Sidebar thumbnails (desktop) */}
                 {galleryImages.length > 1 && (
                   <div className="hidden md:flex flex-col gap-3 w-20">
                     {galleryImages.map((img, idx) => (
@@ -640,32 +642,41 @@ function ProductDetail() {
                         <img
                           src={getOptimizedImage(img)}
                           alt=""
-                          className="w-full h-full object-contain p-1"
+                          className="w-full h-full object-contain p-2 bg-white"
                         />
                       </button>
                     ))}
                   </div>
                 )}
 
+                {/* Main image */}
                 <div className="flex-1">
                   <div className="relative bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl overflow-hidden aspect-square flex items-center justify-center group cursor-zoom-in">
                     {!imageLoaded && (
                       <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-pink-100 to-rose-100"></div>
                     )}
                     <img
-                      src={getOptimizedImage(galleryImages[selectedImage] || productImages[0])}
+                      key={mainImageSrc}
+                      src={getOptimizedImage(mainImageSrc)}
                       alt={product.name}
-                      className={`w-full h-full object-contain p-4 sm:p-8 transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                      className={`w-full h-full object-contain p-4 sm:p-8 transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                       onLoad={() => setImageLoaded(true)}
                       onClick={() => setShowZoom(true)}
+                      ref={(el) => {
+                        if (el && el.complete && el.naturalWidth > 0) {
+                          setImageLoaded(true);
+                        }
+                      }}
                     />
 
+                    {/* Discount badge */}
                     {discountPercent > 0 && (
                       <div className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg">
                         {discountPercent}% OFF
                       </div>
                     )}
 
+                    {/* Wishlist */}
                     <button
                       onClick={handleWishlistToggle}
                       className="absolute top-4 right-4 w-11 h-11 bg-white/95 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all"
@@ -673,6 +684,7 @@ function ProductDetail() {
                       <span className="text-xl">{isInWishlist(product._id || product.id) ? '❤️' : '🤍'}</span>
                     </button>
 
+                    {/* Out of stock overlay */}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-white/85 backdrop-blur-sm flex items-center justify-center">
                         <span className="bg-gray-900 text-white font-bold px-6 py-3 rounded-full text-sm">
@@ -681,11 +693,13 @@ function ProductDetail() {
                       </div>
                     )}
 
+                    {/* Zoom hint */}
                     <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm text-[11px] text-gray-600 px-3 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition">
                       🔍 Click to zoom
                     </div>
                   </div>
 
+                  {/* Mobile thumbnails */}
                   {galleryImages.length > 1 && (
                     <div className="flex md:hidden gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
                       {galleryImages.map((img, idx) => (
@@ -696,7 +710,7 @@ function ProductDetail() {
                             selectedImage === idx ? 'border-pink-500 shadow-md' : 'border-gray-200'
                           }`}
                         >
-                          <img src={getOptimizedImage(img)} alt="" className="w-full h-full object-contain p-1" />
+                          <img src={getOptimizedImage(img)} alt="" className="w-full h-full object-contain p-1 bg-white" />
                         </button>
                       ))}
                     </div>
@@ -740,7 +754,7 @@ function ProductDetail() {
                 )}
               </div>
 
-              {/* Price */}
+              {/* Price block */}
               <div className="space-y-1">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl sm:text-4xl font-bold text-gray-900">₹{currentPrice.toLocaleString()}</span>
@@ -776,7 +790,7 @@ function ProductDetail() {
               )}
 
               {/* ============================================================ */}
-              {/* ✅ VARIANT SELECTORS — Size (with thumbnail) + Color */}
+              {/* VARIANT SELECTORS */}
               {/* ============================================================ */}
               {hasVariants && (
                 <div className="pt-4 border-t border-gray-100 space-y-5">
@@ -799,7 +813,7 @@ function ProductDetail() {
                           const isSel = selectedSize === size;
                           const avail = isSizeAvailable(size);
 
-                          // ✅ Is size ka representative variant (with image)
+                          // Is size ka representative variant (with image)
                           const sizeVariants = variants.filter(v => v.option1?.value === size);
                           const variantWithImage = sizeVariants.find(v => v.image) || sizeVariants[0];
                           const thumbImage = variantWithImage?.image || '';
@@ -809,7 +823,7 @@ function ProductDetail() {
                               key={size}
                               onClick={() => handleSizeSelect(size)}
                               disabled={!avail}
-                              className={`relative flex flex-col items-center justify-center gap-1 min-w-[58px] px-2 py-2 rounded-lg border-2 transition-all ${
+                              className={`relative flex flex-col items-center justify-center gap-1 min-w-[64px] px-2 py-2 rounded-lg border-2 transition-all ${
                                 isSel
                                   ? 'bg-gray-900 text-white border-gray-900 shadow-md'
                                   : !avail
@@ -817,12 +831,12 @@ function ProductDetail() {
                                   : 'border-gray-300 text-gray-700 hover:border-pink-500 hover:text-pink-600 bg-white'
                               }`}
                             >
-                              {/* ✅ Thumbnail — sirf tab jab variant image ho */}
+                              {/* Thumbnail — object-contain, no crop */}
                               {variantWithImage?.image ? (
                                 <img
                                   src={getOptimizedImage(thumbImage)}
                                   alt={size}
-                                  className={`w-8 h-8 rounded object-cover ${!avail ? 'opacity-40 grayscale' : ''}`}
+                                  className={`w-10 h-10 rounded object-contain bg-white p-0.5 ${!avail ? 'opacity-40 grayscale' : ''}`}
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                               ) : null}
@@ -873,7 +887,7 @@ function ProductDetail() {
                               }`}
                             >
                               <div
-                                className={`w-12 h-12 rounded-full overflow-hidden border-2 transition-all ${
+                                className={`w-12 h-12 rounded-full overflow-hidden border-2 transition-all bg-white ${
                                   isSel
                                     ? 'border-pink-500 ring-2 ring-pink-200 scale-105'
                                     : 'border-gray-300 group-hover:border-pink-400'
@@ -883,7 +897,7 @@ function ProductDetail() {
                                   <img
                                     src={getOptimizedImage(c.image)}
                                     alt={c.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain p-1"
                                   />
                                 ) : (
                                   <div
