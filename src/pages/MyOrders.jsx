@@ -108,12 +108,20 @@ function MyOrders() {
           shippingAddress: parsedAddress,
           paymentMethod: order.paymentMethod || order.payment_method,
           paymentStatus: order.paymentStatus || order.payment_status,
+          // ✅ VARIANT FIELDS NORMALIZE
           items: (order.items || []).map((item) => ({
             ...item,
             productId: item.productId || item.product_id,
             name: item.name || item.product_name,
             image: item.image || item.product_image || item.img,
             price: item.price || item.unit_price || 0,
+            variantId: item.variantId || item.variant_id || null,
+            variantSku: item.variantSku || item.variant_sku || null,
+            variantLabel: item.variantLabel || item.variant_label || null,
+            size: item.size || null,
+            color: item.color || null,
+            option1Name: item.option1Name || item.option1_name || null,
+            option2Name: item.option2Name || item.option2_name || null,
           })),
         };
       });
@@ -199,6 +207,7 @@ function MyOrders() {
     }
   };
 
+  // ✅ REORDER with variant info
   const reorder = (order) => {
     order.items.forEach((item) => {
       addToCart({
@@ -207,6 +216,14 @@ function MyOrders() {
         price: item.price,
         quantity: 1,
         image: item.image,
+        // ✅ Variant fields
+        variantId: item.variantId || null,
+        variantSku: item.variantSku || null,
+        variantLabel: item.variantLabel || null,
+        size: item.size || null,
+        color: item.color || null,
+        option1Name: item.option1Name || null,
+        option2Name: item.option2Name || null,
       });
     });
     toast.success('Items added to cart!');
@@ -343,7 +360,6 @@ function MyOrders() {
 
   const getStatusText = (status) => getStatusConfig(status).label;
 
-  // ✅ Timeline steps for order progress
   const getOrderTimeline = (status) => {
     const steps = [
       { key: 'placed', label: 'Ordered', icon: '✓' },
@@ -408,7 +424,7 @@ function MyOrders() {
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100">
         <OfferBanner />
 
-        {/* ============ HEADER ============ */}
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -483,7 +499,7 @@ function MyOrders() {
           </div>
         </header>
 
-        {/* ============ BREADCRUMB ============ */}
+        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -492,7 +508,7 @@ function MyOrders() {
           </div>
         </div>
 
-        {/* ============ PREMIUM STATS CARDS ============ */}
+        {/* STATS CARDS */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <button
@@ -561,7 +577,7 @@ function MyOrders() {
           </div>
         </div>
 
-        {/* ============ MAIN CONTENT ============ */}
+        {/* MAIN CONTENT */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           <div className="mb-6 flex flex-wrap justify-between items-center gap-3">
             <div>
@@ -595,7 +611,6 @@ function MyOrders() {
             </div>
           </div>
 
-          {/* ============ EMPTY STATE ============ */}
           {filteredOrders.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 sm:p-16 text-center border-2 border-pink-100 shadow-lg">
               <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center">
@@ -641,7 +656,7 @@ function MyOrders() {
                         : 'border-pink-100'
                     }`}
                   >
-                    {/* HEADER — STATUS BAR */}
+                    {/* HEADER */}
                     <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-5 sm:px-6 py-4">
                       <div className="flex flex-wrap justify-between items-center gap-3">
                         <div className="flex flex-wrap items-center gap-4 sm:gap-8">
@@ -671,7 +686,7 @@ function MyOrders() {
                       </div>
                     </div>
 
-                    {/* TIMELINE (only for non-cancelled orders) */}
+                    {/* TIMELINE */}
                     {!isCancelled && (
                       <div className="px-5 sm:px-6 py-5 bg-gradient-to-r from-pink-50/50 to-rose-50/50 border-b border-pink-100">
                         <div className="flex items-center justify-between relative">
@@ -748,10 +763,20 @@ function MyOrders() {
                                 <p className="text-xs sm:text-sm text-gray-500 mt-1 font-medium">
                                   Qty: {item.quantity}
                                 </p>
-                                {item.variationName && (
-                                  <p className="text-xs text-gray-500 font-medium">
-                                    Size: {item.variationName}
-                                  </p>
+                                {/* ✅ VARIANT CHIPS */}
+                                {(item.size || item.color) && (
+                                  <div className="flex flex-wrap gap-1.5 mt-1">
+                                    {item.size && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] bg-pink-50 text-pink-700 font-bold px-2 py-0.5 rounded-full border border-pink-200">
+                                        {item.option1Name || 'Size'}: {item.size}
+                                      </span>
+                                    )}
+                                    {item.color && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded-full border border-purple-200">
+                                        {item.option2Name || 'Color'}: {item.color}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                               <div className="text-right flex-shrink-0">
@@ -811,7 +836,7 @@ function MyOrders() {
           )}
         </div>
 
-        {/* ============ TRUST BADGES ============ */}
+        {/* TRUST BADGES */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           <div className="bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100 border-2 border-pink-200 rounded-3xl p-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -835,7 +860,7 @@ function MyOrders() {
           </div>
         </section>
 
-        {/* ============ LIVE TRACKING MODAL ============ */}
+        {/* LIVE TRACKING MODAL */}
         {showTracking && selectedOrder && (
           <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
@@ -987,7 +1012,7 @@ function MyOrders() {
           </div>
         )}
 
-        {/* ============ REVIEW MODAL ============ */}
+        {/* REVIEW MODAL */}
         {showReviewModal && selectedProduct && (
           <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -1022,6 +1047,21 @@ function MyOrders() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 text-sm line-clamp-2">{selectedProduct.name}</p>
+                    {/* ✅ Variant info in review modal */}
+                    {(selectedProduct.size || selectedProduct.color) && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {selectedProduct.size && (
+                          <span className="text-[10px] bg-pink-50 text-pink-700 font-bold px-2 py-0.5 rounded-full border border-pink-200">
+                            {selectedProduct.option1Name || 'Size'}: {selectedProduct.size}
+                          </span>
+                        )}
+                        {selectedProduct.color && (
+                          <span className="text-[10px] bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded-full border border-purple-200">
+                            {selectedProduct.option2Name || 'Color'}: {selectedProduct.color}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <p className="text-xs text-gray-500 mt-1 font-mono font-medium">
                       #{getOrderIdDisplay(selectedOrderForReview)}
                     </p>
@@ -1135,7 +1175,7 @@ function MyOrders() {
           </div>
         )}
 
-        {/* ============ FOOTER ============ */}
+        {/* FOOTER */}
         <footer className="bg-gray-900 text-gray-400 py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
