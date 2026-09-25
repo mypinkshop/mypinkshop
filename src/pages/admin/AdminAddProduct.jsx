@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
 // ============================================================
-// ✅ SEO AUTO-GENERATOR HELPERS (Smart limits)
+// ✅ SEO AUTO-GENERATOR HELPERS (Smart — No truncation)
 // ============================================================
 const SEO_LIMITS = {
   TITLE_MAX: 60,
@@ -20,25 +20,61 @@ const shortenText = (text, maxLen) => {
   return clean.substring(0, maxLen).trim() + '...';
 };
 
+// ✅ SMART META TITLE — Brand + Product + Store (NO '...')
 const generateMetaTitle = (name, brand, subCategory = '') => {
-  if (!name) return 'Product | MyPinkShop';
-  const shortName = shortenText(name, 35);
-  const brandPart = brand && !shortName.toLowerCase().startsWith(String(brand).toLowerCase())
-    ? `${brand} `
-    : '';
-  const catPart = subCategory ? ` - ${subCategory}` : '';
+  if (!name) return 'MyPinkShop';
+
+  const cleanName = String(name).trim().replace(/\s+/g, ' ');
+  const cleanBrand = brand ? String(brand).trim() : '';
   const storePart = ' | MyPinkShop';
 
-  let title = `${brandPart}${shortName}${catPart}${storePart}`;
-  if (title.length > SEO_LIMITS.TITLE_MAX) {
-    const allowed = SEO_LIMITS.TITLE_MAX - storePart.length;
-    title = `${brandPart}${shortName}${catPart}`.substring(0, allowed - 3).trim() + '...' + storePart;
+  // Feature words — hata dene hain
+  const featureWords = new Set([
+    'long', 'lasting', 'waterproof', 'smudge', 'proof',
+    'ultra', 'super', 'premium', 'best', 'new', 'latest',
+    'smooth', 'silky', 'soft', 'gentle', 'strong', 'rich',
+    'pure', 'natural', 'organic', 'herbal', 'fresh',
+    'for', 'with', 'and', 'the', 'a', 'an', 'of', 'in', 'on', 'to',
+    'women', 'men', 'girls', 'boys', 'kids', 'her', 'his', 'unisex',
+    'skin', 'hair', 'face', 'body', 'dry', 'oily', 'normal',
+    'combination', 'sensitive', 'damaged', 'frizzy', 'dull', 'tanned',
+    'dandruff', 'hairfall', 'acne', 'pimple', 'aging', 'pigmentation',
+    'instant', 'glow', 'glowing', 'radiant', 'bright', 'brightening',
+    'hydrating', 'moisturizing', 'nourishing', 'repairing',
+    'anti', 'pro', 'advanced', 'professional'
+  ]);
+
+  const words = cleanName.split(' ');
+
+  // Brand words skip karo
+  let startIndex = 0;
+  if (cleanBrand) {
+    const brandWords = cleanBrand.toLowerCase().split(' ');
+    const nameFirstWords = words.slice(0, brandWords.length).map(w => w.toLowerCase());
+    if (nameFirstWords.join(' ') === brandWords.join(' ')) {
+      startIndex = brandWords.length;
+    }
   }
-  return title;
+
+  // Meaningful words
+  const meaningfulWords = words.slice(startIndex).filter(w =>
+    w.length > 1 && !featureWords.has(w.toLowerCase())
+  );
+
+  const productPart = meaningfulWords.slice(0, 3).join(' ');
+  const brandPart = cleanBrand ? `${cleanBrand} ` : '';
+
+  if (productPart) {
+    return `${brandPart}${productPart}${storePart}`.trim();
+  }
+
+  return `${brandPart.trim()}${storePart}`.trim();
 };
 
+// ✅ SMART META DESCRIPTION
 const generateMetaDescription = (name, brand, subCategory, category) => {
   if (!name) return 'Shop online at MyPinkShop.';
+
   const shortName = shortenText(name, 50);
   const brandPart = brand ? ` by ${brand}` : '';
   const catPart = subCategory ? ` ${subCategory}` : (category ? ` ${category}` : '');
@@ -50,44 +86,49 @@ const generateMetaDescription = (name, brand, subCategory, category) => {
   return desc;
 };
 
+// ✅ SMART META KEYWORDS
 const generateMetaKeywords = (name, brand, category, subCategory, keyFeatures = []) => {
   const keywords = [];
+
   if (brand) keywords.push(brand);
   if (brand && subCategory) keywords.push(`${brand} ${subCategory}`);
+
   if (name) {
     const shortName = name.split(' ').slice(0, 4).join(' ');
     if (shortName.length > 3) keywords.push(shortName);
   }
+
   if (category) keywords.push(category);
   if (subCategory) {
     keywords.push(subCategory);
     keywords.push(`${subCategory} online`);
   }
+
   if (Array.isArray(keyFeatures)) {
     keyFeatures.slice(0, 3).forEach(f => {
       const words = String(f).split(' ').slice(0, 3).join(' ');
       if (words.length > 3 && words.length < 30) keywords.push(words);
     });
   }
+
   keywords.push('buy online', 'best price', 'free shipping', 'MyPinkShop');
 
   const unique = [...new Set(keywords.map(k => k.trim().toLowerCase()).filter(Boolean))];
   return unique.slice(0, SEO_LIMITS.KEYWORDS_MAX).join(', ');
 };
 
-// ============================================================
-// ✅ FALLBACK BRANDS (agar API fail ho)
-// ============================================================
+// ✅ FALLBACK BRANDS
 const FALLBACK_BRANDS = [
   'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'Lakmé',
   'Maybelline', 'Loreal Paris', 'Plum', 'Wow Skin Science',
   'Biotique', 'Forest Essentials', 'MyGlamm', 'MAC',
   'The Face Shop', 'Kama Ayurveda', 'Mcaffeine', 'Estee Lauder',
-  'Clinique', 'Huda Beauty', 'St.Botanica', 'Richfem'
+  'Clinique', 'Huda Beauty', 'St.Botanica', 'Richfem',
+  'SKINQ', 'Fashion Colour'
 ];
 
 // ============================================
-// AMAZON IMPORTER COMPONENT (UNTOUCHED LOGIC)
+// AMAZON IMPORTER COMPONENT
 // ============================================
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -222,11 +263,10 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       .filter(item => !isGarbage(item))
       .slice(0, 10);
 
-    // ✅ CATEGORY PEHLE DETECT KARO
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
 
-    // ✅ SMART SEO GENERATION
+    // ✅ SMART SEO
     const metaTitle = generateMetaTitle(product.name, product.brand, detectedSubCategory);
     const metaDescription = generateMetaDescription(product.name, product.brand, detectedSubCategory, detectedCategory);
     const metaKeywords = generateMetaKeywords(product.name, product.brand, detectedCategory, detectedSubCategory, keyFeaturesArray);
@@ -341,7 +381,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 };
 
 // ============================================
-// FLIPKART IMPORTER COMPONENT (UNTOUCHED LOGIC)
+// FLIPKART IMPORTER COMPONENT
 // ============================================
 const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -475,7 +515,6 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       .filter(item => !isGarbage(item))
       .slice(0, 10);
 
-    // ✅ CATEGORY PEHLE DETECT KARO
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
 
@@ -598,7 +637,7 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
 };
 
 // ============================================
-// VARIATION SELECT WITH SEARCH AND CUSTOM INPUT
+// VARIATION SELECT WITH SEARCH
 // ============================================
 const VariationSelectWithSearch = ({ label, options, value, onChange, placeholder = "Select or type..." }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -705,7 +744,6 @@ function AdminAddProduct() {
   const [apiSubCategories, setApiSubCategories] = useState({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
 
-  // ✅ NAYA — API se brands
   const [brands, setBrands] = useState(FALLBACK_BRANDS);
   const [brandsLoading, setBrandsLoading] = useState(true);
 
@@ -774,7 +812,7 @@ function AdminAddProduct() {
     fetchCategories();
   }, []);
 
-  // ✅ NAYA — API se brands fetch karo + localStorage custom brands merge karo
+  // ✅ API se brands fetch
   useEffect(() => {
     const fetchBrands = async () => {
       try {
@@ -784,7 +822,6 @@ function AdminAddProduct() {
         const json = await res.json();
         const brandList = json.data || json;
 
-        // ✅ localStorage ke custom brands
         const savedBrands = localStorage.getItem('brandsList');
         let customBrands = [];
         if (savedBrands) {
@@ -794,7 +831,6 @@ function AdminAddProduct() {
           } catch (e) { customBrands = []; }
         }
 
-        // ✅ Merge — API brands + custom brands + fallback
         const apiBrands = Array.isArray(brandList) ? brandList : [];
         const allBrands = [...new Set([
           ...apiBrands,
@@ -803,10 +839,8 @@ function AdminAddProduct() {
         ])].filter(Boolean).sort();
 
         setBrands(allBrands);
-        console.log('✅ Brands loaded:', apiBrands.length, 'from API,', customBrands.length, 'custom,', allBrands.length, 'total');
       } catch (err) {
         console.error('❌ Brands fetch error:', err);
-        // Fallback + custom merge
         const savedBrands = localStorage.getItem('brandsList');
         let customBrands = [];
         if (savedBrands) {
@@ -825,7 +859,7 @@ function AdminAddProduct() {
     fetchBrands();
   }, []);
 
-  // ✅ SEO META TAG GENERATOR (SMART)
+  // ✅ SEO META TAG GENERATOR
   useEffect(() => {
     if (!formData.productName) {
       setSeoData({
@@ -890,7 +924,6 @@ function AdminAddProduct() {
 
   const variationAttrs = getVariationAttributes();
 
-  // ✅ localStorage se custom sub-categories load karo
   useEffect(() => {
     const savedSubCategories = localStorage.getItem('customSubCategories');
     if (savedSubCategories) {
@@ -900,10 +933,8 @@ function AdminAddProduct() {
     }
   }, []);
 
-  // ✅ Brands save karo localStorage mein (custom brands ke liye)
   const saveBrands = (updatedBrands) => {
     setBrands(updatedBrands);
-    // Sirf custom brands save karo (API brands nahi)
     const customBrands = updatedBrands.filter(b => !FALLBACK_BRANDS.includes(b));
     localStorage.setItem('brandsList', JSON.stringify(customBrands));
   };
@@ -1133,14 +1164,12 @@ function AdminAddProduct() {
 
     const cleanBrand = newBrand.trim();
 
-    // ✅ Duplicate check (case-insensitive)
     const exists = brands.some(b => b.toLowerCase() === cleanBrand.toLowerCase());
     if (exists) {
       toast.error('⚠️ Brand already exists!');
       return;
     }
 
-    // ✅ Naya brand add karo
     const updatedBrands = [...brands, cleanBrand].sort();
     saveBrands(updatedBrands);
     setFormData(prev => ({ ...prev, brand: cleanBrand }));
