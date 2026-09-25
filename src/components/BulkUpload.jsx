@@ -1,34 +1,104 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
 function BulkUpload({ userRole, onSuccess }) {
   const [uploadMethod, setUploadMethod] = useState('csv');
-  const [products, setProducts] = useState([{ name: '', price: '', stock: '', brand: '', category: '', description: '' }]);
+  const [products, setProducts] = useState([{ name: '', price: '', stock: '', brand: '', category: '', subCategory: '', description: '' }]);
   const [csvFile, setCsvFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  // ✅ API se categories
+  const [apiCategories, setApiCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  const API_URL = import.meta.env?.VITE_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('vendorToken') || localStorage.getItem('adminToken');
   const vendorData = JSON.parse(localStorage.getItem('vendor') || '{}');
 
-  // ✅ Download CSV template
+  // ✅ API se categories fetch karo
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const res = await fetch(`${API_URL}/api/categories/tree`);
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const json = await res.json();
+        const tree = json.data || json;
+        setApiCategories(Array.isArray(tree) ? tree : []);
+      } catch (err) {
+        console.error('❌ Categories fetch error:', err);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // ✅ Fallback categories
+  const fallbackCategories = [
+    'Skincare', 'Makeup', 'Haircare', 'Fashion', 'Accessories',
+    'Electronics', 'Home & Kitchen', 'Health & Wellness', 'Books & Stationery'
+  ];
+
+  const mainCategoriesList = apiCategories.length > 0
+    ? apiCategories.map(c => ({ name: c.name, icon: c.icon, subs: (c.children || []).map(s => s.name) }))
+    : fallbackCategories.map(name => ({ name, icon: '📁', subs: [] }));
+
+  const getSubCategories = (mainCatName) => {
+    const cat = mainCategoriesList.find(c => c.name === mainCatName);
+    return cat ? cat.subs : [];
+  };
+
+  // ✅ Download CSV template (backend format ke saath match)
   const downloadTemplate = () => {
-    const headers = ['name', 'brand', 'category', 'subCategory', 'price', 'originalPrice', 'stock', 'description', 'keyFeatures', 'weight', 'dimensions'];
-    const sampleRow = ['Vitamin C Serum', 'MyBrand', 'Skincare', 'Serum', '499', '599', '10', 'Brightening serum with Vitamin C', 'Vitamin C|Antioxidants', '0.25', '10x5x3'];
-    
-    const csvContent = headers.join(',') + '\n' + sampleRow.join(',');
+    const headers = [
+      'name', 'brand', 'main_category', 'sub_category',
+      'price', 'original_price', 'stock', 'tax', 'sku',
+      'description', 'key_features', 'images',
+      'short_description', 'weight', 'dimensions',
+      'meta_title', 'meta_description', 'meta_keywords', 'is_featured'
+    ];
+    const sampleRow1 = [
+      'iPhone 15', 'Apple', 'Electronics', 'Mobile Phones',
+      '79999', '89999', '50', '18', 'IPH15-001',
+      'Latest iPhone with A16 chip|6.1 inch display|48MP camera',
+      '5G Ready|Face ID|iOS 17',
+      'https://example.com/img1.jpg|https://example.com/img2.jpg',
+      'Apple iPhone 15 with A16 Bionic chip', '171g', '15x7x0.8 cm',
+      'iPhone 15 - Buy Online | MyPinkShop',
+      'Buy iPhone 15 at best price', 'iphone 15, apple, mobile', 'true'
+    ];
+    const sampleRow2 = [
+      'Vitamin C Serum', 'Nykaa', 'Skincare', 'Serums & Essence',
+      '499', '699', '100', '18', 'VCS-001',
+      'Brightening serum with Vitamin C|Reduces dark spots',
+      'Dermatologically tested|Paraben free',
+      'https://example.com/serum.jpg',
+      'Vitamin C face serum', '50ml', '',
+      'Vitamin C Serum - Buy Online | MyPinkShop',
+      'Buy Vitamin C Serum at best price', 'vitamin c serum, skincare', 'false'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      sampleRow1.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','),
+      sampleRow2.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')
+    ].join('\n');
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'product_template.csv';
+    a.download = 'bulk-upload-template.csv';
     a.click();
     URL.revokeObjectURL(url);
+    toast.success('📄 Template downloaded!');
   };
 
-  // ✅ CSV Upload
+  // ✅ CSV Upload — backend bulk endpoint use karo
   const handleCSVUpload = async () => {
     if (!csvFile) {
       setError('Please select a CSV file');
@@ -40,98 +110,43 @@ function BulkUpload({ userRole, onSuccess }) {
     setSuccess('');
 
     try {
-      // Read CSV file
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const text = e.target.result;
-          const lines = text.split('\n').filter(line => line.trim());
-          const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-          
-          const productsData = [];
-          for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-            const row = {};
-            headers.forEach((h, idx) => {
-              row[h] = values[idx] || '';
-            });
-            productsData.push(row);
-          }
+      const formData = new FormData();
+      formData.append('file', csvFile);
 
-          // Upload products one by one
-          let successCount = 0;
-          let failedCount = 0;
-          const vendorBrand = vendorData.brandName || vendorData.name || '';
-          const vendorId = vendorData._id || vendorData.id || '';
+      // ✅ Backend bulk-upload endpoint use karo (fast + auto-categories)
+      const res = await fetch(`${API_URL}/api/bulk-upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // ❌ Content-Type mat set karo — browser khud set karega multipart ke liye
+        },
+        body: formData
+      });
 
-          for (let i = 0; i < productsData.length; i++) {
-            const p = productsData[i];
-            
-            if (!p.name || !p.price) {
-              failedCount++;
-              continue;
-            }
+      const data = await res.json();
 
-            try {
-              const productData = {
-                name: p.name,
-                brand: p.brand || vendorBrand,
-                category: p.category || 'Skincare',
-                subCategory: p.subCategory || '',
-                mainCategory: p.category || 'Skincare',
-                price: parseFloat(p.price) || 0,
-                originalPrice: parseFloat(p.originalPrice) || parseFloat(p.price) * 1.2 || 0,
-                stock: parseInt(p.stock) || 10,
-                description: p.description ? [p.description] : [],
-                keyFeatures: p.keyFeatures ? p.keyFeatures.split('|').map(f => f.trim()) : [],
-                weight: p.weight || '',
-                dimensions: p.dimensions || '',
-                vendorId: userRole === 'vendor' ? vendorId : null,
-                vendorName: userRole === 'vendor' ? vendorBrand : '',
-                status: 'active',
-                adminApproved: userRole === 'admin' ? true : false,
-                isNew: true,
-                rating: 4.0
-              };
+      if (res.ok && (data.success || data.data)) {
+        const result = data.data || data;
+        const successCount = result.success || 0;
+        const failedCount = result.failed || 0;
 
-              const res = await fetch(`${API_URL}/api/products`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(productData)
-              });
-
-              const data = await res.json();
-              if (res.ok && data.success) {
-                successCount++;
-              } else {
-                failedCount++;
-                console.error('Failed:', p.name, data.message);
-              }
-            } catch (err) {
-              failedCount++;
-              console.error('Error:', err);
-            }
-
-            setProgress({ current: i + 1, total: productsData.length });
-          }
-
-          setSuccess(`✅ ${successCount} products added! ${failedCount > 0 ? `❌ ${failedCount} failed` : ''}`);
-          if (successCount > 0 && onSuccess) onSuccess();
-          setCsvFile(null);
-          
-        } catch (err) {
-          setError('Failed to parse CSV file');
-          console.error('CSV parse error:', err);
+        setSuccess(`✅ ${successCount} products added! ${failedCount > 0 ? `❌ ${failedCount} failed` : ''}`);
+        
+        if (failedCount > 0 && result.errors?.length > 0) {
+          console.warn('Failed rows:', result.errors);
+          toast.error(`${failedCount} rows failed — check console`);
         }
-        setUploading(false);
-      };
-      reader.readAsText(csvFile);
-      
+
+        if (successCount > 0 && onSuccess) onSuccess();
+        setCsvFile(null);
+        document.getElementById('csvFile').value = '';
+      } else {
+        setError(data.message || data.error || 'Upload failed');
+      }
     } catch (err) {
+      console.error('CSV upload error:', err);
       setError('Upload failed: ' + err.message);
+    } finally {
       setUploading(false);
     }
   };
@@ -143,13 +158,17 @@ function BulkUpload({ userRole, onSuccess }) {
       setError(`Maximum ${maxLimit} products at once`);
       return;
     }
-    setProducts([...products, { name: '', price: '', stock: '', brand: '', category: '', description: '' }]);
+    setProducts([...products, { name: '', price: '', stock: '', brand: '', category: '', subCategory: '', description: '' }]);
     setError('');
   };
 
   const updateProduct = (index, field, value) => {
     const updated = [...products];
     updated[index][field] = value;
+    // ✅ Category change hone pe subcategory reset
+    if (field === 'category') {
+      updated[index].subCategory = '';
+    }
     setProducts(updated);
   };
 
@@ -157,7 +176,7 @@ function BulkUpload({ userRole, onSuccess }) {
     setProducts(products.filter((_, i) => i !== index));
   };
 
-  // ✅ Submit form products
+  // ✅ Submit form products — /api/products/create use karo
   const submitFormProducts = async () => {
     const validProducts = products.filter(p => p.name && p.price);
     
@@ -182,24 +201,23 @@ function BulkUpload({ userRole, onSuccess }) {
       try {
         const productData = {
           name: p.name,
-          brand: p.brand || vendorBrand,
-          category: p.category || 'Skincare',
+          brand: p.brand || vendorBrand || 'MyPinkShop',
+          mainCategory: p.category || 'Other',       // ✅ Empty na ho
           subCategory: p.subCategory || '',
-          mainCategory: p.category || 'Skincare',
           price: parseFloat(p.price) || 0,
           originalPrice: parseFloat(p.originalPrice) || parseFloat(p.price) * 1.2 || 0,
           stock: parseInt(p.stock) || 10,
           description: p.description ? [p.description] : [],
           keyFeatures: [],
-          vendorId: userRole === 'vendor' ? vendorId : null,
-          vendorName: userRole === 'vendor' ? vendorBrand : '',
-          status: 'active',
-          adminApproved: userRole === 'admin' ? true : false,
-          isNew: true,
-          rating: 4.0
+          images: [],
+          vendorId: userRole === 'vendor' ? vendorId : 'admin',
+          vendorName: userRole === 'vendor' ? vendorBrand : 'MyPinkShop',
+          isActive: true,
+          adminApproved: userRole === 'admin',
         };
 
-        const res = await fetch(`${API_URL}/api/products`, {
+        // ✅ Sahi endpoint use karo — /api/products/create
+        const res = await fetch(`${API_URL}/api/products/create`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -209,11 +227,11 @@ function BulkUpload({ userRole, onSuccess }) {
         });
 
         const data = await res.json();
-        if (res.ok && data.success) {
+        if (res.ok && (data.success || data.data)) {
           successCount++;
         } else {
           failedCount++;
-          console.error('Failed:', p.name, data.message);
+          console.error('Failed:', p.name, data.message || data.error);
         }
       } catch (err) {
         failedCount++;
@@ -226,7 +244,7 @@ function BulkUpload({ userRole, onSuccess }) {
     setSuccess(`✅ ${successCount} products added! ${failedCount > 0 ? `❌ ${failedCount} failed` : ''}`);
     
     if (successCount > 0) {
-      setProducts([{ name: '', price: '', stock: '', brand: '', category: '', description: '' }]);
+      setProducts([{ name: '', price: '', stock: '', brand: '', category: '', subCategory: '', description: '' }]);
       if (onSuccess) onSuccess();
     }
     setUploading(false);
@@ -290,7 +308,7 @@ function BulkUpload({ userRole, onSuccess }) {
                 📄 Download CSV Template
               </button>
               <p className="text-xs text-gray-500 mt-2">
-                {userRole === 'vendor' ? 'Max 100 products per CSV upload' : 'Unlimited products'}
+                Template mein <strong>main_category</strong> aur <strong>sub_category</strong> columns bharo. Nayi categories automatically create ho jayengi.
               </p>
             </div>
 
@@ -313,13 +331,13 @@ function BulkUpload({ userRole, onSuccess }) {
 
             {uploading && (
               <div className="mt-4">
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className="bg-pink-500 h-2.5 rounded-full transition-all duration-300"
-                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                    className="bg-pink-500 h-2.5 rounded-full transition-all duration-300 animate-pulse"
+                    style={{ width: '100%' }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">{progress.current}/{progress.total} products uploaded</p>
+                <p className="text-xs text-gray-400 mt-1">Uploading and processing...</p>
               </div>
             )}
 
@@ -346,7 +364,6 @@ function BulkUpload({ userRole, onSuccess }) {
               </button>
             </div>
 
-            {/* Progress Bar */}
             {uploading && (
               <div className="mb-4">
                 <div className="flex justify-between text-sm mb-1">
@@ -385,17 +402,40 @@ function BulkUpload({ userRole, onSuccess }) {
                       className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                     />
                     <input
-                      placeholder="Brand (auto-filled)"
+                      placeholder="Brand"
                       value={product.brand}
                       onChange={(e) => updateProduct(idx, 'brand', e.target.value)}
                       className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
                     />
-                    <input
-                      placeholder="Category"
+                    
+                    {/* ✅ Category dropdown (API se) */}
+                    <select
                       value={product.category}
                       onChange={(e) => updateProduct(idx, 'category', e.target.value)}
-                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
-                    />
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white"
+                      disabled={categoriesLoading}
+                    >
+                      <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
+                      {mainCategoriesList.map(cat => (
+                        <option key={cat.name} value={cat.name}>
+                          {cat.icon} {cat.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* ✅ SubCategory dropdown */}
+                    <select
+                      value={product.subCategory}
+                      onChange={(e) => updateProduct(idx, 'subCategory', e.target.value)}
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 bg-white disabled:bg-gray-100"
+                      disabled={!product.category || getSubCategories(product.category).length === 0}
+                    >
+                      <option value="">Select Sub Category</option>
+                      {getSubCategories(product.category).map(sub => (
+                        <option key={sub} value={sub}>{sub}</option>
+                      ))}
+                    </select>
+
                     <input
                       placeholder="Price *"
                       type="number"
@@ -414,7 +454,7 @@ function BulkUpload({ userRole, onSuccess }) {
                       placeholder="Description"
                       value={product.description}
                       onChange={(e) => updateProduct(idx, 'description', e.target.value)}
-                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200"
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 md:col-span-2 lg:col-span-3"
                     />
                   </div>
                 </div>
