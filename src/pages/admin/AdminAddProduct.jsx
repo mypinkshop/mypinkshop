@@ -4,8 +4,90 @@ import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
+// ============================================================
+// ✅ SEO AUTO-GENERATOR HELPERS (Smart limits)
+// ============================================================
+const SEO_LIMITS = {
+  TITLE_MAX: 60,
+  DESCRIPTION_MAX: 155,
+  KEYWORDS_MAX: 15,
+};
+
+const shortenText = (text, maxLen) => {
+  if (!text) return '';
+  const clean = String(text).trim().replace(/\s+/g, ' ');
+  if (clean.length <= maxLen) return clean;
+  return clean.substring(0, maxLen).trim() + '...';
+};
+
+const generateMetaTitle = (name, brand, subCategory = '') => {
+  if (!name) return 'Product | MyPinkShop';
+  const shortName = shortenText(name, 35);
+  const brandPart = brand && !shortName.toLowerCase().startsWith(String(brand).toLowerCase())
+    ? `${brand} `
+    : '';
+  const catPart = subCategory ? ` - ${subCategory}` : '';
+  const storePart = ' | MyPinkShop';
+
+  let title = `${brandPart}${shortName}${catPart}${storePart}`;
+  if (title.length > SEO_LIMITS.TITLE_MAX) {
+    const allowed = SEO_LIMITS.TITLE_MAX - storePart.length;
+    title = `${brandPart}${shortName}${catPart}`.substring(0, allowed - 3).trim() + '...' + storePart;
+  }
+  return title;
+};
+
+const generateMetaDescription = (name, brand, subCategory, category) => {
+  if (!name) return 'Shop online at MyPinkShop.';
+  const shortName = shortenText(name, 50);
+  const brandPart = brand ? ` by ${brand}` : '';
+  const catPart = subCategory ? ` ${subCategory}` : (category ? ` ${category}` : '');
+
+  let desc = `Buy ${shortName}${brandPart} online at best price.${catPart} with ✓ Free Shipping ✓ COD. Shop at MyPinkShop.`;
+  if (desc.length > SEO_LIMITS.DESCRIPTION_MAX) {
+    desc = desc.substring(0, SEO_LIMITS.DESCRIPTION_MAX - 3).trim() + '...';
+  }
+  return desc;
+};
+
+const generateMetaKeywords = (name, brand, category, subCategory, keyFeatures = []) => {
+  const keywords = [];
+  if (brand) keywords.push(brand);
+  if (brand && subCategory) keywords.push(`${brand} ${subCategory}`);
+  if (name) {
+    const shortName = name.split(' ').slice(0, 4).join(' ');
+    if (shortName.length > 3) keywords.push(shortName);
+  }
+  if (category) keywords.push(category);
+  if (subCategory) {
+    keywords.push(subCategory);
+    keywords.push(`${subCategory} online`);
+  }
+  if (Array.isArray(keyFeatures)) {
+    keyFeatures.slice(0, 3).forEach(f => {
+      const words = String(f).split(' ').slice(0, 3).join(' ');
+      if (words.length > 3 && words.length < 30) keywords.push(words);
+    });
+  }
+  keywords.push('buy online', 'best price', 'free shipping', 'MyPinkShop');
+
+  const unique = [...new Set(keywords.map(k => k.trim().toLowerCase()).filter(Boolean))];
+  return unique.slice(0, SEO_LIMITS.KEYWORDS_MAX).join(', ');
+};
+
+// ============================================================
+// ✅ FALLBACK BRANDS (agar API fail ho)
+// ============================================================
+const FALLBACK_BRANDS = [
+  'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'Lakmé',
+  'Maybelline', 'Loreal Paris', 'Plum', 'Wow Skin Science',
+  'Biotique', 'Forest Essentials', 'MyGlamm', 'MAC',
+  'The Face Shop', 'Kama Ayurveda', 'Mcaffeine', 'Estee Lauder',
+  'Clinique', 'Huda Beauty', 'St.Botanica', 'Richfem'
+];
+
 // ============================================
-// AMAZON IMPORTER COMPONENT (UNTOUCHED)
+// AMAZON IMPORTER COMPONENT (UNTOUCHED LOGIC)
 // ============================================
 const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -140,27 +222,14 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
       .filter(item => !isGarbage(item))
       .slice(0, 10);
 
-    let metaTitle = product.name || '';
-    if (product.brand) metaTitle += ` - ${product.brand}`;
-    metaTitle += ' | Lowest Price on MyPinkShop';
-    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-
-    let metaDescription = `Buy ${product.name}`;
-    if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ' online at lowest price with free delivery. Shop now at MyPinkShop.';
-    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-
-    const autoKeywords = [
-      product.brand,
-      ...keyFeaturesArray.slice(0, 5),
-      'online shopping',
-      'lowest price',
-      'MyPinkShop'
-    ].filter(Boolean);
-    const metaKeywords = [...new Set(autoKeywords)].join(', ');
-
+    // ✅ CATEGORY PEHLE DETECT KARO
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
+
+    // ✅ SMART SEO GENERATION
+    const metaTitle = generateMetaTitle(product.name, product.brand, detectedSubCategory);
+    const metaDescription = generateMetaDescription(product.name, product.brand, detectedSubCategory, detectedCategory);
+    const metaKeywords = generateMetaKeywords(product.name, product.brand, detectedCategory, detectedSubCategory, keyFeaturesArray);
 
     setFormData(prev => ({
       ...prev,
@@ -272,7 +341,7 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
 };
 
 // ============================================
-// FLIPKART IMPORTER COMPONENT (UNTOUCHED)
+// FLIPKART IMPORTER COMPONENT (UNTOUCHED LOGIC)
 // ============================================
 const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
   const [urls, setUrls] = useState(['']);
@@ -406,29 +475,14 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
       .filter(item => !isGarbage(item))
       .slice(0, 10);
 
-    let metaTitle = product.name || '';
-    if (product.brand) metaTitle += ` - ${product.brand}`;
-    metaTitle += ' | MyPinkShop';
-    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
-
-    let metaDescription = `Buy ${product.name}`;
-    if (product.brand) metaDescription += ` by ${product.brand}`;
-    metaDescription += ' online at best price. Shop now at MyPinkShop.';
-    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
-
+    // ✅ CATEGORY PEHLE DETECT KARO
     const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
     const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
 
-    const autoKeywords = [
-      product.brand,
-      ...keyFeaturesArray.slice(0, 5),
-      detectedCategory,
-      detectedSubCategory,
-      'online shopping',
-      'best price',
-      'MyPinkShop'
-    ].filter(Boolean);
-    const metaKeywords = [...new Set(autoKeywords)].join(', ');
+    // ✅ SMART SEO
+    const metaTitle = generateMetaTitle(product.name, product.brand, detectedSubCategory);
+    const metaDescription = generateMetaDescription(product.name, product.brand, detectedSubCategory, detectedCategory);
+    const metaKeywords = generateMetaKeywords(product.name, product.brand, detectedCategory, detectedSubCategory, keyFeaturesArray);
 
     setFormData(prev => ({
       ...prev,
@@ -647,22 +701,19 @@ function AdminAddProduct() {
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
 
-  // ✅ NAYA — API se categories
   const [apiCategories, setApiCategories] = useState([]);
   const [apiSubCategories, setApiSubCategories] = useState({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
 
+  // ✅ NAYA — API se brands
+  const [brands, setBrands] = useState(FALLBACK_BRANDS);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
-  const [brands, setBrands] = useState([
-    'Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'The Face Shop',
-    'Lakmé', 'MyGlamm', 'Plum', 'Wow Skin Science', 'Biotique',
-    'Forest Essentials', 'Kama Ayurveda', 'Mcaffeine', 'St.Botanica',
-    'Loreal Paris', 'Maybelline', 'Clinique', 'Estee Lauder', 'Huda Beauty', 'MAC', 'Richfem'
-  ]);
-
   const [customSubCategories, setCustomSubCategories] = useState({
-    Skincare: [], Makeup: [], Hair: [], Clothing: [], Accessories: []
+    Skincare: [], Makeup: [], Haircare: [], Fashion: [], Accessories: [],
+    Electronics: [], 'Home & Kitchen': [], 'Health & Wellness': [], 'Books & Stationery': []
   });
 
   const [activeTab, setActiveTab] = useState('manual');
@@ -695,7 +746,7 @@ function AdminAddProduct() {
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  // ✅ NAYA — API se categories fetch karo
+  // ✅ API se categories fetch
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -705,16 +756,13 @@ function AdminAddProduct() {
         const json = await res.json();
         const tree = json.data || json;
 
-        console.log('✅ Categories loaded:', tree.length, 'main');
         setApiCategories(tree);
 
-        // Sub categories map banao: { "Skincare": ["Face Wash", "Serum", ...] }
         const subMap = {};
         tree.forEach(cat => {
           subMap[cat.name] = (cat.children || []).map(child => child.name);
         });
         setApiSubCategories(subMap);
-        console.log('✅ Sub categories map ready');
       } catch (err) {
         console.error('❌ Categories fetch error:', err);
         toast.error('Categories load nahi ho payi — fallback use ho raha hai');
@@ -726,24 +774,72 @@ function AdminAddProduct() {
     fetchCategories();
   }, []);
 
-  // SEO META TAG GENERATOR
+  // ✅ NAYA — API se brands fetch karo + localStorage custom brands merge karo
   useEffect(() => {
-    let metaTitle = formData.productName
-      ? `${formData.productName} ${formData.brand ? `- ${formData.brand}` : ''} | Lowest Price on MyPinkShop`
-      : 'Add New Product | MyPinkShop';
-    if (metaTitle.length > 100) metaTitle = metaTitle.substring(0, 97) + '...';
+    const fetchBrands = async () => {
+      try {
+        setBrandsLoading(true);
+        const res = await fetch(`${API_URL}/api/brands`);
+        if (!res.ok) throw new Error('Failed to fetch brands');
+        const json = await res.json();
+        const brandList = json.data || json;
 
-    let metaDescription = formData.productName
-      ? `Buy ${formData.productName} online at lowest price. ✓ 100% Original ✓ Free Delivery ✓ COD. Shop now at MyPinkShop!`
-      : 'Add products to your store.';
-    if (metaDescription.length > 200) metaDescription = metaDescription.substring(0, 197) + '...';
+        // ✅ localStorage ke custom brands
+        const savedBrands = localStorage.getItem('brandsList');
+        let customBrands = [];
+        if (savedBrands) {
+          try {
+            customBrands = JSON.parse(savedBrands);
+            if (!Array.isArray(customBrands)) customBrands = [];
+          } catch (e) { customBrands = []; }
+        }
 
-    const autoKeywords = [
-      formData.brand, formData.category, formData.subCategory,
-      ...formData.keyFeatures.slice(0, 5),
-      'lowest price online', 'best deals', 'free shipping india', 'MyPinkShop'
-    ].filter(Boolean);
-    const metaKeywords = [...new Set(autoKeywords)].join(', ');
+        // ✅ Merge — API brands + custom brands + fallback
+        const apiBrands = Array.isArray(brandList) ? brandList : [];
+        const allBrands = [...new Set([
+          ...apiBrands,
+          ...customBrands,
+          ...FALLBACK_BRANDS
+        ])].filter(Boolean).sort();
+
+        setBrands(allBrands);
+        console.log('✅ Brands loaded:', apiBrands.length, 'from API,', customBrands.length, 'custom,', allBrands.length, 'total');
+      } catch (err) {
+        console.error('❌ Brands fetch error:', err);
+        // Fallback + custom merge
+        const savedBrands = localStorage.getItem('brandsList');
+        let customBrands = [];
+        if (savedBrands) {
+          try {
+            customBrands = JSON.parse(savedBrands);
+            if (!Array.isArray(customBrands)) customBrands = [];
+          } catch (e) { customBrands = []; }
+        }
+        const allBrands = [...new Set([...FALLBACK_BRANDS, ...customBrands])].sort();
+        setBrands(allBrands);
+      } finally {
+        setBrandsLoading(false);
+      }
+    };
+
+    fetchBrands();
+  }, []);
+
+  // ✅ SEO META TAG GENERATOR (SMART)
+  useEffect(() => {
+    if (!formData.productName) {
+      setSeoData({
+        metaTitle: 'Add New Product | MyPinkShop',
+        metaDescription: 'Shop online at MyPinkShop.',
+        metaKeywords: 'online shopping, best price, MyPinkShop',
+        slug: productId
+      });
+      return;
+    }
+
+    const metaTitle = generateMetaTitle(formData.productName, formData.brand, formData.subCategory);
+    const metaDescription = generateMetaDescription(formData.productName, formData.brand, formData.subCategory, formData.category);
+    const metaKeywords = generateMetaKeywords(formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures);
 
     setSeoData({ metaTitle, metaDescription, metaKeywords, slug: productId });
   }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
@@ -754,7 +850,6 @@ function AdminAddProduct() {
   const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
   const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
 
-  // ✅ Fallback hardcoded (agar API fail ho)
   const fallbackSubCategories = {
     Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
     Makeup: ['Foundation', 'Concealer', 'Compact Powder', 'Primer', 'Highlighter', 'Blush', 'Lipstick', 'Lip Gloss', 'Eyeshadow', 'Eyeliner', 'Kajal', 'Mascara'],
@@ -767,14 +862,9 @@ function AdminAddProduct() {
     'Books & Stationery': ['Fiction', 'Non-Fiction', 'Self-Help', 'Academic', 'Notebooks & Diaries', 'Pens & Pencils', 'Art Supplies']
   };
 
-  // ✅ Category specific fields ke liye
   const getCategoryKey = () => {
     const cat = formData.category;
-    // Purane naam se naye naam pe map karo
-    const map = {
-      'Hair': 'Haircare',
-      'Clothing': 'Fashion'
-    };
+    const map = { 'Hair': 'Haircare', 'Clothing': 'Fashion' };
     return map[cat] || cat;
   };
 
@@ -800,16 +890,22 @@ function AdminAddProduct() {
 
   const variationAttrs = getVariationAttributes();
 
+  // ✅ localStorage se custom sub-categories load karo
   useEffect(() => {
-    const savedBrands = localStorage.getItem('brandsList');
-    if (savedBrands) setBrands(JSON.parse(savedBrands));
     const savedSubCategories = localStorage.getItem('customSubCategories');
-    if (savedSubCategories) setCustomSubCategories(JSON.parse(savedSubCategories));
+    if (savedSubCategories) {
+      try {
+        setCustomSubCategories(JSON.parse(savedSubCategories));
+      } catch (e) { /* ignore */ }
+    }
   }, []);
 
+  // ✅ Brands save karo localStorage mein (custom brands ke liye)
   const saveBrands = (updatedBrands) => {
     setBrands(updatedBrands);
-    localStorage.setItem('brandsList', JSON.stringify(updatedBrands));
+    // Sirf custom brands save karo (API brands nahi)
+    const customBrands = updatedBrands.filter(b => !FALLBACK_BRANDS.includes(b));
+    localStorage.setItem('brandsList', JSON.stringify(customBrands));
   };
 
   const saveCustomSubCategory = (category, newSubCat) => {
@@ -818,19 +914,14 @@ function AdminAddProduct() {
     localStorage.setItem('customSubCategories', JSON.stringify(updated));
   };
 
-  // ✅ NAYA — API + fallback + custom merge
   const getCurrentSubCategories = () => {
     const category = formData.category;
     if (!category) return [];
 
-    // API se (priority)
     const apiSubs = apiSubCategories[category] || [];
-    // Fallback
     const fallbackSubs = fallbackSubCategories[category] || [];
-    // Custom (localStorage)
     const customSubs = customSubCategories[category] || [];
 
-    // Merge karo, duplicates remove
     return [...new Set([...apiSubs, ...fallbackSubs, ...customSubs])];
   };
 
@@ -1035,17 +1126,27 @@ function AdminAddProduct() {
   const removeKeyFeature = (index) => setFormData(prev => ({ ...prev, keyFeatures: prev.keyFeatures.filter((_, i) => i !== index) }));
 
   const handleAddNewBrand = () => {
-    if (newBrand.trim() && !brands.includes(newBrand.trim())) {
-      saveBrands([...brands, newBrand.trim()]);
-      setFormData(prev => ({ ...prev, brand: newBrand.trim() }));
-      setNewBrand('');
-      setShowAddBrand(false);
-      toast.success(`✅ Brand "${newBrand.trim()}" added!`);
-    } else if (brands.includes(newBrand.trim())) {
-      toast.error('⚠️ Brand already exists!');
-    } else {
-      toast.error('Please enter a valid brand name');
+    if (!newBrand.trim()) {
+      toast.error('Please enter a brand name');
+      return;
     }
+
+    const cleanBrand = newBrand.trim();
+
+    // ✅ Duplicate check (case-insensitive)
+    const exists = brands.some(b => b.toLowerCase() === cleanBrand.toLowerCase());
+    if (exists) {
+      toast.error('⚠️ Brand already exists!');
+      return;
+    }
+
+    // ✅ Naya brand add karo
+    const updatedBrands = [...brands, cleanBrand].sort();
+    saveBrands(updatedBrands);
+    setFormData(prev => ({ ...prev, brand: cleanBrand }));
+    setNewBrand('');
+    setShowAddBrand(false);
+    toast.success(`✅ Brand "${cleanBrand}" added!`);
   };
 
   const currentSubCategories = getCurrentSubCategories();
@@ -1115,7 +1216,6 @@ function AdminAddProduct() {
 
     const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
     const finalSku = formData.sku || generateSKU();
-
     const attrs = getVariationAttributes();
 
     const productData = {
@@ -1394,15 +1494,27 @@ function AdminAddProduct() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Brand <span className="text-red-500">*</span>
+                      {!brandsLoading && <span className="text-xs text-gray-400 ml-2">({brands.length} brands)</span>}
+                    </label>
                     <div className="relative">
-                      <input type="text" placeholder="Type brand name..." value={formData.brand} onChange={(e) => { setFormData({ ...formData, brand: e.target.value }); setBrandSearch(e.target.value); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
-                      {brandSearch && (
+                      <input 
+                        type="text" 
+                        placeholder={brandsLoading ? "Loading brands..." : "Type brand name..."} 
+                        value={formData.brand} 
+                        onChange={(e) => { setFormData({ ...formData, brand: e.target.value }); setBrandSearch(e.target.value); }} 
+                        className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" 
+                        disabled={brandsLoading}
+                      />
+                      {brandSearch && filteredBrands.length > 0 && (
                         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
-                          {filteredBrands.slice(0, 10).map(b => (
+                          {filteredBrands.slice(0, 15).map(b => (
                             <button key={b} type="button" onClick={() => { setFormData({ ...formData, brand: b }); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm transition">{b}</button>
                           ))}
-                          <button type="button" onClick={() => setShowAddBrand(true)} className="w-full text-left px-3 sm:px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 transition border-t font-medium">+ Add new brand "{brandSearch}"</button>
+                          {!filteredBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                            <button type="button" onClick={() => setShowAddBrand(true)} className="w-full text-left px-3 sm:px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 transition border-t font-medium">+ Add new brand "{brandSearch}"</button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1467,7 +1579,6 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* Add Brand Modal */}
             {showAddBrand && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddBrand(false)}>
                 <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1483,7 +1594,6 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* Add Sub Category Modal */}
             {showAddSubCategory && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddSubCategory(false)}>
                 <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
@@ -1587,7 +1697,6 @@ function AdminAddProduct() {
                   </div>
                 </div>
 
-                {/* Variations Section */}
                 <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
                   <div className="flex flex-wrap justify-between items-center gap-3 mb-4 pb-3 border-b border-gray-100">
                     <div className="flex gap-2">
@@ -1812,16 +1921,19 @@ function AdminAddProduct() {
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">🔍 Google SEO & Permanent URL Structure</h2>
                 <div className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title</label>
-                    <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({ ...seoData, metaTitle: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title <span className="text-xs text-gray-400">(max 60 chars)</span></label>
+                    <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({ ...seoData, metaTitle: e.target.value })} maxLength={60} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">{seoData.metaTitle.length}/60 characters</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description</label>
-                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({ ...seoData, metaDescription: e.target.value })} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description <span className="text-xs text-gray-400">(max 155 chars)</span></label>
+                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({ ...seoData, metaDescription: e.target.value })} maxLength={155} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <p className="text-xs text-gray-400 mt-1">{seoData.metaDescription.length}/155 characters</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords <span className="text-xs text-gray-400">(max 15 phrases)</span></label>
                     <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({ ...seoData, metaKeywords: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="keyword1, keyword2, keyword3" />
+                    <p className="text-xs text-gray-400 mt-1">{seoData.metaKeywords.split(',').filter(Boolean).length}/15 keywords</p>
                   </div>
 
                   <div className="p-4 bg-blue-50 rounded-xl">
