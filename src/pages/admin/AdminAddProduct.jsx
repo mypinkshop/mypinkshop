@@ -647,7 +647,11 @@ function AdminAddProduct() {
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [expandedVariationId, setExpandedVariationId] = useState(null);
 
-  // Permanent Pre-Generated SEO Product ID
+  // ✅ NAYA — API se categories
+  const [apiCategories, setApiCategories] = useState([]);
+  const [apiSubCategories, setApiSubCategories] = useState({});
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
   const [brands, setBrands] = useState([
@@ -691,6 +695,37 @@ function AdminAddProduct() {
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
+  // ✅ NAYA — API se categories fetch karo
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const res = await fetch(`${API_URL}/api/categories/tree`);
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const json = await res.json();
+        const tree = json.data || json;
+
+        console.log('✅ Categories loaded:', tree.length, 'main');
+        setApiCategories(tree);
+
+        // Sub categories map banao: { "Skincare": ["Face Wash", "Serum", ...] }
+        const subMap = {};
+        tree.forEach(cat => {
+          subMap[cat.name] = (cat.children || []).map(child => child.name);
+        });
+        setApiSubCategories(subMap);
+        console.log('✅ Sub categories map ready');
+      } catch (err) {
+        console.error('❌ Categories fetch error:', err);
+        toast.error('Categories load nahi ho payi — fallback use ho raha hai');
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   // SEO META TAG GENERATOR
   useEffect(() => {
     let metaTitle = formData.productName
@@ -719,60 +754,45 @@ function AdminAddProduct() {
   const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
   const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
 
-  const subCategoriesOptions = {
-    Skincare: [
-      'Face Wash', 'Cleanser', 'Face Scrub', 'Toner', 'Serum', 'Moisturizer', 'Face Cream',
-      'Sunscreen', 'Face Mask', 'Sheet Mask', 'Eye Cream', 'Lip Balm', 'Lip Scrub',
-      'Facial Oil', 'Facial Mist', 'Night Cream', 'Day Cream', 'Anti Aging Cream',
-      'Acne Treatment', 'Spot Corrector', 'Pimple Patch', 'Face Mist', 'Facial Kit', 'Soap',
-      'Body Wash', 'Body Lotion', 'Body Scrub', 'Body Oil', 'Body Butter', 'Hand Cream'
-    ],
-    Makeup: [
-      'Foundation', 'Concealer', 'Compact Powder', 'Loose Powder', 'Setting Powder',
-      'Primer', 'Color Corrector', 'Highlighter', 'Contour', 'Blush', 'Bronzer',
-      'Lipstick', 'Lip Gloss', 'Lip Liner', 'Lip Stain', 'Lip Oil', 'Lip Plumper',
-      'Eyeshadow', 'Eyeshadow Palette', 'Eyeliner', 'Kajal', 'Mascara', 'Eyebrow Pencil',
-      'Eyebrow Gel', 'Eye Primer', 'False Eyelashes', 'Makeup Fixer', 'Setting Spray',
-      'Makeup Remover', 'Micellar Water'
-    ],
-    Hair: [
-      'Shampoo', 'Conditioner', 'Hair Mask', 'Hair Oil', 'Hair Serum', 'Hair Spray',
-      'Hair Cream', 'Hair Butter', 'Hair Gel', 'Hair Wax', 'Dry Shampoo', 'Leave-in Conditioner',
-      'Hair Color', 'Hair Dye', 'Hair Toner', 'Bleach', 'Hair Removal Cream',
-      'Anti Dandruff', 'Hair Fall Control', 'Hair Growth Serum', 'Scalp Scrub',
-      'Heat Protectant', 'Sulfate Free Shampoo', 'Curly Hair Products'
-    ],
-    Clothing: [
-      'T-Shirt', 'Top', 'Blouse', 'Shirt', 'Kurti', 'Kurta', 'Saree', 'Lehenga',
-      'Salwar Suit', 'Anarkali', 'Gown', 'Dress', 'Skirt', 'Shorts', 'Jeans',
-      'Trousers', 'Joggers', 'Leggings', 'Jeggings', 'Palazzos', 'Cargos',
-      'Jacket', 'Blazer', 'Sweater', 'Sweatshirt', 'Hoodie', 'Cardigan',
-      'Winter Coat', 'Puffer Jacket', 'Denim Jacket', 'Leather Jacket',
-      'Night Suit', 'Pyjama', 'Lounge Wear', 'Activewear', 'Sports Bra',
-      'Swimsuit', 'Bikini', 'Beach Wear', 'Ethnic Wear', 'Western Wear'
-    ],
-    Accessories: [
-      'Bag', 'Handbag', 'Tote Bag', 'Sling Bag', 'Backpack', 'Clutch', 'Wallet',
-      'Jewelry Set', 'Necklace', 'Earrings', 'Ring', 'Bracelet', 'Anklet',
-      'Hair Accessory', 'Hair Clip', 'Hair Band', 'Scrunchie', 'Hair Tie',
-      'Watch', 'Smart Watch', 'Sunglasses', 'Spectacles', 'Belt', 'Scarf',
-      'Stole', 'Muffler', 'Cap', 'Hat', 'Gloves', 'Socks', 'Stockings',
-      'Phone Case', 'Keychain', 'Lanyard', 'Face Mask', 'Hand Purse'
-    ]
+  // ✅ Fallback hardcoded (agar API fail ho)
+  const fallbackSubCategories = {
+    Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+    Makeup: ['Foundation', 'Concealer', 'Compact Powder', 'Primer', 'Highlighter', 'Blush', 'Lipstick', 'Lip Gloss', 'Eyeshadow', 'Eyeliner', 'Kajal', 'Mascara'],
+    Haircare: ['Shampoo', 'Conditioner', 'Hair Mask', 'Hair Oil', 'Hair Serum', 'Hair Color'],
+    Fashion: ['T-Shirt', 'Top', 'Kurti', 'Saree', 'Lehenga', 'Dress', 'Jeans', 'Jacket', 'Nightwear'],
+    Accessories: ['Bag', 'Handbag', 'Jewelry', 'Necklace', 'Earrings', 'Watch', 'Sunglasses', 'Belt', 'Scarf'],
+    Electronics: ['Mobile Phones', 'Mobile Accessories', 'Chargers & Cables', 'Power Banks', 'Earphones', 'Headphones', 'Keyboards', 'Mouse', 'Smart Watches'],
+    'Home & Kitchen': ['Kitchen Tools', 'Storage & Organizers', 'Home Decor', 'Wall Art', 'Bedding', 'Cushions', 'Bathroom Accessories'],
+    'Health & Wellness': ['Supplements', 'Ayurvedic Products', 'Personal Care', 'Fitness & Yoga', 'Health Devices'],
+    'Books & Stationery': ['Fiction', 'Non-Fiction', 'Self-Help', 'Academic', 'Notebooks & Diaries', 'Pens & Pencils', 'Art Supplies']
+  };
+
+  // ✅ Category specific fields ke liye
+  const getCategoryKey = () => {
+    const cat = formData.category;
+    // Purane naam se naye naam pe map karo
+    const map = {
+      'Hair': 'Haircare',
+      'Clothing': 'Fashion'
+    };
+    return map[cat] || cat;
   };
 
   const getVariationAttributes = () => {
-    switch (formData.category) {
+    const categoryKey = getCategoryKey();
+    switch (categoryKey) {
       case 'Skincare':
         return { type: 'Size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic'] };
       case 'Makeup':
         return { type: 'Shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry'], secondary: 'Finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'] };
-      case 'Hair':
+      case 'Haircare':
         return { type: 'Size', options: ['100ml', '200ml', '300ml', '500ml', '1L'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free'] };
-      case 'Clothing':
+      case 'Fashion':
         return { type: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'], secondary: 'Color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey'] };
       case 'Accessories':
         return { type: 'Size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable'], secondary: 'Color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor'] };
+      case 'Electronics':
+        return { type: 'Variant', options: ['Standard', 'Pro', 'Plus', 'Lite', 'Max'], secondary: 'Color', secondaryOptions: ['Black', 'White', 'Silver', 'Blue', 'Grey'] };
       default:
         return { type: 'Variant', options: ['Default'], secondary: null, secondaryOptions: [] };
     }
@@ -798,10 +818,20 @@ function AdminAddProduct() {
     localStorage.setItem('customSubCategories', JSON.stringify(updated));
   };
 
+  // ✅ NAYA — API + fallback + custom merge
   const getCurrentSubCategories = () => {
     const category = formData.category;
     if (!category) return [];
-    return [...(subCategoriesOptions[category] || []), ...(customSubCategories[category] || [])];
+
+    // API se (priority)
+    const apiSubs = apiSubCategories[category] || [];
+    // Fallback
+    const fallbackSubs = fallbackSubCategories[category] || [];
+    // Custom (localStorage)
+    const customSubs = customSubCategories[category] || [];
+
+    // Merge karo, duplicates remove
+    return [...new Set([...apiSubs, ...fallbackSubs, ...customSubs])];
   };
 
   const handleAddNewSubCategory = () => {
@@ -1021,7 +1051,6 @@ function AdminAddProduct() {
   const currentSubCategories = getCurrentSubCategories();
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
 
-  // STRICT VALIDATION
   const validateAndProceed = (targetStep) => {
     if (targetStep > 1) {
       if (!formData.productName.trim()) {
@@ -1060,9 +1089,6 @@ function AdminAddProduct() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ============================================================
-  // ✅ SUBMIT PRODUCT — NAYA FORMAT (variants)
-  // ============================================================
   const submitProduct = async () => {
     if (!formData.productName.trim() || !formData.brand.trim() || !formData.category || !formData.subCategory || !formData.images.length || !formData.sellingPrice) {
       const msg = '❌ Please fill all mandatory fields across steps before publishing!';
@@ -1078,7 +1104,6 @@ function AdminAddProduct() {
       return;
     }
 
-    // ✅ Variation validation
     if (variations.length > 0) {
       const invalid = variations.find(v => !v.name || !v.price || v.stock === undefined);
       if (invalid) {
@@ -1091,7 +1116,6 @@ function AdminAddProduct() {
     const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
     const finalSku = formData.sku || generateSKU();
 
-    // ✅ NAYA: variation attrs nikalo
     const attrs = getVariationAttributes();
 
     const productData = {
@@ -1123,21 +1147,18 @@ function AdminAddProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-
-      // ✅ NAYA: variants format (backend isi ko expect karta hai)
       hasVariations: variations.length > 0,
-      option1Name: attrs.type,                  // "Size" ya "Shade"
-      option2Name: attrs.secondary || '',       // "Color" ya "Finish"
+      option1Name: attrs.type,
+      option2Name: attrs.secondary || '',
       variants: variations.map(v => ({
         sku: v.sku,
-        option1Value: v.name,                   // "M"
-        option2Value: v.secondaryName || '',    // "Red"
+        option1Value: v.name,
+        option2Value: v.secondaryName || '',
         price: parseFloat(v.price) || 0,
         compareAtPrice: parseFloat(v.mrp) || 0,
         stock: parseInt(v.stock) || 0,
         image: v.image || '',
       })),
-
       metaTitle: seoData.metaTitle,
       metaDescription: seoData.metaDescription,
       metaKeywords: seoData.metaKeywords,
@@ -1173,7 +1194,8 @@ function AdminAddProduct() {
   const IconPlus = () => (<svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 
   const renderCategorySpecificFields = () => {
-    switch (formData.category) {
+    const categoryKey = getCategoryKey();
+    switch (categoryKey) {
       case 'Skincare':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
@@ -1238,7 +1260,7 @@ function AdminAddProduct() {
           </div>
         );
 
-      case 'Hair':
+      case 'Haircare':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
             <h3 className="font-medium text-gray-800">💇 Hair Care Details</h3>
@@ -1267,10 +1289,10 @@ function AdminAddProduct() {
           </div>
         );
 
-      case 'Clothing':
+      case 'Fashion':
         return (
           <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
-            <h3 className="font-medium text-gray-800">👗 Clothing Details</h3>
+            <h3 className="font-medium text-gray-800">👗 Fashion Details</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Fabric / Material</label>
@@ -1389,9 +1411,24 @@ function AdminAddProduct() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Category <span className="text-red-500">*</span></label>
-                      <select value={formData.category} onChange={(e) => { setFormData({ ...formData, category: e.target.value, subCategory: '' }); setShowAddSubCategory(false); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
-                        <option value="">Select Category</option>
-                        {Object.keys(subCategoriesOptions).map(c => <option key={c} value={c}>{c}</option>)}
+                      <select
+                        value={formData.category}
+                        onChange={(e) => { setFormData({ ...formData, category: e.target.value, subCategory: '' }); setShowAddSubCategory(false); }}
+                        className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white"
+                        disabled={categoriesLoading}
+                      >
+                        <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
+                        {apiCategories.length > 0 ? (
+                          apiCategories.map(cat => (
+                            <option key={cat.id} value={cat.name}>
+                              {cat.icon} {cat.name}
+                            </option>
+                          ))
+                        ) : (
+                          Object.keys(fallbackSubCategories).map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))
+                        )}
                       </select>
                     </div>
                     <div>
@@ -1401,7 +1438,11 @@ function AdminAddProduct() {
                           <option value="">Select Sub Category</option>
                           {currentSubCategories.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        {formData.category && (<button onClick={() => setShowAddSubCategory(true)} className="px-3 py-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition text-sm whitespace-nowrap">+ Add</button>)}
+                        {formData.category && (
+                          <button onClick={() => setShowAddSubCategory(true)} className="px-3 py-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition text-sm whitespace-nowrap" title="Add new sub-category">
+                            + Add
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1514,7 +1555,6 @@ function AdminAddProduct() {
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">✨ Product Details & Variations</h2>
 
-                {/* About this item */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">About this item <span className="text-xs text-gray-400 ml-2">(Bullet points)</span></label>
                   <div className="space-y-2 mb-3 max-h-96 overflow-y-auto">
@@ -1532,7 +1572,6 @@ function AdminAddProduct() {
                   </div>
                 </div>
 
-                {/* Product Highlights */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Product Highlights <span className="text-xs text-gray-400 ml-2">(Max 10)</span></label>
                   <div className="flex flex-wrap gap-2 mb-3">
@@ -1629,7 +1668,6 @@ function AdminAddProduct() {
                   )}
                 </div>
 
-                {/* Expanded Variation Details Modal */}
                 {expandedVariationId && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setExpandedVariationId(null)}>
                     <div className="bg-white rounded-xl max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -1685,7 +1723,6 @@ function AdminAddProduct() {
                   </div>
                 )}
 
-                {/* Variation Modal with Image Upload */}
                 {variationModalOpen && (
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
                     <div className="bg-white rounded-xl max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -1713,7 +1750,6 @@ function AdminAddProduct() {
                           />
                         )}
 
-                        {/* Variation Image Upload */}
                         <div>
                           <label className="block text-sm font-medium mb-1.5">Variation Image</label>
                           <div className="flex items-center gap-3">
@@ -1762,12 +1798,11 @@ function AdminAddProduct() {
                   </div>
                 )}
 
-                {/* Category Specific Fields */}
                 {renderCategorySpecificFields()}
 
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6 sm:mt-8 pt-4 border-t">
                   <button onClick={() => validateAndProceed(3)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
-                  <button onClick={() => validateAndProceed(5)} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue to SEO →</button>
+                  <button onClick={() => validateAndProceed(5)} className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue to SEO →</button>
                 </div>
               </div>
             )}
