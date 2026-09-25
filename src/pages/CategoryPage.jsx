@@ -10,55 +10,40 @@ import OfferBanner from '../components/OfferBanner';
 import ProductCard from '../components/ProductCard';
 import toast from 'react-hot-toast';
 
-const API_URL = 'https://api.mypinkshop.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
 function CategoryPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { 
-    wishlist,          // ✅ guest wishlist ke liye
-    wishlistCount, 
-    addToWishlist, 
-    removeFromWishlist, 
-    isInWishlist 
-  } = useWishlist();
+  const { wishlist, wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
   const [category, setCategory] = useState(null);
   const [subcategories, setSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
+  const [selectedConcern, setSelectedConcern] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(16);
 
-  // ✅ Guest wishlist context (agar wishlist array nahi hai to localStorage se lo)
-  const wishlistContext = useMemo(() => {
-    if (wishlist && Array.isArray(wishlist)) return wishlist;
-    try {
-      const saved = localStorage.getItem('guestWishlist');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  }, [wishlist]);
-
-  // ✅ STEP 1: Category + Subcategories fetch karo (tree se)
+  // ✅ Category load karo
   useEffect(() => {
     const loadCategory = async () => {
       try {
         setLoading(true);
-
         const res = await fetch(`${API_URL}/api/categories/tree`);
         if (!res.ok) throw new Error('Failed to load categories');
-
         const json = await res.json();
         const tree = json.data || json;
 
         const found = tree.find(c => c.slug === slug);
-
         if (!found) {
           toast.error('Category not found');
           navigate('/');
@@ -72,11 +57,10 @@ function CategoryPage() {
         toast.error('Failed to load category');
       }
     };
-
     loadCategory();
   }, [slug, navigate]);
 
-  // ✅ STEP 2: Products fetch karo
+  // ✅ Products load karo
   useEffect(() => {
     const loadProducts = async () => {
       if (!category) return;
@@ -85,12 +69,11 @@ function CategoryPage() {
         setLoading(true);
         const res = await fetch(`${API_URL}/api/products`);
         if (!res.ok) throw new Error('Failed to load products');
-
         const data = await res.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
 
         const categoryProducts = productsArray.filter(p =>
-          (p.is_active === 1 || p.is_active === true) &&
+          (p.is_active === 1 || p.isActive === true || p.isActive === 1) &&
           (p.main_category === category.name || p.mainCategory === category.name)
         ).map(p => {
           let images = p.images;
@@ -109,6 +92,7 @@ function CategoryPage() {
         });
 
         setProducts(categoryProducts);
+        setFeaturedProducts(categoryProducts.filter(p => p.isFeatured || p.is_featured === 1).slice(0, 8));
       } catch (err) {
         console.error('Products load error:', err);
         setProducts([]);
@@ -116,11 +100,10 @@ function CategoryPage() {
         setLoading(false);
       }
     };
-
     loadProducts();
   }, [category]);
 
-  // ✅ STEP 3: Filter + Sort
+  // ✅ Filters
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
@@ -140,6 +123,13 @@ function CategoryPage() {
 
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
+    }
+
+    if (selectedConcern !== 'all') {
+      filtered = filtered.filter(p => {
+        const concerns = Array.isArray(p.concerns) ? p.concerns : (typeof p.concerns === 'string' ? JSON.parse(p.concerns || '[]') : []);
+        return concerns.includes(selectedConcern);
+      });
     }
 
     let min = 0, max = Infinity;
@@ -162,11 +152,26 @@ function CategoryPage() {
     }
 
     return filtered;
-  }, [products, searchTerm, selectedSubcategory, selectedBrand, priceRange, sortBy]);
+  }, [products, searchTerm, selectedSubcategory, selectedBrand, selectedConcern, priceRange, sortBy]);
 
+  // ✅ Brands
   const brands = useMemo(() => {
     const unique = [...new Set(products.map(p => p.brand).filter(Boolean))];
     return [{ id: 'all', name: 'All Brands' }, ...unique.map(b => ({ id: b, name: b }))];
+  }, [products]);
+
+  // ✅ Concerns
+  const concerns = useMemo(() => {
+    const allConcerns = products.flatMap(p => {
+      const c = p.concerns;
+      if (Array.isArray(c)) return c;
+      if (typeof c === 'string') {
+        try { return JSON.parse(c); } catch { return []; }
+      }
+      return [];
+    }).filter(Boolean);
+    const unique = [...new Set(allConcerns)];
+    return unique;
   }, [products]);
 
   const priceRanges = [
@@ -190,8 +195,25 @@ function CategoryPage() {
     setSearchTerm('');
     setSelectedSubcategory('all');
     setSelectedBrand('all');
+    setSelectedConcern('all');
     setPriceRange('all');
     setSortBy('default');
+  };
+
+  // ✅ Category-specific banner content
+  const getCategoryBanner = () => {
+    const banners = {
+      skincare: { title: '✨ Glow Up Sale', subtitle: 'Flat 30% OFF on Skincare', bg: 'from-pink-500 to-rose-500' },
+      makeup: { title: '💄 Bridal Makeup Sale', subtitle: 'Up to 50% OFF on Makeup', bg: 'from-purple-500 to-pink-500' },
+      haircare: { title: '💇‍♀️ Silky Hair Sale', subtitle: 'Buy 2 Get 1 Free on Haircare', bg: 'from-amber-500 to-orange-500' },
+      fashion: { title: '👗 Wedding Season Sale', subtitle: 'Flat 40% OFF on Fashion', bg: 'from-red-500 to-pink-500' },
+      accessories: { title: '👜 Accessory Sale', subtitle: 'Starting from ₹99', bg: 'from-indigo-500 to-purple-500' },
+      electronics: { title: '📱 Gadget Sale', subtitle: 'Up to 60% OFF on Electronics', bg: 'from-blue-500 to-cyan-500' },
+      'home-kitchen': { title: '🏠 Home Decor Sale', subtitle: 'Flat 35% OFF on Home', bg: 'from-emerald-500 to-teal-500' },
+      'health-wellness': { title: '🌿 Wellness Sale', subtitle: 'Up to 40% OFF on Health', bg: 'from-green-500 to-emerald-500' },
+      'books-stationery': { title: '📚 Book Sale', subtitle: 'Buy 2 Get 1 Free on Books', bg: 'from-yellow-500 to-amber-500' },
+    };
+    return banners[slug] || { title: `✨ ${category?.name} Collection`, subtitle: 'Explore Our Collection', bg: 'from-pink-500 to-rose-500' };
   };
 
   if (loading && !category) {
@@ -207,11 +229,13 @@ function CategoryPage() {
 
   if (!category) return null;
 
+  const banner = getCategoryBanner();
+
   return (
     <>
       <Helmet>
-        <title>{category.name} - Shop Online | MyPinkShop</title>
-        <meta name="description" content={`Shop ${category.name} products at MyPinkShop. Best prices, fast delivery.`} />
+        <title>{category.name} - Shop Online at Best Prices | MyPinkShop</title>
+        <meta name="description" content={`Shop ${category.name} products at MyPinkShop. ${subcategories.length}+ subcategories, best prices, fast delivery.`} />
         <link rel="canonical" href={`https://www.mypinkshop.com/category/${slug}`} />
       </Helmet>
 
@@ -236,7 +260,7 @@ function CategoryPage() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder={`Search ${category.name}...`}
+                    placeholder={`Search in ${category.name}...`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50"
@@ -272,14 +296,17 @@ function CategoryPage() {
           </div>
         </header>
 
-        {/* Hero */}
-        <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
-          <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-            <div className="text-5xl mb-3">{category.icon || '🛍️'}</div>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-2">
-              {category.name}
-            </h1>
-            <p className="text-gray-600 text-sm">{category.description || `Explore our ${category.name} collection`}</p>
+        {/* Hero Section with Category */}
+        <div className={`relative bg-gradient-to-r ${banner.bg} text-white`}>
+          <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12">
+            <div className="flex items-center gap-4">
+              <div className="text-5xl sm:text-6xl">{category.icon || '🛍️'}</div>
+              <div>
+                <h1 className="text-2xl sm:text-4xl font-bold mb-1">{category.name}</h1>
+                <p className="text-sm sm:text-base text-white/90">{banner.subtitle}</p>
+                <p className="text-xs mt-1 text-white/80">{filteredProducts.length} products • {subcategories.length} subcategories</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -294,44 +321,103 @@ function CategoryPage() {
 
         <div className="max-w-7xl mx-auto px-4 pb-12">
 
-          {/* ✅ SUBCATEGORY CHIPS */}
+          {/* ✅ SUBCATEGORY TABS — Scrollable */}
           {subcategories.length > 0 && (
-            <div className="mb-6 flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedSubcategory('all')}
-                className={`px-4 py-2 rounded-full text-sm border transition ${
-                  selectedSubcategory === 'all'
-                    ? 'bg-pink-500 text-white border-pink-500'
-                    : 'bg-white border-pink-200 text-gray-700 hover:border-pink-400'
-                }`}
-              >
-                All
-              </button>
-              {subcategories.map(sub => (
+            <div className="mb-6 -mx-4 px-4 overflow-x-auto">
+              <div className="flex gap-2 pb-2 min-w-max">
                 <button
-                  key={sub.id}
-                  onClick={() => setSelectedSubcategory(sub.name)}
-                  className={`px-4 py-2 rounded-full text-sm border transition flex items-center gap-1 ${
-                    selectedSubcategory === sub.name
-                      ? 'bg-pink-500 text-white border-pink-500'
-                      : 'bg-white border-pink-200 text-gray-700 hover:border-pink-400'
+                  onClick={() => setSelectedSubcategory('all')}
+                  className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap border-2 transition-all ${
+                    selectedSubcategory === 'all'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-500 shadow-md'
+                      : 'bg-white border-pink-200 text-gray-700 hover:border-pink-400 hover:shadow-sm'
                   }`}
                 >
-                  <span>{sub.icon}</span>
-                  <span>{sub.name}</span>
+                  🔥 All Products
                 </button>
-              ))}
+                {subcategories.map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setSelectedSubcategory(sub.name)}
+                    className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap border-2 transition-all flex items-center gap-1.5 ${
+                      selectedSubcategory === sub.name
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-500 shadow-md'
+                        : 'bg-white border-pink-200 text-gray-700 hover:border-pink-400 hover:shadow-sm'
+                    }`}
+                  >
+                    <span>{sub.icon}</span>
+                    <span>{sub.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Filters Bar */}
-          <div className="mb-6">
+          {/* ✅ Shop by Concern (agar concerns hain) */}
+          {concerns.length > 0 && (
+            <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">🎯 Shop by Concern</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedConcern('all')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                    selectedConcern === 'all'
+                      ? 'bg-pink-500 text-white'
+                      : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                  }`}
+                >
+                  All
+                </button>
+                {concerns.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setSelectedConcern(c)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                      selectedConcern === c
+                        ? 'bg-pink-500 text-white'
+                        : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ✅ FEATURED PRODUCTS SECTION */}
+          {featuredProducts.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+                  ⭐ Featured {category.name}
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {featuredProducts.slice(0, 4).map(product => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                    wishlistContext={wishlist}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ✅ FILTERS BAR */}
+          <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="hidden md:flex gap-2">
-                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
+              <div className="hidden md:flex gap-2 flex-wrap">
+                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
                   {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
-                <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white">
+                <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
                   {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
@@ -340,43 +426,23 @@ function CategoryPage() {
                 Filters 🔽
               </button>
 
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
+              <div className="flex items-center gap-2">
+                {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || priceRange !== 'all' || searchTerm) && (
+                  <button onClick={clearFilters} className="text-xs text-pink-500 underline whitespace-nowrap">
+                    Clear All
+                  </button>
+                )}
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                  {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Mobile Filters Modal */}
-          {showFilters && (
-            <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFilters(false)}>
-              <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-5">
-                  <h3 className="font-semibold text-gray-800">Filters</h3>
-                  <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm mb-1">Brand</label>
-                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border rounded-lg">
-                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Price</label>
-                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border rounded-lg">
-                      {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                    </select>
-                  </div>
-                  <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Results */}
-          <div className="mb-4">
+          {/* Results Count */}
+          <div className="mb-4 flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              Showing <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products
+              Showing <span className="font-semibold text-pink-600">{Math.min(visibleCount, filteredProducts.length)}</span> of <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products
             </p>
           </div>
 
@@ -393,21 +459,43 @@ function CategoryPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  addToCart={addToCart}
-                  isInWishlist={isInWishlist}
-                  addToWishlist={addToWishlist}
-                  removeFromWishlist={removeFromWishlist}
-                  user={user}
-                  wishlistContext={wishlistContext}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredProducts.slice(0, visibleCount).map(product => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    addToCart={addToCart}
+                    isInWishlist={isInWishlist}
+                    addToWishlist={addToWishlist}
+                    removeFromWishlist={removeFromWishlist}
+                    user={user}
+                    wishlistContext={wishlist}
+                  />
+                ))}
+              </div>
+
+              {visibleCount < filteredProducts.length && (
+                <div className="text-center mt-8">
+                  <button
+                    onClick={() => setVisibleCount(prev => prev + 16)}
+                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transition"
+                  >
+                    Load More Products ↓
+                  </button>
+                </div>
+              )}
+            </>
           )}
+
+          {/* ✅ CATEGORY BANNER */}
+          <div className={`mt-12 rounded-2xl bg-gradient-to-r ${banner.bg} text-white p-8 text-center`}>
+            <h3 className="text-2xl font-bold mb-2">{banner.title}</h3>
+            <p className="text-white/90 mb-4">{banner.subtitle}</p>
+            <Link to="/shop" className="inline-block bg-white text-gray-800 px-6 py-2 rounded-full font-medium hover:shadow-lg transition">
+              Shop All Products →
+            </Link>
+          </div>
         </div>
 
         {/* Footer */}
@@ -421,7 +509,7 @@ function CategoryPage() {
                   </div>
                   <h3 className="font-bold text-white">MyPinkShop</h3>
                 </div>
-                <p className="text-xs">Luxury skincare for glowing skin.</p>
+                <p className="text-xs">Your one-stop shop for beauty & fashion.</p>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-3 text-sm">Shop</h4>
@@ -431,6 +519,7 @@ function CategoryPage() {
                   <li><Link to="/category/haircare" className="hover:text-pink-500">Haircare</Link></li>
                   <li><Link to="/category/fashion" className="hover:text-pink-500">Fashion</Link></li>
                   <li><Link to="/category/accessories" className="hover:text-pink-500">Accessories</Link></li>
+                  <li><Link to="/category/electronics" className="hover:text-pink-500">Electronics</Link></li>
                 </ul>
               </div>
               <div>
