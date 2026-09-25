@@ -31,7 +31,7 @@ function SkincarePage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
 
-  // ✅ API se subcategories fetch karo
+  // ✅ API se subcategories
   useEffect(() => {
     const loadCategory = async () => {
       try {
@@ -48,7 +48,7 @@ function SkincarePage() {
     loadCategory();
   }, []);
 
-  // ✅ Products fetch karo
+  // ✅ Products
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -100,11 +100,11 @@ function SkincarePage() {
       return apiSubcategories.map(s => ({
         id: s.id,
         name: s.name,
-        icon: s.icon || '◇',
+        icon: s.icon || '🌸',
       }));
     }
     const subs = [...new Set(products.map(p => p.subCategory).filter(Boolean))];
-    return subs.map((s, idx) => ({ id: idx, name: s, icon: '◇' }));
+    return subs.map((s, idx) => ({ id: idx, name: s, icon: '🌸' }));
   }, [apiSubcategories, products]);
 
   // ✅ Filters
@@ -198,10 +198,10 @@ function SkincarePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#faf7f5] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-10 h-10 border-2 border-[#c9a87c] border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-[#8b7d6b] text-sm tracking-widest uppercase">Loading</p>
+          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500 text-sm tracking-widest uppercase">Loading</p>
         </div>
       </div>
     );
@@ -210,25 +210,25 @@ function SkincarePage() {
   return (
     <>
       <Helmet>
-        <title>Skincare — Curated Luxury Skincare | MyPinkShop</title>
+        <title>Skincare — Curated Beauty | MyPinkShop</title>
         <meta name="description" content="Discover our curated collection of premium skincare. Face washes, serums, moisturizers, and more." />
         <link rel="canonical" href="https://www.mypinkshop.com/skincare" />
       </Helmet>
 
-      <div className="min-h-screen bg-[#faf7f5]">
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
-        {/* ═══════════ PREMIUM HEADER ═══════════ */}
-        <header className="sticky top-0 z-50 bg-[#faf7f5]/95 backdrop-blur-xl border-b border-[#e8ddd0]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+        {/* ═══════════ HEADER ═══════════ */}
+        <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-pink-100/70 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between gap-4">
               <Link to="/" className="flex items-center gap-3 shrink-0 group">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#d4a574] via-[#c9a87c] to-[#b8935f] rounded-full flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
-                  <span className="text-white font-serif font-bold text-lg">M</span>
+                <div className="w-10 h-10 bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-200/50 group-hover:scale-105 transition-transform duration-300">
+                  <span className="text-white font-bold text-lg">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl font-serif font-semibold tracking-wide text-[#3d3229]">MyPinkShop</h1>
-                  <p className="text-[10px] tracking-[0.3em] text-[#8b7d6b] uppercase">Luxe Beauty</p>
+                  <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[9px] tracking-[0.25em] text-pink-400 uppercase">For the Girlies ✨</p>
                 </div>
               </Link>
 
@@ -239,30 +239,30 @@ function SkincarePage() {
                     placeholder="Search skincare..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-5 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-sm text-[#3d3229] placeholder-[#b0a695] focus:outline-none focus:border-[#c9a87c] transition-colors"
+                    className="w-full px-5 py-2.5 bg-pink-50/50 border border-pink-100 rounded-full text-sm text-gray-700 placeholder-pink-300 focus:outline-none focus:border-pink-400 focus:bg-white transition-all"
                   />
-                  <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#b0a695]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
               </div>
 
               <div className="flex items-center gap-1">
-                <button onClick={() => navigate('/wishlist')} className="relative p-2.5 hover:bg-[#f5ede4] rounded-full transition-colors">
-                  <svg className="w-5 h-5 text-[#3d3229]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <button onClick={() => navigate('/wishlist')} className="relative p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#c9a87c] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{wishlistCount}</span>}
                 </button>
-                <Link to="/cart" className="relative p-2.5 hover:bg-[#f5ede4] rounded-full transition-colors">
-                  <svg className="w-5 h-5 text-[#3d3229]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                <Link to="/cart" className="relative p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#c9a87c] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
+                  {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{cartCount}</span>}
                 </Link>
                 {user ? <Avatar user={user} onLogout={logout} /> :
-                  <Link to="/login" className="p-2.5 hover:bg-[#f5ede4] rounded-full transition-colors">
-                    <svg className="w-5 h-5 text-[#3d3229]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <Link to="/login" className="p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                    <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
@@ -273,25 +273,25 @@ function SkincarePage() {
         </header>
 
         {/* ═══════════ ELEGANT HERO ═══════════ */}
-        <section className="relative bg-gradient-to-b from-[#f5ede4] to-[#faf7f5] border-b border-[#e8ddd0]">
-          <div className="max-w-7xl mx-auto px-4 py-16 sm:py-24 text-center">
-            <p className="text-[11px] tracking-[0.4em] text-[#b8935f] uppercase mb-4">The Skincare Edit</p>
-            <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-light text-[#3d3229] mb-5 leading-tight">
-              Radiance, Refined
+        <section className="relative bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 border-b border-pink-100">
+          <div className="max-w-7xl mx-auto px-4 py-16 sm:py-20 text-center">
+            <p className="text-[11px] tracking-[0.4em] text-pink-500 uppercase mb-4 font-medium">The Skincare Edit</p>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-light text-gray-800 mb-5 leading-tight">
+              Glow, <span className="bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-semibold">Beautifully</span>
             </h1>
-            <div className="w-16 h-px bg-[#c9a87c] mx-auto mb-5"></div>
-            <p className="text-[#8b7d6b] text-sm sm:text-base max-w-xl mx-auto font-light leading-relaxed">
-              Curated formulas for luminous, healthy skin — thoughtfully selected from the world's most refined houses.
+            <div className="w-16 h-px bg-gradient-to-r from-pink-400 to-rose-400 mx-auto mb-5"></div>
+            <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto font-light leading-relaxed">
+              Curated skincare formulas for luminous, healthy skin — thoughtfully selected for the modern woman.
             </p>
           </div>
         </section>
 
         {/* ═══════════ BREADCRUMB ═══════════ */}
         <div className="max-w-7xl mx-auto px-4 py-5">
-          <div className="flex items-center gap-2 text-xs tracking-wider text-[#8b7d6b]">
-            <Link to="/" className="hover:text-[#3d3229] transition-colors">HOME</Link>
-            <span className="text-[#d4c7b5]">/</span>
-            <span className="text-[#3d3229] font-medium">SKINCARE</span>
+          <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
+            <Link to="/" className="hover:text-pink-500 transition-colors">HOME</Link>
+            <span className="text-pink-300">/</span>
+            <span className="text-pink-600 font-medium">SKINCARE</span>
           </div>
         </div>
 
@@ -302,29 +302,29 @@ function SkincarePage() {
             {/* ═══ LEFT SIDEBAR ═══ */}
             <aside className={`fixed md:static inset-0 z-40 md:z-0 ${showSidebar ? '' : 'hidden md:block'} md:w-64 shrink-0`}>
               {showSidebar && (
-                <div className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-30" onClick={() => setShowSidebar(false)} />
+                <div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-30" onClick={() => setShowSidebar(false)} />
               )}
 
-              <div className={`${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto bg-white' : 'bg-transparent'}`}>
+              <div className={`${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto bg-white shadow-2xl' : 'bg-white/70 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-sm'} overflow-hidden`}>
                 {/* Sidebar Header */}
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#e8ddd0]">
-                  <h3 className="font-serif text-lg text-[#3d3229] tracking-wide">Categories</h3>
+                <div className="px-5 py-4 border-b border-pink-100/70 bg-gradient-to-r from-pink-50 to-rose-50 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-800 text-sm tracking-wide">Categories</h3>
                   {showSidebar && (
-                    <button onClick={() => setShowSidebar(false)} className="md:hidden text-[#8b7d6b] text-xl p-2">✕</button>
+                    <button onClick={() => setShowSidebar(false)} className="md:hidden text-gray-400 text-lg">✕</button>
                   )}
                 </div>
 
                 {/* Sidebar Items */}
-                <nav className="space-y-0.5">
+                <nav className="p-2">
                   <button
                     onClick={() => { setSelectedSubcategory('all'); setShowSidebar(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm tracking-wide transition-all duration-200 rounded-lg flex items-center gap-3 ${
+                    className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 rounded-2xl flex items-center gap-3 mb-1 ${
                       selectedSubcategory === 'all'
-                        ? 'bg-[#3d3229] text-white font-medium'
-                        : 'text-[#5a4d40] hover:bg-[#f5ede4] hover:pl-5'
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-md shadow-pink-200/50'
+                        : 'text-gray-700 hover:bg-pink-50'
                     }`}
                   >
-                    <span className="text-base">✦</span>
+                    <span className="text-base">✨</span>
                     <span>All Products</span>
                   </button>
 
@@ -332,13 +332,13 @@ function SkincarePage() {
                     <button
                       key={sub.id}
                       onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm tracking-wide transition-all duration-200 rounded-lg flex items-center gap-3 ${
+                      className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 rounded-2xl flex items-center gap-3 mb-1 ${
                         selectedSubcategory === sub.name
-                          ? 'bg-[#3d3229] text-white font-medium'
-                          : 'text-[#5a4d40] hover:bg-[#f5ede4] hover:pl-5'
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-md shadow-pink-200/50'
+                          : 'text-gray-700 hover:bg-pink-50'
                       }`}
                     >
-                      <span className="text-[#c9a87c] text-xs">◇</span>
+                      <span className="text-base">{sub.icon || '🌸'}</span>
                       <span className="truncate">{sub.name}</span>
                     </button>
                   ))}
@@ -349,17 +349,17 @@ function SkincarePage() {
             {/* ═══ RIGHT: PRODUCTS ═══ */}
             <main className="flex-1 min-w-0">
 
-              {/* Mobile: Sidebar + Filters Buttons */}
+              {/* Mobile Buttons */}
               <div className="md:hidden mb-5 flex gap-2">
                 <button
                   onClick={() => setShowSidebar(true)}
-                  className="flex-1 px-4 py-3 bg-[#3d3229] text-white rounded-full text-xs tracking-widest uppercase font-medium"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md shadow-pink-200/50"
                 >
                   Categories
                 </button>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="px-4 py-3 border border-[#e8ddd0] rounded-full text-xs tracking-widest uppercase font-medium text-[#3d3229] bg-white"
+                  className="px-4 py-3 border border-pink-200 rounded-full text-xs tracking-widest uppercase font-medium text-pink-600 bg-white"
                 >
                   Filters
                 </button>
@@ -368,14 +368,14 @@ function SkincarePage() {
               {/* Shop by Concern */}
               {concerns.length > 0 && (
                 <div className="mb-8">
-                  <h3 className="text-[11px] tracking-[0.3em] text-[#b8935f] uppercase mb-4">Shop by Concern</h3>
+                  <h3 className="text-[11px] tracking-[0.3em] text-pink-500 uppercase mb-4 font-semibold">Shop by Concern</h3>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setSelectedConcern('all')}
                       className={`px-4 py-2 rounded-full text-xs tracking-wider transition-all duration-200 border ${
                         selectedConcern === 'all'
-                          ? 'bg-[#3d3229] text-white border-[#3d3229]'
-                          : 'bg-white text-[#5a4d40] border-[#e8ddd0] hover:border-[#c9a87c]'
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md shadow-pink-200/50'
+                          : 'bg-white text-gray-600 border-pink-200 hover:border-pink-400 hover:text-pink-600'
                       }`}
                     >
                       All
@@ -386,8 +386,8 @@ function SkincarePage() {
                         onClick={() => setSelectedConcern(c)}
                         className={`px-4 py-2 rounded-full text-xs tracking-wider transition-all duration-200 border ${
                           selectedConcern === c
-                            ? 'bg-[#3d3229] text-white border-[#3d3229]'
-                            : 'bg-white text-[#5a4d40] border-[#e8ddd0] hover:border-[#c9a87c]'
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md shadow-pink-200/50'
+                            : 'bg-white text-gray-600 border-pink-200 hover:border-pink-400 hover:text-pink-600'
                         }`}
                       >
                         {c}
@@ -398,27 +398,27 @@ function SkincarePage() {
               )}
 
               {/* Filters Bar */}
-              <div className="mb-8 pb-6 border-b border-[#e8ddd0]">
+              <div className="mb-8 pb-6 border-b border-pink-100">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="hidden md:flex gap-3 flex-wrap">
-                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
                       {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
+                    <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
                       {skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
                       {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                   </div>
 
                   <div className="flex items-center gap-3 ml-auto">
                     {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
-                      <button onClick={clearFilters} className="text-[11px] tracking-wider text-[#b8935f] uppercase underline underline-offset-4 hover:text-[#3d3229] transition-colors">
+                      <button onClick={clearFilters} className="text-[11px] tracking-wider text-pink-500 uppercase underline underline-offset-4 hover:text-pink-700 transition-colors">
                         Clear All
                       </button>
                     )}
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
                       {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                   </div>
@@ -428,31 +428,31 @@ function SkincarePage() {
               {/* Mobile Filters Modal */}
               {showFilters && (
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
-                  <div className="absolute right-0 top-0 h-full w-80 bg-[#faf7f5] shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-[#e8ddd0]">
-                      <h3 className="font-serif text-lg text-[#3d3229]">Refine</h3>
-                      <button onClick={() => setShowFilters(false)} className="text-[#8b7d6b] text-xl">✕</button>
+                  <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-pink-100">
+                      <h3 className="font-semibold text-gray-800 text-base">Refine</h3>
+                      <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
                     </div>
                     <div className="space-y-5">
                       <div>
-                        <label className="block text-[11px] tracking-widest text-[#b8935f] uppercase mb-2">Brand</label>
-                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-white border border-[#e8ddd0] rounded-lg text-sm text-[#3d3229]">
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Brand</label>
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-pink-400">
                           {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[11px] tracking-widest text-[#b8935f] uppercase mb-2">Skin Type</label>
-                        <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-3 bg-white border border-[#e8ddd0] rounded-lg text-sm text-[#3d3229]">
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Skin Type</label>
+                        <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-pink-400">
                           {skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[11px] tracking-widest text-[#b8935f] uppercase mb-2">Price</label>
-                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-white border border-[#e8ddd0] rounded-lg text-sm text-[#3d3229]">
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Price</label>
+                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-pink-400">
                           {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
                       </div>
-                      <button onClick={clearFilters} className="w-full py-3 bg-[#3d3229] text-white rounded-full text-xs tracking-widest uppercase mt-4">Clear All</button>
+                      <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md shadow-pink-200/50">Clear All</button>
                     </div>
                   </div>
                 </div>
@@ -460,21 +460,21 @@ function SkincarePage() {
 
               {/* Results Info */}
               <div className="mb-6">
-                <p className="text-xs tracking-wider text-[#8b7d6b]">
+                <p className="text-xs tracking-wider text-gray-400">
                   {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
-                  {selectedSubcategory !== 'all' && <span className="text-[#3d3229]"> · {selectedSubcategory}</span>}
+                  {selectedSubcategory !== 'all' && <span className="text-pink-600 font-medium"> · {selectedSubcategory}</span>}
                 </p>
               </div>
 
               {/* Products Grid */}
               {filteredProducts.length === 0 ? (
-                <div className="bg-white rounded-2xl p-16 text-center border border-[#e8ddd0]">
-                  <div className="font-serif text-4xl text-[#c9a87c] mb-4">✦</div>
-                  <h3 className="font-serif text-xl text-[#3d3229] mb-2">Nothing here yet</h3>
-                  <p className="text-sm text-[#8b7d6b] mb-6">
+                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-16 text-center border border-pink-100 shadow-sm">
+                  <div className="text-4xl mb-4">🌸</div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Nothing here yet</h3>
+                  <p className="text-sm text-gray-500 mb-6">
                     {selectedSubcategory !== 'all' ? `We're adding ${selectedSubcategory} soon.` : 'New arrivals coming soon.'}
                   </p>
-                  <button onClick={clearFilters} className="px-8 py-3 bg-[#3d3229] text-white rounded-full text-xs tracking-widest uppercase hover:bg-[#5a4d40] transition-colors">
+                  <button onClick={clearFilters} className="px-8 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md shadow-pink-200/50 hover:shadow-lg transition-shadow">
                     View All
                   </button>
                 </div>
@@ -499,7 +499,7 @@ function SkincarePage() {
                     <div className="text-center mt-12">
                       <button
                         onClick={() => setVisibleCount(prev => prev + 16)}
-                        className="px-10 py-3.5 border border-[#3d3229] text-[#3d3229] rounded-full text-xs tracking-[0.25em] uppercase hover:bg-[#3d3229] hover:text-white transition-all duration-300"
+                        className="px-10 py-3.5 border-2 border-pink-300 text-pink-600 rounded-full text-xs tracking-[0.25em] uppercase font-semibold hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white hover:border-transparent transition-all duration-300 shadow-sm hover:shadow-md hover:shadow-pink-200/50"
                       >
                         Load More
                       </button>
@@ -512,47 +512,47 @@ function SkincarePage() {
         </div>
 
         {/* ═══════════ FOOTER ═══════════ */}
-        <footer className="bg-[#3d3229] text-[#d4c7b5] py-16 mt-12">
+        <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-16 mt-12">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
               <div className="col-span-2 md:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-9 h-9 bg-gradient-to-br from-[#d4a574] to-[#b8935f] rounded-full flex items-center justify-center">
-                    <span className="text-white font-serif font-bold text-sm">M</span>
+                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/30">
+                    <span className="text-white font-bold text-sm">M</span>
                   </div>
-                  <h3 className="font-serif font-semibold text-white text-lg">MyPinkShop</h3>
+                  <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-xs leading-relaxed text-[#b0a695]">Luxe beauty essentials, thoughtfully curated.</p>
+                <p className="text-xs leading-relaxed text-gray-500">Luxe beauty essentials, thoughtfully curated for the girlies ✨</p>
               </div>
               <div>
-                <h4 className="font-serif text-white text-sm mb-4 tracking-wide">Shop</h4>
+                <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Shop</h4>
                 <ul className="space-y-2.5 text-xs">
-                  <li><Link to="/skincare" className="hover:text-[#c9a87c] transition-colors">Skincare</Link></li>
-                  <li><Link to="/makeup" className="hover:text-[#c9a87c] transition-colors">Makeup</Link></li>
-                  <li><Link to="/hair" className="hover:text-[#c9a87c] transition-colors">Haircare</Link></li>
-                  <li><Link to="/clothing" className="hover:text-[#c9a87c] transition-colors">Fashion</Link></li>
-                  <li><Link to="/accessories" className="hover:text-[#c9a87c] transition-colors">Accessories</Link></li>
+                  <li><Link to="/skincare" className="hover:text-pink-400 transition-colors">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-400 transition-colors">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-400 transition-colors">Haircare</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-400 transition-colors">Fashion</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-400 transition-colors">Accessories</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-serif text-white text-sm mb-4 tracking-wide">Support</h4>
+                <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Support</h4>
                 <ul className="space-y-2.5 text-xs">
-                  <li><Link to="/contact" className="hover:text-[#c9a87c] transition-colors">Contact</Link></li>
-                  <li><Link to="/faqs" className="hover:text-[#c9a87c] transition-colors">FAQs</Link></li>
-                  <li><Link to="/shipping-info" className="hover:text-[#c9a87c] transition-colors">Shipping</Link></li>
-                  <li><Link to="/returns-policy" className="hover:text-[#c9a87c] transition-colors">Returns</Link></li>
+                  <li><Link to="/contact" className="hover:text-pink-400 transition-colors">Contact</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-400 transition-colors">FAQs</Link></li>
+                  <li><Link to="/shipping-info" className="hover:text-pink-400 transition-colors">Shipping</Link></li>
+                  <li><Link to="/returns-policy" className="hover:text-pink-400 transition-colors">Returns</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-serif text-white text-sm mb-4 tracking-wide">Follow</h4>
+                <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Follow</h4>
                 <ul className="space-y-2.5 text-xs">
-                  <li><a href="#" className="hover:text-[#c9a87c] transition-colors">Instagram</a></li>
-                  <li><a href="#" className="hover:text-[#c9a87c] transition-colors">Pinterest</a></li>
+                  <li><a href="#" className="hover:text-pink-400 transition-colors">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-400 transition-colors">Pinterest</a></li>
                 </ul>
               </div>
             </div>
-            <div className="text-center pt-8 border-t border-[#5a4d40]">
-              <p className="text-[11px] tracking-widest text-[#8b7d6b] uppercase">© 2026 MyPinkShop · All Rights Reserved</p>
+            <div className="text-center pt-8 border-t border-gray-800">
+              <p className="text-[11px] tracking-widest text-gray-500 uppercase">© 2026 MyPinkShop · All Rights Reserved</p>
             </div>
           </div>
         </footer>
