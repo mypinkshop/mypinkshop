@@ -11,7 +11,6 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 // ============================================================
 // ✅ LAZY WITH RETRY — network hiccup handle karega
-// Agar chunk fetch fail ho (404/cache), toh 3 baar retry karega
 // ============================================================
 function lazyWithRetry(importFn, retries = 3) {
   return lazy(() => {
@@ -22,15 +21,12 @@ function lazyWithRetry(importFn, retries = 3) {
       const lastRetry = sessionStorage.getItem(key);
       const now = Date.now();
 
-      // ✅ Ek session mein sirf 1 baar full reload karo (infinite loop avoid)
       if (!lastRetry || now - parseInt(lastRetry) > 10000) {
         sessionStorage.setItem(key, String(now));
-        // ✅ Full page reload — naya index.html + fresh chunks
         window.location.reload();
-        return new Promise(() => {}); // Never resolve (page reload ho raha)
+        return new Promise(() => {});
       }
 
-      // ✅ Wait 1 sec, then retry
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve(lazyWithRetry(importFn, retries - 1));
@@ -71,6 +67,9 @@ const MakeupPage = lazyWithRetry(() => import('./pages/MakeupPage'));
 const ClothingPage = lazyWithRetry(() => import('./pages/ClothingPage'));
 const AccessoriesPage = lazyWithRetry(() => import('./pages/AccessoriesPage'));
 const HairPage = lazyWithRetry(() => import('./pages/HairPage'));
+
+// ✅ NAYA — Dynamic Category Page (nayi 4+ categories ke liye)
+const CategoryPage = lazyWithRetry(() => import('./pages/CategoryPage'));
 
 // ============ ADMIN PAGES ============
 const AdminLogin = lazyWithRetry(() => import('./pages/admin/AdminLogin'));
@@ -171,11 +170,15 @@ function App() {
                     <Route path="/payment-callback" element={<PaymentSuccess />} />
 
                     {/* ============ CATEGORY PAGES ============ */}
+                    {/* Purane (specific) routes — inse custom filters kaam karte hain */}
                     <Route path="/skincare" element={<SkincarePage />} />
                     <Route path="/makeup" element={<MakeupPage />} />
                     <Route path="/clothing" element={<ClothingPage />} />
                     <Route path="/accessories" element={<AccessoriesPage />} />
                     <Route path="/hair" element={<HairPage />} />
+
+                    {/* ✅ NAYA — Dynamic route (nayi 4+ categories ke liye) */}
+                    <Route path="/category/:slug" element={<CategoryPage />} />
 
                     {/* ============ ADMIN ROUTES ============ */}
                     <Route path="/admin/login" element={<AdminLogin />} />
