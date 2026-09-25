@@ -15,8 +15,11 @@ function AdminInventory() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [updatingStock, setUpdatingStock] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  
+  // ✅ NAYA — API se categories
+  const [apiCategories, setApiCategories] = useState([]);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
+  const API_URL = import.meta.env?.VITE_API_URL || 'https://api.mypinkshop.com';
 
   const getToken = () => {
     return localStorage.getItem('adminToken') || localStorage.getItem('token');
@@ -29,7 +32,22 @@ function AdminInventory() {
       return;
     }
     loadInventory();
+    loadCategories();  // ✅ NAYA
   }, [navigate]);
+
+  // ✅ NAYA — API se categories fetch karo
+  const loadCategories = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/categories/tree`);
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      const json = await res.json();
+      const tree = json.data || json;
+      setApiCategories(tree);
+      console.log('✅ Categories loaded:', tree.length);
+    } catch (err) {
+      console.error('❌ Categories fetch error:', err);
+    }
+  };
 
   const loadInventory = async () => {
     try {
@@ -172,13 +190,27 @@ function AdminInventory() {
     return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">In Stock</span>;
   };
 
+  // ✅ NAYA — Dynamic categories (API se + fallback)
   const categories = [
     { value: 'all', label: 'All Categories' },
-    { value: 'skincare', label: 'Skincare' },
-    { value: 'makeup', label: 'Makeup' },
-    { value: 'hair', label: 'Hair' },
-    { value: 'clothing', label: 'Clothing' },
-    { value: 'accessories', label: 'Accessories' },
+    ...(apiCategories.length > 0
+      ? apiCategories.map(cat => ({
+          value: cat.name.toLowerCase(),
+          label: `${cat.icon || '📁'} ${cat.name}`
+        }))
+      : [
+          // ✅ Fallback — agar API fail ho ya load ho rahi ho
+          { value: 'skincare', label: '🧴 Skincare' },
+          { value: 'makeup', label: '💄 Makeup' },
+          { value: 'haircare', label: '💇‍♀️ Haircare' },
+          { value: 'fashion', label: '👗 Fashion' },
+          { value: 'accessories', label: '👜 Accessories' },
+          { value: 'electronics', label: '📱 Electronics' },
+          { value: 'home & kitchen', label: '🏠 Home & Kitchen' },
+          { value: 'health & wellness', label: '🌿 Health & Wellness' },
+          { value: 'books & stationery', label: '📚 Books & Stationery' },
+        ]
+    )
   ];
 
   const statusOptions = [
@@ -193,10 +225,27 @@ function AdminInventory() {
   const lowStockCount = products.filter(p => p.stock > 0 && p.stock < 10).length;
   const outOfStockCount = products.filter(p => p.stock === 0).length;
 
+  // ✅ NAYA — Better filter logic (naye categories ke liye)
   const filteredProducts = products.filter(p => {
     if (filterStatus !== 'all' && p.status !== filterStatus) return false;
-    if (filterCategory !== 'all' && p.mainCategory?.toLowerCase() !== filterCategory && p.category?.toLowerCase() !== filterCategory) return false;
-    if (searchTerm && !p.name?.toLowerCase().includes(searchTerm.toLowerCase()) && !p.sku?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    
+    if (filterCategory !== 'all') {
+      const productCat = (p.mainCategory || p.category || '').toLowerCase().trim();
+      const filterCat = filterCategory.toLowerCase().trim();
+      
+      // ✅ Multiple match strategies
+      const matches = 
+        productCat === filterCat ||
+        productCat.replace(/\s+/g, '-') === filterCat ||
+        productCat.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') === filterCat;
+      
+      if (!matches) return false;
+    }
+    
+    if (searchTerm && 
+        !p.name?.toLowerCase().includes(searchTerm.toLowerCase()) && 
+        !p.sku?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    
     return true;
   });
 
@@ -337,7 +386,7 @@ function AdminInventory() {
                       }`}
                     >
                       <span className="text-sm">{opt.icon}</span> 
-                      <span className="hidden xs:inline">{opt.label}</span>
+                      <span className="hidden sm:inline">{opt.label}</span>
                     </button>
                   ))}
                 </div>
@@ -522,11 +571,6 @@ function AdminInventory() {
         }
         .animate-fade-in-up {
           animation: fade-in-up 0.3s ease-out;
-        }
-        @media (max-width: 480px) {
-          .xs\\:inline {
-            display: inline;
-          }
         }
       `}</style>
     </div>
