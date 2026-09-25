@@ -403,7 +403,7 @@ function CategoryPage() {
                   addToWishlist={addToWishlist}
                   removeFromWishlist={removeFromWishlist}
                   user={user}
-                  wishlistContext={wishlistContext}  {/* ✅ YE ADD KIYA */}
+                  wishlistContext={wishlistContext}
                 />
               ))}
             </div>
