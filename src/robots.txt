@@ -1,0 +1,57 @@
+# ═══════════════════════════════════════════════════════════
+# MyPinkShop - robots.txt
+# ═══════════════════════════════════════════════════════════
+
+User-agent: *
+Allow: /
+
+# ═══════════════════════════════════════════════════════════
+# 🛍️ PUBLIC PAGES — ALLOWED
+# ═══════════════════════════════════════════════════════════
+
+# ── Main Pages ──
+Allow: /shop
+
+# ── Category Pages (Purane URLs) ──
+Allow: /skincare
+Allow: /makeup
+Allow: /hair
+Allow: /clothing
+Allow: /accessories
+
+# ── Category Pages (Naye Dynamic URLs) ──
+Allow: /category/
+
+# ── Product Pages ──
+Allow: /product/
+
+# ── Static Pages ──
+Allow: /contact
+Allow: /faqs
+Allow: /shipping-info
+Allow: /returns-policy
+Allow: /privacy
+Allow: /terms
+
+# ═══════════════════════════════════════════════════════════
+# 🔒 PRIVATE PAGES — DISALLOWED
+# ═══════════════════════════════════════════════════════════
+
+Disallow: /admin/
+Disallow: /vendor/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /cart
+Disallow: /checkout
+Disallow: /profile
+Disallow: /my-orders
+Disallow: /wishlist
+Disallow: /track-order/
+Disallow: /payment-callback
+
+# ═══════════════════════════════════════════════════════════
+# 📍 SITEMAP LOCATION
+# ═══════════════════════════════════════════════════════════
+
+Sitemap: https://www.mypinkshop.com/sitemap.xml
