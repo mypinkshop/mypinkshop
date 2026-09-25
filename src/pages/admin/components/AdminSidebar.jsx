@@ -11,7 +11,7 @@ function AdminSidebar() {
   const [isMobile, setIsMobile] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
-  const [pendingReviewCount, setPendingReviewCount] = useState(0);   // ✅ NEW
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
@@ -79,7 +79,7 @@ function AdminSidebar() {
     return () => clearInterval(interval);
   }, [API_URL]);
 
-  // ✅ NEW: Pending reviews count
+  // ✅ Pending reviews count
   useEffect(() => {
     const fetchPendingReviewCount = async () => {
       try {
@@ -107,33 +107,24 @@ function AdminSidebar() {
 
   // Complete menu items
   const menuItems = [
-    // Main
     { name: 'Dashboard', icon: '📊', path: '/admin/dashboard', badge: null },
     { name: 'Vendors', icon: '🏪', path: '/admin/vendors', badge: null },
     { name: 'Brand Applications', icon: '📝', path: '/admin/brand-applications', badge: null },
-    
-    // Products
     { name: 'Inventory', icon: '📦', path: '/admin/products', badge: null },
     { name: 'Add Product', icon: '➕', path: '/admin/add-product', badge: null },
     { name: 'Bulk Upload', icon: '📤', path: '/admin/bulk-upload', badge: null },
     { name: 'Categories', icon: '📁', path: '/admin/categories', badge: null },
-    
-    // Sales
     { name: 'Orders', icon: '🛒', path: '/admin/orders', badge: pendingOrderCount > 0 ? pendingOrderCount : null },
     { name: 'Customers', icon: '👥', path: '/admin/customers', badge: null },
     { name: 'Payments', icon: '💳', path: '/admin/payments', badge: null },
-    
-    // Marketing
     { name: 'Offers', icon: '🏷️', path: '/admin/offers', badge: null },
     { name: 'Banners', icon: '🎨', path: '/admin/banners', badge: null },
     { name: 'Coupons', icon: '🎫', path: '/admin/coupons', badge: null },
     { name: 'Homepage', icon: '🏠', path: '/admin/homepage', badge: null },
     { name: 'Advertising', icon: '📢', path: '/admin/advertising', badge: null },
     { name: 'Ad Analytics', icon: '📊', path: '/admin/ad-analytics', badge: null },
-    
-    // Management
     { name: 'Notifications', icon: '🔔', path: '/admin/notifications', badge: unreadNotifications > 0 ? unreadNotifications : null },
-    { name: 'Reviews', icon: '⭐', path: '/admin/reviews', badge: pendingReviewCount > 0 ? pendingReviewCount : null },   // ✅ NEW BADGE
+    { name: 'Reviews', icon: '⭐', path: '/admin/reviews', badge: pendingReviewCount > 0 ? pendingReviewCount : null },
     { name: 'Reports', icon: '📈', path: '/admin/reports', badge: null },
     { name: 'Settings', icon: '⚙️', path: '/admin/settings', badge: null },
   ];
@@ -151,6 +142,8 @@ function AdminSidebar() {
   // Sidebar content
   const SidebarContent = () => (
     <>
+      {/* ═══════════ TOP: LOGO + PROFILE + LOGOUT ═══════════ */}
+      
       {/* Logo */}
       <div className={`p-5 border-b border-gray-700 flex ${collapsed && !isMobile ? 'justify-center' : 'justify-between'} items-center`}>
         {(!collapsed || isMobile) && (
@@ -179,7 +172,42 @@ function AdminSidebar() {
         )}
       </div>
 
-      {/* Navigation */}
+      {/* ✅ Profile + Logout — UPAR */}
+      {(!collapsed || isMobile) ? (
+        <div className="px-3 py-3 border-b border-gray-700">
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-gray-800/50">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-bold shadow-md shrink-0">
+              SA
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">Super Admin</p>
+              <p className="text-[10px] text-gray-400 truncate">admin@mypinkshop.com</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg text-gray-400 hover:bg-red-600 hover:text-white transition-all duration-200 shrink-0"
+              title="Logout"
+            >
+              <span className="text-lg">🚪</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center py-3 border-b border-gray-700 gap-2">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-bold shadow-md">
+            SA
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-lg text-gray-400 hover:bg-red-600 hover:text-white transition-all duration-200"
+            title="Logout"
+          >
+            <span className="text-lg">🚪</span>
+          </button>
+        </div>
+      )}
+
+      {/* ═══════════ NAVIGATION ═══════════ */}
       <nav className="mt-4 px-3 flex-1 overflow-y-auto">
         <div className="space-y-1">
           {menuItems.map((item) => (
@@ -213,44 +241,10 @@ function AdminSidebar() {
         </div>
       </nav>
 
-      {/* Bottom Section */}
+      {/* ═══════════ BOTTOM: VERSION ONLY ═══════════ */}
       <div className="p-3 mt-auto">
-        <div className="border-t border-gray-700 my-2"></div>
-        
         {(!collapsed || isMobile) && (
-          <div className="px-3 py-2 mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-bold shadow-md">
-                SA
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-white">Super Admin</p>
-                <p className="text-[10px] text-gray-400">admin@mypinkshop.com</p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {(collapsed && !isMobile) && (
-          <div className="flex justify-center py-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center text-white font-bold shadow-md">
-              SA
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={handleLogout}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-300 hover:bg-red-600 hover:text-white transition-all duration-200 ${
-            collapsed && !isMobile ? 'justify-center' : ''
-          }`}
-        >
-          <span className="text-xl">🚪</span>
-          {(!collapsed || isMobile) && <span className="text-sm font-medium">Logout</span>}
-        </button>
-        
-        {(!collapsed || isMobile) && (
-          <p className="text-[10px] text-gray-500 text-center mt-3">v2.0.0</p>
+          <p className="text-[10px] text-gray-500 text-center">v2.0.0</p>
         )}
       </div>
     </>
@@ -316,7 +310,7 @@ function AdminSidebar() {
 
   // Desktop view
   return (
-    <aside className={`fixed left-0 top-0 h-full bg-gradient-to-b from-gray-900 to-gray-800 text-white transition-all duration-300 z-50 shadow-2xl ${
+    <aside className={`fixed left-0 top-0 h-full bg-gradient-to-b from-gray-900 to-gray-800 text-white transition-all duration-300 z-50 shadow-2xl flex flex-col ${
       collapsed ? 'w-20' : 'w-64'
     }`}>
       <SidebarContent />
