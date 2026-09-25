@@ -1,3 +1,4 @@
+// src/pages/CategoryPage.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -6,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
-import { getCategoryBySlug } from '../config/categoryMap';
+import ProductCard from '../components/ProductCard';
 import toast from 'react-hot-toast';
 
 const API_URL = 'https://api.mypinkshop.com';
@@ -16,7 +17,13 @@ function CategoryPage() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { 
+    wishlist,          // ✅ guest wishlist ke liye
+    wishlistCount, 
+    addToWishlist, 
+    removeFromWishlist, 
+    isInWishlist 
+  } = useWishlist();
 
   const [category, setCategory] = useState(null);
   const [subcategories, setSubcategories] = useState([]);
@@ -29,27 +36,35 @@ function CategoryPage() {
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
 
+  // ✅ Guest wishlist context (agar wishlist array nahi hai to localStorage se lo)
+  const wishlistContext = useMemo(() => {
+    if (wishlist && Array.isArray(wishlist)) return wishlist;
+    try {
+      const saved = localStorage.getItem('guestWishlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  }, [wishlist]);
+
   // ✅ STEP 1: Category + Subcategories fetch karo (tree se)
   useEffect(() => {
     const loadCategory = async () => {
       try {
         setLoading(true);
-        
+
         const res = await fetch(`${API_URL}/api/categories/tree`);
         if (!res.ok) throw new Error('Failed to load categories');
-        
+
         const json = await res.json();
         const tree = json.data || json;
-        
-        // Slug se category dhundo
+
         const found = tree.find(c => c.slug === slug);
-        
+
         if (!found) {
           toast.error('Category not found');
           navigate('/');
           return;
         }
-        
+
         setCategory(found);
         setSubcategories(found.children || []);
       } catch (err) {
@@ -57,7 +72,7 @@ function CategoryPage() {
         toast.error('Failed to load category');
       }
     };
-    
+
     loadCategory();
   }, [slug, navigate]);
 
@@ -65,28 +80,34 @@ function CategoryPage() {
   useEffect(() => {
     const loadProducts = async () => {
       if (!category) return;
-      
+
       try {
         setLoading(true);
         const res = await fetch(`${API_URL}/api/products`);
         if (!res.ok) throw new Error('Failed to load products');
-        
+
         const data = await res.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
-        
-        // Sirf is category ke products
-        const categoryProducts = productsArray.filter(p => 
-          p.is_active === 1 &&
+
+        const categoryProducts = productsArray.filter(p =>
+          (p.is_active === 1 || p.is_active === true) &&
           (p.main_category === category.name || p.mainCategory === category.name)
-        ).map(p => ({
-          ...p,
-          id: p.id || p._id,
-          images: typeof p.images === 'string' ? JSON.parse(p.images || '[]') : (p.images || []),
-          subCategory: p.sub_category || p.subCategory || '',
-          mainCategory: p.main_category || p.mainCategory || '',
-          originalPrice: p.original_price || p.originalPrice || 0,
-        }));
-        
+        ).map(p => {
+          let images = p.images;
+          if (typeof images === 'string') {
+            try { images = JSON.parse(images || '[]'); } catch { images = []; }
+          }
+          return {
+            ...p,
+            id: p.id || p._id,
+            _id: p._id || p.id,
+            images: images || [],
+            subCategory: p.sub_category || p.subCategory || '',
+            mainCategory: p.main_category || p.mainCategory || '',
+            originalPrice: p.original_price || p.originalPrice || 0,
+          };
+        });
+
         setProducts(categoryProducts);
       } catch (err) {
         console.error('Products load error:', err);
@@ -95,7 +116,7 @@ function CategoryPage() {
         setLoading(false);
       }
     };
-    
+
     loadProducts();
   }, [category]);
 
@@ -139,7 +160,7 @@ function CategoryPage() {
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
       case 'newest': filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); break;
     }
-    
+
     return filtered;
   }, [products, searchTerm, selectedSubcategory, selectedBrand, priceRange, sortBy]);
 
@@ -272,7 +293,7 @@ function CategoryPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 pb-12">
-          
+
           {/* ✅ SUBCATEGORY CHIPS */}
           {subcategories.length > 0 && (
             <div className="mb-6 flex flex-wrap gap-2">
@@ -325,6 +346,33 @@ function CategoryPage() {
             </div>
           </div>
 
+          {/* Mobile Filters Modal */}
+          {showFilters && (
+            <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFilters(false)}>
+              <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="font-semibold text-gray-800">Filters</h3>
+                  <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-1">Brand</label>
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border rounded-lg">
+                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">Price</label>
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border rounded-lg">
+                      {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Results */}
           <div className="mb-4">
             <p className="text-sm text-gray-500">
@@ -355,6 +403,7 @@ function CategoryPage() {
                   addToWishlist={addToWishlist}
                   removeFromWishlist={removeFromWishlist}
                   user={user}
+                  wishlistContext={wishlistContext}  {/* ✅ YE ADD KIYA */}
                 />
               ))}
             </div>
