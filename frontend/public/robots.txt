@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════════════════
+# MyPinkShop - robots.txt
+# ═══════════════════════════════════════════════════════════
+
+User-agent: *
+Allow: /
+
+# 🛍️ Public Pages
+Allow: /shop
+Allow: /skincare
+Allow: /makeup
+Allow: /hair
+Allow: /clothing
+Allow: /accessories
+Allow: /category/
+Allow: /product/
+Allow: /contact
+Allow: /faqs
+Allow: /shipping-info
+Allow: /returns-policy
+Allow: /privacy
+Allow: /terms
+
+# 🔒 Private Pages
+Disallow: /admin/
+Disallow: /vendor/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /cart
+Disallow: /checkout
+Disallow: /profile
+Disallow: /my-orders
+Disallow: /wishlist
+Disallow: /track-order/
+Disallow: /payment-callback
+
+# 📍 Sitemap (API subdomain)
+Sitemap: https://api.mypinkshop.com/sitemap.xml
