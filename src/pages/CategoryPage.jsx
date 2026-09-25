@@ -6,13 +6,13 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
-import ProductCard from '../components/ProductCard';
+import { getCategoryBySlug } from '../config/categoryMap';
 import toast from 'react-hot-toast';
 
 const API_URL = 'https://api.mypinkshop.com';
 
 function CategoryPage() {
-  const { slug } = useParams(); // URL se slug milega
+  const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
@@ -77,14 +77,14 @@ function CategoryPage() {
         // Sirf is category ke products
         const categoryProducts = productsArray.filter(p => 
           p.is_active === 1 &&
-          p.main_category === category.name
+          (p.main_category === category.name || p.mainCategory === category.name)
         ).map(p => ({
           ...p,
           id: p.id || p._id,
           images: typeof p.images === 'string' ? JSON.parse(p.images || '[]') : (p.images || []),
-          subCategory: p.sub_category,
-          mainCategory: p.main_category,
-          originalPrice: p.original_price,
+          subCategory: p.sub_category || p.subCategory || '',
+          mainCategory: p.main_category || p.mainCategory || '',
+          originalPrice: p.original_price || p.originalPrice || 0,
         }));
         
         setProducts(categoryProducts);
@@ -143,7 +143,6 @@ function CategoryPage() {
     return filtered;
   }, [products, searchTerm, selectedSubcategory, selectedBrand, priceRange, sortBy]);
 
-  // Brands from products
   const brands = useMemo(() => {
     const unique = [...new Set(products.map(p => p.brand).filter(Boolean))];
     return [{ id: 'all', name: 'All Brands' }, ...unique.map(b => ({ id: b, name: b }))];
@@ -176,66 +175,90 @@ function CategoryPage() {
 
   if (loading && !category) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading...</p>
+        </div>
       </div>
     );
   }
 
+  if (!category) return null;
+
   return (
     <>
       <Helmet>
-        <title>{category?.name} - Shop Online | MyPinkShop</title>
-        <meta name="description" content={`Shop ${category?.name} products at MyPinkShop. Best prices, fast delivery.`} />
+        <title>{category.name} - Shop Online | MyPinkShop</title>
+        <meta name="description" content={`Shop ${category.name} products at MyPinkShop. Best prices, fast delivery.`} />
         <link rel="canonical" href={`https://www.mypinkshop.com/category/${slug}`} />
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
-        {/* Header (same as your existing) */}
+        {/* Header */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
-          <div className="max-w-7xl mx-auto px-4 py-3">
-            <div className="flex items-center justify-between gap-4">
-              <Link to="/" className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">M</span>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
+              <Link to="/" className="flex items-center gap-2 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
+                </div>
+                <div className="hidden sm:block">
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight">MyPinkShop</h1>
+                  <p className="text-[9px] text-gray-400">FOR THE GIRLIES ✨</p>
                 </div>
               </Link>
 
               <div className="flex-1 max-w-md">
-                <input
-                  type="text"
-                  placeholder={`Search ${category?.name}...`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2.5 border rounded-full bg-gray-50 focus:outline-none focus:border-pink-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={`Search ${category.name}...`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50"
+                  />
+                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</button>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <Link to="/wishlist" className="relative p-2">
-                  🤍
+                <button onClick={() => navigate('/wishlist')} className="relative p-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
                   {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{wishlistCount}</span>}
-                </Link>
+                </button>
+
                 <Link to="/cart" className="relative p-2">
-                  🛒
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
                   {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
                 </Link>
-                {user ? <Avatar user={user} onLogout={logout} /> : <Link to="/login">👤</Link>}
+
+                {user ? <Avatar user={user} onLogout={logout} /> :
+                  <Link to="/login" className="p-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </Link>
+                }
               </div>
             </div>
           </div>
         </header>
 
         {/* Hero */}
-        <div className="bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
+        <div className="relative bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100">
           <div className="max-w-7xl mx-auto px-4 py-12 text-center">
-            <div className="text-5xl mb-3">{category?.icon || '🛍️'}</div>
+            <div className="text-5xl mb-3">{category.icon || '🛍️'}</div>
             <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-2">
-              {category?.name}
+              {category.name}
             </h1>
-            <p className="text-gray-600 text-sm">{category?.description || `Explore our ${category?.name} collection`}</p>
+            <p className="text-gray-600 text-sm">{category.description || `Explore our ${category.name} collection`}</p>
           </div>
         </div>
 
@@ -244,13 +267,13 @@ function CategoryPage() {
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500">Home</Link>
             <span className="text-gray-400">/</span>
-            <span className="text-pink-600 font-medium">{category?.name}</span>
+            <span className="text-pink-600 font-medium">{category.name}</span>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 pb-12">
           
-          {/* ✅ SUBCATEGORY CHIPS (Ye naya hai!) */}
+          {/* ✅ SUBCATEGORY CHIPS */}
           {subcategories.length > 0 && (
             <div className="mb-6 flex flex-wrap gap-2">
               <button
@@ -312,7 +335,7 @@ function CategoryPage() {
           {/* Products Grid */}
           {filteredProducts.length === 0 ? (
             <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
-              <div className="text-6xl mb-3">{category?.icon || '🛍️'}</div>
+              <div className="text-6xl mb-3">{category.icon || '🛍️'}</div>
               <h3 className="text-lg font-semibold text-gray-800 mb-1">No products found</h3>
               <p className="text-gray-500 text-sm mb-4">
                 {selectedSubcategory !== 'all' ? `No products in "${selectedSubcategory}" yet` : 'Coming soon!'}
@@ -338,7 +361,51 @@ function CategoryPage() {
           )}
         </div>
 
-        {/* Footer (same as existing) */}
+        {/* Footer */}
+        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-xs">M</span>
+                  </div>
+                  <h3 className="font-bold text-white">MyPinkShop</h3>
+                </div>
+                <p className="text-xs">Luxury skincare for glowing skin.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-3 text-sm">Shop</h4>
+                <ul className="space-y-1 text-xs">
+                  <li><Link to="/category/skincare" className="hover:text-pink-500">Skincare</Link></li>
+                  <li><Link to="/category/makeup" className="hover:text-pink-500">Makeup</Link></li>
+                  <li><Link to="/category/haircare" className="hover:text-pink-500">Haircare</Link></li>
+                  <li><Link to="/category/fashion" className="hover:text-pink-500">Fashion</Link></li>
+                  <li><Link to="/category/accessories" className="hover:text-pink-500">Accessories</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-3 text-sm">Support</h4>
+                <ul className="space-y-1 text-xs">
+                  <li><Link to="/contact" className="hover:text-pink-500">Contact Us</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-500">FAQs</Link></li>
+                  <li><Link to="/shipping" className="hover:text-pink-500">Shipping</Link></li>
+                  <li><Link to="/returns" className="hover:text-pink-500">Returns</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-white mb-3 text-sm">Follow Us</h4>
+                <ul className="space-y-1 text-xs">
+                  <li><a href="#" className="hover:text-pink-500">Instagram</a></li>
+                  <li><a href="#" className="hover:text-pink-500">Pinterest</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="text-center pt-6 border-t border-gray-800">
+              <p className="text-xs">© 2026 MyPinkShop. All rights reserved.</p>
+            </div>
+          </div>
+        </footer>
       </div>
     </>
   );
