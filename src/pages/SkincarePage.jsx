@@ -17,7 +17,6 @@ function SkincarePage() {
   const { user, logout } = useAuth();
   const { wishlist, wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
-  const [category, setCategory] = useState(null);
   const [apiSubcategories, setApiSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +31,7 @@ function SkincarePage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
 
-  // ✅ Step 1: API se category + subcategories fetch karo
+  // ✅ API se subcategories fetch karo
   useEffect(() => {
     const loadCategory = async () => {
       try {
@@ -40,12 +39,8 @@ function SkincarePage() {
         if (!res.ok) throw new Error('Failed to load categories');
         const json = await res.json();
         const tree = json.data || json;
-
         const found = tree.find(c => c.slug === 'skincare');
-        if (found) {
-          setCategory(found);
-          setApiSubcategories(found.children || []);
-        }
+        if (found) setApiSubcategories(found.children || []);
       } catch (err) {
         console.error('Category load error:', err);
       }
@@ -53,14 +48,13 @@ function SkincarePage() {
     loadCategory();
   }, []);
 
-  // ✅ Step 2: Products fetch karo
+  // ✅ Products fetch karo
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
         const response = await fetch(`${API_URL}/api/products`);
         if (!response.ok) throw new Error('Failed to load products');
-
         const data = await response.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
 
@@ -100,54 +94,42 @@ function SkincarePage() {
     loadProducts();
   }, []);
 
-  // ✅ Subcategories — API se + products se fallback
+  // ✅ Subcategories
   const subcategories = useMemo(() => {
-    // API se (priority)
     if (apiSubcategories.length > 0) {
       return apiSubcategories.map(s => ({
         id: s.id,
         name: s.name,
-        icon: s.icon || '📁',
+        icon: s.icon || '◇',
       }));
     }
-    // Fallback — products se derive
     const subs = [...new Set(products.map(p => p.subCategory).filter(Boolean))];
-    return subs.map((s, idx) => ({ id: idx, name: s, icon: '📁' }));
+    return subs.map((s, idx) => ({ id: idx, name: s, icon: '◇' }));
   }, [apiSubcategories, products]);
 
   // ✅ Filters
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
-
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
-        p.name?.toLowerCase().includes(t) ||
-        p.brand?.toLowerCase().includes(t)
+        p.name?.toLowerCase().includes(t) || p.brand?.toLowerCase().includes(t)
       );
     }
-
     if (selectedSubcategory !== 'all') {
       filtered = filtered.filter(p =>
         (p.subCategory || '').toLowerCase() === selectedSubcategory.toLowerCase()
       );
     }
-
     if (selectedConcern !== 'all') {
-      filtered = filtered.filter(p => {
-        const concerns = p.skinConcerns || [];
-        return concerns.includes(selectedConcern);
-      });
+      filtered = filtered.filter(p => (p.skinConcerns || []).includes(selectedConcern));
     }
-
     if (selectedBrand !== 'all') {
       filtered = filtered.filter(p => p.brand === selectedBrand);
     }
-
     if (selectedSkinType !== 'all') {
       filtered = filtered.filter(p => (p.skinType || 'all') === selectedSkinType);
     }
-
     let min = 0, max = Infinity;
     if (priceRange !== 'all') {
       switch (priceRange) {
@@ -159,20 +141,18 @@ function SkincarePage() {
       }
     }
     filtered = filtered.filter(p => p.price >= min && p.price <= max);
-
     switch (sortBy) {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
       case 'newest': filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); break;
     }
-
     return filtered;
   }, [products, searchTerm, selectedSubcategory, selectedConcern, selectedBrand, selectedSkinType, priceRange, sortBy]);
 
   const concerns = useMemo(() => {
-    const allConcerns = products.flatMap(p => p.skinConcerns || []).filter(Boolean);
-    return [...new Set(allConcerns)];
+    const all = products.flatMap(p => p.skinConcerns || []).filter(Boolean);
+    return [...new Set(all)];
   }, [products]);
 
   const brands = useMemo(() => {
@@ -182,27 +162,27 @@ function SkincarePage() {
 
   const skinTypes = [
     { id: 'all', name: 'All Skin Types' },
-    { id: 'oily', name: 'Oily Skin' },
-    { id: 'dry', name: 'Dry Skin' },
-    { id: 'combination', name: 'Combination Skin' },
-    { id: 'sensitive', name: 'Sensitive Skin' },
-    { id: 'normal', name: 'Normal Skin' },
+    { id: 'oily', name: 'Oily' },
+    { id: 'dry', name: 'Dry' },
+    { id: 'combination', name: 'Combination' },
+    { id: 'sensitive', name: 'Sensitive' },
+    { id: 'normal', name: 'Normal' },
   ];
 
   const priceRanges = [
     { id: 'all', name: 'All Prices' },
     { id: 'under500', name: 'Under ₹500' },
-    { id: '500-1000', name: '₹500 - ₹1000' },
-    { id: '1000-2000', name: '₹1000 - ₹2000' },
-    { id: '2000-5000', name: '₹2000 - ₹5000' },
+    { id: '500-1000', name: '₹500 – ₹1000' },
+    { id: '1000-2000', name: '₹1000 – ₹2000' },
+    { id: '2000-5000', name: '₹2000 – ₹5000' },
     { id: 'above5000', name: 'Above ₹5000' },
   ];
 
   const sortOptions = [
-    { id: 'default', name: 'Default' },
+    { id: 'default', name: 'Featured' },
     { id: 'price_low', name: 'Price: Low to High' },
     { id: 'price_high', name: 'Price: High to Low' },
-    { id: 'rating', name: 'Highest Rated' },
+    { id: 'rating', name: 'Top Rated' },
     { id: 'newest', name: 'Newest First' },
   ];
 
@@ -218,10 +198,10 @@ function SkincarePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#faf7f5] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading skincare products...</p>
+          <div className="animate-spin w-10 h-10 border-2 border-[#c9a87c] border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-[#8b7d6b] text-sm tracking-widest uppercase">Loading</p>
         </div>
       </div>
     );
@@ -230,25 +210,25 @@ function SkincarePage() {
   return (
     <>
       <Helmet>
-        <title>Skincare Products - Face Wash, Serum, Moisturizer & More | MyPinkShop</title>
-        <meta name="description" content="Shop premium skincare products at MyPinkShop. Face washes, serums, moisturizers, sunscreens, and masks for glowing skin." />
+        <title>Skincare — Curated Luxury Skincare | MyPinkShop</title>
+        <meta name="description" content="Discover our curated collection of premium skincare. Face washes, serums, moisturizers, and more." />
         <link rel="canonical" href="https://www.mypinkshop.com/skincare" />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
+      <div className="min-h-screen bg-[#faf7f5]">
         <OfferBanner />
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-              <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
+        {/* ═══════════ PREMIUM HEADER ═══════════ */}
+        <header className="sticky top-0 z-50 bg-[#faf7f5]/95 backdrop-blur-xl border-b border-[#e8ddd0]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+            <div className="flex items-center justify-between gap-4">
+              <Link to="/" className="flex items-center gap-3 shrink-0 group">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#d4a574] via-[#c9a87c] to-[#b8935f] rounded-full flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
+                  <span className="text-white font-serif font-bold text-lg">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight">MyPinkShop</h1>
-                  <p className="text-[9px] text-gray-400">FOR THE GIRLIES ✨</p>
+                  <h1 className="text-xl font-serif font-semibold tracking-wide text-[#3d3229]">MyPinkShop</h1>
+                  <p className="text-[10px] tracking-[0.3em] text-[#8b7d6b] uppercase">Luxe Beauty</p>
                 </div>
               </Link>
 
@@ -259,31 +239,31 @@ function SkincarePage() {
                     placeholder="Search skincare..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50"
+                    className="w-full px-5 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-sm text-[#3d3229] placeholder-[#b0a695] focus:outline-none focus:border-[#c9a87c] transition-colors"
                   />
-                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</button>
+                  <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#b0a695]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button onClick={() => navigate('/wishlist')} className="relative p-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              <div className="flex items-center gap-1">
+                <button onClick={() => navigate('/wishlist')} className="relative p-2.5 hover:bg-[#f5ede4] rounded-full transition-colors">
+                  <svg className="w-5 h-5 text-[#3d3229]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#c9a87c] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{wishlistCount}</span>}
                 </button>
-
-                <Link to="/cart" className="relative p-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                <Link to="/cart" className="relative p-2.5 hover:bg-[#f5ede4] rounded-full transition-colors">
+                  <svg className="w-5 h-5 text-[#3d3229]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
+                  {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#c9a87c] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{cartCount}</span>}
                 </Link>
-
                 {user ? <Avatar user={user} onLogout={logout} /> :
-                  <Link to="/login" className="p-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <Link to="/login" className="p-2.5 hover:bg-[#f5ede4] rounded-full transition-colors">
+                    <svg className="w-5 h-5 text-[#3d3229]" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
                 }
@@ -292,122 +272,110 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* Hero */}
-        <div className="relative bg-gradient-to-r from-pink-500 to-rose-500 text-white">
-          <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12">
-            <div className="flex items-center gap-4">
-              <div className="text-5xl sm:text-6xl">🧴</div>
-              <div>
-                <h1 className="text-2xl sm:text-4xl font-bold mb-1">Skincare</h1>
-                <p className="text-sm sm:text-base text-white/90">✨ Glow Up Sale — Flat 30% OFF</p>
-                <p className="text-xs mt-1 text-white/80">{filteredProducts.length} products • {subcategories.length} subcategories</p>
-              </div>
-            </div>
+        {/* ═══════════ ELEGANT HERO ═══════════ */}
+        <section className="relative bg-gradient-to-b from-[#f5ede4] to-[#faf7f5] border-b border-[#e8ddd0]">
+          <div className="max-w-7xl mx-auto px-4 py-16 sm:py-24 text-center">
+            <p className="text-[11px] tracking-[0.4em] text-[#b8935f] uppercase mb-4">The Skincare Edit</p>
+            <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-light text-[#3d3229] mb-5 leading-tight">
+              Radiance, Refined
+            </h1>
+            <div className="w-16 h-px bg-[#c9a87c] mx-auto mb-5"></div>
+            <p className="text-[#8b7d6b] text-sm sm:text-base max-w-xl mx-auto font-light leading-relaxed">
+              Curated formulas for luminous, healthy skin — thoughtfully selected from the world's most refined houses.
+            </p>
+          </div>
+        </section>
+
+        {/* ═══════════ BREADCRUMB ═══════════ */}
+        <div className="max-w-7xl mx-auto px-4 py-5">
+          <div className="flex items-center gap-2 text-xs tracking-wider text-[#8b7d6b]">
+            <Link to="/" className="hover:text-[#3d3229] transition-colors">HOME</Link>
+            <span className="text-[#d4c7b5]">/</span>
+            <span className="text-[#3d3229] font-medium">SKINCARE</span>
           </div>
         </div>
 
-        {/* Breadcrumb */}
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-500 hover:text-pink-500">Home</Link>
-            <span className="text-gray-400">/</span>
-            <span className="text-pink-600 font-medium">Skincare</span>
-          </div>
-        </div>
+        {/* ═══════════ MAIN LAYOUT ═══════════ */}
+        <div className="max-w-7xl mx-auto px-4 pb-20">
+          <div className="flex gap-8 lg:gap-10">
 
-        {/* MAIN LAYOUT */}
-        <div className="max-w-7xl mx-auto px-4 pb-12">
-          <div className="flex gap-6">
-
-            {/* ✅ LEFT SIDEBAR — Subcategories */}
+            {/* ═══ LEFT SIDEBAR ═══ */}
             <aside className={`fixed md:static inset-0 z-40 md:z-0 ${showSidebar ? '' : 'hidden md:block'} md:w-64 shrink-0`}>
-              {/* Mobile overlay */}
               {showSidebar && (
-                <div className="md:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setShowSidebar(false)} />
+                <div className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-30" onClick={() => setShowSidebar(false)} />
               )}
 
-              <div className={`bg-white rounded-2xl border border-pink-100 shadow-sm overflow-hidden ${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto' : ''}`}>
+              <div className={`${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto bg-white' : 'bg-transparent'}`}>
                 {/* Sidebar Header */}
-                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 flex items-center justify-between">
-                  <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">📂 Categories</h3>
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#e8ddd0]">
+                  <h3 className="font-serif text-lg text-[#3d3229] tracking-wide">Categories</h3>
                   {showSidebar && (
-                    <button onClick={() => setShowSidebar(false)} className="md:hidden text-gray-400 text-xl">✕</button>
+                    <button onClick={() => setShowSidebar(false)} className="md:hidden text-[#8b7d6b] text-xl p-2">✕</button>
                   )}
                 </div>
 
                 {/* Sidebar Items */}
-                <div className="max-h-[600px] overflow-y-auto">
-                  {/* All Products */}
+                <nav className="space-y-0.5">
                   <button
                     onClick={() => { setSelectedSubcategory('all'); setShowSidebar(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm flex items-center gap-3 border-b border-gray-50 transition ${
+                    className={`w-full text-left px-4 py-3 text-sm tracking-wide transition-all duration-200 rounded-lg flex items-center gap-3 ${
                       selectedSubcategory === 'all'
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold'
-                        : 'text-gray-700 hover:bg-pink-50'
+                        ? 'bg-[#3d3229] text-white font-medium'
+                        : 'text-[#5a4d40] hover:bg-[#f5ede4] hover:pl-5'
                     }`}
                   >
-                    <span className="text-lg">🔥</span>
+                    <span className="text-base">✦</span>
                     <span>All Products</span>
-                    <span className={`ml-auto text-xs ${selectedSubcategory === 'all' ? 'text-white/80' : 'text-gray-400'}`}>
-                      {products.length}
-                    </span>
                   </button>
 
-                  {/* Subcategories */}
-                  {subcategories.map(sub => {
-                    const count = products.filter(p =>
-                      (p.subCategory || '').toLowerCase() === sub.name.toLowerCase()
-                    ).length;
-                    return (
-                      <button
-                        key={sub.id}
-                        onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
-                        className={`w-full text-left px-4 py-3 text-sm flex items-center gap-3 border-b border-gray-50 transition ${
-                          selectedSubcategory === sub.name
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold'
-                            : 'text-gray-700 hover:bg-pink-50'
-                        }`}
-                      >
-                        <span className="text-lg">{sub.icon || '📁'}</span>
-                        <span className="truncate">{sub.name}</span>
-                        <span className={`ml-auto text-xs ${selectedSubcategory === sub.name ? 'text-white/80' : 'text-gray-400'}`}>
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                  {subcategories.map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm tracking-wide transition-all duration-200 rounded-lg flex items-center gap-3 ${
+                        selectedSubcategory === sub.name
+                          ? 'bg-[#3d3229] text-white font-medium'
+                          : 'text-[#5a4d40] hover:bg-[#f5ede4] hover:pl-5'
+                      }`}
+                    >
+                      <span className="text-[#c9a87c] text-xs">◇</span>
+                      <span className="truncate">{sub.name}</span>
+                    </button>
+                  ))}
+                </nav>
               </div>
             </aside>
 
-            {/* ✅ RIGHT: Products */}
+            {/* ═══ RIGHT: PRODUCTS ═══ */}
             <main className="flex-1 min-w-0">
 
-              {/* Mobile: Filter Buttons */}
-              <div className="md:hidden mb-4 flex gap-2">
+              {/* Mobile: Sidebar + Filters Buttons */}
+              <div className="md:hidden mb-5 flex gap-2">
                 <button
                   onClick={() => setShowSidebar(true)}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-sm font-medium"
+                  className="flex-1 px-4 py-3 bg-[#3d3229] text-white rounded-full text-xs tracking-widest uppercase font-medium"
                 >
-                  📂 Categories ({subcategories.length})
+                  Categories
                 </button>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="px-4 py-2.5 border border-pink-200 rounded-full text-sm bg-white"
+                  className="px-4 py-3 border border-[#e8ddd0] rounded-full text-xs tracking-widest uppercase font-medium text-[#3d3229] bg-white"
                 >
-                  Filters 🔽
+                  Filters
                 </button>
               </div>
 
               {/* Shop by Concern */}
               {concerns.length > 0 && (
-                <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">🎯 Shop by Concern</h3>
+                <div className="mb-8">
+                  <h3 className="text-[11px] tracking-[0.3em] text-[#b8935f] uppercase mb-4">Shop by Concern</h3>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setSelectedConcern('all')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                        selectedConcern === 'all' ? 'bg-pink-500 text-white' : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                      className={`px-4 py-2 rounded-full text-xs tracking-wider transition-all duration-200 border ${
+                        selectedConcern === 'all'
+                          ? 'bg-[#3d3229] text-white border-[#3d3229]'
+                          : 'bg-white text-[#5a4d40] border-[#e8ddd0] hover:border-[#c9a87c]'
                       }`}
                     >
                       All
@@ -416,8 +384,10 @@ function SkincarePage() {
                       <button
                         key={c}
                         onClick={() => setSelectedConcern(c)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                          selectedConcern === c ? 'bg-pink-500 text-white' : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                        className={`px-4 py-2 rounded-full text-xs tracking-wider transition-all duration-200 border ${
+                          selectedConcern === c
+                            ? 'bg-[#3d3229] text-white border-[#3d3229]'
+                            : 'bg-white text-[#5a4d40] border-[#e8ddd0] hover:border-[#c9a87c]'
                         }`}
                       >
                         {c}
@@ -428,25 +398,27 @@ function SkincarePage() {
               )}
 
               {/* Filters Bar */}
-              <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="hidden md:flex gap-2 flex-wrap">
-                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+              <div className="mb-8 pb-6 border-b border-[#e8ddd0]">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="hidden md:flex gap-3 flex-wrap">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
                       {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                    <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
                       {skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
                       {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                   </div>
 
-                  <div className="flex items-center gap-2 ml-auto">
+                  <div className="flex items-center gap-3 ml-auto">
                     {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
-                      <button onClick={clearFilters} className="text-xs text-pink-500 underline whitespace-nowrap">Clear All</button>
+                      <button onClick={clearFilters} className="text-[11px] tracking-wider text-[#b8935f] uppercase underline underline-offset-4 hover:text-[#3d3229] transition-colors">
+                        Clear All
+                      </button>
                     )}
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 bg-white border border-[#e8ddd0] rounded-full text-xs tracking-wider text-[#3d3229] focus:outline-none focus:border-[#c9a87c] cursor-pointer">
                       {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                   </div>
@@ -455,43 +427,60 @@ function SkincarePage() {
 
               {/* Mobile Filters Modal */}
               {showFilters && (
-                <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setShowFilters(false)}>
-                  <div className="absolute right-0 top-0 h-full w-72 bg-white shadow-xl p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-between items-center mb-5">
-                      <h3 className="font-semibold text-gray-800">Filters</h3>
-                      <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+                  <div className="absolute right-0 top-0 h-full w-80 bg-[#faf7f5] shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-[#e8ddd0]">
+                      <h3 className="font-serif text-lg text-[#3d3229]">Refine</h3>
+                      <button onClick={() => setShowFilters(false)} className="text-[#8b7d6b] text-xl">✕</button>
                     </div>
-                    <div className="space-y-4">
-                      <div><label className="block text-sm mb-1">Brand</label><select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-2 border rounded-lg">{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                      <div><label className="block text-sm mb-1">Skin Type</label><select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-2 border rounded-lg">{skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                      <div><label className="block text-sm mb-1">Price</label><select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-2 border rounded-lg">{priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
-                      <button onClick={clearFilters} className="w-full py-2 bg-pink-500 text-white rounded-lg mt-4">Clear All</button>
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-[#b8935f] uppercase mb-2">Brand</label>
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-white border border-[#e8ddd0] rounded-lg text-sm text-[#3d3229]">
+                          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-[#b8935f] uppercase mb-2">Skin Type</label>
+                        <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-3 bg-white border border-[#e8ddd0] rounded-lg text-sm text-[#3d3229]">
+                          {skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-[#b8935f] uppercase mb-2">Price</label>
+                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-white border border-[#e8ddd0] rounded-lg text-sm text-[#3d3229]">
+                          {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={clearFilters} className="w-full py-3 bg-[#3d3229] text-white rounded-full text-xs tracking-widest uppercase mt-4">Clear All</button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Results Count */}
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm text-gray-500">
-                  Showing <span className="font-semibold text-pink-600">{Math.min(visibleCount, filteredProducts.length)}</span> of <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products
-                  {selectedSubcategory !== 'all' && <span className="ml-2 text-pink-600 font-medium">in {selectedSubcategory}</span>}
+              {/* Results Info */}
+              <div className="mb-6">
+                <p className="text-xs tracking-wider text-[#8b7d6b]">
+                  {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+                  {selectedSubcategory !== 'all' && <span className="text-[#3d3229]"> · {selectedSubcategory}</span>}
                 </p>
               </div>
 
               {/* Products Grid */}
               {filteredProducts.length === 0 ? (
-                <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
-                  <div className="text-6xl mb-3">🧴</div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-1">No skincare products found</h3>
-                  <p className="text-gray-500 text-sm mb-4">
-                    {selectedSubcategory !== 'all' ? `No products in "${selectedSubcategory}" yet` : 'Coming soon!'}
+                <div className="bg-white rounded-2xl p-16 text-center border border-[#e8ddd0]">
+                  <div className="font-serif text-4xl text-[#c9a87c] mb-4">✦</div>
+                  <h3 className="font-serif text-xl text-[#3d3229] mb-2">Nothing here yet</h3>
+                  <p className="text-sm text-[#8b7d6b] mb-6">
+                    {selectedSubcategory !== 'all' ? `We're adding ${selectedSubcategory} soon.` : 'New arrivals coming soon.'}
                   </p>
-                  <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">Clear Filters</button>
+                  <button onClick={clearFilters} className="px-8 py-3 bg-[#3d3229] text-white rounded-full text-xs tracking-widest uppercase hover:bg-[#5a4d40] transition-colors">
+                    View All
+                  </button>
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
                     {filteredProducts.slice(0, visibleCount).map(product => (
                       <ProductCard
                         key={product.id}
@@ -507,72 +496,63 @@ function SkincarePage() {
                   </div>
 
                   {visibleCount < filteredProducts.length && (
-                    <div className="text-center mt-8">
+                    <div className="text-center mt-12">
                       <button
                         onClick={() => setVisibleCount(prev => prev + 16)}
-                        className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transition"
+                        className="px-10 py-3.5 border border-[#3d3229] text-[#3d3229] rounded-full text-xs tracking-[0.25em] uppercase hover:bg-[#3d3229] hover:text-white transition-all duration-300"
                       >
-                        Load More Products ↓
+                        Load More
                       </button>
                     </div>
                   )}
                 </>
               )}
-
-              {/* Category Banner */}
-              <div className="mt-12 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white p-8 text-center">
-                <h3 className="text-2xl font-bold mb-2">✨ Glow Up Sale</h3>
-                <p className="text-white/90 mb-4">Flat 30% OFF on all Skincare</p>
-                <Link to="/shop" className="inline-block bg-white text-gray-800 px-6 py-2 rounded-full font-medium hover:shadow-lg transition">
-                  Shop All Products →
-                </Link>
-              </div>
             </main>
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="bg-gray-900 text-gray-400 py-12 mt-8">
+        {/* ═══════════ FOOTER ═══════════ */}
+        <footer className="bg-[#3d3229] text-[#d4c7b5] py-16 mt-12">
           <div className="max-w-7xl mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-xs">M</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+              <div className="col-span-2 md:col-span-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 bg-gradient-to-br from-[#d4a574] to-[#b8935f] rounded-full flex items-center justify-center">
+                    <span className="text-white font-serif font-bold text-sm">M</span>
                   </div>
-                  <h3 className="font-bold text-white">MyPinkShop</h3>
+                  <h3 className="font-serif font-semibold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-xs">Your one-stop shop for beauty & fashion.</p>
+                <p className="text-xs leading-relaxed text-[#b0a695]">Luxe beauty essentials, thoughtfully curated.</p>
               </div>
               <div>
-                <h4 className="font-semibold text-white mb-3 text-sm">Shop</h4>
-                <ul className="space-y-1 text-xs">
-                  <li><Link to="/category/skincare" className="hover:text-pink-500">Skincare</Link></li>
-                  <li><Link to="/category/makeup" className="hover:text-pink-500">Makeup</Link></li>
-                  <li><Link to="/category/haircare" className="hover:text-pink-500">Haircare</Link></li>
-                  <li><Link to="/category/fashion" className="hover:text-pink-500">Fashion</Link></li>
-                  <li><Link to="/category/accessories" className="hover:text-pink-500">Accessories</Link></li>
+                <h4 className="font-serif text-white text-sm mb-4 tracking-wide">Shop</h4>
+                <ul className="space-y-2.5 text-xs">
+                  <li><Link to="/skincare" className="hover:text-[#c9a87c] transition-colors">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-[#c9a87c] transition-colors">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-[#c9a87c] transition-colors">Haircare</Link></li>
+                  <li><Link to="/clothing" className="hover:text-[#c9a87c] transition-colors">Fashion</Link></li>
+                  <li><Link to="/accessories" className="hover:text-[#c9a87c] transition-colors">Accessories</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-white mb-3 text-sm">Support</h4>
-                <ul className="space-y-1 text-xs">
-                  <li><Link to="/contact" className="hover:text-pink-500">Contact Us</Link></li>
-                  <li><Link to="/faqs" className="hover:text-pink-500">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500">Shipping</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500">Returns</Link></li>
+                <h4 className="font-serif text-white text-sm mb-4 tracking-wide">Support</h4>
+                <ul className="space-y-2.5 text-xs">
+                  <li><Link to="/contact" className="hover:text-[#c9a87c] transition-colors">Contact</Link></li>
+                  <li><Link to="/faqs" className="hover:text-[#c9a87c] transition-colors">FAQs</Link></li>
+                  <li><Link to="/shipping-info" className="hover:text-[#c9a87c] transition-colors">Shipping</Link></li>
+                  <li><Link to="/returns-policy" className="hover:text-[#c9a87c] transition-colors">Returns</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-white mb-3 text-sm">Follow Us</h4>
-                <ul className="space-y-1 text-xs">
-                  <li><a href="#" className="hover:text-pink-500">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500">Pinterest</a></li>
+                <h4 className="font-serif text-white text-sm mb-4 tracking-wide">Follow</h4>
+                <ul className="space-y-2.5 text-xs">
+                  <li><a href="#" className="hover:text-[#c9a87c] transition-colors">Instagram</a></li>
+                  <li><a href="#" className="hover:text-[#c9a87c] transition-colors">Pinterest</a></li>
                 </ul>
               </div>
             </div>
-            <div className="text-center pt-6 border-t border-gray-800">
-              <p className="text-xs">© 2026 MyPinkShop. All rights reserved.</p>
+            <div className="text-center pt-8 border-t border-[#5a4d40]">
+              <p className="text-[11px] tracking-widest text-[#8b7d6b] uppercase">© 2026 MyPinkShop · All Rights Reserved</p>
             </div>
           </div>
         </footer>
