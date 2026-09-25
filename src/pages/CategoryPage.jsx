@@ -31,6 +31,7 @@ function CategoryPage() {
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
 
   // ✅ Category load karo
@@ -184,7 +185,7 @@ function CategoryPage() {
   ];
 
   const sortOptions = [
-    { id: 'default', name: 'Default Sorting' },
+    { id: 'default', name: 'Default' },
     { id: 'price_low', name: 'Price: Low to High' },
     { id: 'price_high', name: 'Price: High to Low' },
     { id: 'rating', name: 'Highest Rated' },
@@ -319,182 +320,225 @@ function CategoryPage() {
           </div>
         </div>
 
+        {/* MAIN LAYOUT: Sidebar + Products */}
         <div className="max-w-7xl mx-auto px-4 pb-12">
+          <div className="flex gap-6">
 
-          {/* ✅ SUBCATEGORY TABS — Scrollable */}
-          {subcategories.length > 0 && (
-            <div className="mb-6 -mx-4 px-4 overflow-x-auto">
-              <div className="flex gap-2 pb-2 min-w-max">
-                <button
-                  onClick={() => setSelectedSubcategory('all')}
-                  className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap border-2 transition-all ${
-                    selectedSubcategory === 'all'
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-500 shadow-md'
-                      : 'bg-white border-pink-200 text-gray-700 hover:border-pink-400 hover:shadow-sm'
-                  }`}
-                >
-                  🔥 All Products
-                </button>
-                {subcategories.map(sub => (
+            {/* ✅ LEFT SIDEBAR — Subcategories */}
+            <aside className={`fixed md:static inset-0 z-40 md:z-0 ${showSidebar ? '' : 'hidden md:block'} md:w-64 shrink-0`}>
+              {/* Mobile overlay */}
+              {showSidebar && (
+                <div className="md:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setShowSidebar(false)} />
+              )}
+
+              <div className={`bg-white rounded-2xl border border-pink-100 shadow-sm overflow-hidden ${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto' : ''}`}>
+                {/* Sidebar Header */}
+                <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-4 py-3 border-b border-pink-100 flex items-center justify-between">
+                  <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                    📂 Categories
+                  </h3>
+                  {showSidebar && (
+                    <button onClick={() => setShowSidebar(false)} className="md:hidden text-gray-400 text-xl">✕</button>
+                  )}
+                </div>
+
+                {/* Sidebar Items */}
+                <div className="max-h-[600px] overflow-y-auto">
+                  {/* All Products */}
                   <button
-                    key={sub.id}
-                    onClick={() => setSelectedSubcategory(sub.name)}
-                    className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap border-2 transition-all flex items-center gap-1.5 ${
-                      selectedSubcategory === sub.name
-                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-500 shadow-md'
-                        : 'bg-white border-pink-200 text-gray-700 hover:border-pink-400 hover:shadow-sm'
+                    onClick={() => { setSelectedSubcategory('all'); setShowSidebar(false); }}
+                    className={`w-full text-left px-4 py-3 text-sm flex items-center gap-3 border-b border-gray-50 transition ${
+                      selectedSubcategory === 'all'
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold'
+                        : 'text-gray-700 hover:bg-pink-50'
                     }`}
                   >
-                    <span>{sub.icon}</span>
-                    <span>{sub.name}</span>
+                    <span className="text-lg">🔥</span>
+                    <span>All Products</span>
+                    <span className={`ml-auto text-xs ${selectedSubcategory === 'all' ? 'text-white/80' : 'text-gray-400'}`}>
+                      {products.length}
+                    </span>
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* ✅ Shop by Concern (agar concerns hain) */}
-          {concerns.length > 0 && (
-            <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">🎯 Shop by Concern</h3>
-              <div className="flex flex-wrap gap-2">
+                  {/* Subcategories */}
+                  {subcategories.map(sub => {
+                    const count = products.filter(p => (p.subCategory || '').toLowerCase() === sub.name.toLowerCase()).length;
+                    return (
+                      <button
+                        key={sub.id}
+                        onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
+                        className={`w-full text-left px-4 py-3 text-sm flex items-center gap-3 border-b border-gray-50 transition ${
+                          selectedSubcategory === sub.name
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold'
+                            : 'text-gray-700 hover:bg-pink-50'
+                        }`}
+                      >
+                        <span className="text-lg">{sub.icon || '📁'}</span>
+                        <span className="truncate">{sub.name}</span>
+                        <span className={`ml-auto text-xs ${selectedSubcategory === sub.name ? 'text-white/80' : 'text-gray-400'}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
+
+            {/* ✅ RIGHT: Products */}
+            <main className="flex-1 min-w-0">
+
+              {/* Mobile: Filter Button */}
+              <div className="md:hidden mb-4 flex gap-2">
                 <button
-                  onClick={() => setSelectedConcern('all')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                    selectedConcern === 'all'
-                      ? 'bg-pink-500 text-white'
-                      : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
-                  }`}
+                  onClick={() => setShowSidebar(true)}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-sm font-medium"
                 >
-                  All
+                  📂 Categories ({subcategories.length})
                 </button>
-                {concerns.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setSelectedConcern(c)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                      selectedConcern === c
-                        ? 'bg-pink-500 text-white'
-                        : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ✅ FEATURED PRODUCTS SECTION */}
-          {featuredProducts.length > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
-                  ⭐ Featured {category.name}
-                </h2>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {featuredProducts.slice(0, 4).map(product => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                    wishlistContext={wishlist}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ✅ FILTERS BAR */}
-          <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="hidden md:flex gap-2 flex-wrap">
-                <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
-                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-                <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
-                  {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="px-4 py-2.5 border border-pink-200 rounded-full text-sm bg-white"
+                >
+                  Filters 🔽
+                </button>
               </div>
 
-              <button onClick={() => setShowFilters(!showFilters)} className="md:hidden px-4 py-2 border border-pink-200 rounded-full text-sm bg-white">
-                Filters 🔽
-              </button>
-
-              <div className="flex items-center gap-2">
-                {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || priceRange !== 'all' || searchTerm) && (
-                  <button onClick={clearFilters} className="text-xs text-pink-500 underline whitespace-nowrap">
-                    Clear All
-                  </button>
-                )}
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
-                  {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Results Count */}
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              Showing <span className="font-semibold text-pink-600">{Math.min(visibleCount, filteredProducts.length)}</span> of <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products
-            </p>
-          </div>
-
-          {/* Products Grid */}
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
-              <div className="text-6xl mb-3">{category.icon || '🛍️'}</div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-1">No products found</h3>
-              <p className="text-gray-500 text-sm mb-4">
-                {selectedSubcategory !== 'all' ? `No products in "${selectedSubcategory}" yet` : 'Coming soon!'}
-              </p>
-              <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredProducts.slice(0, visibleCount).map(product => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    addToCart={addToCart}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                    wishlistContext={wishlist}
-                  />
-                ))}
-              </div>
-
-              {visibleCount < filteredProducts.length && (
-                <div className="text-center mt-8">
-                  <button
-                    onClick={() => setVisibleCount(prev => prev + 16)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transition"
-                  >
-                    Load More Products ↓
-                  </button>
+              {/* Shop by Concern */}
+              {concerns.length > 0 && (
+                <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">🎯 Shop by Concern</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setSelectedConcern('all')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                        selectedConcern === 'all' ? 'bg-pink-500 text-white' : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {concerns.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setSelectedConcern(c)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                          selectedConcern === c ? 'bg-pink-500 text-white' : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-            </>
-          )}
 
-          {/* ✅ CATEGORY BANNER */}
-          <div className={`mt-12 rounded-2xl bg-gradient-to-r ${banner.bg} text-white p-8 text-center`}>
-            <h3 className="text-2xl font-bold mb-2">{banner.title}</h3>
-            <p className="text-white/90 mb-4">{banner.subtitle}</p>
-            <Link to="/shop" className="inline-block bg-white text-gray-800 px-6 py-2 rounded-full font-medium hover:shadow-lg transition">
-              Shop All Products →
-            </Link>
+              {/* Featured Products */}
+              {featuredProducts.length > 0 && !selectedSubcategory.includes('all') === false && (
+                <div className="mb-8">
+                  <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    ⭐ Featured {category.name}
+                  </h2>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {featuredProducts.slice(0, 3).map(product => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Filters Bar */}
+              <div className="mb-6 bg-white rounded-2xl p-4 border border-pink-100 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="hidden md:flex gap-2 flex-wrap">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                      {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || priceRange !== 'all' || searchTerm) && (
+                      <button onClick={clearFilters} className="text-xs text-pink-500 underline whitespace-nowrap">
+                        Clear All
+                      </button>
+                    )}
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2 border border-pink-200 rounded-full text-sm bg-white focus:outline-none focus:border-pink-500">
+                      {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Count */}
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm text-gray-500">
+                  Showing <span className="font-semibold text-pink-600">{Math.min(visibleCount, filteredProducts.length)}</span> of <span className="font-semibold text-pink-600">{filteredProducts.length}</span> products
+                  {selectedSubcategory !== 'all' && <span className="ml-2 text-pink-600 font-medium">in {selectedSubcategory}</span>}
+                </p>
+              </div>
+
+              {/* Products Grid */}
+              {filteredProducts.length === 0 ? (
+                <div className="bg-white/80 rounded-2xl p-12 text-center border border-pink-100">
+                  <div className="text-6xl mb-3">{category.icon || '🛍️'}</div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">No products found</h3>
+                  <p className="text-gray-500 text-sm mb-4">
+                    {selectedSubcategory !== 'all' ? `No products in "${selectedSubcategory}" yet` : 'Coming soon!'}
+                  </p>
+                  <button onClick={clearFilters} className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2 rounded-full text-sm">
+                    Clear Filters
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredProducts.slice(0, visibleCount).map(product => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+
+                  {visibleCount < filteredProducts.length && (
+                    <div className="text-center mt-8">
+                      <button
+                        onClick={() => setVisibleCount(prev => prev + 16)}
+                        className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transition"
+                      >
+                        Load More Products ↓
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Category Banner */}
+              <div className={`mt-12 rounded-2xl bg-gradient-to-r ${banner.bg} text-white p-8 text-center`}>
+                <h3 className="text-2xl font-bold mb-2">{banner.title}</h3>
+                <p className="text-white/90 mb-4">{banner.subtitle}</p>
+                <Link to="/shop" className="inline-block bg-white text-gray-800 px-6 py-2 rounded-full font-medium hover:shadow-lg transition">
+                  Shop All Products →
+                </Link>
+              </div>
+            </main>
           </div>
         </div>
 
