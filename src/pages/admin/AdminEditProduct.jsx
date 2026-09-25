@@ -125,7 +125,6 @@ const stringToBullets = (desc) => {
 const normalizeVariantsFromBackend = (rawVariants) => {
   if (!Array.isArray(rawVariants)) return [];
   return rawVariants.map((v, idx) => {
-    // Case 1: Backend naya format (option1/option2 objects)
     if (v.option1 || v.option2) {
       return {
         id: v.id || `var_${idx}_${Date.now()}`,
@@ -139,7 +138,6 @@ const normalizeVariantsFromBackend = (rawVariants) => {
         attributes: {},
       };
     }
-    // Case 2: Purana admin format (name/secondaryName)
     return {
       id: v.id || `var_${idx}_${Date.now()}`,
       name: v.name || v.option1Value || '',
@@ -166,6 +164,11 @@ function AdminEditProduct() {
   const [showAddSubCategory, setShowAddSubCategory] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState('');
   
+  // ✅ NAYA — API se categories
+  const [apiCategories, setApiCategories] = useState([]);
+  const [apiSubCategories, setApiSubCategories] = useState({});
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  
   const [variations, setVariations] = useState([]);
   const [selectedVariationIds, setSelectedVariationIds] = useState([]);
   const [variationModalOpen, setVariationModalOpen] = useState(false);
@@ -183,7 +186,8 @@ function AdminEditProduct() {
   ]);
   
   const [customSubCategories, setCustomSubCategories] = useState({
-    Skincare: [], Makeup: [], Hair: [], Clothing: [], Accessories: []
+    Skincare: [], Makeup: [], Haircare: [], Fashion: [], Accessories: [],
+    Electronics: [], 'Home & Kitchen': [], 'Health & Wellness': [], 'Books & Stationery': []
   });
 
   const [formData, setFormData] = useState({
@@ -225,36 +229,77 @@ function AdminEditProduct() {
   const [specValueInput, setSpecValueInput] = useState('');
   const [currentBullet, setCurrentBullet] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://api.mypinkshop.com';
-  
-  const categories = {
-    'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Lip Balm', 'Toner', 'Face Scrub', 'Body Lotion', 'Body Wash'],
-    'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer', 'Primer', 'Setting Spray'],
-    'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff', 'Hair Fall Control'],
-    'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Shorts', 'Jacket', 'Sweater', 'Lehenga', 'Salwar Suit', 'Activewear'],
-    'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Hair Accessory', 'Belt', 'Scarf', 'Wallet', 'Cap', 'Gloves']
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
+  // ✅ Fallback subcategories (agar API fail ho)
+  const fallbackSubCategories = {
+    Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Lip Balm', 'Toner', 'Face Scrub', 'Body Lotion', 'Body Wash'],
+    Makeup: ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer', 'Primer', 'Setting Spray'],
+    Haircare: ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color', 'Hair Spray', 'Anti Dandruff', 'Hair Fall Control'],
+    Fashion: ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Shorts', 'Jacket', 'Sweater', 'Lehenga', 'Salwar Suit', 'Activewear'],
+    Accessories: ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Hair Accessory', 'Belt', 'Scarf', 'Wallet', 'Cap', 'Gloves'],
+    Electronics: ['Mobile Phones', 'Mobile Accessories', 'Chargers & Cables', 'Power Banks', 'Earphones', 'Headphones', 'Keyboards', 'Mouse', 'Smart Watches'],
+    'Home & Kitchen': ['Kitchen Tools', 'Storage & Organizers', 'Home Decor', 'Wall Art', 'Bedding', 'Cushions', 'Bathroom Accessories'],
+    'Health & Wellness': ['Supplements', 'Ayurvedic Products', 'Personal Care', 'Fitness & Yoga', 'Health Devices'],
+    'Books & Stationery': ['Fiction', 'Non-Fiction', 'Self-Help', 'Academic', 'Notebooks & Diaries', 'Pens & Pencils', 'Art Supplies']
   };
 
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
 
+  // ✅ Helper: purane naam ko naye naam pe map karo
+  const getCategoryKey = () => {
+    const map = { 'Hair': 'Haircare', 'Clothing': 'Fashion' };
+    return map[formData.category] || formData.category;
+  };
+
   const getVariationAttributes = () => {
-    switch(formData.category) {
+    const categoryKey = getCategoryKey();
+    switch(categoryKey) {
       case 'Skincare': 
         return { type: 'Size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic'] };
       case 'Makeup': 
         return { type: 'Shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry'], secondary: 'Finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'] };
-      case 'Hair': 
+      case 'Haircare': 
         return { type: 'Size', options: ['100ml', '200ml', '300ml', '500ml', '1L'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free'] };
-      case 'Clothing': 
+      case 'Fashion': 
         return { type: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'], secondary: 'Color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey'] };
       case 'Accessories': 
         return { type: 'Size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable'], secondary: 'Color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor'] };
+      case 'Electronics':
+        return { type: 'Variant', options: ['Standard', 'Pro', 'Plus', 'Lite', 'Max'], secondary: 'Color', secondaryOptions: ['Black', 'White', 'Silver', 'Blue', 'Grey'] };
       default: 
         return { type: 'Variant', options: ['Default'], secondary: null, secondaryOptions: [] };
     }
   };
 
   const variationAttrs = getVariationAttributes();
+
+  // ✅ API se categories fetch karo
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const res = await fetch(`${API_URL}/api/categories/tree`);
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const json = await res.json();
+        const tree = json.data || json;
+
+        setApiCategories(tree);
+
+        const subMap = {};
+        tree.forEach(cat => {
+          subMap[cat.name] = (cat.children || []).map(child => child.name);
+        });
+        setApiSubCategories(subMap);
+      } catch (err) {
+        console.error('❌ Categories fetch error:', err);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // ✅ Load product with variants normalization
   useEffect(() => {
@@ -364,12 +409,16 @@ function AdminEditProduct() {
     localStorage.setItem('customSubCategories', JSON.stringify(updated));
   };
 
+  // ✅ API + fallback + custom merge
   const getCurrentSubCategories = () => {
     const category = formData.category;
     if (!category) return [];
-    const defaultOptions = categories[category] || [];
-    const customOptions = customSubCategories[category] || [];
-    return [...defaultOptions, ...customOptions];
+
+    const apiSubs = apiSubCategories[category] || [];
+    const fallbackSubs = fallbackSubCategories[category] || [];
+    const customSubs = customSubCategories[category] || [];
+
+    return [...new Set([...apiSubs, ...fallbackSubs, ...customSubs])];
   };
 
   const handleAddNewSubCategory = () => {
@@ -380,8 +429,10 @@ function AdminEditProduct() {
         setFormData({ ...formData, subCategory: newSubCategory.trim() });
         setNewSubCategory('');
         setShowAddSubCategory(false);
-        alert(`✅ Sub-category added!`);
-      } else alert('⚠️ Already exists!');
+        toast.success(`✅ Sub-category "${newSubCategory.trim()}" added!`);
+      } else {
+        toast.error('⚠️ Already exists!');
+      }
     }
   };
 
@@ -391,8 +442,10 @@ function AdminEditProduct() {
       setFormData({ ...formData, brand: newBrand.trim() });
       setNewBrand('');
       setShowAddBrand(false);
-      alert(`✅ Brand added!`);
-    } else alert('Invalid or duplicate brand');
+      toast.success(`✅ Brand "${newBrand.trim()}" added!`);
+    } else {
+      toast.error('Invalid or duplicate brand');
+    }
   };
 
   const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
@@ -419,7 +472,7 @@ function AdminEditProduct() {
 
   const deleteSelectedVariations = () => {
     if (selectedVariationIds.length === 0) {
-      alert('Please select variations to delete');
+      toast.error('Please select variations to delete');
       return;
     }
     if (confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
@@ -429,7 +482,10 @@ function AdminEditProduct() {
   };
 
   const saveVariation = () => {
-    if (!variationForm.name) return alert(`Please select ${variationAttrs.type}`);
+    if (!variationForm.name) {
+      toast.error(`Please select ${variationAttrs.type}`);
+      return;
+    }
     
     const newVariation = {
       id: editingVariation?.id || Date.now(),
@@ -448,12 +504,15 @@ function AdminEditProduct() {
         v.id === editingVariation.id ? newVariation : v
       );
       setVariations(updated);
-      alert('✅ Variation updated successfully!');
+      toast.success('✅ Variation updated successfully!');
     } else {
       const exists = variations.some(v => v.name === variationForm.name && v.secondaryName === variationForm.attributes.secondary);
-      if (exists) return alert(`⚠️ This ${variationAttrs.type} combination already exists!`);
+      if (exists) {
+        toast.error(`⚠️ This ${variationAttrs.type} combination already exists!`);
+        return;
+      }
       setVariations([...variations, newVariation]);
-      alert(`✅ ${variationAttrs.type} added successfully!`);
+      toast.success(`✅ ${variationAttrs.type} added successfully!`);
     }
     setVariationModalOpen(false);
     setEditingVariation(null);
@@ -498,10 +557,10 @@ function AdminEditProduct() {
       const data = await response.json();
       if (data.url || data.data?.url) {
         setVariationForm({ ...variationForm, image: data.url || data.data?.url });
-        alert('✅ Image uploaded!');
+        toast.success('✅ Image uploaded!');
       }
     } catch (error) {
-      alert('Upload failed');
+      toast.error('Upload failed');
     }
   };
 
@@ -559,7 +618,7 @@ function AdminEditProduct() {
     }
     if (uploadedUrls.length) {
       setFormData({ ...formData, images: [...formData.images, ...uploadedUrls] });
-      alert(`✅ ${uploadedUrls.length} image(s) uploaded!`);
+      toast.success(`✅ ${uploadedUrls.length} image(s) uploaded!`);
     }
     setUploadingImages(false);
     e.target.value = '';
@@ -615,9 +674,6 @@ function AdminEditProduct() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ============================================================
-  // ✅ SUBMIT — NAYA FORMAT (variants) backend ko bhejo
-  // ============================================================
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     
@@ -636,8 +692,6 @@ function AdminEditProduct() {
     }
 
     const finalSku = formData.sku || generateSKU();
-
-    // ✅ NAYA: admin ke purane format se backend ke naye variants format me convert karo
     const attrs = getVariationAttributes();
 
     const cleanVariants = variations.map(v => ({
@@ -683,13 +737,10 @@ function AdminEditProduct() {
       fabric: formData.fabric,
       material: formData.material,
       gender: formData.gender,
-
-      // ✅ NAYA: variants format
       hasVariations: cleanVariants.length > 0,
       option1Name: attrs.type,
       option2Name: attrs.secondary || '',
       variants: cleanVariants,
-
       status: 'active'
     };
 
@@ -709,11 +760,11 @@ function AdminEditProduct() {
         throw new Error(responseData.error || responseData.message || 'Update failed');
       }
       
-      alert(`✅ Product updated successfully! ${cleanVariants.length} variants saved.`);
+      toast.success(`✅ Product updated! ${cleanVariants.length} variants saved.`);
       navigate('/admin/inventory');
     } catch (error) {
       console.error('Update error:', error);
-      alert(`❌ Update failed: ${error.message}`);
+      toast.error(`❌ Update failed: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -801,10 +852,21 @@ function AdminEditProduct() {
                       value={formData.category} 
                       onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: '' })}
                       className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white" 
+                      disabled={categoriesLoading}
                       required
                     >
-                      <option value="">Select Category</option>
-                      {Object.keys(categories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
+                      {apiCategories.length > 0 ? (
+                        apiCategories.map(cat => (
+                          <option key={cat.id} value={cat.name}>
+                            {cat.icon} {cat.name}
+                          </option>
+                        ))
+                      ) : (
+                        Object.keys(fallbackSubCategories).map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div>
