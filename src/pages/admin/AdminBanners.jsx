@@ -33,9 +33,6 @@ function getErrorMessage(err, defaultMsg = 'Something went wrong') {
   }
   if (msg.includes('404')) return 'Banner not found';
   if (msg.includes('500')) return 'Server error — please try again later';
-  if (msg.toLowerCase().includes('title is required')) {
-    return 'Title is required or leave it empty for auto "Untitled Banner"';
-  }
   return msg || defaultMsg;
 }
 
@@ -49,8 +46,14 @@ function AdminBanners() {
   const [previewMode, setPreviewMode] = useState('desktop');
   const [mobileTab, setMobileTab] = useState('list');
 
+  // Filters
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filterPosition, setFilterPosition] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all'); // all | active | inactive
+
+  // Collapsed groups
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
   const [options, setOptions] = useState({
     sizes: [],
@@ -99,6 +102,7 @@ function AdminBanners() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ------------------------- Load options ------------------------- */
   const loadOptions = async () => {
     try {
       setOptionsLoading(true);
@@ -121,12 +125,14 @@ function AdminBanners() {
     }
   };
 
+  /* ------------------------- Load banners (fresh) ------------------------- */
   const loadBanners = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/banners/all`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
       });
 
       if (res.status === 401) {
@@ -138,6 +144,9 @@ function AdminBanners() {
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.data || []);
       setBanners(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
+
+      // Clear frontend cache so Home page also refreshes
+      sessionStorage.removeItem('home_banners_cache');
     } catch (err) {
       console.error(err);
       toast.error('Failed to load banners');
@@ -146,6 +155,7 @@ function AdminBanners() {
     }
   };
 
+  /* ------------------------- Load dropdown data ------------------------- */
   const loadDropdownData = async () => {
     try {
       const [brandsRes, productsRes, catRes] = await Promise.allSettled([
@@ -196,8 +206,11 @@ function AdminBanners() {
     }
   };
 
+  /* ------------------------- Filter + group banners ------------------------- */
   const filteredBanners = useMemo(() => {
     let list = [...banners];
+
+    // Search
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -206,44 +219,168 @@ function AdminBanners() {
           (b.subtitle || '').toLowerCase().includes(q)
       );
     }
-    if (filter === 'active') list = list.filter((b) => b.active);
-    if (filter === 'inactive') list = list.filter((b) => !b.active);
+
+    // Position filter
+    if (filterPosition !== 'all') {
+      list = list.filter((b) => {
+        const positions = Array.isArray(b.positions)
+          ? b.positions
+          : b.position
+          ? [b.position]
+          : [];
+        return positions.includes(filterPosition);
+      });
+    }
+
+    // Category filter
+    if (filterCategory !== 'all') {
+      list = list.filter((b) => {
+        const cats = Array.isArray(b.categories)
+          ? b.categories
+          : b.category
+          ? [b.category]
+          : [];
+        return cats.includes(filterCategory);
+      });
+    }
+
+    // Status filter
+    if (filterStatus === 'active') list = list.filter((b) => b.active);
+    if (filterStatus === 'inactive') list = list.filter((b) => !b.active);
+
     return list;
-  }, [banners, search, filter]);
+  }, [banners, search, filterPosition, filterCategory, filterStatus]);
 
-  const handleSelectBanner = (b) => {
-    setEditingBanner(b);
+  /* ------------------------- Group by position ------------------------- */
+  const groupedBanners = useMemo(() => {
+    const groups = {};
 
-    const cats = Array.isArray(b.categories)
-      ? b.categories
-      : b.category
-      ? [b.category]
-      : [];
-
-    const poss = Array.isArray(b.positions)
-      ? b.positions
-      : b.position
-      ? [b.position]
-      : ['home_hero'];
-
-    setFormData({
-      title: b.title || '',
-      subtitle: b.subtitle || '',
-      buttonText: b.buttonText || 'Shop Now',
-      images: [],
-      order: b.order || 1,
-      active: b.active !== false,
-      showTextOverlay: b.showTextOverlay === true,
-      categories: cats,
-      subcategories: Array.isArray(b.subcategories) ? b.subcategories : [],
-      positions: poss,
-      size: b.size || 'large',
-      display_style: b.display_style || 'single',
-      link_type: b.link_type || 'custom',
-      link: b.link || '/shop',
+    // Initialize groups for all positions (so empty ones also show)
+    options.positions.forEach((p) => {
+      groups[p.value] = {
+        value: p.value,
+        label: p.label,
+        banners: [],
+      };
     });
-    setImagePreviews(b.images || []);
-    setMobileTab('edit');
+
+    // Also handle banners without position
+    const noPositionGroup = {
+      value: '__none__',
+      label: 'No Position',
+      banners: [],
+    };
+
+    filteredBanners.forEach((b) => {
+      const positions = Array.isArray(b.positions) && b.positions.length > 0
+        ? b.positions
+        : b.position
+        ? [b.position]
+        : [];
+
+      if (positions.length === 0) {
+        noPositionGroup.banners.push(b);
+      } else {
+        // Add to each position group (multi-position support)
+        positions.forEach((pos) => {
+          if (groups[pos]) {
+            groups[pos].banners.push(b);
+          } else {
+            // Unknown position — add to noPosition
+            noPositionGroup.banners.push(b);
+          }
+        });
+      }
+    });
+
+    // Convert to array, sort by options.positions order
+    const result = options.positions
+      .map((p) => groups[p.value])
+      .filter(Boolean);
+
+    // Add noPosition group at the end if it has banners
+    if (noPositionGroup.banners.length > 0) {
+      result.push(noPositionGroup);
+    }
+
+    return result;
+  }, [filteredBanners, options.positions]);
+
+  /* ------------------------- Position counts for filter ------------------------- */
+  const positionCounts = useMemo(() => {
+    const counts = {};
+    banners.forEach((b) => {
+      const positions = Array.isArray(b.positions) && b.positions.length > 0
+        ? b.positions
+        : b.position
+        ? [b.position]
+        : [];
+      positions.forEach((pos) => {
+        counts[pos] = (counts[pos] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [banners]);
+
+  /* ------------------------- Select / New ------------------------- */
+  const handleSelectBanner = async (b) => {
+    try {
+      // Fetch fresh data from backend
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/banners/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+
+      if (!res.ok) throw new Error('Failed to load banner');
+
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.data || []);
+      const fresh = list.find(
+        (x) => (x._id || x.id) === (b._id || b.id)
+      );
+
+      if (!fresh) {
+        toast.error('Banner not found');
+        return;
+      }
+
+      setEditingBanner(fresh);
+
+      const cats = Array.isArray(fresh.categories)
+        ? fresh.categories
+        : fresh.category
+        ? [fresh.category]
+        : [];
+
+      const poss = Array.isArray(fresh.positions)
+        ? fresh.positions
+        : fresh.position
+        ? [fresh.position]
+        : ['home_hero'];
+
+      setFormData({
+        title: fresh.title || '',
+        subtitle: fresh.subtitle || '',
+        buttonText: fresh.buttonText || 'Shop Now',
+        images: [],
+        order: fresh.order || 1,
+        active: fresh.active !== false,
+        showTextOverlay: fresh.showTextOverlay === true,
+        categories: cats,
+        subcategories: Array.isArray(fresh.subcategories) ? fresh.subcategories : [],
+        positions: poss,
+        size: fresh.size || 'large',
+        display_style: fresh.display_style || 'single',
+        link_type: fresh.link_type || 'custom',
+        link: fresh.link || '/shop',
+      });
+      setImagePreviews(fresh.images || []);
+      setMobileTab('edit');
+    } catch (err) {
+      console.error('Select banner error:', err);
+      toast.error(getErrorMessage(err, 'Failed to load banner'));
+    }
   };
 
   const handleNewBanner = () => {
@@ -256,6 +393,7 @@ function AdminBanners() {
     setMobileTab('edit');
   };
 
+  /* ------------------------- Image handling ------------------------- */
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -276,6 +414,7 @@ function AdminBanners() {
     setImagePreviews(prev);
   };
 
+  /* ------------------------- Link generation ------------------------- */
   const generateLink = () => formData.link || '';
 
   const copyLink = () => {
@@ -290,6 +429,7 @@ function AdminBanners() {
     window.open(link, '_blank');
   };
 
+  /* ------------------------- Save ------------------------- */
   const saveBannerToAPI = async (data, isEdit) => {
     const token = localStorage.getItem('adminToken');
     const form = new FormData();
@@ -381,6 +521,7 @@ function AdminBanners() {
     setMobileTab('list');
   };
 
+  /* ------------------------- Delete / Toggle ------------------------- */
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this banner permanently?')) return;
     try {
@@ -390,7 +531,7 @@ function AdminBanners() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`Delete failed (HTTP ${res.status})`);
-      toast.success('Banner deleted');
+      toast.success('Banner deleted successfully');
       await loadBanners();
       if (editingBanner?._id === id || editingBanner?.id === id) resetForm();
     } catch (err) {
@@ -419,6 +560,7 @@ function AdminBanners() {
     }
   };
 
+  /* ------------------------- Auto-suggest size/style ------------------------- */
   const applySizeGuide = (positions) => {
     if (!positions || positions.length === 0) {
       setFormData((p) => ({ ...p, positions }));
@@ -451,6 +593,15 @@ function AdminBanners() {
 
   const isMobilePreview = previewMode === 'mobile';
 
+  /* ------------------------- Collapse toggling ------------------------- */
+  const toggleGroup = (value) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [value]: !prev[value],
+    }));
+  };
+
+  /* ------------------------- Loading ------------------------- */
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FFF7FA] flex items-center justify-center">
@@ -462,6 +613,7 @@ function AdminBanners() {
     );
   }
 
+  /* ------------------------- Render ------------------------- */
   return (
     <div className="min-h-screen bg-[#FFF7FA]">
       {/* TOP BAR */}
@@ -478,7 +630,7 @@ function AdminBanners() {
               Banner Manager
             </h1>
             <span className="hidden sm:inline text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full font-medium">
-              {banners.length} banners
+              {banners.length} total
             </span>
           </div>
 
@@ -490,6 +642,7 @@ function AdminBanners() {
           </button>
         </div>
 
+        {/* Mobile tabs */}
         <div className="lg:hidden flex border-t border-pink-100">
           {[
             { id: 'list', label: 'List' },
@@ -513,15 +666,16 @@ function AdminBanners() {
 
       {/* MAIN 3-COLUMN */}
       <div className="max-w-[1600px] mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_400px] gap-4 p-4 sm:p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr_400px] gap-4 p-4 sm:p-6">
 
-          {/* ==================== COLUMN 1: LIST ==================== */}
+          {/* ==================== COLUMN 1: LIST WITH FILTERS ==================== */}
           <aside
             className={`${
               mobileTab === 'list' ? 'block' : 'hidden'
             } lg:block bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden lg:sticky lg:top-24 h-fit max-h-[calc(100vh-120px)] flex flex-col`}
           >
-            <div className="p-4 border-b border-pink-100">
+            {/* Search + Filters */}
+            <div className="p-4 border-b border-pink-100 space-y-3">
               <input
                 type="text"
                 value={search}
@@ -530,7 +684,35 @@ function AdminBanners() {
                 className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
               />
 
-              <div className="flex flex-wrap gap-1.5 mt-3">
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={filterPosition}
+                  onChange={(e) => setFilterPosition(e.target.value)}
+                  className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
+                >
+                  <option value="all">All Positions</option>
+                  {options.positions.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label} ({positionCounts[p.value] || 0})
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-1.5">
                 {[
                   { id: 'all', label: 'All' },
                   { id: 'active', label: 'Active' },
@@ -538,9 +720,9 @@ function AdminBanners() {
                 ].map((f) => (
                   <button
                     key={f.id}
-                    onClick={() => setFilter(f.id)}
+                    onClick={() => setFilterStatus(f.id)}
                     className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors ${
-                      filter === f.id
+                      filterStatus === f.id
                         ? 'bg-pink-500 text-white'
                         : 'bg-pink-50 text-pink-600 hover:bg-pink-100'
                     }`}
@@ -549,63 +731,147 @@ function AdminBanners() {
                   </button>
                 ))}
               </div>
+
+              <p className="text-[10px] text-gray-400">
+                Showing {filteredBanners.length} of {banners.length} banners
+              </p>
             </div>
 
+            {/* Grouped banners list */}
             <div className="overflow-y-auto flex-1">
-              {filteredBanners.length === 0 ? (
+              {groupedBanners.length === 0 || filteredBanners.length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="text-4xl mb-2">🎨</div>
                   <p className="text-gray-400 text-sm">No banners found</p>
+                  {filteredBanners.length === 0 && banners.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setSearch('');
+                        setFilterPosition('all');
+                        setFilterCategory('all');
+                        setFilterStatus('all');
+                      }}
+                      className="mt-3 text-xs text-pink-600 hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
                 </div>
               ) : (
-                filteredBanners.map((b) => {
-                  const isActive =
-                    editingBanner?.id === b.id || editingBanner?._id === b.id;
-                  const positions =
-                    b.positions || (b.position ? [b.position] : []);
-                  const categories =
-                    b.categories || (b.category ? [b.category] : []);
+                groupedBanners.map((group) => {
+                  const isCollapsed = collapsedGroups[group.value];
                   return (
-                    <button
-                      key={b._id || b.id}
-                      onClick={() => handleSelectBanner(b)}
-                      className={`w-full text-left p-3 border-b border-pink-50 transition-colors flex items-center gap-3 ${
-                        isActive
-                          ? 'bg-pink-50 border-l-4 border-l-pink-500'
-                          : 'hover:bg-pink-50/50'
-                      }`}
-                    >
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center shrink-0 overflow-hidden border border-pink-200">
-                        {b.images?.[0] ? (
-                          <img
-                            src={b.images[0]}
-                            alt={b.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xl">🖼️</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 text-sm truncate">
-                          {b.title || 'Untitled'}
-                        </p>
-                        <p className="text-[10px] text-gray-400 truncate">
-                          {positions.length} pos · {categories.length} cat
-                        </p>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          {b.active ? (
-                            <span className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">
-                              Active
-                            </span>
+                    <div key={group.value} className="border-b border-pink-50">
+                      {/* Group header */}
+                      <button
+                        onClick={() => toggleGroup(group.value)}
+                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-pink-50/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs text-pink-500 shrink-0">
+                            {isCollapsed ? '▶' : '▼'}
+                          </span>
+                          <span className="font-semibold text-sm text-gray-800 truncate">
+                            {group.label}
+                          </span>
+                          <span className="text-[10px] bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                            {group.banners.length}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Group items */}
+                      {!isCollapsed && (
+                        <div>
+                          {group.banners.length === 0 ? (
+                            <div className="px-4 py-3 text-[11px] text-gray-400 italic">
+                              No banners in this position
+                            </div>
                           ) : (
-                            <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                              Inactive
-                            </span>
+                            group.banners.map((b) => {
+                              const isActive =
+                                editingBanner?.id === b.id ||
+                                editingBanner?._id === b._id;
+                              const cats = Array.isArray(b.categories)
+                                ? b.categories
+                                : b.category
+                                ? [b.category]
+                                : [];
+                              return (
+                                <div
+                                  key={b._id || b.id}
+                                  className={`px-3 py-2.5 border-b border-pink-50 transition-colors ${
+                                    isActive ? 'bg-pink-50' : 'hover:bg-pink-50/50'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center shrink-0 overflow-hidden border border-pink-200">
+                                      {b.images?.[0] ? (
+                                        <img
+                                          src={b.images[0]}
+                                          alt={b.title}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <span className="text-sm">🖼️</span>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-gray-800 text-xs truncate">
+                                        {b.title || 'Untitled'}
+                                      </p>
+                                      <p className="text-[9px] text-gray-400 truncate">
+                                        {cats.length > 0
+                                          ? cats.join(', ')
+                                          : 'Global'}
+                                      </p>
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        {b.active ? (
+                                          <span className="text-[8px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded">
+                                            Active
+                                          </span>
+                                        ) : (
+                                          <span className="text-[8px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                                            Inactive
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Action buttons */}
+                                  <div className="flex gap-1.5 mt-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectBanner(b)}
+                                      className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 font-medium transition-colors"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleActive(b._id || b.id, b.active)
+                                      }
+                                      className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium transition-colors"
+                                    >
+                                      {b.active ? 'Disable' : 'Enable'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDelete(b._id || b.id)}
+                                      className="text-[10px] px-2 py-0.5 bg-red-50 text-red-600 rounded hover:bg-red-100 font-medium transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
-                      </div>
-                    </button>
+                      )}
+                    </div>
                   );
                 })
               )}
@@ -742,7 +1008,8 @@ function AdminBanners() {
                 )}
                 {currentPositionGuide && (
                   <p className="text-[10px] text-gray-500 mt-1.5">
-                    Recommended (first position): {currentPositionGuide.px} ({currentPositionGuide.ratio})
+                    Recommended (first position): {currentPositionGuide.px} (
+                    {currentPositionGuide.ratio})
                   </p>
                 )}
               </div>
@@ -1044,9 +1311,7 @@ function AdminBanners() {
                 {editingBanner && (
                   <button
                     type="button"
-                    onClick={() =>
-                      handleDelete(editingBanner._id || editingBanner.id)
-                    }
+                    onClick={() => handleDelete(editingBanner._id || editingBanner.id)}
                     className="px-4 py-3 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium"
                   >
                     Delete
@@ -1119,10 +1384,16 @@ function AdminBanners() {
                   Style: <b className="text-gray-700">{formData.display_style}</b>
                 </p>
                 <p>
-                  Positions: <b className="text-gray-700">{formData.positions?.length || 0}</b>
+                  Positions:{' '}
+                  <b className="text-gray-700">
+                    {formData.positions?.length || 0}
+                  </b>
                 </p>
                 <p>
-                  Categories: <b className="text-gray-700">{formData.categories?.length || 0}</b>
+                  Categories:{' '}
+                  <b className="text-gray-700">
+                    {formData.categories?.length || 0}
+                  </b>
                 </p>
                 <p>
                   Link:{' '}
