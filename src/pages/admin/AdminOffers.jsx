@@ -9,23 +9,29 @@ function AdminOffers() {
   const [showModal, setShowModal] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterPosition, setFilterPosition] = useState('all');
+
   const [formData, setFormData] = useState({
-    title: 'Free Shipping',
-    description: 'FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF ON FIRST ORDER',
+    title: '',
+    description: '',
     discountType: 'percentage',
     discountValue: 10,
     minOrderValue: 499,
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     type: 'top_banner',
-    isActive: true
+    isActive: true,
+    categoryMode: 'global',    // 'global' | 'single' | 'multiple'
+    selectedCategories: [],     // array of slugs (agar single/multiple)
+    position: 'top_banner',
+    icon: '🎉',
+    priority: 0,
   });
 
-  // ✅ FIX: Vite env syntax
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const token = localStorage.getItem('adminToken');
 
-  // ✅ Helper: Safe array extraction
   const safeArray = (responseData) => {
     if (Array.isArray(responseData)) return responseData;
     if (responseData && Array.isArray(responseData.data)) return responseData.data;
@@ -33,21 +39,17 @@ function AdminOffers() {
     return [];
   };
 
-  // Load offers
   const loadOffers = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`${API_URL}/api/offers/admin/all`, {
+      const response = await fetch(`${API_URL}/api/offers/all`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to load offers');
-      }
-      
+
+      if (!response.ok) throw new Error('Failed to load offers');
+
       const data = await response.json();
-      // ✅ FIX: Handle { success, data } wrapper
       setOffers(safeArray(data));
     } catch (error) {
       console.error('Error loading offers:', error);
@@ -68,34 +70,32 @@ function AdminOffers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Create/Update offer
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!formData.title.trim()) {
-      toast.error('Please enter offer title');
-      return;
+
+    if (!formData.title.trim()) return toast.error('Please enter offer title');
+    if (!formData.description.trim()) return toast.error('Please enter offer description');
+
+    // ✅ Validate category selection
+    if (formData.categoryMode !== 'global' && formData.selectedCategories.length === 0) {
+      return toast.error('Please select at least one category');
     }
-    if (!formData.description.trim()) {
-      toast.error('Please enter offer description');
-      return;
-    }
-    if (!formData.minOrderValue || formData.minOrderValue <= 0) {
-      toast.error('Please enter valid min order value');
-      return;
-    }
-    if (!formData.discountValue || formData.discountValue <= 0) {
-      toast.error('Please enter valid discount value');
-      return;
-    }
-    
+
     setProcessingId('submitting');
 
     try {
-      const url = editingOffer 
-        ? `${API_URL}/api/offers/update/${editingOffer._id}`
+      // ✅ Category data prepare karo
+      let categoryData = null;
+      if (formData.categoryMode === 'single' && formData.selectedCategories.length > 0) {
+        categoryData = formData.selectedCategories[0];
+      } else if (formData.categoryMode === 'multiple' && formData.selectedCategories.length > 0) {
+        categoryData = JSON.stringify(formData.selectedCategories);
+      }
+
+      const url = editingOffer
+        ? `${API_URL}/api/offers/update/${editingOffer._id || editingOffer.id}`
         : `${API_URL}/api/offers/create`;
-      
+
       const response = await fetch(url, {
         method: editingOffer ? 'PUT' : 'POST',
         headers: {
@@ -104,15 +104,17 @@ function AdminOffers() {
         },
         body: JSON.stringify({
           ...formData,
-          discountValue: parseInt(formData.discountValue),
-          minOrderValue: parseInt(formData.minOrderValue)
+          category: categoryData,
+          discountValue: parseInt(formData.discountValue) || 0,
+          minOrderValue: parseInt(formData.minOrderValue) || 0,
+          priority: parseInt(formData.priority) || 0,
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
-        toast.success(editingOffer ? '✅ Offer updated successfully!' : '✅ Offer created successfully!');
+        toast.success(editingOffer ? '✅ Offer updated!' : '✅ Offer created!');
         setShowModal(false);
         setEditingOffer(null);
         resetForm();
@@ -122,7 +124,7 @@ function AdminOffers() {
       }
     } catch (error) {
       console.error('Error saving offer:', error);
-      toast.error('Network error. Please try again.');
+      toast.error('Network error');
     } finally {
       setProcessingId(null);
     }
@@ -130,19 +132,23 @@ function AdminOffers() {
 
   const resetForm = () => {
     setFormData({
-      title: 'Free Shipping',
-      description: 'FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF ON FIRST ORDER',
+      title: '',
+      description: '',
       discountType: 'percentage',
       discountValue: 10,
       minOrderValue: 499,
       startDate: new Date().toISOString().split('T')[0],
       endDate: '',
       type: 'top_banner',
-      isActive: true
+      isActive: true,
+      categoryMode: 'global',
+      selectedCategories: [],
+      position: 'top_banner',
+      icon: '🎉',
+      priority: 0,
     });
   };
 
-  // Toggle offer status
   const toggleStatus = async (id, currentStatus) => {
     setProcessingId(id);
     try {
@@ -154,20 +160,17 @@ function AdminOffers() {
         toast.success(`Offer ${currentStatus ? 'deactivated' : 'activated'}!`);
         loadOffers();
       } else {
-        toast.error('Failed to toggle status');
+        toast.error('Failed to toggle');
       }
     } catch (error) {
-      console.error('Error toggling offer:', error);
       toast.error('Network error');
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Delete offer
   const deleteOffer = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this offer?')) return;
-    
+    if (!window.confirm('Delete this offer?')) return;
     setProcessingId(id);
     try {
       const response = await fetch(`${API_URL}/api/offers/delete/${id}`, {
@@ -175,18 +178,76 @@ function AdminOffers() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        toast.success('🗑️ Offer deleted successfully');
+        toast.success('🗑️ Offer deleted');
         loadOffers();
       } else {
-        toast.error('Failed to delete offer');
+        toast.error('Failed to delete');
       }
     } catch (error) {
-      console.error('Error deleting offer:', error);
       toast.error('Network error');
     } finally {
       setProcessingId(null);
     }
   };
+
+  // ✅ Parse category to display
+  const getCategoryLabel = (cat) => {
+    if (!cat) return '🌐 Global (All Pages)';
+    try {
+      const parsed = JSON.parse(cat);
+      if (Array.isArray(parsed)) {
+        return parsed.map(c => categoryOptions.find(o => o.value === c)?.label || c).join(', ');
+      }
+    } catch (e) {}
+    return categoryOptions.find(o => o.value === cat)?.label || cat;
+  };
+
+  // ✅ Toggle category selection
+  const toggleCategory = (slug) => {
+    setFormData(prev => {
+      const exists = prev.selectedCategories.includes(slug);
+      return {
+        ...prev,
+        selectedCategories: exists
+          ? prev.selectedCategories.filter(c => c !== slug)
+          : [...prev.selectedCategories, slug],
+      };
+    });
+  };
+
+  // ✅ Filtered offers
+  const filteredOffers = offers.filter(o => {
+    if (filterCategory !== 'all') {
+      if (filterCategory === 'global' && o.category) return false;
+      if (filterCategory !== 'global' && !o.category) return false;
+    }
+    if (filterPosition !== 'all' && o.position !== filterPosition) return false;
+    return true;
+  });
+
+  const activeOffers = offers.filter(o => o.isActive);
+
+  // ✅ Category options
+  const categoryOptions = [
+    { value: 'skincare', label: '🧴 Skincare' },
+    { value: 'makeup', label: '💄 Makeup' },
+    { value: 'haircare', label: '💇‍♀️ Haircare' },
+    { value: 'fashion', label: '👗 Fashion' },
+    { value: 'accessories', label: '👜 Accessories' },
+    { value: 'electronics', label: '📱 Electronics' },
+    { value: 'home-kitchen', label: '🏠 Home & Kitchen' },
+    { value: 'health-wellness', label: '🌿 Health & Wellness' },
+    { value: 'books-stationery', label: '📚 Books & Stationery' },
+  ];
+
+  const positionOptions = [
+    { value: 'top_banner', label: '🔥 Top Banner (Global)' },
+    { value: 'category_top', label: '🎯 Category Top' },
+    { value: 'category_mid', label: '📢 Category Mid' },
+    { value: 'category_bottom', label: '🎯 Category Bottom' },
+    { value: 'product_page', label: '📦 Product Page' },
+    { value: 'checkout', label: '💳 Checkout Page' },
+  ];
 
   if (loading) {
     return (
@@ -202,38 +263,16 @@ function AdminOffers() {
     );
   }
 
-  if (error && offers.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminSidebar />
-        <div className="md:ml-64 flex items-center justify-center h-screen">
-          <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
-            <p className="text-gray-500 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const activeOffer = offers.find(o => o.isActive && o.type === 'top_banner');
-
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminSidebar />
-      
-      <div className="md:ml-64 p-8">
-        <div className="flex justify-between items-center mb-6">
+
+      <div className="md:ml-64 p-6 sm:p-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">🎯 Offer Management</h1>
-            <p className="text-gray-500 text-sm">Manage top banner offers and promotions</p>
+            <p className="text-gray-500 text-sm">Manage offers — global, single, or multi-category</p>
           </div>
           <button
             onClick={() => {
@@ -241,26 +280,65 @@ function AdminOffers() {
               resetForm();
               setShowModal(true);
             }}
-            className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-xl text-sm font-medium hover:shadow-lg transition"
+            className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:shadow-lg transition"
           >
             + Create New Offer
           </button>
         </div>
 
-        {/* Active Offer Preview */}
-        {activeOffer ? (
-          <div className="bg-gradient-to-r from-pink-600 via-rose-600 to-pink-600 text-white rounded-2xl p-4 mb-6 animate-pulse">
-            <p className="text-center text-sm font-medium">
-              🔥 LIVE OFFER: {activeOffer.description}
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4">
+            <p className="text-xs text-gray-500">Total Offers</p>
+            <p className="text-2xl font-bold text-gray-800">{offers.length}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-green-100 p-4">
+            <p className="text-xs text-gray-500">Active</p>
+            <p className="text-2xl font-bold text-green-600">{activeOffers.length}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4">
+            <p className="text-xs text-gray-500">Global</p>
+            <p className="text-2xl font-bold text-pink-600">
+              {offers.filter(o => !o.category).length}
             </p>
           </div>
-        ) : (
-          <div className="bg-gray-200 text-gray-500 rounded-2xl p-4 mb-6">
-            <p className="text-center text-sm font-medium">
-              ⚠️ No active offer. Create one below!
+          <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-4">
+            <p className="text-xs text-gray-500">Category-wise</p>
+            <p className="text-2xl font-bold text-purple-600">
+              {offers.filter(o => o.category).length}
             </p>
           </div>
-        )}
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 mb-6">
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-pink-500"
+            >
+              <option value="all">All Categories</option>
+              <option value="global">🌐 Global Only</option>
+              {categoryOptions.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            <select
+              value={filterPosition}
+              onChange={(e) => setFilterPosition(e.target.value)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:border-pink-500"
+            >
+              <option value="all">All Positions</option>
+              {positionOptions.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+            <span className="ml-auto text-xs text-gray-400 self-center">
+              Showing {filteredOffers.length} of {offers.length}
+            </span>
+          </div>
+        </div>
 
         {/* Offers List */}
         <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
@@ -268,71 +346,112 @@ function AdminOffers() {
             <table className="w-full text-sm">
               <thead className="bg-pink-50 border-b border-pink-100">
                 <tr>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Title</th>
-                  <th className="px-6 py-3 text-left text-gray-700 font-semibold">Description</th>
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Min Order</th>
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Discount</th>
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Status</th>
-                  <th className="px-6 py-3 text-center text-gray-700 font-semibold">Actions</th>
+                  <th className="px-4 py-3 text-left text-gray-700 font-semibold">Icon</th>
+                  <th className="px-4 py-3 text-left text-gray-700 font-semibold">Title</th>
+                  <th className="px-4 py-3 text-left text-gray-700 font-semibold">Category</th>
+                  <th className="px-4 py-3 text-left text-gray-700 font-semibold">Position</th>
+                  <th className="px-4 py-3 text-center text-gray-700 font-semibold">Discount</th>
+                  <th className="px-4 py-3 text-center text-gray-700 font-semibold">Priority</th>
+                  <th className="px-4 py-3 text-center text-gray-700 font-semibold">Status</th>
+                  <th className="px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-pink-50">
-                {offers.length === 0 ? (
+                {filteredOffers.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
-                      No offers created yet. Click "Create New Offer" to get started.
+                    <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                      No offers found. Create your first offer!
                     </td>
                   </tr>
                 ) : (
-                  offers.map(offer => (
-                    <tr key={offer._id} className="hover:bg-pink-50/30 transition">
-                      <td className="px-6 py-4 font-medium text-gray-800">{offer.title}</td>
-                      <td className="px-6 py-4 text-gray-600 max-w-md truncate">{offer.description}</td>
-                      <td className="px-6 py-4 text-center">₹{offer.minOrderValue}</td>
-                      <td className="px-6 py-4 text-center">
-                        {offer.discountType === 'percentage' ? `${offer.discountValue}%` : `₹${offer.discountValue}`}
+                  filteredOffers.map(offer => (
+                    <tr key={offer._id || offer.id} className="hover:bg-pink-50/30 transition">
+                      <td className="px-4 py-3 text-2xl">{offer.icon || '🎉'}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-800">{offer.title}</p>
+                        <p className="text-xs text-gray-500 truncate max-w-xs">{offer.description}</p>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3">
+                        <span className="text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full font-medium">
+                          {getCategoryLabel(offer.category)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-full font-medium">
+                          {positionOptions.find(p => p.value === offer.position)?.label || offer.position || 'top_banner'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center font-medium text-pink-600">
+                        {offer.discountType === 'percentage' || offer.discount_type === 'percentage'
+                          ? `${offer.discountValue || offer.discount_value}%`
+                          : `₹${offer.discountValue || offer.discount_value}`}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-500 text-xs">
+                        {offer.priority || 0}
+                      </td>
+                      <td className="px-4 py-3 text-center">
                         <button
-                          onClick={() => toggleStatus(offer._id, offer.isActive)}
-                          disabled={processingId === offer._id}
+                          onClick={() => toggleStatus(offer._id || offer.id, offer.isActive || offer.is_active)}
+                          disabled={processingId === (offer._id || offer.id)}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                            offer.isActive 
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                            (offer.isActive || offer.is_active)
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
                               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                           } disabled:opacity-50`}
                         >
-                          {offer.isActive ? '✅ Active' : '⛔ Inactive'}
+                          {(offer.isActive || offer.is_active) ? '✅ Active' : '⛔ Inactive'}
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => {
+                              // ✅ Parse category for editing
+                              let categoryMode = 'global';
+                              let selectedCategories = [];
+                              if (offer.category) {
+                                try {
+                                  const parsed = JSON.parse(offer.category);
+                                  if (Array.isArray(parsed)) {
+                                    categoryMode = parsed.length > 1 ? 'multiple' : 'single';
+                                    selectedCategories = parsed;
+                                  } else {
+                                    categoryMode = 'single';
+                                    selectedCategories = [offer.category];
+                                  }
+                                } catch (e) {
+                                  categoryMode = 'single';
+                                  selectedCategories = [offer.category];
+                                }
+                              }
+
                               setEditingOffer(offer);
                               setFormData({
                                 title: offer.title,
                                 description: offer.description,
-                                discountType: offer.discountType,
-                                discountValue: offer.discountValue,
-                                minOrderValue: offer.minOrderValue,
-                                startDate: offer.startDate?.split('T')[0] || new Date().toISOString().split('T')[0],
-                                endDate: offer.endDate?.split('T')[0] || '',
+                                discountType: offer.discountType || offer.discount_type,
+                                discountValue: offer.discountValue || offer.discount_value,
+                                minOrderValue: offer.minOrderValue || offer.min_order_value,
+                                startDate: (offer.startDate || offer.start_date)?.split('T')[0] || '',
+                                endDate: (offer.endDate || offer.end_date)?.split('T')[0] || '',
                                 type: offer.type || 'top_banner',
-                                isActive: offer.isActive
+                                isActive: offer.isActive !== undefined ? offer.isActive : (offer.is_active === 1),
+                                categoryMode,
+                                selectedCategories,
+                                position: offer.position || 'top_banner',
+                                icon: offer.icon || '🎉',
+                                priority: offer.priority || 0,
                               });
                               setShowModal(true);
                             }}
                             className="text-blue-500 hover:text-blue-700 p-1"
-                            title="Edit"
                           >
                             ✏️
                           </button>
                           <button
-                            onClick={() => deleteOffer(offer._id)}
-                            disabled={processingId === offer._id}
+                            onClick={() => deleteOffer(offer._id || offer.id)}
+                            disabled={processingId === (offer._id || offer.id)}
                             className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
-                            title="Delete"
                           >
                             🗑️
                           </button>
@@ -350,117 +469,247 @@ function AdminOffers() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-pink-100 p-5 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-pink-100 p-5 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
               <h3 className="text-lg font-semibold text-gray-800">
                 {editingOffer ? '✏️ Edit Offer' : '✨ Create New Offer'}
               </h3>
-              <button 
-                onClick={() => setShowModal(false)} 
-                className="text-gray-400 hover:text-gray-600 text-2xl transition"
-              >
-                ×
-              </button>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition"
-                  placeholder="e.g., Summer Sale Offer"
-                />
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* Icon + Title */}
+              <div className="grid grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Icon</label>
+                  <input
+                    type="text"
+                    value={formData.icon}
+                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                    className="w-full text-center border border-gray-200 rounded-xl px-3 py-2.5 text-2xl"
+                    maxLength="2"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500"
+                    placeholder="e.g., Summer Sale Offer"
+                  />
+                </div>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Description (Banner Text) *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
                 <textarea
                   required
-                  rows="3"
+                  rows="2"
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition resize-none"
-                  placeholder="FREE SHIPPING ON ORDERS ABOVE ₹499 • EXTRA 10% OFF"
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 resize-none"
+                  placeholder="FREE SHIPPING ON ORDERS ABOVE ₹499"
                 />
-                <p className="text-xs text-gray-400 mt-1">This text will appear on the top banner</p>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* ✅ CATEGORY MODE SELECTION */}
+              <div className="border border-pink-100 rounded-xl p-4 bg-pink-50/30">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  📍 Where should this offer show?
+                </label>
+
+                {/* Mode Radio Buttons */}
+                <div className="space-y-2 mb-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="categoryMode"
+                      value="global"
+                      checked={formData.categoryMode === 'global'}
+                      onChange={(e) => setFormData({ ...formData, categoryMode: e.target.value, selectedCategories: [] })}
+                      className="w-4 h-4 text-pink-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      🌐 <strong>All Pages</strong> (Global — everywhere)
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="categoryMode"
+                      value="single"
+                      checked={formData.categoryMode === 'single'}
+                      onChange={(e) => setFormData({ ...formData, categoryMode: e.target.value, selectedCategories: [] })}
+                      className="w-4 h-4 text-pink-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      🎯 <strong>Single Category</strong> (only one category page)
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="categoryMode"
+                      value="multiple"
+                      checked={formData.categoryMode === 'multiple'}
+                      onChange={(e) => setFormData({ ...formData, categoryMode: e.target.value, selectedCategories: [] })}
+                      className="w-4 h-4 text-pink-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      🎨 <strong>Multiple Categories</strong> (show on selected categories)
+                    </span>
+                  </label>
+                </div>
+
+                {/* Category Checkboxes — Show if single or multiple */}
+                {formData.categoryMode !== 'global' && (
+                  <div className="mt-3 pt-3 border-t border-pink-100">
+                    <p className="text-xs text-gray-500 mb-2">
+                      {formData.categoryMode === 'single'
+                        ? '👇 Select 1 category:'
+                        : '👇 Select multiple categories:'}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                      {categoryOptions.map(cat => {
+                        const isSelected = formData.selectedCategories.includes(cat.value);
+                        const isDisabled = formData.categoryMode === 'single'
+                          && formData.selectedCategories.length >= 1
+                          && !isSelected;
+
+                        return (
+                          <button
+                            key={cat.value}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => toggleCategory(cat.value)}
+                            className={`px-3 py-2 rounded-lg text-xs font-medium text-left transition ${
+                              isSelected
+                                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                                : 'bg-white border border-pink-200 text-gray-700 hover:border-pink-400'
+                            } ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          >
+                            {isSelected ? '✓ ' : ''}{cat.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Position */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">📍 Position (Kahan dikhega?)</label>
+                <select
+                  value={formData.position}
+                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 bg-white"
+                >
+                  {positionOptions.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Discount + Min Order */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Min Order (₹) *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Min Order (₹)</label>
                   <input
                     type="number"
-                    required
                     value={formData.minOrderValue}
-                    onChange={(e) => setFormData({...formData, minOrderValue: parseInt(e.target.value) || 0})}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition"
-                    placeholder="499"
+                    onChange={(e) => setFormData({ ...formData, minOrderValue: parseInt(e.target.value) || 0 })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Discount Value *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Discount</label>
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      required
                       value={formData.discountValue}
-                      onChange={(e) => setFormData({...formData, discountValue: parseInt(e.target.value) || 0})}
-                      className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition"
-                      placeholder="10"
+                      onChange={(e) => setFormData({ ...formData, discountValue: parseInt(e.target.value) || 0 })}
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-pink-500"
                     />
                     <select
                       value={formData.discountType}
-                      onChange={(e) => setFormData({...formData, discountType: e.target.value})}
-                      className="w-24 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition bg-white"
+                      onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                      className="w-20 border border-gray-200 rounded-xl px-2 py-2.5 bg-white text-sm"
                     >
-                      <option value="percentage">% OFF</option>
-                      <option value="fixed">₹ OFF</option>
+                      <option value="percentage">%</option>
+                      <option value="fixed">₹</option>
                     </select>
                   </div>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+
+              {/* Priority + Status */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                  <input
+                    type="number"
+                    value={formData.priority}
+                    onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Higher = shows first</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isActive}
+                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                      className="w-5 h-5 text-pink-500 rounded"
+                    />
+                    <span className="text-sm text-gray-700">Active</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
                   <input
                     type="date"
-                    required
                     value={formData.startDate}
-                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition"
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
                   <input
                     type="date"
                     value={formData.endDate}
-                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-200 transition"
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500"
                   />
-                  <p className="text-xs text-gray-400 mt-1">Leave empty for no expiry</p>
                 </div>
               </div>
-              
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition font-medium"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={processingId === 'submitting'}
-                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none"
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-lg disabled:opacity-50"
                 >
-                  {processingId === 'submitting' ? '⏳ Saving...' : (editingOffer ? '💾 Update Offer' : '✨ Create Offer')}
+                  {processingId === 'submitting' ? '⏳ Saving...' : (editingOffer ? 'Update' : 'Create')}
                 </button>
               </div>
             </form>
