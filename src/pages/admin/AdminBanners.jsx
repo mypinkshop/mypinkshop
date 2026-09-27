@@ -19,12 +19,14 @@ function AdminBanners() {
     images: [],
     order: 1,
     active: true,
-    showTextOverlay: true
+    showTextOverlay: true,
+    category: '',              // ✅ NAYA
+    position: 'home_hero'      // ✅ NAYA
   });
   const [imagePreviews, setImagePreviews] = useState([]);
 
-  const API_BASE = process.env.REACT_APP_API_URL 
-    ? `${process.env.REACT_APP_API_URL}/api` 
+  const API_BASE = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`
     : 'https://api.mypinkshop.com/api';
 
   // Auth check
@@ -43,24 +45,24 @@ function AdminBanners() {
       setLoading(true);
       setError('');
       const token = localStorage.getItem('adminToken');
-      
-      const response = await fetch(`${API_BASE}/banners`, {
+
+      const response = await fetch(`${API_BASE}/banners/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.status === 401) {
         localStorage.removeItem('adminToken');
         navigate('/admin/login');
         return;
       }
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
       setBanners(Array.isArray(data) ? data.sort((a, b) => a.order - b.order) : []);
     } catch (err) {
@@ -84,6 +86,8 @@ function AdminBanners() {
     form.append('order', bannerData.order.toString());
     form.append('active', bannerData.active);
     form.append('showTextOverlay', bannerData.showTextOverlay);
+    form.append('category', bannerData.category || '');          // ✅ NAYA
+    form.append('position', bannerData.position || 'home_hero'); // ✅ NAYA
 
     if (bannerData.images && bannerData.images.length) {
       for (let i = 0; i < bannerData.images.length; i++) {
@@ -100,14 +104,14 @@ function AdminBanners() {
 
     const method = isEdit ? 'PUT' : 'POST';
 
-    const response = await fetch(url, { 
-      method, 
+    const response = await fetch(url, {
+      method,
       body: form,
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
-    
+
     const text = await response.text();
     let json;
     try {
@@ -115,18 +119,18 @@ function AdminBanners() {
     } catch (e) {
       throw new Error('Server returned invalid response');
     }
-    
+
     if (!response.ok) {
       throw new Error(json.error || 'Failed to save banner');
     }
-    
+
     return json;
   };
 
   // ✅ Delete banner with token
   const deleteBanner = async (id) => {
     const token = localStorage.getItem('adminToken');
-    const response = await fetch(`${API_BASE}/banners/${id}`, { 
+    const response = await fetch(`${API_BASE}/banners/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -165,18 +169,18 @@ function AdminBanners() {
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-    
+
     if (files.length > 6) {
       toast.error('Maximum 6 images allowed');
       return;
     }
-    
+
     const totalSize = files.reduce((sum, f) => sum + f.size, 0);
     if (totalSize > 5 * 1024 * 1024) {
       toast.error('Total images size should be less than 5MB');
       return;
     }
-    
+
     const previews = files.map(f => URL.createObjectURL(f));
     setImagePreviews(previews);
     setFormData(prev => ({ ...prev, images: files }));
@@ -193,15 +197,15 @@ function AdminBanners() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.title && formData.images.length === 0) {
       toast.error('Please enter a title or upload at least one image');
       return;
     }
-    
+
     setUploading(true);
     setError('');
-    
+
     try {
       if (editingBanner) {
         await saveBannerToAPI(formData, true);
@@ -230,7 +234,9 @@ function AdminBanners() {
       images: [],
       order: banners.length + 1,
       active: true,
-      showTextOverlay: true
+      showTextOverlay: true,
+      category: '',              // ✅ NAYA
+      position: 'home_hero'      // ✅ NAYA
     });
     setImagePreviews([]);
     setError('');
@@ -246,14 +252,16 @@ function AdminBanners() {
       images: [],
       order: banner.order,
       active: banner.active,
-      showTextOverlay: banner.showTextOverlay !== false
+      showTextOverlay: banner.showTextOverlay !== false,
+      category: banner.category || '',              // ✅ NAYA
+      position: banner.position || 'home_hero'      // ✅ NAYA
     });
     setImagePreviews(banner.images || []);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this banner permanently?')) return;
-    
+
     try {
       await deleteBanner(id);
       toast.success('✅ Banner deleted');
@@ -332,7 +340,7 @@ function AdminBanners() {
       {/* Main Content */}
       <div className="lg:ml-64 pt-16 lg:pt-8">
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-          
+
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 text-red-600">
               ⚠️ {error}
@@ -340,7 +348,7 @@ function AdminBanners() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
+
             {/* Add/Edit Form */}
             <div className="bg-white rounded-2xl shadow-xl border border-pink-100 overflow-hidden">
               <div className="bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-4">
@@ -348,42 +356,87 @@ function AdminBanners() {
                   {editingBanner ? '✏️ Edit Banner' : '✨ Create New Banner'}
                 </h2>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                  <input type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} placeholder="e.g., Summer Sale 2024" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
+                  <input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., Summer Sale 2024" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Subtitle</label>
-                  <input type="text" value={formData.subtitle} onChange={(e) => setFormData({...formData, subtitle: e.target.value})} placeholder="e.g., Up to 50% off on skincare" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
+                  <input type="text" value={formData.subtitle} onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })} placeholder="e.g., Up to 50% off on skincare" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Button Text</label>
-                  <input type="text" value={formData.buttonText} onChange={(e) => setFormData({...formData, buttonText: e.target.value})} placeholder="e.g., Shop Now" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
+                  <input type="text" value={formData.buttonText} onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })} placeholder="e.g., Shop Now" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Link URL</label>
-                  <input type="text" value={formData.link} onChange={(e) => setFormData({...formData, link: e.target.value})} placeholder="/skincare or /makeup" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
-                  <p className="text-xs text-gray-400 mt-1">Example: /skincare, /makeup, /shop</p>
+                  <input type="text" value={formData.link} onChange={(e) => setFormData({ ...formData, link: e.target.value })} placeholder="/category/electronics or /shop" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
+                  <p className="text-xs text-gray-400 mt-1">Example: /category/skincare, /shop</p>
                 </div>
-                
+
+                {/* ✅ NAYA — Category */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category (Kahan Dikhega?)
+                  </label>
+                  <select
+                    value={formData.category || ''}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  >
+                    <option value="">🌐 Global (All Pages)</option>
+                    <option value="skincare">🧴 Skincare</option>
+                    <option value="makeup">💄 Makeup</option>
+                    <option value="haircare">💇‍♀️ Haircare</option>
+                    <option value="fashion">👗 Fashion</option>
+                    <option value="accessories">👜 Accessories</option>
+                    <option value="electronics">📱 Electronics</option>
+                    <option value="home-kitchen">🏠 Home & Kitchen</option>
+                    <option value="health-wellness">🌿 Health & Wellness</option>
+                    <option value="books-stationery">📚 Books & Stationery</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Global = sab pages pe. Category = sirf us category page pe.
+                  </p>
+                </div>
+
+                {/* ✅ NAYA — Position */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Position (Kahan Dikhega?)
+                  </label>
+                  <select
+                    value={formData.position || 'home_hero'}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  >
+                    <option value="home_hero">🏠 Home Hero (Homepage Top)</option>
+                    <option value="category_hero">🎯 Category Hero (Category Top)</option>
+                    <option value="category_mid_1">📢 Mid 1 (2 products ke baad)</option>
+                    <option value="category_mid_2">📢 Mid 2 (4 products ke baad)</option>
+                    <option value="category_mid_3">📢 Mid 3 (6 products ke baad)</option>
+                    <option value="category_bottom">🎯 Bottom (sab products ke baad)</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Display Order</label>
-                  <input type="number" value={formData.order} onChange={(e) => setFormData({...formData, order: parseInt(e.target.value) || 1})} min="1" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
+                  <input type="number" value={formData.order} onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })} min="1" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition" />
                   <p className="text-xs text-gray-400 mt-1">Lower numbers appear first</p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Banner Images</label>
                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-pink-500 transition cursor-pointer">
                     <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="w-full text-sm cursor-pointer" />
                     <p className="text-xs text-gray-400 mt-2">Select up to 6 images (max 5MB total)</p>
                   </div>
-                  
+
                   {imagePreviews.length > 0 && (
                     <div className="mt-3">
                       <p className="text-sm font-medium text-gray-700 mb-2">{imagePreviews.length} image(s) selected</p>
@@ -398,19 +451,19 @@ function AdminBanners() {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.active} onChange={(e) => setFormData({...formData, active: e.target.checked})} className="w-4 h-4 text-pink-500 rounded" />
-                    <span className="text-sm text-gray-700">Active (show on homepage)</span>
+                    <input type="checkbox" checked={formData.active} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="w-4 h-4 text-pink-500 rounded" />
+                    <span className="text-sm text-gray-700">Active</span>
                   </label>
-                  
+
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.showTextOverlay} onChange={(e) => setFormData({...formData, showTextOverlay: e.target.checked})} className="w-4 h-4 text-pink-500 rounded" />
+                    <input type="checkbox" checked={formData.showTextOverlay} onChange={(e) => setFormData({ ...formData, showTextOverlay: e.target.checked })} className="w-4 h-4 text-pink-500 rounded" />
                     <span className="text-sm text-gray-700">Show title/text on banner</span>
                   </label>
                 </div>
-                
+
                 <div className="flex gap-3 pt-2">
                   <button type="submit" disabled={uploading} className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-2.5 rounded-xl font-medium hover:shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50">
                     {uploading ? 'Saving...' : (editingBanner ? 'Update Banner' : 'Add Banner')}
@@ -447,11 +500,22 @@ function AdminBanners() {
                           </div>
                         )}
                         <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h3 className="font-semibold text-gray-800">{banner.title || 'Untitled'}</h3>
-                            {banner.subtitle && <p className="text-sm text-gray-500">{banner.subtitle}</p>}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-800 truncate">{banner.title || 'Untitled'}</h3>
+                            {banner.subtitle && <p className="text-sm text-gray-500 truncate">{banner.subtitle}</p>}
+                            {/* ✅ NAYA — Category + Position badges */}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              <span className="text-[10px] bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full font-medium">
+                                {banner.category ? `📂 ${banner.category}` : '🌐 Global'}
+                              </span>
+                              <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">
+                                {banner.position || 'home_hero'}
+                              </span>
+                            </div>
                           </div>
-                          <span className={`text-xs px-2 py-1 rounded-full ${banner.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{banner.active ? 'Active' : 'Inactive'}</span>
+                          <span className={`text-xs px-2 py-1 rounded-full ml-2 shrink-0 ${banner.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {banner.active ? 'Active' : 'Inactive'}
+                          </span>
                         </div>
                         <div className="flex gap-3 mt-3">
                           <button onClick={() => handleEdit(banner)} className="text-sm text-blue-600 hover:text-blue-700 transition">Edit</button>
@@ -470,7 +534,7 @@ function AdminBanners() {
           <div className="mt-8 bg-white rounded-2xl shadow-xl border border-pink-100 overflow-hidden">
             <div className="bg-gradient-to-r from-pink-600 to-rose-600 px-6 py-4">
               <h2 className="text-xl font-semibold text-white">🎯 Live Preview</h2>
-              <p className="text-pink-100 text-sm">How it looks on homepage</p>
+              <p className="text-pink-100 text-sm">Active banner (first one)</p>
             </div>
             <div className="p-6">
               {banners.filter(b => b.active).length > 0 ? (
