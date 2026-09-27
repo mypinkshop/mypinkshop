@@ -10,7 +10,6 @@ const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : 'https://api.mypinkshop.com/api';
 
-/* Helper */
 function slugify(str) {
   return String(str || '')
     .toLowerCase()
@@ -20,9 +19,26 @@ function slugify(str) {
     .replace(/^-|-$/g, '');
 }
 
-/* ------------------------------------------------------------------ */
-/* Main Component                                                     */
-/* ------------------------------------------------------------------ */
+function getErrorMessage(err, defaultMsg = 'Something went wrong') {
+  if (!err) return defaultMsg;
+  const msg = err.message || '';
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+    return 'Network error — please check your internet connection';
+  }
+  if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+    return 'Session expired — please login again';
+  }
+  if (msg.includes('403') || msg.toLowerCase().includes('forbidden')) {
+    return 'You do not have permission to perform this action';
+  }
+  if (msg.includes('404')) return 'Banner not found';
+  if (msg.includes('500')) return 'Server error — please try again later';
+  if (msg.toLowerCase().includes('title is required')) {
+    return 'Title is required or leave it empty for auto "Untitled Banner"';
+  }
+  return msg || defaultMsg;
+}
+
 function AdminBanners() {
   const navigate = useNavigate();
 
@@ -33,11 +49,9 @@ function AdminBanners() {
   const [previewMode, setPreviewMode] = useState('desktop');
   const [mobileTab, setMobileTab] = useState('list');
 
-  // Search + filter
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
 
-  // Backend-driven options
   const [options, setOptions] = useState({
     sizes: [],
     styles: [],
@@ -46,7 +60,6 @@ function AdminBanners() {
   });
   const [optionsLoading, setOptionsLoading] = useState(true);
 
-  // Dropdown data
   const [brands, setBrands] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -63,7 +76,7 @@ function AdminBanners() {
       images: [],
       order: 1,
       active: true,
-      showTextOverlay: true,
+      showTextOverlay: false,
       categories: [],
       subcategories: [],
       positions: ['home_hero'],
@@ -74,7 +87,6 @@ function AdminBanners() {
     };
   }
 
-  /* ------------------------- Auth + Load ------------------------- */
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
@@ -87,7 +99,6 @@ function AdminBanners() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ------------------------- Load options ------------------------- */
   const loadOptions = async () => {
     try {
       setOptionsLoading(true);
@@ -104,13 +115,12 @@ function AdminBanners() {
       }
     } catch (err) {
       console.error('Options load error:', err);
-      toast.error('Options load nahi ho paye');
+      toast.error('Failed to load options');
     } finally {
       setOptionsLoading(false);
     }
   };
 
-  /* ------------------------- Load banners ------------------------- */
   const loadBanners = async () => {
     try {
       setLoading(true);
@@ -130,13 +140,12 @@ function AdminBanners() {
       setBanners(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
     } catch (err) {
       console.error(err);
-      toast.error('Banners load nahi ho paye');
+      toast.error('Failed to load banners');
     } finally {
       setLoading(false);
     }
   };
 
-  /* ------------------------- Load dropdowns ------------------------- */
   const loadDropdownData = async () => {
     try {
       const [brandsRes, productsRes, catRes] = await Promise.allSettled([
@@ -187,7 +196,6 @@ function AdminBanners() {
     }
   };
 
-  /* ------------------------- Filtered banners ------------------------- */
   const filteredBanners = useMemo(() => {
     let list = [...banners];
     if (search.trim()) {
@@ -203,7 +211,6 @@ function AdminBanners() {
     return list;
   }, [banners, search, filter]);
 
-  /* ------------------------- Select / New ------------------------- */
   const handleSelectBanner = (b) => {
     setEditingBanner(b);
 
@@ -226,7 +233,7 @@ function AdminBanners() {
       images: [],
       order: b.order || 1,
       active: b.active !== false,
-      showTextOverlay: b.showTextOverlay !== false,
+      showTextOverlay: b.showTextOverlay === true,
       categories: cats,
       subcategories: Array.isArray(b.subcategories) ? b.subcategories : [],
       positions: poss,
@@ -249,13 +256,12 @@ function AdminBanners() {
     setMobileTab('edit');
   };
 
-  /* ------------------------- Image handling ------------------------- */
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    if (files.length > 6) return toast.error('Max 6 images allowed');
+    if (files.length > 6) return toast.error('Maximum 6 images allowed');
     if (files.reduce((s, f) => s + f.size, 0) > 5 * 1024 * 1024) {
-      return toast.error('Total size 5MB se kam hona chahiye');
+      return toast.error('Total image size must be under 5MB');
     }
     setImagePreviews(files.map((f) => URL.createObjectURL(f)));
     setFormData((p) => ({ ...p, images: files }));
@@ -270,13 +276,12 @@ function AdminBanners() {
     setImagePreviews(prev);
   };
 
-  /* ------------------------- Link generation ------------------------- */
   const generateLink = () => formData.link || '';
 
   const copyLink = () => {
     const full = `${window.location.origin}${generateLink()}`;
     navigator.clipboard.writeText(full);
-    toast.success('Link copied! 📋');
+    toast.success('Link copied');
   };
 
   const testLink = () => {
@@ -285,7 +290,6 @@ function AdminBanners() {
     window.open(link, '_blank');
   };
 
-  /* ------------------------- Save ------------------------- */
   const saveBannerToAPI = async (data, isEdit) => {
     const token = localStorage.getItem('adminToken');
     const form = new FormData();
@@ -318,21 +322,29 @@ function AdminBanners() {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Save failed');
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error(`Server error (HTTP ${res.status})`);
+    }
+
+    if (res.status === 401) throw new Error('401 Unauthorized');
+    if (!res.ok) throw new Error(json?.error || `Save failed (HTTP ${res.status})`);
     return json;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title && !formData.images.length && !imagePreviews.length) {
-      return toast.error('Title ya image required');
+
+    if (!formData.images.length && !imagePreviews.length) {
+      return toast.error('Please upload at least one image');
     }
     if (!generateLink()) {
-      return toast.error('Link generate nahi hua');
+      return toast.error('Please enter a valid link');
     }
     if (!formData.positions || formData.positions.length === 0) {
-      return toast.error('Kam se kam 1 position select karo');
+      return toast.error('Please select at least one position');
     }
 
     setUploading(true);
@@ -340,15 +352,20 @@ function AdminBanners() {
       const payload = { ...formData, link: generateLink() };
       if (editingBanner) {
         await saveBannerToAPI(payload, true);
-        toast.success('✅ Banner updated');
+        toast.success('Banner updated');
       } else {
         await saveBannerToAPI(payload, false);
-        toast.success('✅ Banner published');
+        toast.success('Banner published');
       }
       await loadBanners();
       resetForm();
     } catch (err) {
-      toast.error('❌ ' + err.message);
+      console.error('Save banner error:', err);
+      toast.error(getErrorMessage(err, 'Failed to save banner'));
+      if (err.message?.includes('401')) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+      }
     } finally {
       setUploading(false);
     }
@@ -364,25 +381,21 @@ function AdminBanners() {
     setMobileTab('list');
   };
 
-  /* ------------------------- Delete / Toggle ------------------------- */
-  const deleteBanner = async (id) => {
-    const token = localStorage.getItem('adminToken');
-    const res = await fetch(`${API_BASE}/banners/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error('Delete failed');
-  };
-
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this banner permanently?')) return;
     try {
-      await deleteBanner(id);
-      toast.success('✅ Banner deleted');
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/banners/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Delete failed (HTTP ${res.status})`);
+      toast.success('Banner deleted');
       await loadBanners();
       if (editingBanner?._id === id || editingBanner?.id === id) resetForm();
     } catch (err) {
-      toast.error('❌ ' + err.message);
+      console.error('Delete banner error:', err);
+      toast.error(getErrorMessage(err, 'Failed to delete banner'));
     }
   };
 
@@ -397,16 +410,15 @@ function AdminBanners() {
         },
         body: JSON.stringify({ active: !current }),
       });
-      if (res.ok) {
-        await loadBanners();
-        toast.success(`Banner ${!current ? 'activated' : 'deactivated'}`);
-      }
+      if (!res.ok) throw new Error(`Toggle failed (HTTP ${res.status})`);
+      await loadBanners();
+      toast.success(`Banner ${!current ? 'activated' : 'deactivated'}`);
     } catch (err) {
-      toast.error('Toggle failed');
+      console.error('Toggle error:', err);
+      toast.error(getErrorMessage(err, 'Failed to update banner'));
     }
   };
 
-  /* ------------------------- Auto-suggest size/style ------------------------- */
   const applySizeGuide = (positions) => {
     if (!positions || positions.length === 0) {
       setFormData((p) => ({ ...p, positions }));
@@ -427,7 +439,6 @@ function AdminBanners() {
     return options.positions.find((p) => p.value === formData.positions[0]);
   }, [options.positions, formData.positions]);
 
-  /* ------------------------- Preview ------------------------- */
   const previewBanner = useMemo(
     () => ({
       ...formData,
@@ -440,7 +451,6 @@ function AdminBanners() {
 
   const isMobilePreview = previewMode === 'mobile';
 
-  /* ------------------------- Loading ------------------------- */
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FFF7FA] flex items-center justify-center">
@@ -452,7 +462,6 @@ function AdminBanners() {
     );
   }
 
-  /* ------------------------- Render ------------------------- */
   return (
     <div className="min-h-screen bg-[#FFF7FA]">
       {/* TOP BAR */}
@@ -466,7 +475,7 @@ function AdminBanners() {
               ←
             </button>
             <h1 className="text-lg sm:text-xl font-bold text-gray-800">
-              🎨 Banner Manager
+              Banner Manager
             </h1>
             <span className="hidden sm:inline text-xs bg-pink-50 text-pink-600 px-2 py-1 rounded-full font-medium">
               {banners.length} banners
@@ -481,12 +490,11 @@ function AdminBanners() {
           </button>
         </div>
 
-        {/* Mobile tabs */}
         <div className="lg:hidden flex border-t border-pink-100">
           {[
-            { id: 'list', label: '📋 List' },
-            { id: 'edit', label: '✏️ Edit' },
-            { id: 'preview', label: '👁️ Preview' },
+            { id: 'list', label: 'List' },
+            { id: 'edit', label: 'Edit' },
+            { id: 'preview', label: 'Preview' },
           ].map((t) => (
             <button
               key={t.id}
@@ -518,7 +526,7 @@ function AdminBanners() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 Search banners..."
+                placeholder="Search banners..."
                 className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
               />
 
@@ -612,7 +620,7 @@ function AdminBanners() {
           >
             <div className="p-4 sm:p-6 border-b border-pink-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <h2 className="font-bold text-gray-800">
-                {editingBanner ? `✏️ Edit Banner` : '✨ Create Banner'}
+                {editingBanner ? 'Edit Banner' : 'Create Banner'}
               </h2>
               {editingBanner && (
                 <div className="flex gap-2">
@@ -639,11 +647,10 @@ function AdminBanners() {
               onSubmit={handleSubmit}
               className="p-4 sm:p-6 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto"
             >
-              {/* Title / Subtitle / Button */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Title
+                    Title <span className="text-gray-400">(optional)</span>
                   </label>
                   <input
                     type="text"
@@ -657,7 +664,7 @@ function AdminBanners() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Subtitle
+                    Subtitle <span className="text-gray-400">(optional)</span>
                   </label>
                   <input
                     type="text"
@@ -685,7 +692,6 @@ function AdminBanners() {
                 </div>
               </div>
 
-              {/* Images */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-2">
                   Images <span className="text-gray-400">(max 6, 5MB total)</span>
@@ -719,7 +725,6 @@ function AdminBanners() {
                 )}
               </div>
 
-              {/* POSITIONS — multi-select dropdown */}
               <div>
                 {optionsLoading ? (
                   <div className="text-xs text-gray-400 py-2">
@@ -727,7 +732,7 @@ function AdminBanners() {
                   </div>
                 ) : (
                   <SearchableMultiSelect
-                    label="📍 Positions (multi-select)"
+                    label="Positions"
                     options={options.positions}
                     selected={formData.positions || []}
                     onChange={(vals) => applySizeGuide(vals)}
@@ -737,15 +742,14 @@ function AdminBanners() {
                 )}
                 {currentPositionGuide && (
                   <p className="text-[10px] text-gray-500 mt-1.5">
-                    📏 Recommended (first position): {currentPositionGuide.px} ({currentPositionGuide.ratio})
+                    Recommended (first position): {currentPositionGuide.px} ({currentPositionGuide.ratio})
                   </p>
                 )}
               </div>
 
-              {/* CATEGORIES — multi-select dropdown */}
               <div>
                 <SearchableMultiSelect
-                  label="📂 Categories (khaali = Global)"
+                  label="Categories (empty = Global)"
                   options={categories}
                   selected={formData.categories || []}
                   onChange={(vals) =>
@@ -756,15 +760,14 @@ function AdminBanners() {
                 />
                 {formData.categories.length === 0 && (
                   <p className="text-[10px] text-green-600 mt-1.5">
-                    ✓ Global — saare pages pe dikhega
+                    Global — will show on all pages
                   </p>
                 )}
               </div>
 
-              {/* SUBCATEGORIES — multi-select dropdown (agar options hain) */}
               {subcategories.length > 0 && (
                 <SearchableMultiSelect
-                  label="📁 Subcategories (optional)"
+                  label="Subcategories (optional)"
                   options={subcategories}
                   selected={formData.subcategories || []}
                   onChange={(vals) =>
@@ -775,11 +778,10 @@ function AdminBanners() {
                 />
               )}
 
-              {/* SIZE — backend se, single */}
               {!optionsLoading && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">
-                    📐 Size
+                    Size
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {options.sizes.map((s) => (
@@ -813,11 +815,10 @@ function AdminBanners() {
                 </div>
               )}
 
-              {/* STYLE — backend se, single */}
               {!optionsLoading && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">
-                    🎨 Display Style
+                    Display Style
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {options.styles.map((s) => (
@@ -849,11 +850,10 @@ function AdminBanners() {
                 </div>
               )}
 
-              {/* LINK TYPE — single */}
               {!optionsLoading && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">
-                    🔗 Link Type
+                    Link Type
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {options.link_types.map((l) => (
@@ -886,7 +886,6 @@ function AdminBanners() {
                 </div>
               )}
 
-              {/* LINK VALUE */}
               {formData.link_type === 'category' && (
                 <SearchableSelect
                   label="Category"
@@ -956,11 +955,10 @@ function AdminBanners() {
                 </div>
               )}
 
-              {/* GENERATED LINK */}
               {generateLink() && (
                 <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                   <p className="text-[10px] text-green-700 mb-1 font-medium">
-                    ✅ Generated Link
+                    Generated Link
                   </p>
                   <p className="text-xs font-mono text-green-800 break-all mb-2">
                     {generateLink()}
@@ -971,20 +969,19 @@ function AdminBanners() {
                       onClick={copyLink}
                       className="text-[11px] px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
                     >
-                      📋 Copy
+                      Copy
                     </button>
                     <button
                       type="button"
                       onClick={testLink}
                       className="text-[11px] px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
                     >
-                      🔗 Test
+                      Test
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* ORDER + TOGGLES */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1027,12 +1024,11 @@ function AdminBanners() {
                       }
                       className="w-4 h-4 accent-pink-500"
                     />
-                    Show text overlay
+                    Show text on banner
                   </label>
                 </div>
               </div>
 
-              {/* ACTIONS */}
               <div className="flex gap-3 pt-4 border-t border-pink-100 sticky bottom-0 bg-white -mx-4 sm:-mx-6 px-4 sm:px-6 -mb-4 sm:-mb-6 pb-4 sm:pb-6">
                 <button
                   type="submit"
@@ -1042,8 +1038,8 @@ function AdminBanners() {
                   {uploading
                     ? 'Publishing...'
                     : editingBanner
-                    ? '💾 Update Banner'
-                    : '🚀 Publish Banner'}
+                    ? 'Update Banner'
+                    : 'Publish Banner'}
                 </button>
                 {editingBanner && (
                   <button
@@ -1069,7 +1065,7 @@ function AdminBanners() {
             <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
               <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-3 flex items-center justify-between">
                 <h3 className="text-white font-semibold text-sm">
-                  👁️ Live Preview
+                  Live Preview
                 </h3>
                 <div className="flex gap-1 bg-white/20 rounded-lg p-1">
                   <button
@@ -1117,26 +1113,19 @@ function AdminBanners() {
 
               <div className="px-4 pb-4 text-[11px] text-gray-500 space-y-1 border-t border-pink-100 pt-3">
                 <p>
-                  📐 Size: <b className="text-gray-700">{formData.size}</b>
+                  Size: <b className="text-gray-700">{formData.size}</b>
                 </p>
                 <p>
-                  🎨 Style:{' '}
-                  <b className="text-gray-700">{formData.display_style}</b>
+                  Style: <b className="text-gray-700">{formData.display_style}</b>
                 </p>
                 <p>
-                  📍 Positions:{' '}
-                  <b className="text-gray-700">
-                    {formData.positions?.length || 0}
-                  </b>
+                  Positions: <b className="text-gray-700">{formData.positions?.length || 0}</b>
                 </p>
                 <p>
-                  📂 Categories:{' '}
-                  <b className="text-gray-700">
-                    {formData.categories?.length || 0}
-                  </b>
+                  Categories: <b className="text-gray-700">{formData.categories?.length || 0}</b>
                 </p>
                 <p>
-                  🔗 Link:{' '}
+                  Link:{' '}
                   <b className="break-all text-gray-700">
                     {generateLink() || '—'}
                   </b>
