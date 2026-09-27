@@ -9,6 +9,8 @@ import FloatingCartButton from './components/FloatingCartButton';
 import AdminAdAnalytics from './pages/admin/AdminAdAnalytics';
 import ErrorBoundary from './components/ErrorBoundary';
 import BrandPage from './pages/BrandPage';
+import AdminBrands from './pages/admin/AdminBrands';
+
 
 
 // ============================================================
@@ -208,6 +210,7 @@ function App() {
                     <Route path="/admin/bulk-upload" element={<AdminBulkUpload />} />
                     <Route path="/admin/notifications" element={<AdminNotifications />} />
                     <Route path="/admin/ad-analytics" element={<AdminAdAnalytics />} />
+                    <Route path="/admin/brands" element={<AdminBrands />} />
 
                     {/* ============ VENDOR ROUTES ============ */}
                     <Route path="/vendor/login" element={<VendorLogin />} />
