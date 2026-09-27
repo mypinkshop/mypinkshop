@@ -1,19 +1,29 @@
+// src/components/ProductCard.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
 
-function ProductCard({ 
-  product, 
-  isInWishlist, 
-  addToWishlist, 
-  removeFromWishlist, 
+/* ✅ Backend se match — same slugify */
+function slugify(str) {
+  return String(str || '')
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function ProductCard({
+  product,
+  isInWishlist,
+  addToWishlist,
+  removeFromWishlist,
   user,
-  wishlistContext 
+  wishlistContext,
 }) {
   const navigate = useNavigate();
 
-  // ✅ CartContext se cart nikalo
   const { cart, addToCart } = useCart();
 
   const [imgError, setImgError] = useState(false);
@@ -24,7 +34,7 @@ function ProductCard({
 
   const productId = product._id || product.id;
 
-  // ✅ isAdded — cart se DERIVE karo (local state nahi)
+  // ✅ isAdded — cart se derive (refresh proof)
   const isAdded = cart.some((item) => {
     const itemId = item.id || item._id;
     return itemId === productId;
@@ -65,7 +75,7 @@ function ProductCard({
     };
   }, [checkWishlistStatus]);
 
-  // ✅ ADD TO CART
+  /* ------------------ Add to cart ------------------ */
   const handleAddToCart = () => {
     if (product.stock === 0) {
       toast.error('Out of stock!');
@@ -162,8 +172,13 @@ function ProductCard({
     0;
   const discountPercent = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
 
+  /* ✅ Brand slug — backend se match */
+  const brandSlug = product.brand ? slugify(product.brand) : '';
+
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-pink-100">
+
+      {/* ==================== IMAGE ==================== */}
       <Link to={`/product/${productId}`}>
         <div className="relative h-48 sm:h-52 md:h-60 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
           {!imageLoaded && !imgError && (
@@ -190,18 +205,21 @@ function ProductCard({
             </div>
           )}
 
+          {/* Discount badge — top-left */}
           {discountPercent > 0 && (
             <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-md z-10">
               {discountPercent}% OFF
             </span>
           )}
 
+          {/* NEW badge — top-right */}
           {product.isNew && (
             <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
 
+          {/* Out of stock overlay */}
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">
@@ -212,13 +230,29 @@ function ProductCard({
         </div>
       </Link>
 
+      {/* ==================== INFO ==================== */}
       <div className="p-4">
+
+        {/* ✅ BRAND NAME — Clickable (Amazon/Flipkart style) */}
+        {product.brand && (
+          <Link
+            to={`/brand/${brandSlug}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-[11px] font-semibold text-pink-600 hover:text-pink-700 hover:underline uppercase tracking-wider mb-1 inline-block transition-colors"
+            title={`View all ${product.brand} products`}
+          >
+            {product.brand}
+          </Link>
+        )}
+
+        {/* Product name */}
         <Link to={`/product/${productId}`}>
-          <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-1 hover:text-pink-500 transition">
+          <h3 className="font-semibold text-gray-800 text-sm mb-2 line-clamp-2 min-h-[2.5rem] hover:text-pink-500 transition leading-snug">
             {product.name}
           </h3>
         </Link>
 
+        {/* Rating */}
         <div className="flex items-center gap-1 mb-2">
           <div className="flex text-yellow-400 text-sm">
             {'★'.repeat(Math.floor(product.rating || 4))}
@@ -227,6 +261,7 @@ function ProductCard({
           <span className="text-xs text-gray-400">({product.rating || 4})</span>
         </div>
 
+        {/* Price */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-lg font-bold text-pink-600">
             ₹{price.toLocaleString()}
@@ -243,8 +278,8 @@ function ProductCard({
           )}
         </div>
 
+        {/* Actions */}
         <div className="flex gap-2">
-          {/* ✅ Button — cart se derive hota hai (refresh proof) */}
           {isAdded ? (
             <button
               onClick={handleGoToCart}
