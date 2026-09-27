@@ -124,7 +124,6 @@ function ProductCard({ product, index = 0 }) {
 
           {/* Info */}
           <div className="pt-4 pb-3 px-4">
-            {/* Rating */}
             {product.rating > 0 && (
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="flex gap-0.5">
@@ -148,15 +147,12 @@ function ProductCard({ product, index = 0 }) {
               </div>
             )}
 
-            {/* Name */}
             <h3 className="font-serif text-[15px] leading-snug text-gray-800 line-clamp-2 min-h-[2.6rem] transition-colors duration-300 group-hover:text-pink-600">
               {product.name}
             </h3>
 
-            {/* Divider */}
             <div className="w-8 h-px bg-pink-300 my-3 transition-all duration-500 group-hover:w-16" />
 
-            {/* Price */}
             <div className="flex items-baseline gap-2">
               <span className="text-[15px] font-semibold text-gray-800">
                 ₹{Number(product.price).toLocaleString('en-IN')}
@@ -175,18 +171,56 @@ function ProductCard({ product, index = 0 }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Skeleton                                                           */
+/* Compact Brand Card (jab banner nahi ho)                            */
 /* ------------------------------------------------------------------ */
-function ProductSkeleton() {
+function CompactBrandHeader({ brand, total }) {
   return (
-    <div className="animate-pulse">
-      <div className="aspect-product bg-pink-100 rounded-2xl" />
-      <div className="pt-4 space-y-3">
-        <div className="h-3 bg-pink-100 rounded w-1/2" />
-        <div className="h-4 bg-pink-100 rounded w-3/4" />
-        <div className="h-4 bg-pink-100 rounded w-1/3" />
+    <section className="max-w-[1400px] mx-auto px-4 sm:px-6 pt-6">
+      <div className="bg-white rounded-2xl border border-pink-100 shadow-sm p-5 sm:p-7">
+        <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
+
+          {/* Logo */}
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center border-4 border-white shadow-lg shrink-0 overflow-hidden relative">
+            {brand.logo ? (
+              <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-serif text-4xl text-pink-500">
+                {brand.name?.[0]?.toUpperCase()}
+              </span>
+            )}
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-pink-400" />
+          </div>
+
+          {/* Info */}
+          <div className="text-center sm:text-left flex-1 min-w-0">
+            <p className="text-[10px] tracking-luxe-xl uppercase text-pink-500 mb-1">
+              Exclusive Brand
+            </p>
+            <h1 className="font-serif text-3xl sm:text-4xl text-gray-800 tracking-wide">
+              {brand.name}
+            </h1>
+            {brand.tagline && (
+              <p className="text-pink-600 mt-2 font-display italic text-lg">
+                "{brand.tagline}"
+              </p>
+            )}
+            {brand.description && (
+              <p className="text-gray-500 text-sm mt-2 max-w-2xl">
+                {brand.description}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
+              <span className="text-[11px] bg-pink-50 text-pink-600 px-3 py-1 rounded-full font-medium">
+                📦 {total} {total === 1 ? 'product' : 'products'}
+              </span>
+              <span className="text-[11px] bg-green-50 text-green-600 px-3 py-1 rounded-full font-medium">
+                ✓ Verified
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -209,8 +243,6 @@ function BrandPage() {
   const [sort, setSort] = useState('popular');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-
-  const [heroRef, heroVisible] = useReveal({ threshold: 0.05 });
 
   /* ---------------------- Scroll listener ---------------------- */
   useEffect(() => {
@@ -320,12 +352,14 @@ function BrandPage() {
     );
   }
 
+  const hasBanner = !!(brand.banner && brand.banner.trim());
+
   /* ---------------------- RENDER ---------------------- */
   return (
     <div className="min-h-screen bg-[#FFF7FA] font-sans">
 
       {/* ============================================================ */}
-      {/* STICKY MINI HEADER                                          */}
+      {/* STICKY MINI HEADER — only when scrolled                      */}
       {/* ============================================================ */}
       <div
         className={`fixed top-0 left-0 right-0 z-40 glass border-b border-pink-200 transition-all duration-500 ${
@@ -348,7 +382,7 @@ function BrandPage() {
                 {brand.name}
               </p>
               <p className="text-[10px] text-gray-400 tracking-wider">
-                {total} pieces
+                {total} {total === 1 ? 'piece' : 'pieces'}
               </p>
             </div>
           </div>
@@ -362,140 +396,109 @@ function BrandPage() {
       </div>
 
       {/* ============================================================ */}
-      {/* HERO                                                         */}
+      {/* HERO — only if banner exists                                 */}
       {/* ============================================================ */}
-      <section
-        ref={heroRef}
-        className={`relative w-full h-[65vh] min-h-[460px] max-h-[680px] overflow-hidden transition-all duration-1000 ${
-          heroVisible ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        {/* Background */}
-        {brand.banner ? (
+      {hasBanner ? (
+        <section className="relative w-full h-[320px] sm:h-[380px] md:h-[420px] lg:h-[460px] max-h-[500px] overflow-hidden">
           <img
             src={brand.banner}
             alt={brand.name}
             className="absolute inset-0 w-full h-full object-cover animate-slow-zoom"
           />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-pink-400 via-pink-500 to-rose-500" />
-        )}
 
-        {/* Overlays */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/10 via-transparent to-rose-500/15" />
+          {/* Overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/25 to-black/65" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/10 via-transparent to-rose-500/15" />
 
-        {/* Top pink line */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-pink-400 to-transparent" />
+          {/* Top pink line */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-pink-400 to-transparent" />
 
-        {/* Corner ornaments */}
-        <div className="absolute top-6 left-6 w-12 h-12 border-t-2 border-l-2 border-white/30 hidden sm:block" />
-        <div className="absolute top-6 right-6 w-12 h-12 border-t-2 border-r-2 border-white/30 hidden sm:block" />
-        <div className="absolute bottom-6 left-6 w-12 h-12 border-b-2 border-l-2 border-white/30 hidden sm:block" />
-        <div className="absolute bottom-6 right-6 w-12 h-12 border-b-2 border-r-2 border-white/30 hidden sm:block" />
+          {/* Corner ornaments */}
+          <div className="absolute top-5 left-5 w-10 h-10 border-t-2 border-l-2 border-white/30 hidden sm:block" />
+          <div className="absolute top-5 right-5 w-10 h-10 border-t-2 border-r-2 border-white/30 hidden sm:block" />
+          <div className="absolute bottom-5 left-5 w-10 h-10 border-b-2 border-l-2 border-white/30 hidden sm:block" />
+          <div className="absolute bottom-5 right-5 w-10 h-10 border-b-2 border-r-2 border-white/30 hidden sm:block" />
 
-        {/* Content */}
-        <div className="relative h-full flex flex-col items-center justify-center text-center px-6">
-
-          {/* Logo */}
-          <div className="mb-6 relative animate-fade-in-up">
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28">
-              <div className="absolute inset-0 rounded-full border border-white/30 animate-rotate-slow" />
-              <div className="absolute inset-1.5 rounded-full border border-white/50" />
-              <div className="absolute inset-3 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-2xl">
-                {brand.logo ? (
-                  <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="font-serif text-4xl text-pink-500">
-                    {brand.name?.[0]?.toUpperCase()}
-                  </span>
-                )}
+          {/* Content */}
+          <div className="relative h-full flex flex-col items-center justify-center text-center px-6">
+            {/* Logo */}
+            <div className="mb-4 relative">
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24">
+                <div className="absolute inset-0 rounded-full border border-white/30 animate-rotate-slow" />
+                <div className="absolute inset-1 rounded-full border border-white/50" />
+                <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-2xl">
+                  {brand.logo ? (
+                    <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-serif text-3xl text-pink-500">
+                      {brand.name?.[0]?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-pink-400 animate-soft-pulse" />
-          </div>
 
-          {/* Small label */}
-          <p className="text-[10px] tracking-luxe-xl uppercase text-pink-200 mb-3 animate-fade-in-up">
-            Exclusive Brand
-          </p>
-
-          {/* Brand name */}
-          <h1
-            className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-white tracking-luxe uppercase font-light text-shadow-lg animate-fade-in-up"
-            style={{ animationDelay: '0.1s' }}
-          >
-            {brand.name}
-          </h1>
-
-          {/* Divider */}
-          <div
-            className="flex items-center gap-4 my-5 animate-fade-in-up"
-            style={{ animationDelay: '0.2s' }}
-          >
-            <div className="w-16 h-px bg-gradient-to-r from-transparent to-pink-300" />
-            <span className="text-pink-300 text-sm">✦</span>
-            <div className="w-16 h-px bg-gradient-to-l from-transparent to-pink-300" />
-          </div>
-
-          {/* Tagline / description */}
-          {brand.tagline && (
-            <p
-              className="font-display italic text-white/95 text-xl sm:text-2xl tracking-wide max-w-2xl text-shadow-md animate-fade-in-up"
-              style={{ animationDelay: '0.3s' }}
-            >
-              "{brand.tagline}"
+            {/* Small label */}
+            <p className="text-[10px] tracking-luxe-xl uppercase text-pink-200 mb-2">
+              Exclusive Brand
             </p>
-          )}
-          {!brand.tagline && brand.description && (
-            <p
-              className="text-white/85 text-sm sm:text-base tracking-wider max-w-2xl leading-relaxed animate-fade-in-up"
-              style={{ animationDelay: '0.3s' }}
-            >
-              {brand.description}
-            </p>
-          )}
 
-          {/* Stats */}
-          <div
-            className="flex items-center gap-8 mt-7 text-white/90 animate-fade-in-up"
-            style={{ animationDelay: '0.4s' }}
-          >
-            <div className="text-center">
-              <p className="font-serif text-2xl text-white">{total}</p>
-              <p className="text-[10px] tracking-luxe uppercase mt-1 opacity-80">Pieces</p>
+            {/* Brand name */}
+            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl text-white tracking-luxe uppercase font-light text-shadow-lg">
+              {brand.name}
+            </h1>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-3">
+              <div className="w-12 h-px bg-gradient-to-r from-transparent to-pink-300" />
+              <span className="text-pink-300 text-xs">✦</span>
+              <div className="w-12 h-px bg-gradient-to-l from-transparent to-pink-300" />
             </div>
-            <div className="w-px h-8 bg-white/30" />
-            <div className="text-center">
-              <p className="font-serif text-2xl text-white">✦</p>
-              <p className="text-[10px] tracking-luxe uppercase mt-1 opacity-80">Curated</p>
+
+            {/* Tagline */}
+            {brand.tagline && (
+              <p className="font-display italic text-white/95 text-base sm:text-lg tracking-wide max-w-xl text-shadow-md">
+                "{brand.tagline}"
+              </p>
+            )}
+
+            {/* Stats */}
+            <div className="flex items-center gap-6 mt-4 text-white/90">
+              <div className="text-center">
+                <p className="font-serif text-lg sm:text-xl text-white">{total}</p>
+                <p className="text-[9px] tracking-luxe uppercase opacity-80">Pieces</p>
+              </div>
+              <div className="w-px h-6 bg-white/30" />
+              <div className="text-center">
+                <p className="font-serif text-lg sm:text-xl text-white">✦</p>
+                <p className="text-[9px] tracking-luxe uppercase opacity-80">Curated</p>
+              </div>
+              <div className="w-px h-6 bg-white/30" />
+              <div className="text-center">
+                <p className="font-serif text-lg sm:text-xl text-white">100%</p>
+                <p className="text-[9px] tracking-luxe uppercase opacity-80">Authentic</p>
+              </div>
             </div>
-            <div className="w-px h-8 bg-white/30" />
-            <div className="text-center">
-              <p className="font-serif text-2xl text-white">100%</p>
-              <p className="text-[10px] tracking-luxe uppercase mt-1 opacity-80">Authentic</p>
-            </div>
+
+            {/* CTA */}
+            <a href="#collection" className="btn-white mt-5 text-[10px]">
+              Explore Collection
+            </a>
           </div>
 
-          {/* CTA */}
-          <a
-            href="#collection"
-            className="btn-white mt-9 animate-fade-in-up"
-            style={{ animationDelay: '0.5s' }}
-          >
-            Explore Collection
-          </a>
-        </div>
-
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#FFF7FA] to-transparent pointer-events-none" />
-      </section>
+          {/* Bottom fade */}
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#FFF7FA] to-transparent pointer-events-none" />
+        </section>
+      ) : (
+        /* ============ NO BANNER — Compact Card ============ */
+        <CompactBrandHeader brand={brand} total={total} />
+      )}
 
       {/* ============================================================ */}
       {/* HIGHLIGHTS                                                   */}
       {/* ============================================================ */}
       {brand.highlights && brand.highlights.length > 0 && (
-        <section className="max-w-[1400px] mx-auto px-6 -mt-8 relative z-10">
+        <section className={`max-w-[1400px] mx-auto px-4 sm:px-6 ${hasBanner ? '-mt-6' : 'mt-6'} relative z-10`}>
           <div className="bg-white rounded-2xl shadow-lg border border-pink-100 p-5 sm:p-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {brand.highlights.map((h, i) => (
@@ -518,7 +521,7 @@ function BrandPage() {
       {/* OFFERS                                                       */}
       {/* ============================================================ */}
       {brand.offers && brand.offers.length > 0 && (
-        <section className="max-w-[1400px] mx-auto px-6 mt-8">
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-6 mt-6">
           <div className="bg-gradient-to-r from-pink-500 via-pink-500 to-rose-500 rounded-2xl shadow-xl p-6 sm:p-8 text-white">
             <div className="text-center mb-5">
               <p className="text-[10px] tracking-luxe-xl uppercase text-pink-100 mb-2">
@@ -561,7 +564,7 @@ function BrandPage() {
       {/* ============================================================ */}
       {/* BREADCRUMB                                                   */}
       {/* ============================================================ */}
-      <div className="max-w-[1400px] mx-auto px-6 pt-10">
+      <div className={`max-w-[1400px] mx-auto px-6 ${hasBanner ? 'pt-8' : 'pt-6'}`}>
         <nav className="flex items-center gap-2 text-[10px] tracking-luxe uppercase text-gray-400">
           <Link to="/" className="hover:text-pink-600 transition-colors">Home</Link>
           <span className="text-pink-400">✦</span>
@@ -574,8 +577,8 @@ function BrandPage() {
       {/* ============================================================ */}
       {/* MAIN                                                         */}
       {/* ============================================================ */}
-      <div id="collection" className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+      <div id="collection" className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
 
           {/* ==================== SIDEBAR ==================== */}
           <aside className="lg:col-span-3">
@@ -594,8 +597,7 @@ function BrandPage() {
                 sidebarOpen ? 'block' : 'hidden'
               } lg:block lg:sticky lg:top-24 bg-white border border-pink-100 rounded-2xl overflow-hidden shadow-sm`}
             >
-              {/* Header */}
-              <div className="px-6 py-6 border-b border-pink-100 bg-gradient-to-br from-pink-50 to-white">
+              <div className="px-6 py-5 border-b border-pink-100 bg-gradient-to-br from-pink-50 to-white">
                 <p className="text-[10px] tracking-luxe-xl uppercase text-pink-500 mb-2">
                   The Brands
                 </p>
@@ -605,7 +607,6 @@ function BrandPage() {
                 <div className="w-10 h-px bg-pink-400 mt-3" />
               </div>
 
-              {/* Search */}
               <div className="px-5 py-4 border-b border-pink-100">
                 <SearchableSelect
                   options={allBrands.map((b) => ({
@@ -621,7 +622,6 @@ function BrandPage() {
                 />
               </div>
 
-              {/* Brand list */}
               <div className="max-h-[60vh] overflow-y-auto py-2 scrollbar-pink">
                 {allBrands.map((b) => {
                   const active = b.slug === slug;
@@ -664,8 +664,7 @@ function BrandPage() {
                 })}
               </div>
 
-              {/* Footer flourish */}
-              <div className="px-6 py-5 border-t border-pink-100 text-center">
+              <div className="px-6 py-4 border-t border-pink-100 text-center">
                 <div className="inline-flex items-center gap-2 text-pink-300">
                   <span className="w-6 h-px bg-pink-300" />
                   <span className="text-xs">✦</span>
@@ -678,21 +677,19 @@ function BrandPage() {
           {/* ==================== PRODUCTS ==================== */}
           <main className="lg:col-span-9">
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 pb-6 border-b border-pink-200">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pb-5 border-b border-pink-200">
               <div>
-                <p className="text-[10px] tracking-luxe-xl uppercase text-pink-500 mb-3">
+                <p className="text-[10px] tracking-luxe-xl uppercase text-pink-500 mb-2">
                   The Collection
                 </p>
-                <h2 className="font-serif text-3xl sm:text-4xl text-gray-800 tracking-wide">
+                <h2 className="font-serif text-2xl sm:text-3xl text-gray-800 tracking-wide">
                   {brand.name}
                 </h2>
-                <p className="text-xs text-gray-500 mt-3 tracking-wider">
+                <p className="text-xs text-gray-500 mt-2 tracking-wider">
                   {total} {total === 1 ? 'piece' : 'pieces'} · Curated with care
                 </p>
               </div>
 
-              {/* Sort */}
               <div className="flex items-center gap-3">
                 <span className="text-[10px] tracking-luxe-lg uppercase text-gray-400">
                   Sort
@@ -716,9 +713,8 @@ function BrandPage() {
               </div>
             </div>
 
-            {/* Products */}
             {products.length === 0 ? (
-              <div className="py-28 text-center">
+              <div className="py-24 text-center">
                 <div className="text-pink-400 text-5xl mb-6 animate-float">✦</div>
                 <h3 className="font-serif text-2xl text-gray-800 mb-4">
                   Coming Soon
@@ -738,9 +734,8 @@ function BrandPage() {
                   ))}
                 </div>
 
-                {/* Load More */}
                 {hasMore && (
-                  <div className="text-center mt-16">
+                  <div className="text-center mt-14">
                     <button
                       onClick={loadMore}
                       disabled={loadingMore}
@@ -758,15 +753,14 @@ function BrandPage() {
                   </div>
                 )}
 
-                {/* End mark */}
                 {!hasMore && products.length > 0 && (
-                  <div className="text-center mt-16">
+                  <div className="text-center mt-14">
                     <div className="inline-flex items-center gap-3 text-pink-400">
                       <div className="w-12 h-px bg-pink-300" />
                       <span className="text-xs animate-soft-pulse">✦</span>
                       <div className="w-12 h-px bg-pink-300" />
                     </div>
-                    <p className="mt-4 text-[10px] tracking-luxe-xl uppercase text-gray-400">
+                    <p className="mt-3 text-[10px] tracking-luxe-xl uppercase text-gray-400">
                       End of Collection
                     </p>
                   </div>
@@ -780,21 +774,21 @@ function BrandPage() {
       {/* ============================================================ */}
       {/* TRUST BADGES                                                 */}
       {/* ============================================================ */}
-      <section className="bg-gradient-to-br from-pink-500 via-pink-500 to-rose-500 text-white py-16 mt-16">
+      <section className="bg-gradient-to-br from-pink-500 via-pink-500 to-rose-500 text-white py-14 mt-12">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="text-center mb-12">
+          <div className="text-center mb-10">
             <p className="text-[10px] tracking-luxe-xl uppercase text-pink-100 mb-3">
               The Promise
             </p>
-            <h3 className="font-serif text-3xl text-white tracking-wide">
+            <h3 className="font-serif text-2xl sm:text-3xl text-white tracking-wide">
               Why Shop With Us
             </h3>
-            <div className="divider-pink max-w-xs mx-auto mt-6 opacity-70">
+            <div className="divider-pink max-w-xs mx-auto mt-5 opacity-70">
               <span className="text-xs text-white">✦</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
               { icon: '✦', title: 'Curated', desc: 'Hand-selected' },
               { icon: '✧', title: 'Authentic', desc: '100% genuine' },
@@ -802,13 +796,13 @@ function BrandPage() {
               { icon: '✧', title: 'Support', desc: '24/7 help' },
             ].map((item, i) => (
               <div key={i} className="group">
-                <div className="text-white/90 text-3xl mb-4 group-hover:scale-125 transition-transform duration-500">
+                <div className="text-white/90 text-3xl mb-3 group-hover:scale-125 transition-transform duration-500">
                   {item.icon}
                 </div>
-                <p className="font-serif text-lg text-white mb-2 tracking-wide">
+                <p className="font-serif text-base sm:text-lg text-white mb-1 tracking-wide">
                   {item.title}
                 </p>
-                <p className="text-[11px] tracking-wider text-white/70 uppercase">
+                <p className="text-[10px] tracking-wider text-white/70 uppercase">
                   {item.desc}
                 </p>
               </div>
