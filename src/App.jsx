@@ -8,6 +8,8 @@ import { ReviewProvider } from './context/ReviewContext';
 import FloatingCartButton from './components/FloatingCartButton';
 import AdminAdAnalytics from './pages/admin/AdminAdAnalytics';
 import ErrorBoundary from './components/ErrorBoundary';
+import BrandPage from './pages/BrandPage';
+
 
 // ============================================================
 // ✅ LAZY WITH RETRY — network hiccup handle karega
@@ -168,6 +170,7 @@ function App() {
                     <Route path="/returns" element={<ReturnsPolicy />} />
                     <Route path="/faqs" element={<FAQs />} />
                     <Route path="/payment-callback" element={<PaymentSuccess />} />
+                    <Route path="/brand/:slug" element={<BrandPage />} />
 
                     {/* ============ CATEGORY PAGES ============ */}
                     {/* Purane (specific) routes — inse custom filters kaam karte hain */}
