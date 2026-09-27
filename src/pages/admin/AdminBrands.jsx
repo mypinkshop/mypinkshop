@@ -28,7 +28,7 @@ const EMOJI_OPTIONS = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Slugify helper                                                     */
+/* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 function slugify(str) {
   return String(str || '')
@@ -37,6 +37,81 @@ function slugify(str) {
     .replace(/&/g, 'and')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+/**
+ * ✅ Safe fetch with timeout + JSON parsing
+ */
+async function safeFetch(url, options = {}, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    let data = null;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Server ne invalid JSON bheja');
+      }
+    } else {
+      const text = await res.text().catch(() => '');
+      // HTML error page ya plain text
+      if (!res.ok) {
+        throw new Error(
+          `Server error (${res.status}): ${text.slice(0, 120) || 'No details'}`
+        );
+      }
+    }
+
+    return { res, data };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+/**
+ * ✅ Get user-friendly error message
+ */
+function getFriendlyError(err, defaultMsg = 'Kuch galat ho gaya') {
+  if (!err) return defaultMsg;
+
+  const msg = err.message || '';
+
+  if (err.name === 'AbortError' || msg.includes('aborted')) {
+    return 'Request timeout ho gayi. Internet check karo.';
+  }
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+    return 'Network error — server se connect nahi ho paya.';
+  }
+  if (msg.includes('invalid JSON')) {
+    return 'Server ne galat response bheja. Baad me try karo.';
+  }
+  if (msg.toLowerCase().includes('name is required')) {
+    return 'Brand Name required hai';
+  }
+  if (msg.toLowerCase().includes('slug')) {
+    return 'Slug required hai ya invalid hai';
+  }
+  if (msg.toLowerCase().includes('already exists')) {
+    return 'Ye brand already exist karta hai (same name ya slug)';
+  }
+  if (msg.toLowerCase().includes('not found')) {
+    return 'Brand nahi mila. Refresh karo.';
+  }
+  if (msg.toLowerCase().includes('unauthorized') || msg.includes('401')) {
+    return 'Session expire ho gaya. Please login again.';
+  }
+  if (msg.toLowerCase().includes('forbidden') || msg.includes('403')) {
+    return 'Aapko is action ki permission nahi hai';
+  }
+
+  return msg || defaultMsg;
 }
 
 /* ------------------------------------------------------------------ */
@@ -49,15 +124,13 @@ function AdminBrands() {
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [editingBrand, setEditingBrand] = useState(null); // null = new
-  const [mobileTab, setMobileTab] = useState('list'); // 'list' | 'edit' | 'preview'
+  const [editingBrand, setEditingBrand] = useState(null);
+  const [mobileTab, setMobileTab] = useState('list');
   const [previewMode, setPreviewMode] = useState('desktop');
 
-  // Filters
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // all, active, inactive, featured
+  const [filter, setFilter] = useState('all');
 
-  // Form
   const [formData, setFormData] = useState(emptyForm());
   const [logoPreview, setLogoPreview] = useState('');
   const [bannerPreview, setBannerPreview] = useState('');
@@ -83,34 +156,49 @@ function AdminBrands() {
     };
   }
 
+  /* ---------------------- Handle token expiry ---------------------- */
+  const handleAuthError = useCallback(() => {
+    localStorage.removeItem('adminToken');
+    toast.error('Session expire ho gaya. Please login again.');
+    navigate('/admin/login');
+  }, [navigate]);
+
   /* ---------------------- Load brands ---------------------- */
   const loadBrands = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${API_BASE}/brands/admin/all`, {
+
+      if (!token) {
+        handleAuthError();
+        return;
+      }
+
+      const { res, data } = await safeFetch(`${API_BASE}/brands/admin/all`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.status === 401) {
-        localStorage.removeItem('adminToken');
-        navigate('/admin/login');
+        handleAuthError();
         return;
       }
 
-      const json = await res.json();
-      if (json.success) {
-        setBrands(json.data || []);
+      if (!res.ok) {
+        throw new Error(data?.error || `Load failed (HTTP ${res.status})`);
+      }
+
+      if (data?.success) {
+        setBrands(data.data || []);
       } else {
-        toast.error('Failed to load brands');
+        throw new Error(data?.error || 'Brands load nahi ho paye');
       }
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to load brands');
+      console.error('Load brands error:', err);
+      toast.error(getFriendlyError(err, 'Brands load nahi ho paye'));
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [handleAuthError]);
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -128,7 +216,9 @@ function AdminBrands() {
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
-        (b) => b.name.toLowerCase().includes(q) || b.slug.toLowerCase().includes(q)
+        (b) =>
+          (b.name || '').toLowerCase().includes(q) ||
+          (b.slug || '').toLowerCase().includes(q)
       );
     }
 
@@ -139,7 +229,7 @@ function AdminBrands() {
     return list;
   }, [brands, search, filter]);
 
-  /* ---------------------- Select brand for edit ---------------------- */
+  /* ---------------------- Select brand ---------------------- */
   const handleSelectBrand = (brand) => {
     setEditingBrand(brand);
     setFormData({
@@ -186,7 +276,7 @@ function AdminBrands() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 500 * 1024) {
-      toast.error('Logo must be under 500KB');
+      toast.error('Logo 500KB se chhota hona chahiye');
       return;
     }
     const reader = new FileReader();
@@ -201,7 +291,7 @@ function AdminBrands() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 1024 * 1024) {
-      toast.error('Banner must be under 1MB');
+      toast.error('Banner 1MB se chhota hona chahiye');
       return;
     }
     const reader = new FileReader();
@@ -215,12 +305,10 @@ function AdminBrands() {
   /* ---------------------- Highlights ---------------------- */
   const addHighlight = (preset = null) => {
     if (formData.highlights.length >= 8) {
-      toast.error('Max 8 highlights');
+      toast.error('Max 8 highlights allowed hain');
       return;
     }
-    const newItem = preset
-      ? { ...preset }
-      : { icon: '✨', title: '', desc: '' };
+    const newItem = preset ? { ...preset } : { icon: '✨', title: '', desc: '' };
     setFormData((p) => ({ ...p, highlights: [...p.highlights, newItem] }));
   };
 
@@ -252,7 +340,7 @@ function AdminBrands() {
   /* ---------------------- Offers ---------------------- */
   const addOffer = () => {
     if (formData.offers.length >= 5) {
-      toast.error('Max 5 offers');
+      toast.error('Max 5 offers allowed hain');
       return;
     }
     setFormData((p) => ({
@@ -278,18 +366,27 @@ function AdminBrands() {
 
   /* ---------------------- Save ---------------------- */
   const handleSave = async () => {
-    if (!formData.name.trim()) {
-      toast.error('Brand name is required');
-      return;
-    }
-    if (!formData.slug.trim()) {
-      toast.error('Slug is required');
+    // ✅ Field-level validation
+    const missing = [];
+    if (!formData.name?.trim()) missing.push('Brand Name');
+    if (!formData.slug?.trim()) missing.push('Slug');
+
+    if (missing.length > 0) {
+      toast.error(`Ye fields required hain: ${missing.join(', ')}`, {
+        duration: 4000,
+      });
       return;
     }
 
     setSaving(true);
+
     try {
       const token = localStorage.getItem('adminToken');
+      if (!token) {
+        handleAuthError();
+        return;
+      }
+
       const payload = {
         name: formData.name.trim(),
         slug: formData.slug.trim(),
@@ -309,7 +406,7 @@ function AdminBrands() {
         ? `${API_BASE}/brands/${editingBrand.id}`
         : `${API_BASE}/brands`;
 
-      const res = await fetch(url, {
+      const { res, data } = await safeFetch(url, {
         method: editingBrand ? 'PUT' : 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -318,20 +415,41 @@ function AdminBrands() {
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Save failed');
+      // ✅ HTTP status specific messages
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+      if (res.status === 403) {
+        throw new Error('Aapko is action ki permission nahi hai');
+      }
+      if (res.status === 409) {
+        throw new Error(data?.error || 'Ye brand already exist karta hai (same name ya slug)');
+      }
+      if (res.status === 400) {
+        throw new Error(data?.error || 'Kuch fields invalid hain. Please check karo.');
+      }
+      if (res.status >= 500) {
+        throw new Error(data?.error || 'Server me problem hai. Baad me try karo.');
+      }
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `Save failed (HTTP ${res.status})`);
       }
 
-      toast.success(editingBrand ? 'Brand updated!' : 'Brand created!');
+      // ✅ Success
+      toast.success(
+        editingBrand ? '✅ Brand update ho gaya!' : '✅ Brand create ho gaya!',
+        { duration: 3000 }
+      );
+
       await loadBrands();
 
-      if (!editingBrand && json.data) {
-        handleSelectBrand(json.data);
+      if (!editingBrand && data.data) {
+        handleSelectBrand(data.data);
       }
     } catch (err) {
-      console.error(err);
-      toast.error(err.message || 'Save failed');
+      console.error('Save error:', err);
+      toast.error(getFriendlyError(err, 'Save nahi ho paya'), { duration: 5000 });
     } finally {
       setSaving(false);
     }
@@ -340,19 +458,40 @@ function AdminBrands() {
   /* ---------------------- Delete ---------------------- */
   const handleDelete = async (brand) => {
     if (!window.confirm(`Delete "${brand.name}" permanently?`)) return;
+
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${API_BASE}/brands/${brand.id}`, {
+      if (!token) {
+        handleAuthError();
+        return;
+      }
+
+      const { res, data } = await safeFetch(`${API_BASE}/brands/${brand.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Delete failed');
-      toast.success('Brand deleted');
+
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (res.status === 404) {
+        toast.error('Brand nahi mila. Refresh kar rahe hain...');
+        await loadBrands();
+        return;
+      }
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Delete nahi ho paya');
+      }
+
+      toast.success('✅ Brand delete ho gaya');
       await loadBrands();
       if (editingBrand?.id === brand.id) handleNewBrand();
     } catch (err) {
-      toast.error(err.message || 'Delete failed');
+      console.error('Delete error:', err);
+      toast.error(getFriendlyError(err, 'Delete nahi ho paya'), { duration: 5000 });
     }
   };
 
@@ -360,7 +499,12 @@ function AdminBrands() {
   const toggleField = async (brand, field) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`${API_BASE}/brands/${brand.id}`, {
+      if (!token) {
+        handleAuthError();
+        return;
+      }
+
+      const { res, data } = await safeFetch(`${API_BASE}/brands/${brand.id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -368,23 +512,49 @@ function AdminBrands() {
         },
         body: JSON.stringify({ [field]: !brand[field] }),
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Update failed');
+
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Update nahi ho paya');
+      }
+
+      const fieldName = field === 'active' ? 'Status' : 'Featured';
+      const newVal = !brand[field];
+      toast.success(
+        `${fieldName} ${newVal ? 'enable' : 'disable'} ho gaya`,
+        { duration: 2000 }
+      );
+
       await loadBrands();
-      if (editingBrand?.id === brand.id && json.data) handleSelectBrand(json.data);
+      if (editingBrand?.id === brand.id && data.data) {
+        handleSelectBrand(data.data);
+      }
     } catch (err) {
-      toast.error(err.message || 'Update failed');
+      console.error('Toggle error:', err);
+      toast.error(getFriendlyError(err, 'Update nahi ho paya'), { duration: 4000 });
     }
   };
 
   /* ---------------------- Copy link ---------------------- */
   const copyLink = () => {
+    if (!formData.slug) {
+      toast.error('Pehle slug bharo');
+      return;
+    }
     const url = `${window.location.origin}/brand/${formData.slug}`;
     navigator.clipboard.writeText(url);
-    toast.success('Link copied!');
+    toast.success('Link copied! 📋');
   };
 
   const testLink = () => {
+    if (!formData.slug) {
+      toast.error('Pehle slug bharo');
+      return;
+    }
     window.open(`/brand/${formData.slug}`, '_blank');
   };
 
@@ -454,7 +624,7 @@ function AdminBrands() {
       {/* Main 3-column layout */}
       <div className="max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_400px] gap-4 p-4 sm:p-6">
-          {/* ==================== COLUMN 1: BRANDS LIST ==================== */}
+          {/* ==================== COLUMN 1: LIST ==================== */}
           <aside
             className={`${
               mobileTab === 'list' ? 'block' : 'hidden'
@@ -670,7 +840,7 @@ function AdminBrands() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Brand Name *
+                    Brand Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -682,7 +852,7 @@ function AdminBrands() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Slug (URL) *
+                    Slug (URL) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -749,7 +919,6 @@ function AdminBrands() {
                   </button>
                 </div>
 
-                {/* Presets */}
                 {formData.highlights.length < 8 && (
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {HIGHLIGHT_PRESETS.slice(0, 6).map((p, i) => (
@@ -956,10 +1125,10 @@ function AdminBrands() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+                  className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving
-                    ? 'Saving...'
+                    ? '⏳ Saving...'
                     : editingBrand
                     ? '💾 Update Brand'
                     : '🚀 Create Brand'}
@@ -1099,7 +1268,7 @@ function AdminBrands() {
                     </div>
                   )}
 
-                  {/* Status indicators */}
+                  {/* Status */}
                   <div className="mt-3 flex flex-wrap gap-2 justify-center">
                     {formData.active ? (
                       <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
