@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import SearchableSelect from '../../components/SearchableSelect';
+import SearchableMultiSelect from '../../components/SearchableMultiSelect';
 import BannerRenderer from '../../components/BannerRenderer';
 
 const API_BASE = import.meta.env.VITE_API_URL
@@ -17,89 +18,6 @@ function slugify(str) {
     .replace(/&/g, 'and')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-}
-
-/* ------------------------------------------------------------------ */
-/* Checkbox List Component                                            */
-/* ------------------------------------------------------------------ */
-function CheckboxList({ options, selected = [], onChange, columns = 2, emptyText = 'No options' }) {
-  if (!options || options.length === 0) {
-    return (
-      <div className="text-xs text-gray-400 py-2 px-3 bg-gray-50 rounded-lg">
-        {emptyText}
-      </div>
-    );
-  }
-
-  const toggle = (value) => {
-    if (selected.includes(value)) {
-      onChange(selected.filter((v) => v !== value));
-    } else {
-      onChange([...selected, value]);
-    }
-  };
-
-  const selectAll = () => {
-    onChange(options.map((o) => o.value));
-  };
-
-  const clearAll = () => {
-    onChange([]);
-  };
-
-  return (
-    <div>
-      {/* Actions */}
-      <div className="flex gap-2 mb-2">
-        <button
-          type="button"
-          onClick={selectAll}
-          className="text-[10px] px-2 py-0.5 bg-pink-50 text-pink-600 rounded hover:bg-pink-100 font-medium"
-        >
-          Select All
-        </button>
-        <button
-          type="button"
-          onClick={clearAll}
-          className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium"
-        >
-          Clear
-        </button>
-        <span className="text-[10px] text-gray-400 self-center ml-auto">
-          {selected.length} selected
-        </span>
-      </div>
-
-      {/* Checkboxes */}
-      <div
-        className={`grid gap-1.5 ${
-          columns === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
-        }`}
-      >
-        {options.map((opt) => {
-          const checked = selected.includes(opt.value);
-          return (
-            <label
-              key={opt.value}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-xs ${
-                checked
-                  ? 'border-pink-500 bg-pink-50 text-pink-700 font-medium'
-                  : 'border-pink-100 bg-white hover:border-pink-300 hover:bg-pink-50/50'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                onChange={() => toggle(opt.value)}
-                className="w-4 h-4 accent-pink-500 shrink-0"
-              />
-              <span className="truncate">{opt.label}</span>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,10 +64,9 @@ function AdminBanners() {
       order: 1,
       active: true,
       showTextOverlay: true,
-      // ✅ Multi-select arrays
       categories: [],
+      subcategories: [],
       positions: ['home_hero'],
-      // Single
       size: 'large',
       display_style: 'single',
       link_type: 'custom',
@@ -228,7 +145,6 @@ function AdminBanners() {
         fetch(`${API_BASE}/categories/tree`).then((r) => r.json()),
       ]);
 
-      // Brands — { success, data }
       if (brandsRes.status === 'fulfilled') {
         const res = brandsRes.value;
         const b = Array.isArray(res) ? res : (res.data || []);
@@ -237,7 +153,6 @@ function AdminBanners() {
         );
       }
 
-      // Products
       if (productsRes.status === 'fulfilled') {
         const res = productsRes.value;
         const list = Array.isArray(res)
@@ -246,7 +161,6 @@ function AdminBanners() {
         setProducts(list);
       }
 
-      // Categories
       if (catRes.status === 'fulfilled') {
         const res = catRes.value;
         const list = Array.isArray(res)
@@ -293,14 +207,13 @@ function AdminBanners() {
   const handleSelectBanner = (b) => {
     setEditingBanner(b);
 
-    // Backward compat: agar purana single `category` aaya to array me convert karo
-    const categories = Array.isArray(b.categories)
+    const cats = Array.isArray(b.categories)
       ? b.categories
       : b.category
       ? [b.category]
       : [];
 
-    const positions = Array.isArray(b.positions)
+    const poss = Array.isArray(b.positions)
       ? b.positions
       : b.position
       ? [b.position]
@@ -314,8 +227,9 @@ function AdminBanners() {
       order: b.order || 1,
       active: b.active !== false,
       showTextOverlay: b.showTextOverlay !== false,
-      categories,
-      positions,
+      categories: cats,
+      subcategories: Array.isArray(b.subcategories) ? b.subcategories : [],
+      positions: poss,
       size: b.size || 'large',
       display_style: b.display_style || 'single',
       link_type: b.link_type || 'custom',
@@ -376,16 +290,13 @@ function AdminBanners() {
     const token = localStorage.getItem('adminToken');
     const form = new FormData();
 
-    // Single fields
     ['title', 'subtitle', 'buttonText', 'link', 'size', 'display_style', 'link_type'].forEach(
-      (k) => {
-        form.append(k, data[k] || '');
-      }
+      (k) => form.append(k, data[k] || '')
     );
 
-    // ✅ Multi-select — arrays
     form.append('categories', JSON.stringify(data.categories || []));
     form.append('positions', JSON.stringify(data.positions || []));
+    form.append('subcategories', JSON.stringify(data.subcategories || []));
 
     form.append('order', data.order);
     form.append('active', data.active);
@@ -497,16 +408,17 @@ function AdminBanners() {
 
   /* ------------------------- Auto-suggest size/style ------------------------- */
   const applySizeGuide = (positions) => {
-    // Pehli selected position se size/style suggest karo
-    if (!positions || positions.length === 0) return;
+    if (!positions || positions.length === 0) {
+      setFormData((p) => ({ ...p, positions }));
+      return;
+    }
     const firstPos = positions[0];
     const pos = options.positions.find((p) => p.value === firstPos);
-    if (!pos) return;
     setFormData((p) => ({
       ...p,
       positions,
-      size: pos.size || p.size,
-      display_style: pos.style || p.display_style,
+      size: pos?.size || p.size,
+      display_style: pos?.style || p.display_style,
     }));
   };
 
@@ -520,7 +432,6 @@ function AdminBanners() {
     () => ({
       ...formData,
       images: imagePreviews.length ? imagePreviews : formData.images,
-      // Backward compat for BannerRenderer
       category: formData.categories?.[0] || null,
       position: formData.positions?.[0] || 'home_hero',
     }),
@@ -640,9 +551,12 @@ function AdminBanners() {
                 </div>
               ) : (
                 filteredBanners.map((b) => {
-                  const isActive = editingBanner?.id === b.id || editingBanner?._id === b.id;
-                  const positions = b.positions || (b.position ? [b.position] : []);
-                  const categories = b.categories || (b.category ? [b.category] : []);
+                  const isActive =
+                    editingBanner?.id === b.id || editingBanner?._id === b.id;
+                  const positions =
+                    b.positions || (b.position ? [b.position] : []);
+                  const categories =
+                    b.categories || (b.category ? [b.category] : []);
                   return (
                     <button
                       key={b._id || b.id}
@@ -805,75 +719,60 @@ function AdminBanners() {
                 )}
               </div>
 
-              {/* ============ MULTI-SELECT: POSITIONS ============ */}
+              {/* POSITIONS — multi-select dropdown */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  📍 Positions{' '}
-                  <span className="text-pink-500 font-bold">
-                    (multi-select — 1+ choose karo)
-                  </span>
-                </label>
                 {optionsLoading ? (
                   <div className="text-xs text-gray-400 py-2">
                     Loading positions...
                   </div>
                 ) : (
-                  <CheckboxList
+                  <SearchableMultiSelect
+                    label="📍 Positions (multi-select)"
                     options={options.positions}
                     selected={formData.positions || []}
                     onChange={(vals) => applySizeGuide(vals)}
-                    columns={2}
+                    placeholder="Search positions..."
+                    emptyText="No positions available"
                   />
                 )}
                 {currentPositionGuide && (
-                  <p className="text-[10px] text-gray-500 mt-2">
+                  <p className="text-[10px] text-gray-500 mt-1.5">
                     📏 Recommended (first position): {currentPositionGuide.px} ({currentPositionGuide.ratio})
                   </p>
                 )}
               </div>
 
-              {/* ============ MULTI-SELECT: CATEGORIES ============ */}
+              {/* CATEGORIES — multi-select dropdown */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  📂 Categories{' '}
-                  <span className="text-gray-400">
-                    (multi-select — khaali = Global)
-                  </span>
-                </label>
-                <CheckboxList
+                <SearchableMultiSelect
+                  label="📂 Categories (khaali = Global)"
                   options={categories}
                   selected={formData.categories || []}
                   onChange={(vals) =>
                     setFormData({ ...formData, categories: vals })
                   }
-                  columns={2}
+                  placeholder="Search categories..."
                   emptyText="No categories available"
                 />
                 {formData.categories.length === 0 && (
-                  <p className="text-[10px] text-green-600 mt-1">
+                  <p className="text-[10px] text-green-600 mt-1.5">
                     ✓ Global — saare pages pe dikhega
                   </p>
                 )}
               </div>
 
-              {/* ============ MULTI-SELECT: SUBCATEGORIES ============ */}
+              {/* SUBCATEGORIES — multi-select dropdown (agar options hain) */}
               {subcategories.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">
-                    📁 Subcategories{' '}
-                    <span className="text-gray-400">
-                      (optional, multi-select)
-                    </span>
-                  </label>
-                  <CheckboxList
-                    options={subcategories}
-                    selected={formData.subcategories || []}
-                    onChange={(vals) =>
-                      setFormData({ ...formData, subcategories: vals })
-                    }
-                    columns={2}
-                  />
-                </div>
+                <SearchableMultiSelect
+                  label="📁 Subcategories (optional)"
+                  options={subcategories}
+                  selected={formData.subcategories || []}
+                  onChange={(vals) =>
+                    setFormData({ ...formData, subcategories: vals })
+                  }
+                  placeholder="Search subcategories..."
+                  emptyText="No subcategories available"
+                />
               )}
 
               {/* SIZE — backend se, single */}
