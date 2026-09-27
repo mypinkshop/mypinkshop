@@ -1167,7 +1167,13 @@ function ProductDetail() {
                       </div>
                       <div className="p-3">
                         {rp.brand && (
-                          <p className="text-[10px] text-pink-600 font-bold uppercase tracking-wider mb-1">{rp.brand}</p>
+                       <Link
+                       to={`/brand/${slugify(rp.brand)}`}
+                       onClick={(e) => e.stopPropagation()}
+                       className="text-[10px] text-pink-600 font-bold uppercase tracking-wider mb-1 inline-block hover:underline"
+                        >
+                       {rp.brand}
+                        </Link>
                         )}
                         <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 min-h-[2.5rem] mb-2">
                           {rp.name}
