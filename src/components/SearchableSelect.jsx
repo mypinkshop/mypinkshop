@@ -1,16 +1,16 @@
-// src/components/SearchableSelect.jsx
-// Reusable searchable dropdown — brand, product, subcategory sab ke liye
-import { useState, useEffect, useRef } from 'react';
+// src/components/SearchableMultiSelect.jsx
+// Multi-select searchable dropdown — positions, categories, subcategories sab ke liye
+import { useState, useEffect, useRef, useMemo } from 'react';
 
-function SearchableSelect({
+function SearchableMultiSelect({
   label = 'Select',
-  options = [],              // [{ value, label }] ya ["SKINQ", "Mamaearth"]
-  value = '',
-  onChange,
+  options = [],              // [{ value, label }] ya ["Garnier", "Mamaearth"]
+  selected = [],             // array of values
+  onChange,                  // (newArray) => void
   placeholder = 'Search...',
-  allowCustom = false,
   disabled = false,
   maxHeight = 240,
+  emptyText = 'No options',
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -18,22 +18,34 @@ function SearchableSelect({
   const inputRef = useRef(null);
 
   // Normalize options — string ya object dono handle karo
-  const normalized = options.map((opt) =>
-    typeof opt === 'string'
-      ? { value: opt, label: opt }
-      : { value: opt.value, label: opt.label ?? opt.value }
-  );
+  const normalized = useMemo(() => {
+    return options.map((opt) =>
+      typeof opt === 'string'
+        ? { value: opt, label: opt }
+        : { value: opt.value, label: opt.label ?? opt.value }
+    );
+  }, [options]);
 
   // Filter by search
-  const filtered = search.trim()
-    ? normalized.filter((o) =>
-        o.label.toLowerCase().includes(search.toLowerCase())
-      )
-    : normalized;
+  const filtered = useMemo(() => {
+    if (!search.trim()) return normalized;
+    const q = search.toLowerCase();
+    return normalized.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        String(o.value).toLowerCase().includes(q)
+    );
+  }, [normalized, search]);
 
-  // Selected ka label dhundho
-  const selectedLabel =
-    normalized.find((o) => o.value === value)?.label || value || '';
+  // Selected labels — chips ke liye
+  const selectedLabels = useMemo(() => {
+    return selected
+      .map((v) => {
+        const found = normalized.find((o) => o.value === v);
+        return { value: v, label: found?.label || v };
+      })
+      .filter(Boolean);
+  }, [selected, normalized]);
 
   // Close on outside click
   useEffect(() => {
@@ -50,24 +62,32 @@ function SearchableSelect({
   // Focus input when opened
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
 
-  const handleSelect = (opt) => {
-    onChange(opt.value);
-    setIsOpen(false);
-    setSearch('');
+  const toggle = (value) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
   };
 
-  const handleCustomAdd = () => {
-    if (!search.trim()) return;
-    onChange(search.trim());
-    setIsOpen(false);
-    setSearch('');
+  const removeOne = (value) => {
+    onChange(selected.filter((v) => v !== value));
   };
 
-  // Keyboard: Enter pe first result select, Escape pe close
+  const selectAll = () => {
+    const allValues = filtered.map((o) => o.value);
+    const merged = [...new Set([...selected, ...allValues])];
+    onChange(merged);
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') {
       setIsOpen(false);
@@ -75,8 +95,15 @@ function SearchableSelect({
     }
     if (e.key === 'Enter' && filtered.length > 0) {
       e.preventDefault();
-      handleSelect(filtered[0]);
+      toggle(filtered[0].value);
     }
+  };
+
+  /* Trigger text */
+  const triggerText = () => {
+    if (selected.length === 0) return null;
+    if (selected.length === 1) return selectedLabels[0]?.label || '';
+    return `${selected.length} selected`;
   };
 
   return (
@@ -87,7 +114,7 @@ function SearchableSelect({
         </label>
       )}
 
-      {/* Selected value / trigger */}
+      {/* Trigger */}
       <button
         type="button"
         disabled={disabled}
@@ -96,16 +123,47 @@ function SearchableSelect({
           ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:border-pink-400'}
           ${isOpen ? 'ring-2 ring-pink-500 border-transparent' : 'border-gray-200'}`}
       >
-        <span className={selectedLabel ? 'text-gray-800' : 'text-gray-400'}>
-          {selectedLabel || placeholder}
+        <span className={`truncate ${selected.length > 0 ? 'text-gray-800' : 'text-gray-400'}`}>
+          {triggerText() || placeholder}
         </span>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
+
+      {/* Selected chips — 1+ selected hone pe */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {selectedLabels.slice(0, 5).map((item) => (
+            <span
+              key={item.value}
+              className="inline-flex items-center gap-1 bg-pink-50 text-pink-600 text-xs px-2 py-1 rounded-full border border-pink-100"
+            >
+              <span className="truncate max-w-[120px]">{item.label}</span>
+              <button
+                type="button"
+                onClick={() => removeOne(item.value)}
+                className="hover:text-pink-800 shrink-0"
+                aria-label="Remove"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+          {selected.length > 5 && (
+            <span className="text-xs text-gray-400 self-center">
+              +{selected.length - 5} more
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Dropdown */}
       {isOpen && (
@@ -123,37 +181,76 @@ function SearchableSelect({
             />
           </div>
 
+          {/* Actions bar */}
+          <div className="flex items-center gap-3 px-3 py-1.5 border-b border-gray-100 bg-gray-50 text-[11px]">
+            <button
+              type="button"
+              onClick={selectAll}
+              className="text-pink-600 hover:text-pink-700 font-medium"
+            >
+              Select All
+            </button>
+            <span className="text-gray-300">|</span>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-gray-500 hover:text-gray-700 font-medium"
+            >
+              Clear
+            </button>
+            <span className="ml-auto text-gray-400">
+              {selected.length} selected
+            </span>
+          </div>
+
           {/* Options list */}
           <div className="overflow-y-auto" style={{ maxHeight }}>
             {filtered.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-400 text-center">
-                No results found
+                {search.trim() ? 'No results found' : emptyText}
               </div>
             ) : (
-              filtered.slice(0, 100).map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => handleSelect(opt)}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-pink-50 transition
-                    ${opt.value === value ? 'bg-pink-50 text-pink-600 font-medium' : 'text-gray-700'}`}
-                >
-                  {opt.label}
-                </button>
-              ))
-            )}
-
-            {/* Custom add */}
-            {allowCustom && search.trim() && !filtered.some(
-              (o) => o.label.toLowerCase() === search.trim().toLowerCase()
-            ) && (
-              <button
-                type="button"
-                onClick={handleCustomAdd}
-                className="w-full text-left px-4 py-2 text-sm text-pink-600 hover:bg-pink-50 border-t border-gray-100 font-medium"
-              >
-                + Add "{search.trim()}"
-              </button>
+              filtered.slice(0, 100).map((opt) => {
+                const checked = selected.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => toggle(opt.value)}
+                    className={`w-full text-left px-4 py-2 text-sm transition flex items-center gap-3 ${
+                      checked ? 'bg-pink-50 text-pink-700' : 'text-gray-700 hover:bg-pink-50'
+                    }`}
+                  >
+                    {/* Custom checkbox */}
+                    <span
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition ${
+                        checked
+                          ? 'bg-pink-500 border-pink-500'
+                          : 'border-gray-300 bg-white'
+                      }`}
+                    >
+                      {checked && (
+                        <svg
+                          className="w-2.5 h-2.5 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          strokeWidth={3}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )}
+                    </span>
+                    <span className={`truncate ${checked ? 'font-medium' : ''}`}>
+                      {opt.label}
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -162,4 +259,4 @@ function SearchableSelect({
   );
 }
 
-export default SearchableSelect;
+export default SearchableMultiSelect;
