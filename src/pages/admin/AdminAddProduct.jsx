@@ -1,738 +1,1848 @@
-// src/routes/products.js
-import { Hono } from 'hono';
-import { authMiddleware, requireAdmin } from './auth.js';
-import { ok, fail, genId, parsePagination, safeJsonArray } from '../lib/utils.js';
+// src/pages/admin/AdminAddProduct.jsx
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
-const products = new Hono();
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-// ============================================================
-// HELPERS
-// ============================================================
-function safeJsonObject(val) {
-  if (!val) return {};
-  if (typeof val === 'object' && !Array.isArray(val)) return val;
-  if (typeof val === 'string') {
-    try {
-      const parsed = JSON.parse(val);
-      return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-  return {};
-}
-
-const toSafeString = (val) => {
-  if (val === null || val === undefined) return '';
-  if (Array.isArray(val)) return val.join(', ');
-  if (typeof val === 'object') return JSON.stringify(val);
-  return String(val);
+/* ============================================================ */
+/* SEO HELPERS                                                  */
+/* ============================================================ */
+const SEO_LIMITS = {
+  TITLE_MAX: 60,
+  DESCRIPTION_MAX: 155,
+  KEYWORDS_MAX: 15,
 };
 
-const toSafeJsonString = (val) => {
-  if (!val) return JSON.stringify([]);
-  if (typeof val === 'string') {
-    try { JSON.parse(val); return val; } catch { return JSON.stringify([val]); }
-  }
-  return JSON.stringify(val);
+const shortenText = (text, maxLen) => {
+  if (!text) return '';
+  const clean = String(text).trim().replace(/\s+/g, ' ');
+  if (clean.length <= maxLen) return clean;
+  return clean.substring(0, maxLen).trim() + '...';
 };
 
-const toSafeJsonObjectString = (val) => {
-  if (!val) return JSON.stringify({});
-  if (typeof val === 'string') {
-    try {
-      const parsed = JSON.parse(val);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return val;
-      return JSON.stringify({});
-    } catch {
-      return JSON.stringify({});
+const generateMetaTitle = (name, brand) => {
+  if (!name) return 'MyPinkShop';
+  const cleanName = String(name).trim().replace(/\s+/g, ' ');
+  const cleanBrand = brand ? String(brand).trim() : '';
+  const storePart = ' | MyPinkShop';
+
+  const featureWords = new Set([
+    'long', 'lasting', 'waterproof', 'smudge', 'proof', 'ultra', 'super',
+    'premium', 'best', 'new', 'latest', 'smooth', 'silky', 'soft', 'gentle',
+    'strong', 'rich', 'pure', 'natural', 'organic', 'herbal', 'fresh',
+    'for', 'with', 'and', 'the', 'a', 'an', 'of', 'in', 'on', 'to',
+  ]);
+
+  const words = cleanName.split(' ');
+  let startIndex = 0;
+  if (cleanBrand) {
+    const brandWords = cleanBrand.toLowerCase().split(' ');
+    const nameFirstWords = words.slice(0, brandWords.length).map(w => w.toLowerCase());
+    if (nameFirstWords.join(' ') === brandWords.join(' ')) {
+      startIndex = brandWords.length;
     }
   }
-  if (typeof val === 'object' && !Array.isArray(val)) {
-    return JSON.stringify(val);
+
+  const meaningfulWords = words.slice(startIndex).filter(w =>
+    w.length > 1 && !featureWords.has(w.toLowerCase())
+  );
+
+  const productPart = meaningfulWords.slice(0, 3).join(' ');
+  const brandPart = cleanBrand ? `${cleanBrand} ` : '';
+
+  if (productPart) {
+    return `${brandPart}${productPart}${storePart}`.trim().slice(0, SEO_LIMITS.TITLE_MAX);
   }
-  return JSON.stringify({});
+  return `${brandPart.trim()}${storePart}`.trim();
 };
 
-const makeSlug = (s) => String(s || '')
-  .toLowerCase()
-  .trim()
-  .replace(/&/g, 'and')
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-|-$/g, '');
-
-/**
- * ✅ AUTO-CALCULATE DISCOUNT
- * Har price/original_price change pe discount recalculate hoga
- */
-function calculateDiscount(price, originalPrice) {
-  const p = parseFloat(price) || 0;
-  const op = parseFloat(originalPrice) || 0;
-  if (op > 0 && op > p) {
-    return Math.round(((op - p) / op) * 100);
+const generateMetaDescription = (name, brand, subCategory, category) => {
+  if (!name) return 'Shop online at MyPinkShop.';
+  const shortName = shortenText(name, 50);
+  const brandPart = brand ? ` by ${brand}` : '';
+  const catPart = subCategory ? ` ${subCategory}` : (category ? ` ${category}` : '');
+  let desc = `Buy ${shortName}${brandPart} online at best price.${catPart} with ✓ Free Shipping ✓ COD. Shop at MyPinkShop.`;
+  if (desc.length > SEO_LIMITS.DESCRIPTION_MAX) {
+    desc = desc.substring(0, SEO_LIMITS.DESCRIPTION_MAX - 3).trim() + '...';
   }
-  return 0;
-}
+  return desc;
+};
 
-// ============================================================
-// AUTO-CREATE CATEGORY
-// ============================================================
-async function ensureCategory(db, name, type = 'main', parentId = null) {
-  if (!name || !String(name).trim()) return null;
-  const cleanName = String(name).trim();
-
-  try {
-    if (type === 'main') {
-      const existing = await db.prepare(
-        'SELECT id FROM categories WHERE LOWER(name) = LOWER(?)'
-      ).bind(cleanName).first();
-      if (existing) return existing.id;
-
-      const id = 'cat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      await db.prepare(
-        `INSERT INTO categories (id, name, slug, icon, status, "order", type)
-         VALUES (?, ?, ?, '📁', 'active', 999, 'main')`
-      ).bind(id, cleanName, makeSlug(cleanName)).run();
-      return id;
-    }
-
-    if (type === 'sub' && parentId) {
-      const existing = await db.prepare(
-        'SELECT id FROM categories WHERE LOWER(name) = LOWER(?) AND parent_id = ?'
-      ).bind(cleanName, parentId).first();
-      if (existing) return existing.id;
-
-      const id = 'cat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      await db.prepare(
-        `INSERT INTO categories (id, name, slug, icon, status, "order", type, parent_id)
-         VALUES (?, ?, ?, '📁', 'active', 999, 'sub', ?)`
-      ).bind(id, cleanName, makeSlug(cleanName), parentId).run();
-      return id;
-    }
-
-    return null;
-  } catch (err) {
-    console.warn('ensureCategory failed:', err.message);
-    return null;
+const generateMetaKeywords = (name, brand, category, subCategory, keyFeatures = []) => {
+  const keywords = [];
+  if (brand) keywords.push(brand);
+  if (brand && subCategory) keywords.push(`${brand} ${subCategory}`);
+  if (name) {
+    const shortName = name.split(' ').slice(0, 4).join(' ');
+    if (shortName.length > 3) keywords.push(shortName);
   }
-}
+  if (category) keywords.push(category);
+  if (subCategory) {
+    keywords.push(subCategory);
+    keywords.push(`${subCategory} online`);
+  }
+  if (Array.isArray(keyFeatures)) {
+    keyFeatures.slice(0, 3).forEach(f => {
+      const words = String(f).split(' ').slice(0, 3).join(' ');
+      if (words.length > 3 && words.length < 30) keywords.push(words);
+    });
+  }
+  keywords.push('buy online', 'best price', 'free shipping', 'MyPinkShop');
+  const unique = [...new Set(keywords.map(k => k.trim().toLowerCase()).filter(Boolean))];
+  return unique.slice(0, SEO_LIMITS.KEYWORDS_MAX).join(', ');
+};
 
-// ============================================================
-// SERIALIZE PRODUCT
-// ============================================================
-function serializeProduct(row) {
-  if (!row) return null;
-  const images = safeJsonArray(row.images);
+const FALLBACK_BRANDS = ['Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'Lakmé', 'Maybelline', 'Loreal Paris', 'Plum', 'Wow Skin Science', 'Biotique', 'Forest Essentials', 'MyGlamm', 'MAC', 'The Face Shop', 'Kama Ayurveda', 'Mcaffeine', 'Estee Lauder', 'Clinique', 'Huda Beauty', 'St.Botanica', 'Richfem', 'SKINQ', 'Fashion Colour'];
 
-  // ✅ Auto-calculate discount (agar DB me purana/galat ho)
-  const calculatedDiscount = calculateDiscount(row.price, row.original_price);
-  const discountPercent = calculatedDiscount > 0
-    ? calculatedDiscount
-    : (parseFloat(row.discount_percent) || 0);
+/* ============================================================ */
+/* AMAZON IMPORTER                                              */
+/* ============================================================ */
+const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
+  const [urls, setUrls] = useState(['']);
+  const [loading, setLoading] = useState(false);
+  const [importedProducts, setImportedProducts] = useState([]);
+  const token = localStorage.getItem('adminToken');
 
-  return {
-    ...row,
-    id: row.id,
-    _id: row.id,
-    images: images,
-    aboutThisItem: safeJsonArray(row.about_this_item),
-    keyFeatures: safeJsonArray(row.key_features),
-    variations: safeJsonArray(row.variations),
-    specifications: safeJsonObject(row.specifications),
-    shortDescription: row.short_description || '',
-    isActive: !!row.is_active,
-    isFeatured: !!row.is_featured,
-    hasVariations: !!row.has_variations,
-    option1Name: row.option1_name || 'Size',
-    option2Name: row.option2_name || 'Color',
-    adminApproved: row.admin_approved === 1 || row.admin_approved === true,
-    status: row.is_active ? 'active' : 'inactive',
-    is_active: row.is_active,
-    category: row.main_category,
-    mainCategory: row.main_category,
-    subcategory: row.sub_category,
-    subCategory: row.sub_category,
-    metaTitle: row.meta_title,
-    metaDescription: row.meta_description,
-    metaKeywords: row.meta_keywords,
-    slug: row.slug,
-    skinType: row.skin_type,
-    hairType: row.hair_type,
-    hairConcerns: row.hair_concerns,
-    // ✅ Discount — calculated value use karo
-    discountPercent: discountPercent,
-    discount_percent: discountPercent,
-    seoMeta: {
-      "@context": "https://schema.org/",
-      "@type": "Product",
-      "name": row.name,
-      "image": images,
-      "description": row.description || `Buy ${row.name} online at best price in India on MyPinkShop. Free Shipping & COD available.`,
-      "brand": { "@type": "Brand", "name": row.brand || "MyPinkShop" },
-      "sku": row.sku || row.id,
-      "offers": {
-        "@type": "Offer",
-        "url": `https://www.mypinkshop.com/product/${row.id}`,
-        "priceCurrency": "INR",
-        "price": row.price,
-        "priceValidUntil": "2027-12-31",
-        "itemCondition": "https://schema.org/NewCondition",
-        "availability": row.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-        "seller": { "@type": "Organization", "name": "MyPinkShop" }
+  const garbageWords = ['See more product details', 'Report an issue', 'Product Description', 'To see our price', 'See more', 'Product details', 'Would you like to', 'Tell us about', 'Brief content visible', 'double tap to read full content', 'full content visible', 'double tap to read', 'Read more', 'Read less'];
+
+  const cleanText = (text) => {
+    if (!text) return '';
+    return text.replace(/【.*?】/g, '').replace(/\s+/g, ' ').trim();
+  };
+
+  const isGarbage = (text) => {
+    if (!text || text.length < 15) return true;
+    for (const word of garbageWords) {
+      if (text.toLowerCase().includes(word.toLowerCase())) return true;
+    }
+    return false;
+  };
+
+  const detectCategoryFromName = (productName) => {
+    const name = productName.toLowerCase();
+    const categoryKeywords = {
+      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
+      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
+      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
+    };
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      for (const keyword of keywords) {
+        if (name.includes(keyword)) return category;
       }
     }
+    return 'Skincare';
   };
-}
 
-// ============================================================
-// SERIALIZE PRODUCT + VARIANTS
-// ============================================================
-async function serializeProductWithVariants(db, row, includeInactive = false) {
-  const base = serializeProduct(row);
-  if (!base) return null;
+  const detectSubCategoryFromName = (productName, category) => {
+    const name = productName.toLowerCase();
+    const subCategoryMap = {
+      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
+      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
+    };
+    const subCats = subCategoryMap[category] || [];
+    for (const sub of subCats) {
+      if (name.includes(sub.toLowerCase())) return sub;
+    }
+    return '';
+  };
 
-  try {
-    const where = includeInactive
-      ? 'WHERE product_id = ?'
-      : 'WHERE product_id = ? AND is_active = 1';
+  const addUrlField = () => {
+    if (urls.length < 20) setUrls([...urls, '']);
+    else toast.error('Maximum 20 URLs allowed');
+  };
 
-    const { results: variants } = await db.prepare(
-      `SELECT * FROM product_variants ${where} ORDER BY option1_value ASC, option2_value ASC`
-    ).bind(row.id).all();
+  const removeUrlField = (index) => setUrls(urls.filter((_, i) => i !== index));
 
-    const parentImages = safeJsonArray(row.images);
-    const fallbackImage = parentImages[0] || '';
+  const updateUrl = (index, value) => {
+    const newUrls = [...urls];
+    newUrls[index] = value;
+    setUrls(newUrls);
+  };
 
-    base.variants = (variants || []).map(v => ({
-      id: v.id,
-      sku: v.sku,
-      option1: { name: v.option1_name || base.option1Name, value: v.option1_value || '' },
-      option2: { name: v.option2_name || base.option2Name, value: v.option2_value || '' },
-      price: v.price,
-      compareAtPrice: v.compare_at_price,
-      stock: v.stock,
-      image: v.image || fallbackImage,
-      barcode: v.barcode || '',
-      weight: v.weight || 0,
-      inStock: v.stock > 0,
-      isActive: !!v.is_active,
+  const fetchAllProducts = async () => {
+    const validUrls = urls.filter(u => u.trim());
+    if (validUrls.length === 0) {
+      toast.error('Please enter at least one Amazon URL');
+      return;
+    }
+    setLoading(true);
+    const results = [];
+    for (let i = 0; i < validUrls.length; i++) {
+      const url = validUrls[i];
+      try {
+        const response = await fetch(`${API_URL}/api/import/amazon`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ url })
+        });
+        const data = await response.json();
+        if (data.success) {
+          const detectedCat = detectCategoryFromName(data.scraped.name);
+          const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
+          results.push({ ...data.scraped, originalUrl: url, detectedCategory: detectedCat, detectedSubCategory: detectedSub });
+        } else {
+          results.push({ error: data.error || 'Unknown error', originalUrl: url });
+        }
+      } catch (error) {
+        results.push({ error: error.message, originalUrl: url });
+      }
+    }
+    setImportedProducts(results);
+    setLoading(false);
+  };
+
+  const importToForm = (product) => {
+    let descriptionArray = [];
+    if (Array.isArray(product.description)) {
+      descriptionArray = product.description.filter(item => !isGarbage(item));
+    } else if (typeof product.description === 'string') {
+      descriptionArray = product.description
+        .split(/\n|•|\*|\d+\./)
+        .map(item => cleanText(item))
+        .filter(item => !isGarbage(item));
+    }
+    descriptionArray = [...new Set(descriptionArray)].slice(0, 15);
+
+    const keyFeaturesArray = (Array.isArray(product.keyFeatures) ? product.keyFeatures : [])
+      .filter(item => !isGarbage(item))
+      .slice(0, 10);
+
+    const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
+    const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
+
+    const metaTitle = generateMetaTitle(product.name, product.brand);
+    const metaDescription = generateMetaDescription(product.name, product.brand, detectedSubCategory, detectedCategory);
+    const metaKeywords = generateMetaKeywords(product.name, product.brand, detectedCategory, detectedSubCategory, keyFeaturesArray);
+
+    setFormData(prev => ({
+      ...prev,
+      productName: product.name,
+      brand: product.brand || prev.brand,
+      sellingPrice: product.price,
+      mrp: product.originalPrice || product.price * 1.2,
+      fullDescription: descriptionArray,
+      keyFeatures: keyFeaturesArray,
+      images: product.images || [],
+      metaTitle,
+      metaDescription,
+      metaKeywords,
+      category: detectedCategory,
+      subCategory: detectedSubCategory,
+      weight: product.weight || '',
+      ingredients: product.ingredients || '',
+      skinType: product.skinType || 'all',
+      concerns: product.concerns || []
     }));
 
-    base.availableColors = [...new Set(
-      base.variants.map(v => v.option2.value).filter(Boolean)
-    )];
-    base.availableSizes = [...new Set(
-      base.variants.map(v => v.option1.value).filter(Boolean)
-    )];
+    if (product.images && product.images.length > 0) setImages(product.images);
 
-    if (base.variants.length > 0) {
-      const prices = base.variants.map(v => Number(v.price) || 0).filter(p => p > 0);
-      if (prices.length > 0) {
-        base.priceRange = {
-          min: Math.min(...prices),
-          max: Math.max(...prices),
-        };
+    if (product.variations && product.variations.length > 0) {
+      const formattedVariations = product.variations.map((v, idx) => ({
+        id: Date.now() + idx,
+        name: v.name,
+        price: v.price || product.price,
+        mrp: v.mrp || product.originalPrice || product.price * 1.2,
+        stock: v.stock || 10,
+        sku: v.sku || `VAR-${Date.now()}-${idx}`,
+        image: v.image || '',
+        attributes: v.attributes || {}
+      }));
+      setVariations(formattedVariations);
+    }
+
+    toast.success(`✅ Imported! Category: ${detectedCategory}`);
+    if (onProductImported) onProductImported();
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border-2 border-pink-200 p-4 sm:p-5 mb-6 shadow-sm">
+      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-2xl">📦</span> Import from Amazon
+        <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full">Multi-URL Support</span>
+      </h3>
+      <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Amazon product URLs (Up to 20 URLs)</p>
+      <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+        {urls.map((url, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input type="text" placeholder="https://www.amazon.in/dp/XXXXXXXXXX" value={url} onChange={(e) => updateUrl(idx, e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 bg-white text-sm" />
+            {urls.length > 1 && (
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">✕</button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <button onClick={addUrlField} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-xs sm:text-sm">
+          ➕ Add Another ({urls.length}/20)
+        </button>
+        <button onClick={fetchAllProducts} disabled={loading} className="px-4 sm:px-5 py-1.5 sm:py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition disabled:opacity-50 text-xs sm:text-sm">
+          {loading ? '⏳ Fetching...' : '🔍 Fetch All'}
+        </button>
+      </div>
+      {importedProducts.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Fetched Products ({importedProducts.length})</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {importedProducts.map((product, idx) => (
+              <div key={idx} className={`p-2 sm:p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-sm'}`}>
+                <div className="flex-1 min-w-0">
+                  {product.error ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-red-600 font-medium truncate">❌ Failed: {product.originalUrl}</p>
+                      <p className="text-xs text-red-400">{product.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-gray-800 text-xs sm:text-sm truncate">{product.name}</p>
+                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'} | 🏷️ {product.detectedCategory}</p>
+                    </>
+                  )}
+                </div>
+                {!product.error && (
+                  <button onClick={() => importToForm(product)} className="px-3 sm:px-4 py-1.5 bg-green-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">
+                    📥 Import
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ============================================================ */
+/* FLIPKART IMPORTER                                            */
+/* ============================================================ */
+const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setImages }) => {
+  const [urls, setUrls] = useState(['']);
+  const [loading, setLoading] = useState(false);
+  const [importedProducts, setImportedProducts] = useState([]);
+  const token = localStorage.getItem('adminToken');
+
+  const garbageWords = ['See more product details', 'Report an issue', 'Product Description', 'Flipkart', 'See more', 'Product details', 'Would you like to', 'Buy now', 'Add to cart', 'Extra discount', 'Bank offer'];
+
+  const cleanText = (text) => {
+    if (!text) return '';
+    return text.replace(/【.*?】/g, '').replace(/\s+/g, ' ').trim();
+  };
+
+  const isGarbage = (text) => {
+    if (!text || text.length < 15) return true;
+    for (const word of garbageWords) {
+      if (text.toLowerCase().includes(word.toLowerCase())) return true;
+    }
+    return false;
+  };
+
+  const detectCategoryFromName = (productName) => {
+    const name = productName.toLowerCase();
+    const categoryKeywords = {
+      'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
+      'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
+      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+      'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
+    };
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      for (const keyword of keywords) {
+        if (name.includes(keyword)) return category;
       }
     }
-  } catch (err) {
-    console.warn('serializeProductWithVariants failed:', err.message);
-    base.variants = [];
-    base.availableColors = [];
-    base.availableSizes = [];
-  }
+    return 'Skincare';
+  };
 
-  return base;
-}
-
-// ============================================================
-// SAVE VARIANTS
-// ============================================================
-async function saveVariants(db, productId, variants, option1Name = 'Size', option2Name = 'Color') {
-  if (!Array.isArray(variants) || variants.length === 0) return;
-
-  for (const v of variants) {
-    const variantId = v.id || ('var_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
-    const sku = v.sku || `${productId}-${makeSlug(v.option1Value || v.option1?.value || '')}-${makeSlug(v.option2Value || v.option2?.value || '')}`;
-
-    await db.prepare(
-      `INSERT INTO product_variants
-        (id, product_id, sku, option1_name, option1_value, option2_name, option2_value,
-         price, compare_at_price, stock, image, barcode, weight, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-    ).bind(
-      variantId,
-      productId,
-      sku,
-      v.option1Name || option1Name,
-      v.option1Value || v.option1?.value || '',
-      v.option2Name || option2Name,
-      v.option2Value || v.option2?.value || '',
-      parseFloat(v.price) || 0,
-      parseFloat(v.compareAtPrice || v.compare_at_price) || 0,
-      parseInt(v.stock) || 0,
-      v.image || '',
-      v.barcode || '',
-      parseFloat(v.weight) || 0,
-      v.isActive === false ? 0 : 1
-    ).run();
-  }
-}
-
-// ============================================================
-// REPLACE VARIANTS
-// ============================================================
-async function replaceVariants(db, productId, variants, option1Name = 'Size', option2Name = 'Color') {
-  await db.prepare('DELETE FROM product_variants WHERE product_id = ?').bind(productId).run();
-  await saveVariants(db, productId, variants, option1Name, option2Name);
-}
-
-// ============================================================
-// GET /api/products
-// ✅ Search me SKU
-// ✅ Brand filter
-// ✅ Sort by discount_high
-// ============================================================
-products.get('/', async (c) => {
-  try {
-    const url = new URL(c.req.url);
-    const category = url.searchParams.get('category');
-    const subCategory = url.searchParams.get('subCategory');
-    const search = url.searchParams.get('search');
-    const brand = url.searchParams.get('brand');
-    const minPrice = url.searchParams.get('minPrice');
-    const maxPrice = url.searchParams.get('maxPrice');
-    const featured = url.searchParams.get('featured');
-    const sort = url.searchParams.get('sort') || 'newest';
-    const { page, limit, offset } = parsePagination(c);
-
-    const conditions = ['is_active = 1'];
-    const bindings = [];
-
-    if (category) {
-      conditions.push('main_category = ?');
-      bindings.push(category);
+  const detectSubCategoryFromName = (productName, category) => {
+    const name = productName.toLowerCase();
+    const subCategoryMap = {
+      'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+      'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
+      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+      'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
+    };
+    const subCats = subCategoryMap[category] || [];
+    for (const sub of subCats) {
+      if (name.includes(sub.toLowerCase())) return sub;
     }
-    if (subCategory) {
-      conditions.push('sub_category = ?');
-      bindings.push(subCategory);
+    return '';
+  };
+
+  const addUrlField = () => {
+    if (urls.length < 20) setUrls([...urls, '']);
+    else toast.error('Maximum 20 URLs allowed');
+  };
+
+  const removeUrlField = (index) => setUrls(urls.filter((_, i) => i !== index));
+
+  const updateUrl = (index, value) => {
+    const newUrls = [...urls];
+    newUrls[index] = value;
+    setUrls(newUrls);
+  };
+
+  const fetchAllProducts = async () => {
+    const validUrls = urls.filter(u => u.trim());
+    if (validUrls.length === 0) {
+      toast.error('Please enter at least one Flipkart URL');
+      return;
     }
-    if (brand) {
-      conditions.push('LOWER(brand) = LOWER(?)');
-      bindings.push(brand);
+    setLoading(true);
+    const results = [];
+    for (let i = 0; i < validUrls.length; i++) {
+      const url = validUrls[i];
+      try {
+        const response = await fetch(`${API_URL}/api/import/flipkart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ url })
+        });
+        const data = await response.json();
+        if (data.success) {
+          const detectedCat = detectCategoryFromName(data.scraped.name);
+          const detectedSub = detectSubCategoryFromName(data.scraped.name, detectedCat);
+          results.push({ ...data.scraped, originalUrl: url, detectedCategory: detectedCat, detectedSubCategory: detectedSub });
+        } else {
+          results.push({ error: data.error || 'Unknown error', originalUrl: url });
+        }
+      } catch (error) {
+        results.push({ error: error.message, originalUrl: url });
+      }
     }
-    // ✅ Search — title + brand + description + SKU
-    if (search) {
-      conditions.push('(name LIKE ? OR brand LIKE ? OR description LIKE ? OR sku LIKE ?)');
-      const like = `%${search}%`;
-      bindings.push(like, like, like, like);
+    setImportedProducts(results);
+    setLoading(false);
+  };
+
+  const importToForm = (product) => {
+    let descriptionArray = [];
+    if (Array.isArray(product.description)) {
+      descriptionArray = product.description.filter(item => !isGarbage(item));
+    } else if (typeof product.description === 'string') {
+      descriptionArray = product.description
+        .split(/\n|•|\*|\d+\./)
+        .map(item => cleanText(item))
+        .filter(item => !isGarbage(item));
     }
-    if (minPrice && !Number.isNaN(Number(minPrice))) {
-      conditions.push('price >= ?');
-      bindings.push(Number(minPrice));
-    }
-    if (maxPrice && !Number.isNaN(Number(maxPrice))) {
-      conditions.push('price <= ?');
-      bindings.push(Number(maxPrice));
-    }
-    if (featured === 'true') {
-      conditions.push('is_featured = 1');
+    descriptionArray = [...new Set(descriptionArray)].slice(0, 15);
+
+    const keyFeaturesArray = (Array.isArray(product.keyFeatures) ? product.keyFeatures : [])
+      .filter(item => !isGarbage(item))
+      .slice(0, 10);
+
+    const detectedCategory = product.detectedCategory || detectCategoryFromName(product.name);
+    const detectedSubCategory = product.detectedSubCategory || detectSubCategoryFromName(product.name, detectedCategory);
+
+    const metaTitle = generateMetaTitle(product.name, product.brand);
+    const metaDescription = generateMetaDescription(product.name, product.brand, detectedSubCategory, detectedCategory);
+    const metaKeywords = generateMetaKeywords(product.name, product.brand, detectedCategory, detectedSubCategory, keyFeaturesArray);
+
+    setFormData(prev => ({
+      ...prev,
+      productName: product.name,
+      brand: product.brand || prev.brand,
+      sellingPrice: product.price,
+      mrp: product.originalPrice || product.price * 1.2,
+      fullDescription: descriptionArray,
+      keyFeatures: keyFeaturesArray,
+      images: product.images || [],
+      metaTitle,
+      metaDescription,
+      metaKeywords,
+      category: detectedCategory,
+      subCategory: detectedSubCategory,
+      weight: product.weight || '',
+      ingredients: product.ingredients || '',
+      skinType: product.skinType || 'all',
+      concerns: product.concerns || []
+    }));
+
+    if (product.images && product.images.length > 0) setImages(product.images);
+
+    if (product.variations && product.variations.length > 0) {
+      const formattedVariations = product.variations.map((v, idx) => ({
+        id: Date.now() + idx,
+        name: v.name,
+        price: v.price || product.price,
+        mrp: v.mrp || product.originalPrice || product.price * 1.2,
+        stock: v.stock || 10,
+        sku: v.sku || `VAR-${Date.now()}-${idx}`,
+        image: v.image || '',
+        attributes: v.attributes || {}
+      }));
+      setVariations(formattedVariations);
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    toast.success(`✅ Imported! Category: ${detectedCategory}`);
+    if (onProductImported) onProductImported();
+  };
 
-    // ✅ Sort options
-    let orderClause = 'ORDER BY created_at DESC';
-    if (sort === 'price_asc' || sort === 'price_low') orderClause = 'ORDER BY price ASC';
-    else if (sort === 'price_desc' || sort === 'price_high') orderClause = 'ORDER BY price DESC';
-    else if (sort === 'rating') orderClause = 'ORDER BY rating DESC, review_count DESC';
-    else if (sort === 'popular') orderClause = 'ORDER BY review_count DESC, rating DESC, created_at DESC';
-    else if (sort === 'discount_high' || sort === 'discount') {
-      orderClause = `ORDER BY 
-        CASE 
-          WHEN original_price > price AND original_price > 0 
-          THEN (original_price - price) * 100.0 / original_price 
-          ELSE 0 
-        END DESC, rating DESC`;
+  return (
+    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border-2 border-yellow-200 p-4 sm:p-5 mb-6 shadow-sm">
+      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-2xl">🛒</span> Import from Flipkart
+        <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full">Multi-URL Support</span>
+      </h3>
+      <p className="text-xs sm:text-sm text-gray-500 mb-4">Paste Flipkart product URLs (Up to 20 URLs)</p>
+      <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+        {urls.map((url, idx) => (
+          <div key={idx} className="flex gap-2">
+            <input type="text" placeholder="https://www.flipkart.com/..." value={url} onChange={(e) => updateUrl(idx, e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 bg-white text-sm" />
+            {urls.length > 1 && (
+              <button onClick={() => removeUrlField(idx)} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition text-sm">✕</button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <button onClick={addUrlField} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-xs sm:text-sm">
+          ➕ Add Another ({urls.length}/20)
+        </button>
+        <button onClick={fetchAllProducts} disabled={loading} className="px-4 sm:px-5 py-1.5 sm:py-2 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition disabled:opacity-50 text-xs sm:text-sm">
+          {loading ? '⏳ Fetching...' : '🔍 Fetch All'}
+        </button>
+      </div>
+      {importedProducts.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <h4 className="font-medium text-gray-700 mb-3 text-xs sm:text-sm">📋 Fetched Products ({importedProducts.length})</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {importedProducts.map((product, idx) => (
+              <div key={idx} className={`p-2 sm:p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${product.error ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200 hover:shadow-sm'}`}>
+                <div className="flex-1 min-w-0">
+                  {product.error ? (
+                    <>
+                      <p className="text-xs sm:text-sm text-red-600 font-medium truncate">❌ Failed: {product.originalUrl}</p>
+                      <p className="text-xs text-red-400">{product.error}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium text-gray-800 text-xs sm:text-sm truncate">{product.name}</p>
+                      <p className="text-xs text-gray-500">₹{product.price} | {product.brand || 'No brand'} | 🏷️ {product.detectedCategory}</p>
+                    </>
+                  )}
+                </div>
+                {!product.error && (
+                  <button onClick={() => importToForm(product)} className="px-3 sm:px-4 py-1.5 bg-green-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition whitespace-nowrap">
+                    📥 Import
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="mt-3 p-2 sm:p-3 bg-yellow-50 rounded-lg">
+        <p className="text-xs text-yellow-600">💡 Tip: Category, SubCategory, SEO tags auto-detected!</p>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================ */
+/* VARIATION SELECT WITH SEARCH                                 */
+/* ============================================================ */
+const VariationSelectWithSearch = ({ label, options, value, onChange, placeholder = "Select or type..." }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSelect = (selectedValue) => {
+    if (selectedValue === '__CUSTOM__') {
+      setIsCustomMode(true);
+      setCustomValue('');
+    } else {
+      onChange(selectedValue);
+      setSearchTerm('');
+      setIsCustomMode(false);
     }
-    else if (sort === 'newest') orderClause = 'ORDER BY created_at DESC';
+  };
 
-    const listQuery = `SELECT * FROM products ${whereClause} ${orderClause} LIMIT ? OFFSET ?`;
-    const countQuery = `SELECT COUNT(*) as total FROM products ${whereClause}`;
+  const handleSaveCustom = () => {
+    if (customValue.trim()) {
+      onChange(customValue.trim());
+      setIsCustomMode(false);
+      setCustomValue('');
+      setSearchTerm('');
+    }
+  };
 
-    const { results } = await c.env.DB.prepare(listQuery)
-      .bind(...bindings, limit, offset)
-      .all();
-
-    const countRow = await c.env.DB.prepare(countQuery).bind(...bindings).first();
-    const total = countRow?.total || 0;
-
-    const serialized = await Promise.all(
-      (results || []).map(row => serializeProductWithVariants(c.env.DB, row))
+  if (isCustomMode) {
+    return (
+      <div>
+        <label className="block text-sm font-medium mb-1.5">{label}</label>
+        <div className="flex gap-2">
+          <input type="text" value={customValue} onChange={(e) => setCustomValue(e.target.value)} placeholder="Enter custom value..." className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400" autoFocus />
+          <button onClick={handleSaveCustom} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Save</button>
+          <button onClick={() => setIsCustomMode(false)} className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Cancel</button>
+        </div>
+      </div>
     );
+  }
 
-    return ok(c, serialized, {
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5">{label}</label>
+      <div className="relative">
+        <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={placeholder} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-400" />
+        {searchTerm && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(opt => (
+                <button key={opt} type="button" onClick={() => handleSelect(opt)} className="w-full text-left px-3 py-2 hover:bg-pink-50 text-sm transition">
+                  {opt}
+                  {value === opt && <span className="float-right text-green-500">✓</span>}
+                </button>
+              ))
+            ) : (
+              <button type="button" onClick={() => handleSelect('__CUSTOM__')} className="w-full text-left px-3 py-2 text-pink-600 hover:bg-pink-50 text-sm border-t">
+                + Add custom "{searchTerm}"
+              </button>
+            )}
+          </div>
+        )}
+        {value && !searchTerm && (
+          <div className="mt-2 px-3 py-2 bg-pink-50 rounded-lg text-sm text-pink-600 border border-pink-200 flex justify-between items-center">
+            <span>✓ Selected: {value}</span>
+            <button onClick={() => setIsCustomMode(true)} className="text-xs text-blue-500 hover:text-blue-700">Change</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================ */
+/* MAIN COMPONENT                                               */
+/* ============================================================ */
+function AdminAddProduct() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [brandSearch, setBrandSearch] = useState('');
+  const [showAddBrand, setShowAddBrand] = useState(false);
+  const [newBrand, setNewBrand] = useState('');
+  const [showAddSubCategory, setShowAddSubCategory] = useState(false);
+  const [newSubCategory, setNewSubCategory] = useState('');
+  const [selectedVariationIds, setSelectedVariationIds] = useState([]);
+  const [expandedVariationId, setExpandedVariationId] = useState(null);
+  const [apiCategories, setApiCategories] = useState([]);
+  const [apiSubCategories, setApiSubCategories] = useState({});
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [brands, setBrands] = useState(FALLBACK_BRANDS);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+
+  const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
+
+  const [customSubCategories, setCustomSubCategories] = useState({
+    Skincare: [], Makeup: [], Haircare: [], Fashion: [], Accessories: [],
+    Electronics: [], 'Home & Kitchen': [], 'Health & Wellness': [], 'Books & Stationery': []
+  });
+
+  const [activeTab, setActiveTab] = useState('manual');
+
+  const [seoData, setSeoData] = useState({ metaTitle: '', metaDescription: '', metaKeywords: '', slug: '' });
+
+  const [formData, setFormData] = useState({
+    productName: '', brand: '', category: '', subCategory: '', images: [],
+    mrp: '', sellingPrice: '', tax: 18, sku: '', stock: 10, fullDescription: [], keyFeatures: [],
+    weight: '', dimensions: '',
+    skinType: 'all', concerns: [], ingredients: '',
+    finish: '', coverage: '', shade: '',
+    hairType: 'all', hairConcerns: [],
+    fabric: '', material: '', gender: 'unisex'
+  });
+
+  const [variations, setVariations] = useState([]);
+  const [variationModalOpen, setVariationModalOpen] = useState(false);
+  const [editingVariation, setEditingVariation] = useState(null);
+  const [variationForm, setVariationForm] = useState({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} });
+  const [currentBullet, setCurrentBullet] = useState('');
+  const [keyFeature, setKeyFeature] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
+
+  const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+  /* ------------------ Fetch Categories ------------------ */
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const res = await fetch(`${API_URL}/api/categories/tree`);
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const json = await res.json();
+        const tree = json.data || json;
+        setApiCategories(tree);
+        const subMap = {};
+        tree.forEach(cat => {
+          subMap[cat.name] = (cat.children || []).map(child => child.name);
+        });
+        setApiSubCategories(subMap);
+      } catch (err) {
+        console.error('Categories fetch error:', err);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  /* ------------------ Fetch Brands ------------------ */
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        setBrandsLoading(true);
+        const res = await fetch(`${API_URL}/api/brands`);
+        if (!res.ok) throw new Error('Failed to fetch brands');
+        const json = await res.json();
+        const brandList = json.data || json;
+
+        const savedBrands = localStorage.getItem('brandsList');
+        let customBrands = [];
+        if (savedBrands) {
+          try {
+            customBrands = JSON.parse(savedBrands);
+            if (!Array.isArray(customBrands)) customBrands = [];
+          } catch (e) { customBrands = []; }
+        }
+
+        // Brand objects → names
+        const apiBrands = Array.isArray(brandList)
+          ? brandList.map(b => (typeof b === 'string' ? b : b.name)).filter(Boolean)
+          : [];
+
+        const allBrands = [...new Set([...apiBrands, ...customBrands, ...FALLBACK_BRANDS])].filter(Boolean).sort();
+        setBrands(allBrands);
+      } catch (err) {
+        console.error('Brands fetch error:', err);
+        setBrands(FALLBACK_BRANDS);
+      } finally {
+        setBrandsLoading(false);
+      }
+    };
+    fetchBrands();
+  }, []);
+
+  /* ------------------ SEO Auto-Generate ------------------ */
+  useEffect(() => {
+    if (!formData.productName) {
+      setSeoData({
+        metaTitle: 'Add New Product | MyPinkShop',
+        metaDescription: 'Shop online at MyPinkShop.',
+        metaKeywords: 'online shopping, best price, MyPinkShop',
+        slug: productId
+      });
+      return;
+    }
+    const metaTitle = generateMetaTitle(formData.productName, formData.brand);
+    const metaDescription = generateMetaDescription(formData.productName, formData.brand, formData.subCategory, formData.category);
+    const metaKeywords = generateMetaKeywords(formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures);
+    setSeoData({ metaTitle, metaDescription, metaKeywords, slug: productId });
+  }, [formData.productName, formData.brand, formData.category, formData.subCategory, formData.keyFeatures, productId]);
+
+  /* ------------------ Constants ------------------ */
+  const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots', 'Uneven Texture', 'Large Pores'];
+  const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Creamy', 'Powder', 'Liquid', 'Velvet'];
+  const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer', 'Buildable'];
+  const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
+  const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
+
+  const fallbackSubCategories = {
+    Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+    Makeup: ['Foundation', 'Concealer', 'Compact Powder', 'Primer', 'Highlighter', 'Blush', 'Lipstick', 'Lip Gloss', 'Eyeshadow', 'Eyeliner', 'Kajal', 'Mascara'],
+    Haircare: ['Shampoo', 'Conditioner', 'Hair Mask', 'Hair Oil', 'Hair Serum', 'Hair Color'],
+    Fashion: ['T-Shirt', 'Top', 'Kurti', 'Saree', 'Lehenga', 'Dress', 'Jeans', 'Jacket', 'Nightwear'],
+    Accessories: ['Bag', 'Handbag', 'Jewelry', 'Necklace', 'Earrings', 'Watch', 'Sunglasses', 'Belt', 'Scarf'],
+    Electronics: ['Mobile Phones', 'Mobile Accessories', 'Chargers & Cables', 'Power Banks', 'Earphones', 'Headphones', 'Keyboards', 'Mouse', 'Smart Watches'],
+    'Home & Kitchen': ['Kitchen Tools', 'Storage & Organizers', 'Home Decor', 'Wall Art', 'Bedding', 'Cushions', 'Bathroom Accessories'],
+    'Health & Wellness': ['Supplements', 'Ayurvedic Products', 'Personal Care', 'Fitness & Yoga', 'Health Devices'],
+    'Books & Stationery': ['Fiction', 'Non-Fiction', 'Self-Help', 'Academic', 'Notebooks & Diaries', 'Pens & Pencils', 'Art Supplies']
+  };
+
+  const getCategoryKey = () => {
+    const cat = formData.category;
+    const map = { 'Hair': 'Haircare', 'Clothing': 'Fashion' };
+    return map[cat] || cat;
+  };
+
+  const getVariationAttributes = () => {
+    const categoryKey = getCategoryKey();
+    switch (categoryKey) {
+      case 'Skincare':
+        return { type: 'Size', options: ['15ml', '30ml', '50ml', '100ml', '150ml', '200ml', '250ml', '500ml'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Ayurvedic'] };
+      case 'Makeup':
+        return { type: 'Shade', options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Red', 'Pink', 'Nude', 'Coral', 'Berry'], secondary: 'Finish', secondaryOptions: ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic'] };
+      case 'Haircare':
+        return { type: 'Size', options: ['100ml', '200ml', '300ml', '500ml', '1L'], secondary: 'Variant', secondaryOptions: ['Original', 'Herbal', 'Organic', 'Sulfate Free'] };
+      case 'Fashion':
+        return { type: 'Size', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'], secondary: 'Color', secondaryOptions: ['Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Purple', 'Yellow', 'Navy', 'Grey'] };
+      case 'Accessories':
+        return { type: 'Size', options: ['One Size', 'S', 'M', 'L', 'Free Size', 'Adjustable'], secondary: 'Color', secondaryOptions: ['Gold', 'Silver', 'Rose Gold', 'Black', 'White', 'Multicolor'] };
+      case 'Electronics':
+        return { type: 'Variant', options: ['Standard', 'Pro', 'Plus', 'Lite', 'Max'], secondary: 'Color', secondaryOptions: ['Black', 'White', 'Silver', 'Blue', 'Grey'] };
+      default:
+        return { type: 'Variant', options: ['Default'], secondary: null, secondaryOptions: [] };
+    }
+  };
+
+  const variationAttrs = getVariationAttributes();
+
+  useEffect(() => {
+    const savedSubCategories = localStorage.getItem('customSubCategories');
+    if (savedSubCategories) {
+      try { setCustomSubCategories(JSON.parse(savedSubCategories)); } catch (e) { /* ignore */ }
+    }
+  }, []);
+
+  const saveBrands = (updatedBrands) => {
+    setBrands(updatedBrands);
+    const customBrands = updatedBrands.filter(b => !FALLBACK_BRANDS.includes(b));
+    localStorage.setItem('brandsList', JSON.stringify(customBrands));
+  };
+
+  const saveCustomSubCategory = (category, newSubCat) => {
+    const updated = { ...customSubCategories, [category]: [...(customSubCategories[category] || []), newSubCat] };
+    setCustomSubCategories(updated);
+    localStorage.setItem('customSubCategories', JSON.stringify(updated));
+  };
+
+  const getCurrentSubCategories = () => {
+    const category = formData.category;
+    if (!category) return [];
+    const apiSubs = apiSubCategories[category] || [];
+    const fallbackSubs = fallbackSubCategories[category] || [];
+    const customSubs = customSubCategories[category] || [];
+    return [...new Set([...apiSubs, ...fallbackSubs, ...customSubs])];
+  };
+
+  const handleAddNewSubCategory = () => {
+    if (newSubCategory.trim() && formData.category) {
+      const currentOptions = getCurrentSubCategories();
+      if (!currentOptions.includes(newSubCategory.trim())) {
+        saveCustomSubCategory(formData.category, newSubCategory.trim());
+        setFormData({ ...formData, subCategory: newSubCategory.trim() });
+        setNewSubCategory('');
+        setShowAddSubCategory(false);
+        toast.success(`✅ Sub-category "${newSubCategory.trim()}" added!`);
+      } else {
+        toast.error('⚠️ Already exists!');
+      }
+    } else {
+      toast.error('Please select a category first');
+    }
+  };
+
+  const toggleSelectVariation = (id) => {
+    setSelectedVariationIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const selectAllVariations = () => {
+    if (selectedVariationIds.length === variations.length) {
+      setSelectedVariationIds([]);
+    } else {
+      setSelectedVariationIds(variations.map(v => v.id));
+    }
+  };
+
+  const deleteSelectedVariations = () => {
+    if (selectedVariationIds.length === 0) {
+      toast.error('Please select variations to delete');
+      return;
+    }
+    if (window.confirm(`Delete ${selectedVariationIds.length} variation(s)?`)) {
+      setVariations(variations.filter(v => !selectedVariationIds.includes(v.id)));
+      setSelectedVariationIds([]);
+    }
+  };
+
+  const saveVariation = () => {
+    if (!variationForm.name) {
+      toast.error(`Please select ${variationAttrs.type}`);
+      return;
+    }
+    const existingIndex = variations.findIndex(
+      v => v.name === variationForm.name && (v.secondaryName || '') === (variationForm.attributes.secondary || '')
+    );
+    const newVariation = {
+      id: editingVariation?.id || Date.now(),
+      name: variationForm.name,
+      secondaryName: variationForm.attributes.secondary || '',
+      price: parseFloat(variationForm.price) || 0,
+      mrp: parseFloat(variationForm.mrp) || parseFloat(variationForm.price) * 1.2 || 0,
+      stock: parseInt(variationForm.stock) || 0,
+      sku: variationForm.sku || `VAR-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      image: variationForm.image || '',
+      attributes: variationForm.attributes || {}
+    };
+    if (editingVariation) {
+      const updated = [...variations];
+      updated[variations.findIndex(v => v.id === editingVariation.id)] = newVariation;
+      setVariations(updated);
+      toast.success('✅ Variation updated successfully!');
+    } else {
+      if (existingIndex !== -1) {
+        toast.error(`⚠️ This ${variationAttrs.type} combination already exists!`);
+        return;
+      }
+      setVariations([...variations, newVariation]);
+      toast.success(`✅ ${variationAttrs.type} added successfully!`);
+    }
+    setVariationModalOpen(false);
+    setEditingVariation(null);
+    setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} });
+  };
+
+  const editVariation = (variation) => {
+    setEditingVariation(variation);
+    setVariationForm({
+      name: variation.name,
+      price: variation.price,
+      mrp: variation.mrp || variation.price * 1.2,
+      stock: variation.stock,
+      sku: variation.sku,
+      image: variation.image || '',
+      attributes: { secondary: variation.secondaryName || '' }
     });
-  } catch (err) {
-    return fail(c, `Failed to load products: ${err.message}`, 500);
-  }
-});
+    setVariationModalOpen(true);
+  };
 
-// ============================================================
-// GET /api/products/:id
-// ============================================================
-products.get('/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const product = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    if (!product) return fail(c, 'Product not found.', 404);
-    return ok(c, await serializeProductWithVariants(c.env.DB, product));
-  } catch (err) {
-    return fail(c, `Failed to load product: ${err.message}`, 500);
-  }
-});
+  const deleteVariation = (variationId) => {
+    if (window.confirm('Delete this variation?')) {
+      setVariations(variations.filter(v => v.id !== variationId));
+    }
+  };
 
-// ============================================================
-// GET /api/products/:id/variants
-// ============================================================
-products.get('/:id/variants', async (c) => {
-  try {
-    const id = c.req.param('id');
-    const product = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    if (!product) return fail(c, 'Product not found.', 404);
+  const uploadVariationImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formDataImg = new FormData();
+    formDataImg.append('images', file);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataImg
+      });
+      const data = await response.json();
+      const imageUrl = data.data?.url || data.url;
+      if (imageUrl) {
+        setVariationForm(prev => ({ ...prev, image: imageUrl }));
+        toast.success('✅ Image uploaded!');
+      }
+    } catch (error) {
+      toast.error('Upload failed');
+    }
+  };
 
-    const full = await serializeProductWithVariants(c.env.DB, product, true);
-    return ok(c, {
-      productId: id,
-      option1Name: full.option1Name,
-      option2Name: full.option2Name,
-      variants: full.variants,
-      availableColors: full.availableColors,
-      availableSizes: full.availableSizes,
-      priceRange: full.priceRange || null,
-    });
-  } catch (err) {
-    return fail(c, `Failed to load variants: ${err.message}`, 500);
-  }
-});
+  const setImages = (images) => setFormData(prev => ({ ...prev, images }));
 
-// ============================================================
-// POST /api/products/create
-// ✅ AUTO-CALCULATE DISCOUNT (frontend value ignore)
-// ============================================================
-products.post('/create', authMiddleware, requireAdmin, async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const {
-      id: frontendId,
-      name,
-      brand = 'Richfem',
-      mainCategory = 'Other',
-      subCategory = '',
-      description = [],
-      shortDescription = '',
-      keyFeatures = [],
-      productDetails = {},
-      price,
-      originalPrice = 0,
-      tax = 18,
-      stock = 10,
-      sku = null,
-      weight = '',
-      dimensions = '',
-      images = [],
-      skinType = 'all',
-      concerns = [],
-      ingredients = '',
-      finish = '',
-      coverage = '',
-      shade = '',
-      hairType = 'all',
-      hairConcerns = [],
-      fabric = '',
-      material = '',
-      gender = 'unisex',
-      variations = [],
-      hasVariations = false,
-      option1Name = 'Size',
-      option2Name = 'Color',
-      variants = [],
-      metaTitle = '',
-      metaDescription = '',
-      metaKeywords = '',
-      slug = '',
-      isActive = true,
-      isFeatured = false,
-      adminApproved = true,
-      vendorId = 'admin',
-      vendorName = 'MyPinkShop',
-    } = body;
+  const uploadImageToBackend = async (file) => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) throw new Error('Session expired');
+    try {
+      const formDataImg = new FormData();
+      formDataImg.append('images', file);
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formDataImg
+      });
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      return data.data?.url || data.url;
+    } catch (error) {
+      console.error("Upload Error:", error);
+      throw error;
+    }
+  };
 
-    if (!name || price === undefined || price === null) {
-      return fail(c, 'name and price are required.', 400);
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (formData.images.length + files.length > 5) {
+      toast.error('Maximum 5 images allowed');
+      return;
+    }
+    setUploadingImages(true);
+    const uploadedUrls = [];
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} is larger than 5MB`);
+        continue;
+      }
+      try {
+        const url = await uploadImageToBackend(file);
+        if (url) uploadedUrls.push(url);
+      } catch (error) {
+        toast.error(`Failed: ${file.name}`);
+      }
+    }
+    if (uploadedUrls.length) {
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
+      toast.success(`✅ ${uploadedUrls.length} image(s) uploaded successfully!`);
+    }
+    setUploadingImages(false);
+    e.target.value = '';
+  };
+
+  const removeImage = (index) => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
+
+  const addBulletPoint = () => {
+    const text = currentBullet.trim();
+    if (text) {
+      setFormData(prev => ({ ...prev, fullDescription: [...prev.fullDescription, text] }));
+      setCurrentBullet('');
+    }
+  };
+
+  const removeBulletPoint = (index) => setFormData(prev => ({ ...prev, fullDescription: prev.fullDescription.filter((_, i) => i !== index) }));
+
+  const addKeyFeature = () => {
+    if (keyFeature.trim()) {
+      if (formData.keyFeatures.length >= 10) {
+        toast.error('Max 10 features');
+        return;
+      }
+      setFormData(prev => ({ ...prev, keyFeatures: [...prev.keyFeatures, keyFeature.trim()] }));
+      setKeyFeature('');
+    }
+  };
+
+  const removeKeyFeature = (index) => setFormData(prev => ({ ...prev, keyFeatures: prev.keyFeatures.filter((_, i) => i !== index) }));
+
+  const handleAddNewBrand = () => {
+    if (!newBrand.trim()) {
+      toast.error('Please enter a brand name');
+      return;
+    }
+    const cleanBrand = newBrand.trim();
+    const exists = brands.some(b => b.toLowerCase() === cleanBrand.toLowerCase());
+    if (exists) {
+      toast.error('⚠️ Brand already exists!');
+      return;
+    }
+    const updatedBrands = [...brands, cleanBrand].sort();
+    saveBrands(updatedBrands);
+    setFormData(prev => ({ ...prev, brand: cleanBrand }));
+    setNewBrand('');
+    setShowAddBrand(false);
+    toast.success(`✅ Brand "${cleanBrand}" added!`);
+  };
+
+  const currentSubCategories = getCurrentSubCategories();
+  const filteredBrands = brands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
+
+  const validateAndProceed = (targetStep) => {
+    if (targetStep > 1) {
+      if (!formData.productName.trim()) { toast.error('⚠️ Product Name required'); setStep(1); return; }
+      if (!formData.brand.trim()) { toast.error('⚠️ Brand required'); setStep(1); return; }
+      if (!formData.category) { toast.error('⚠️ Category required'); setStep(1); return; }
+      if (!formData.subCategory) { toast.error('⚠️ Sub Category required'); setStep(1); return; }
+    }
+    if (targetStep > 2) {
+      if (!formData.images || formData.images.length === 0) {
+        toast.error('⚠️ At least 1 image required');
+        setStep(2); return;
+      }
+    }
+    if (targetStep > 3) {
+      if (!formData.sellingPrice || parseFloat(formData.sellingPrice) <= 0) {
+        toast.error('⚠️ Selling Price required');
+        setStep(3); return;
+      }
+    }
+    setStep(targetStep);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  /* ============================================================ */
+  /* ✅ SUBMIT — Backend mapping FIXED                              */
+  /* ============================================================ */
+  const submitProduct = async () => {
+    if (!formData.productName.trim() || !formData.brand.trim() || !formData.category || !formData.subCategory || !formData.images.length || !formData.sellingPrice) {
+      toast.error('❌ Please fill all mandatory fields!');
+      return;
     }
 
-    const id = frontendId || genId('prod');
+    setLoading(true);
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+      toast.error('❌ Session expired. Please log in again.');
+      setLoading(false);
+      return;
+    }
 
-    if (frontendId) {
-      const existing = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(id).first();
-      if (existing) {
-        return fail(c, `A product with id "${id}" already exists.`, 409);
+    if (variations.length > 0) {
+      const invalid = variations.find(v => !v.name || !v.price || v.stock === undefined);
+      if (invalid) {
+        toast.error(`❌ Variation "${invalid.name || 'Unknown'}" me price/stock missing hai`);
+        setLoading(false);
+        return;
       }
     }
 
-    // AUTO-CREATE CATEGORIES
-    let mainCatId = null;
-    if (mainCategory && mainCategory.trim()) {
-      mainCatId = await ensureCategory(c.env.DB, mainCategory, 'main');
-      if (mainCatId && subCategory && subCategory.trim()) {
-        await ensureCategory(c.env.DB, subCategory, 'sub', mainCatId);
-      }
-    }
+    const totalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+    const finalSku = formData.sku || generateSKU();
+    const attrs = getVariationAttributes();
 
-    const hasVars = hasVariations || (Array.isArray(variants) && variants.length > 0);
+    // ✅ FIXED: Backend field names
+    const productData = {
+      id: productId,
+      name: formData.productName.trim(),
+      brand: formData.brand.trim(),
+      mainCategory: formData.category,
+      subCategory: formData.subCategory,
+      description: formData.fullDescription,
+      shortDescription: formData.fullDescription?.[0] || '',
+      keyFeatures: formData.keyFeatures,
+      productDetails: {},
 
-    // ✅ AUTO-CALCULATE DISCOUNT
-    const finalPrice = parseFloat(price) || 0;
-    const finalOriginalPrice = parseFloat(originalPrice) || 0;
-    const calculatedDiscount = calculateDiscount(finalPrice, finalOriginalPrice);
+      // ✅ PRICE FIX
+      price: parseFloat(formData.sellingPrice) || 0,
+      originalPrice: parseFloat(formData.mrp) || parseFloat(formData.sellingPrice) * 1.2 || 0,
+      // discountPercent backend auto-calculate karega
 
-    const bindValues = [
-      id, vendorId, vendorName,
-      toSafeString(name), toSafeString(brand),
-      toSafeString(mainCategory), toSafeString(subCategory),
-      toSafeString(slug || makeSlug(name)),
-      toSafeString(Array.isArray(description) ? description.join('\n') : description),
-      toSafeJsonString(description), toSafeJsonString(keyFeatures),
-      toSafeJsonObjectString(productDetails), toSafeString(shortDescription),
-      finalPrice, finalOriginalPrice,
-      calculatedDiscount,  // ✅ AUTO-CALCULATED
-      parseFloat(tax) || 18,
-      parseInt(stock, 10) || 10, toSafeString(sku),
-      toSafeString(weight), toSafeString(dimensions),
-      toSafeJsonString(images), toSafeString(skinType),
-      toSafeJsonString(concerns), toSafeString(ingredients),
-      toSafeString(finish), toSafeString(coverage), toSafeString(shade),
-      toSafeString(hairType), toSafeJsonString(hairConcerns),
-      toSafeString(fabric), toSafeString(material), toSafeString(gender),
-      toSafeJsonString(variations), hasVars ? 1 : 0,
-      toSafeString(option1Name), toSafeString(option2Name),
-      toSafeString(metaTitle), toSafeString(metaDescription),
-      toSafeString(metaKeywords), toSafeString(slug || makeSlug(name) || id),
-      isActive ? 1 : 0, isFeatured ? 1 : 0,
-      adminApproved ? 1 : 0
-    ];
+      tax: parseFloat(formData.tax) || 18,
+      stock: totalStock > 0 ? totalStock : (parseInt(formData.stock) || 10),
+      sku: finalSku,
+      weight: formData.weight || '',
+      dimensions: formData.dimensions || '',
+      images: formData.images,
 
-    if (bindValues.length !== 44) {
-      return fail(c, `Internal error: expected 44 bind values, got ${bindValues.length}`, 500);
-    }
+      // Category-specific
+      skinType: formData.skinType || 'all',
+      concerns: formData.concerns || [],
+      ingredients: formData.ingredients || '',
+      finish: formData.finish || '',
+      coverage: formData.coverage || '',
+      shade: formData.shade || '',
+      hairType: formData.hairType || 'all',
+      hairConcerns: formData.hairConcerns || [],
+      fabric: formData.fabric || '',
+      material: formData.material || '',
+      gender: formData.gender || 'unisex',
 
-    await c.env.DB.prepare(
-      `INSERT INTO products
-        (id, vendor_id, vendor_name, name, brand, main_category, sub_category, category_slug,
-         description, about_this_item, key_features, specifications, short_description,
-         price, original_price, discount_percent, tax, stock, sku,
-         weight, dimensions, images, skin_type, concerns, ingredients, finish, coverage, shade,
-         hair_type, hair_concerns, fabric, material, gender, variations, has_variations,
-         option1_name, option2_name,
-         meta_title, meta_description, meta_keywords, slug,
-         rating, review_count, is_active, is_featured, admin_approved, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               ?, 4.8, 0, ?, ?, ?,
-               datetime('now'), datetime('now'))`
-    )
-      .bind(...bindValues)
-      .run();
+      // Variations
+      hasVariations: variations.length > 0,
+      option1Name: attrs.type,
+      option2Name: attrs.secondary || '',
+      variants: variations.map(v => ({
+        sku: v.sku,
+        option1Value: v.name,
+        option2Value: v.secondaryName || '',
+        price: parseFloat(v.price) || 0,
+        compareAtPrice: parseFloat(v.mrp) || 0,
+        stock: parseInt(v.stock) || 0,
+        image: v.image || '',
+      })),
 
-    // Save variants
-    if (hasVars && Array.isArray(variants) && variants.length > 0) {
-      await saveVariants(c.env.DB, id, variants, option1Name, option2Name);
-    }
+      // SEO
+      metaTitle: seoData.metaTitle,
+      metaDescription: seoData.metaDescription,
+      metaKeywords: seoData.metaKeywords,
+      slug: productId,
 
-    const created = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    return ok(c, await serializeProductWithVariants(c.env.DB, created), undefined, 201);
-  } catch (err) {
-    console.error('❌ Create product error:', err);
-    return fail(c, `Failed to create product: ${err.message}`, 500);
-  }
-});
-
-// ============================================================
-// PUT /api/products/:id
-// ✅ AUTO-RECALCULATE DISCOUNT
-// ============================================================
-products.put('/:id', authMiddleware, requireAdmin, async (c) => {
-  try {
-    const id = c.req.param('id');
-    const existing = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    if (!existing) return fail(c, 'Product not found.', 404);
-
-    const body = await c.req.json().catch(() => ({}));
-
-    // ✅ AUTO-RECALCULATE DISCOUNT
-    const newPrice = body.price !== undefined ? parseFloat(body.price) || 0 : existing.price;
-    const newOriginalPrice = body.originalPrice !== undefined
-      ? parseFloat(body.originalPrice) || 0
-      : existing.original_price;
-    const calculatedDiscount = calculateDiscount(newPrice, newOriginalPrice);
-
-    const merged = {
-      name: body.name ?? existing.name,
-      brand: body.brand ?? existing.brand,
-      main_category: body.mainCategory ?? existing.main_category,
-      sub_category: body.subCategory ?? existing.sub_category,
-      description: body.description !== undefined
-        ? toSafeString(Array.isArray(body.description) ? body.description.join('\n') : body.description)
-        : existing.description,
-      about_this_item: body.description !== undefined ? toSafeJsonString(body.description) : existing.about_this_item,
-      key_features: body.keyFeatures !== undefined ? toSafeJsonString(body.keyFeatures) : existing.key_features,
-      specifications: body.productDetails !== undefined
-        ? toSafeJsonObjectString(body.productDetails)
-        : (body.specifications !== undefined ? toSafeJsonObjectString(body.specifications) : existing.specifications),
-      short_description: body.shortDescription !== undefined ? toSafeString(body.shortDescription) : existing.short_description,
-      price: newPrice,
-      original_price: newOriginalPrice,
-      discount_percent: calculatedDiscount,  // ✅ AUTO-RECALCULATED
-      tax: body.tax !== undefined ? parseFloat(body.tax) || 18 : existing.tax,
-      stock: body.stock !== undefined ? parseInt(body.stock, 10) || 0 : existing.stock,
-      sku: body.sku !== undefined ? toSafeString(body.sku) : existing.sku,
-      weight: body.weight !== undefined ? toSafeString(body.weight) : existing.weight,
-      dimensions: body.dimensions !== undefined ? toSafeString(body.dimensions) : existing.dimensions,
-      images: body.images !== undefined ? toSafeJsonString(body.images) : existing.images,
-      skin_type: body.skinType !== undefined ? toSafeString(body.skinType) : existing.skin_type,
-      concerns: body.concerns !== undefined ? toSafeJsonString(body.concerns) : existing.concerns,
-      ingredients: body.ingredients !== undefined ? toSafeString(body.ingredients) : existing.ingredients,
-      finish: body.finish !== undefined ? toSafeString(body.finish) : existing.finish,
-      coverage: body.coverage !== undefined ? toSafeString(body.coverage) : existing.coverage,
-      shade: body.shade !== undefined ? toSafeString(body.shade) : existing.shade,
-      hair_type: body.hairType !== undefined ? toSafeString(body.hairType) : existing.hair_type,
-      hair_concerns: body.hairConcerns !== undefined ? toSafeJsonString(body.hairConcerns) : existing.hair_concerns,
-      fabric: body.fabric !== undefined ? toSafeString(body.fabric) : existing.fabric,
-      material: body.material !== undefined ? toSafeString(body.material) : existing.material,
-      gender: body.gender !== undefined ? toSafeString(body.gender) : existing.gender,
-      variations: body.variations !== undefined ? toSafeJsonString(body.variations) : existing.variations,
-      has_variations: body.hasVariations !== undefined
-        ? (body.hasVariations ? 1 : 0)
-        : existing.has_variations,
-      option1_name: body.option1Name !== undefined ? toSafeString(body.option1Name) : (existing.option1_name || 'Size'),
-      option2_name: body.option2Name !== undefined ? toSafeString(body.option2Name) : (existing.option2_name || 'Color'),
-      meta_title: body.metaTitle !== undefined ? toSafeString(body.metaTitle) : existing.meta_title,
-      meta_description: body.metaDescription !== undefined ? toSafeString(body.metaDescription) : existing.meta_description,
-      meta_keywords: body.metaKeywords !== undefined ? toSafeString(body.metaKeywords) : existing.meta_keywords,
-      slug: body.slug !== undefined ? toSafeString(body.slug) : existing.slug,
-      is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : existing.is_active,
-      is_featured: body.isFeatured !== undefined ? (body.isFeatured ? 1 : 0) : existing.is_featured,
-      admin_approved: body.adminApproved !== undefined ? (body.adminApproved ? 1 : 0) : existing.admin_approved,
+      isActive: true,
+      isFeatured: false,
+      adminApproved: true,
     };
 
-    let mainCatId = null;
-    if (merged.main_category && merged.main_category.trim()) {
-      mainCatId = await ensureCategory(c.env.DB, merged.main_category, 'main');
-      if (mainCatId && merged.sub_category && merged.sub_category.trim()) {
-        await ensureCategory(c.env.DB, merged.sub_category, 'sub', mainCatId);
+    try {
+      const response = await fetch(`${API_URL}/api/products/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(productData)
+      });
+      const resJson = await response.json();
+      if (!response.ok || resJson.success === false) {
+        throw new Error(resJson.error || resJson.message || 'Server rejected product creation');
       }
+      toast.success('🎉 Product published successfully!');
+      navigate('/admin/inventory');
+    } catch (error) {
+      console.error('Publish error:', error);
+      toast.error(`❌ Failed: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    await c.env.DB.prepare(
-      `UPDATE products SET
-        name = ?, brand = ?, main_category = ?, sub_category = ?,
-        description = ?, about_this_item = ?, key_features = ?,
-        specifications = ?, short_description = ?,
-        price = ?, original_price = ?, discount_percent = ?, tax = ?, stock = ?, sku = ?,
-        weight = ?, dimensions = ?, images = ?,
-        skin_type = ?, concerns = ?, ingredients = ?, finish = ?, coverage = ?, shade = ?,
-        hair_type = ?, hair_concerns = ?, fabric = ?, material = ?, gender = ?,
-        variations = ?, has_variations = ?,
-        option1_name = ?, option2_name = ?,
-        meta_title = ?, meta_description = ?, meta_keywords = ?, slug = ?,
-        is_active = ?, is_featured = ?, admin_approved = ?, updated_at = datetime('now')
-       WHERE id = ?`
-    )
-      .bind(
-        merged.name, merged.brand, merged.main_category, merged.sub_category,
-        merged.description, merged.about_this_item, merged.key_features,
-        merged.specifications, merged.short_description,
-        merged.price, merged.original_price, merged.discount_percent, merged.tax, merged.stock, merged.sku,
-        merged.weight, merged.dimensions, merged.images,
-        merged.skin_type, merged.concerns, merged.ingredients, merged.finish, merged.coverage, merged.shade,
-        merged.hair_type, merged.hair_concerns, merged.fabric, merged.material, merged.gender,
-        merged.variations, merged.has_variations,
-        merged.option1_name, merged.option2_name,
-        merged.meta_title, merged.meta_description, merged.meta_keywords, merged.slug,
-        merged.is_active, merged.is_featured, merged.admin_approved,
-        id
-      )
-      .run();
+  /* ------------------ Icons ------------------ */
+  const IconBack = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
+  const IconUpload = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
+  const IconPlus = () => (<svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 
-    if (Array.isArray(body.variants)) {
-      await replaceVariants(c.env.DB, id, body.variants, merged.option1_name, merged.option2_name);
-      await c.env.DB.prepare(
-        `UPDATE products SET has_variations = ? WHERE id = ?`
-      ).bind(body.variants.length > 0 ? 1 : 0, id).run();
+  /* ------------------ Category Specific Fields ------------------ */
+  const renderCategorySpecificFields = () => {
+    const categoryKey = getCategoryKey();
+    switch (categoryKey) {
+      case 'Skincare':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">🧴 Skincare Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Skin Type</label>
+                <select value={formData.skinType} onChange={(e) => setFormData({ ...formData, skinType: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                  <option value="all">All Skin Types</option>
+                  <option value="oily">Oily</option>
+                  <option value="dry">Dry</option>
+                  <option value="combination">Combination</option>
+                  <option value="sensitive">Sensitive</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Key Ingredients</label>
+                <input type="text" value={formData.ingredients} onChange={(e) => setFormData({ ...formData, ingredients: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Vitamin C, Hyaluronic Acid" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns</label>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                {skinConcerns.map(c => (
+                  <label key={c} className="flex items-center gap-1.5 text-sm">
+                    <input type="checkbox" checked={formData.concerns.includes(c)} onChange={(e) => {
+                      const updated = e.target.checked ? [...formData.concerns, c] : formData.concerns.filter(cn => cn !== c);
+                      setFormData({ ...formData, concerns: updated });
+                    }} />
+                    <span className="text-gray-600">{c}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Makeup':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">💄 Makeup Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Shade / Color</label>
+                <input type="text" value={formData.shade} onChange={(e) => setFormData({ ...formData, shade: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Ruby Red" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Finish</label>
+                <select value={formData.finish} onChange={(e) => setFormData({ ...formData, finish: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                  <option value="">Select Finish</option>
+                  {makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Coverage</label>
+              <select value={formData.coverage} onChange={(e) => setFormData({ ...formData, coverage: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                <option value="">Select Coverage</option>
+                {makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+        );
+
+      case 'Haircare':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">💇 Hair Care Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Hair Type</label>
+                <select value={formData.hairType} onChange={(e) => setFormData({ ...formData, hairType: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                  {hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hair Concerns</label>
+                <div className="flex flex-wrap gap-2 sm:gap-3">
+                  {hairConcernsList.map(c => (
+                    <label key={c} className="flex items-center gap-1.5 text-sm">
+                      <input type="checkbox" checked={(formData.hairConcerns || []).includes(c)} onChange={(e) => {
+                        const updated = e.target.checked ? [...(formData.hairConcerns || []), c] : (formData.hairConcerns || []).filter(cn => cn !== c);
+                        setFormData({ ...formData, hairConcerns: updated });
+                      }} />
+                      <span className="text-gray-600">{c}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Fashion':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">👗 Fashion Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Fabric / Material</label>
+                <input type="text" value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Cotton, Silk, Polyester" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
+                <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                  <option value="unisex">Unisex</option>
+                  <option value="men">Men</option>
+                  <option value="women">Women</option>
+                  <option value="kids">Kids</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Accessories':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">💍 Accessories Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Material</label>
+                <input type="text" value={formData.material} onChange={(e) => setFormData({ ...formData, material: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Silver, Gold, Leather" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
+                <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white">
+                  <option value="unisex">Unisex</option>
+                  <option value="men">Men</option>
+                  <option value="women">Women</option>
+                  <option value="kids">Kids</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
     }
+  };
 
-    const updated = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    return ok(c, await serializeProductWithVariants(c.env.DB, updated));
-  } catch (err) {
-    console.error('❌ Update product error:', err);
-    return fail(c, `Failed to update product: ${err.message}`, 500);
-  }
-});
+  /* ============================================================ */
+  /* RENDER                                                       */
+  /* ============================================================ */
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-pink-50/30">
+      {/* Header */}
+      <div className="bg-white/95 backdrop-blur-md border-b border-pink-100 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Link to="/admin/inventory" className="text-gray-500 hover:text-pink-600 transition p-1"><IconBack /></Link>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Add New Product</h1>
+                <p className="text-xs text-gray-400 hidden sm:block">Built for Google Top Rank & Shopping</p>
+              </div>
+            </div>
+            <button onClick={submitProduct} disabled={loading} className="w-full sm:w-auto bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg text-sm font-medium hover:shadow-md transition disabled:opacity-50">
+              {loading ? 'Publishing...' : 'Save & Publish'}
+            </button>
+          </div>
+        </div>
+      </div>
 
-// ============================================================
-// PUT /api/products/:id/variants
-// ============================================================
-products.put('/:id/variants', authMiddleware, requireAdmin, async (c) => {
-  try {
-    const id = c.req.param('id');
-    const product = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    if (!product) return fail(c, 'Product not found.', 404);
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+        {/* Progress Steps */}
+        <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-3 sm:p-4 mb-6 overflow-x-auto">
+          <div className="flex justify-between min-w-[300px] sm:min-w-[500px]">
+            {['Basic', 'Images', 'Pricing', 'Details', 'SEO'].map((label, idx) => (
+              <div key={idx} className="flex items-center">
+                <div onClick={() => validateAndProceed(idx + 1)} className={`cursor-pointer w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${step >= idx + 1 ? 'bg-pink-600 text-white shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-pink-100 hover:text-pink-600'}`}>
+                  {step > idx + 1 ? '✓' : idx + 1}
+                </div>
+                <span onClick={() => validateAndProceed(idx + 1)} className={`cursor-pointer text-[10px] sm:text-xs ml-1.5 sm:ml-2 hidden xs:inline ${step >= idx + 1 ? 'text-gray-700 font-medium' : 'text-gray-400 hover:text-pink-600'}`}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
-    const body = await c.req.json().catch(() => ({}));
-    const variants = Array.isArray(body.variants) ? body.variants : [];
-    const option1Name = body.option1Name || product.option1_name || 'Size';
-    const option2Name = body.option2Name || product.option2_name || 'Color';
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="flex gap-1 sm:gap-2 border-b border-pink-100">
+            <button onClick={() => setActiveTab('manual')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'manual' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>✏️ Manual Entry</button>
+            <button onClick={() => setActiveTab('import')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'import' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>📦 Import from Amazon</button>
+            <button onClick={() => setActiveTab('flipkart')} className={`px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 md:py-3 text-xs sm:text-sm md:text-base font-medium rounded-t-lg transition-all ${activeTab === 'flipkart' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>🛒 Import from Flipkart</button>
+          </div>
+        </div>
 
-    await replaceVariants(c.env.DB, id, variants, option1Name, option2Name);
+        {activeTab === 'import' && <AmazonImporter onProductImported={() => setActiveTab('manual')} setFormData={setFormData} setVariations={setVariations} setImages={setImages} />}
+        {activeTab === 'flipkart' && <FlipkartImporter onProductImported={() => setActiveTab('manual')} setFormData={setFormData} setVariations={setVariations} setImages={setImages} />}
 
-    await c.env.DB.prepare(
-      `UPDATE products SET has_variations = ?, option1_name = ?, option2_name = ?, updated_at = datetime('now') WHERE id = ?`
-    ).bind(variants.length > 0 ? 1 : 0, option1Name, option2Name, id).run();
+        {activeTab === 'manual' && (
+          <>
+            {/* STEP 1: Basic */}
+            {step === 1 && (
+              <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">📋 Basic Information</h2>
+                <div className="space-y-4 sm:space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Product Name <span className="text-red-500">*</span></label>
+                    <input type="text" value={formData.productName} onChange={(e) => setFormData({ ...formData, productName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., Vitamin C Serum" />
+                  </div>
 
-    const updated = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
-    return ok(c, await serializeProductWithVariants(c.env.DB, updated, true));
-  } catch (err) {
-    return fail(c, `Failed to update variants: ${err.message}`, 500);
-  }
-});
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Brand <span className="text-red-500">*</span>
+                      {!brandsLoading && <span className="text-xs text-gray-400 ml-2">({brands.length} brands)</span>}
+                    </label>
+                    <div className="relative">
+                      <input type="text" placeholder={brandsLoading ? "Loading brands..." : "Type brand name..."} value={formData.brand} onChange={(e) => { setFormData({ ...formData, brand: e.target.value }); setBrandSearch(e.target.value); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" disabled={brandsLoading} />
+                      {brandSearch && filteredBrands.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg max-h-48 overflow-y-auto shadow-lg">
+                          {filteredBrands.slice(0, 15).map(b => (
+                            <button key={b} type="button" onClick={() => { setFormData({ ...formData, brand: b }); setBrandSearch(''); }} className="w-full text-left px-3 sm:px-4 py-2 hover:bg-pink-50 text-sm transition">{b}</button>
+                          ))}
+                          {!filteredBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                            <button type="button" onClick={() => setShowAddBrand(true)} className="w-full text-left px-3 sm:px-4 py-2 text-pink-600 text-sm hover:bg-pink-50 transition border-t font-medium">+ Add new brand "{brandSearch}"</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-// ============================================================
-// DELETE /api/products/:id
-// ============================================================
-products.delete('/:id', authMiddleware, requireAdmin, async (c) => {
-  try {
-    const id = c.req.param('id');
-    const existing = await c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(id).first();
-    if (!existing) return fail(c, 'Product not found.', 404);
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Category <span className="text-red-500">*</span></label>
+                      <select value={formData.category} onChange={(e) => { setFormData({ ...formData, category: e.target.value, subCategory: '' }); setShowAddSubCategory(false); }} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm bg-white" disabled={categoriesLoading}>
+                        <option value="">{categoriesLoading ? 'Loading...' : 'Select Category'}</option>
+                        {apiCategories.length > 0 ? (
+                          apiCategories.map(cat => (
+                            <option key={cat.id} value={cat.name}>{cat.icon} {cat.name}</option>
+                          ))
+                        ) : (
+                          Object.keys(fallbackSubCategories).map(c => <option key={c} value={c}>{c}</option>)
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Sub Category <span className="text-red-500">*</span></label>
+                      <div className="flex gap-2">
+                        <select value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm disabled:bg-gray-100 bg-white" disabled={!formData.category}>
+                          <option value="">Select Sub Category</option>
+                          {currentSubCategories.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        {formData.category && (
+                          <button onClick={() => setShowAddSubCategory(true)} className="px-3 py-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition text-sm whitespace-nowrap" title="Add new sub-category">+ Add</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-    try { await c.env.DB.prepare('DELETE FROM product_variants WHERE product_id = ?').bind(id).run(); } catch (e) {}
-    try { await c.env.DB.prepare('DELETE FROM cart WHERE product_id = ?').bind(id).run(); } catch (e) {}
-    try { await c.env.DB.prepare('DELETE FROM wishlist WHERE product_id = ?').bind(id).run(); } catch (e) {}
-    try { await c.env.DB.prepare('DELETE FROM order_items WHERE product_id = ?').bind(id).run(); } catch (e) {}
-    try { await c.env.DB.prepare('DELETE FROM reviews WHERE product_id = ?').bind(id).run(); } catch (e) {}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU</label>
+                      <div className="flex gap-2">
+                        <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="Auto-generated" />
+                        <button onClick={() => setFormData({ ...formData, sku: generateSKU() })} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap">🔄</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Weight / Dimensions</label>
+                      <input type="text" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="e.g., 250g or 10x10x5 cm" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end mt-6">
+                  <button onClick={() => validateAndProceed(2)} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue →</button>
+                </div>
+              </div>
+            )}
 
-    await c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
-    return ok(c, { id, deleted: true });
-  } catch (err) {
-    console.error('❌ Delete product error:', err);
-    return fail(c, `Failed to delete product: ${err.message}`, 500);
-  }
-});
+            {/* Modals */}
+            {showAddBrand && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddBrand(false)}>
+                <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-4 sm:p-5 border-b border-gray-200"><h3 className="font-semibold text-gray-800">Add New Brand</h3></div>
+                  <div className="p-4 sm:p-5">
+                    <input type="text" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="Enter brand name" className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" autoFocus />
+                    <div className="flex gap-3 mt-5">
+                      <button onClick={() => setShowAddBrand(false)} className="flex-1 px-3 sm:px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition text-sm">Cancel</button>
+                      <button onClick={handleAddNewBrand} className="flex-1 px-3 sm:px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg hover:shadow-md transition text-sm">Add Brand</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-export default products;
+            {showAddSubCategory && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddSubCategory(false)}>
+                <div className="bg-white rounded-xl max-w-md w-full shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-4 sm:p-5 border-b border-gray-200">
+                    <h3 className="font-semibold text-gray-800">Add New Sub-Category</h3>
+                    <p className="text-xs text-gray-500 mt-1">For: {formData.category}</p>
+                  </div>
+                  <div className="p-4 sm:p-5">
+                    <input type="text" value={newSubCategory} onChange={(e) => setNewSubCategory(e.target.value)} placeholder={`Enter ${formData.category} sub-category`} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" autoFocus />
+                    <div className="flex gap-3 mt-5">
+                      <button onClick={() => setShowAddSubCategory(false)} className="flex-1 px-3 sm:px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition text-sm">Cancel</button>
+                      <button onClick={handleAddNewSubCategory} className="flex-1 px-3 sm:px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg hover:shadow-md transition text-sm">Add Sub-Category</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: Images */}
+            {step === 2 && (
+              <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">📸 Product Images</h2>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center hover:border-pink-400 transition">
+                  <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 justify-center">
+                    {formData.images.map((img, idx) => (
+                      <div key={idx} className="relative w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden shadow-sm">
+                        <img src={img} className="w-full h-full object-cover" alt="Product" />
+                        <button onClick={() => removeImage(idx)} className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" id="imageUpload" disabled={uploadingImages} />
+                  <label htmlFor="imageUpload" className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 border-2 border-pink-200 rounded-lg cursor-pointer text-pink-600 hover:bg-pink-50 transition text-sm font-medium ${uploadingImages ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <IconUpload /> {uploadingImages ? 'Uploading...' : 'Choose Images'}
+                  </label>
+                  <p className="text-xs text-gray-400 mt-3">Upload up to 5 images (max 5MB each)</p>
+                </div>
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
+                  <button onClick={() => validateAndProceed(1)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
+                  <button onClick={() => validateAndProceed(3)} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue →</button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: Pricing */}
+            {step === 3 && (
+              <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">💰 Pricing</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">MRP</label>
+                    <input type="number" value={formData.mrp} onChange={(e) => setFormData({ ...formData, mrp: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 999" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Selling Price <span className="text-red-500">*</span></label>
+                    <input type="number" value={formData.sellingPrice} onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 499" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax (GST) %</label>
+                    <input type="number" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
+                  <button onClick={() => validateAndProceed(2)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
+                  <button onClick={() => validateAndProceed(4)} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue →</button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: Details & Variations */}
+            {step === 4 && (
+              <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">✨ Product Details & Variations</h2>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">About this item <span className="text-xs text-gray-400 ml-2">(Bullet points)</span></label>
+                  <div className="space-y-2 mb-3 max-h-96 overflow-y-auto">
+                    {formData.fullDescription.map((bullet, idx) => (
+                      <div key={idx} className="flex items-start gap-2 bg-gray-50 p-2 sm:p-3 rounded-lg border border-gray-100">
+                        <span className="text-pink-500 font-bold mt-0.5 text-base sm:text-lg">•</span>
+                        <span className="flex-1 text-xs sm:text-sm text-gray-700">{bullet}</span>
+                        <button onClick={() => removeBulletPoint(idx)} className="text-red-400 hover:text-red-600 px-2 text-sm">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input type="text" value={currentBullet} onChange={(e) => setCurrentBullet(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addBulletPoint()} placeholder="e.g., Dermatologically tested" className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                    <button onClick={addBulletPoint} className="px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg hover:shadow-md transition flex items-center justify-center gap-1 text-sm font-medium"><IconPlus /> Add</button>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Product Highlights <span className="text-xs text-gray-400 ml-2">(Max 10)</span></label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {formData.keyFeatures.map((f, i) => (
+                      <span key={i} className="bg-green-50 text-green-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm flex items-center gap-1 border border-green-200">
+                        ✓ {f}<button onClick={() => removeKeyFeature(i)} className="text-red-400 ml-1">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input type="text" value={keyFeature} onChange={(e) => setKeyFeature(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addKeyFeature()} placeholder="e.g., 100% Vegan" className="flex-1 border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                    <button onClick={addKeyFeature} className="px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium">Add</button>
+                  </div>
+                </div>
+
+                {/* Variations */}
+                <div className="border-t border-gray-200 pt-4 sm:pt-5 mb-6">
+                  <div className="flex flex-wrap justify-between items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                    <div className="flex gap-2">
+                      {variations.length > 0 && (
+                        <>
+                          <button onClick={selectAllVariations} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center gap-1">
+                            <input type="checkbox" checked={selectedVariationIds.length === variations.length && variations.length > 0} readOnly className="w-3.5 h-3.5" />
+                            {selectedVariationIds.length === variations.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                          <button onClick={deleteSelectedVariations} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition flex items-center gap-1">
+                            🗑️ Delete Selected ({selectedVariationIds.length})
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <div>
+                      {formData.category && (
+                        <button onClick={() => { setEditingVariation(null); setVariationForm({ name: '', price: '', mrp: '', stock: '', sku: '', image: '', attributes: {} }); setVariationModalOpen(true); }} className="bg-gradient-to-r from-pink-600 to-rose-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:shadow-md transition flex items-center gap-1">
+                          <span className="text-lg">+</span> Add {variationAttrs.type}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {!formData.category ? (
+                    <div className="bg-yellow-50 rounded-lg p-4 text-center"><p className="text-yellow-700 text-sm">Select a category first to add variations</p></div>
+                  ) : variations.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-6 text-center"><p className="text-gray-400 text-sm">No variations added yet. Click "Add {variationAttrs.type}" to add.</p></div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm border border-gray-200 rounded-lg">
+                        <thead className="bg-gray-50">
+                          <tr className="border-b border-gray-200">
+                            <th className="px-3 py-2 text-center w-10"><input type="checkbox" checked={selectedVariationIds.length === variations.length && variations.length > 0} onChange={selectAllVariations} /></th>
+                            <th className="px-3 py-2 text-left">{variationAttrs.type}</th>
+                            {variationAttrs.secondary && <th className="px-3 py-2 text-left">{variationAttrs.secondary}</th>}
+                            <th className="px-3 py-2 text-left">Image</th>
+                            <th className="px-3 py-2 text-right">Price</th>
+                            <th className="px-3 py-2 text-right">MRP</th>
+                            <th className="px-3 py-2 text-right">Stock</th>
+                            <th className="px-3 py-2 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {variations.map(v => (
+                            <tr key={v.id} className="hover:bg-pink-50/30 cursor-pointer transition" onClick={() => setExpandedVariationId(expandedVariationId === v.id ? null : v.id)}>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input type="checkbox" checked={selectedVariationIds.includes(v.id)} onChange={() => toggleSelectVariation(v.id)} />
+                              </td>
+                              <td className="px-3 py-2 font-medium">{v.name}</td>
+                              {variationAttrs.secondary && <td className="px-3 py-2">{v.secondaryName || '-'}</td>}
+                              <td className="px-3 py-2">
+                                {v.image ? <img src={v.image} className="w-10 h-10 object-cover rounded border" alt="variation" /> : <span className="text-gray-400 text-xs">No image</span>}
+                              </td>
+                              <td className="px-3 py-2 text-right text-pink-600 font-medium">₹{v.price}</td>
+                              <td className="px-3 py-2 text-right text-gray-400 line-through">₹{v.mrp}</td>
+                              <td className="px-3 py-2 text-right">{v.stock}</td>
+                              <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-center gap-2">
+                                  <button onClick={() => editVariation(v)} className="text-blue-500 hover:text-blue-700" title="Edit">✏️</button>
+                                  <button onClick={() => deleteVariation(v.id)} className="text-red-500 hover:text-red-700" title="Delete">🗑️</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 border-t border-gray-200">
+                          <tr>
+                            <td colSpan={variationAttrs.secondary ? 4 : 3} className="px-3 py-2 font-medium">Total</td>
+                            <td className="px-3 py-2 text-right font-bold text-pink-600">₹{variations.reduce((s, v) => s + v.price, 0)}</td>
+                            <td className="px-3 py-2 text-right"></td>
+                            <td className="px-3 py-2 text-right font-bold">{variations.reduce((s, v) => s + v.stock, 0)}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Variation Details Modal */}
+                {expandedVariationId && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setExpandedVariationId(null)}>
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+                      <div className="border-b border-gray-200 p-4 flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">Variation Details</h3>
+                        <button onClick={() => setExpandedVariationId(null)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                      </div>
+                      <div className="p-5">
+                        {(() => {
+                          const v = variations.find(v => v.id === expandedVariationId);
+                          if (!v) return null;
+                          return (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-xs text-gray-500">{variationAttrs.type}</label>
+                                  <p className="font-semibold">{v.name}</p>
+                                </div>
+                                {variationAttrs.secondary && (
+                                  <div>
+                                    <label className="text-xs text-gray-500">{variationAttrs.secondary}</label>
+                                    <p className="font-semibold">{v.secondaryName || '-'}</p>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-500">Variation Image</label>
+                                {v.image ? <img src={v.image} className="w-24 h-24 object-cover rounded-lg border mt-1" alt="variation" /> : <p className="text-gray-400 text-sm mt-1">No image uploaded</p>}
+                              </div>
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <label className="text-xs text-gray-500">Price</label>
+                                  <p className="text-lg font-bold text-pink-600">₹{v.price}</p>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500">MRP</label>
+                                  <p className="text-sm text-gray-400 line-through">₹{v.mrp}</p>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-500">Stock</label>
+                                  <p className="text-lg">{v.stock}</p>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-500">SKU</label>
+                                <p className="text-xs font-mono bg-gray-100 p-2 rounded">{v.sku}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Variation Add/Edit Modal */}
+                {variationModalOpen && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setVariationModalOpen(false)}>
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+                        <h3 className="text-lg font-semibold">{editingVariation ? 'Edit' : 'Add New'} {variationAttrs.type}</h3>
+                        <button onClick={() => setVariationModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                      </div>
+
+                      <div className="p-5 space-y-4">
+                        <VariationSelectWithSearch
+                          label={`${variationAttrs.type} *`}
+                          options={variationAttrs.options}
+                          value={variationForm.name}
+                          onChange={(val) => setVariationForm(prev => ({ ...prev, name: val }))}
+                          placeholder={`Search or type custom ${variationAttrs.type.toLowerCase()}...`}
+                        />
+
+                        {variationAttrs.secondary && (
+                          <VariationSelectWithSearch
+                            label={variationAttrs.secondary}
+                            options={variationAttrs.secondaryOptions}
+                            value={variationForm.attributes.secondary || ''}
+                            onChange={(val) => setVariationForm(prev => ({ ...prev, attributes: { ...prev.attributes, secondary: val } }))}
+                            placeholder={`Search or type custom ${variationAttrs.secondary.toLowerCase()}...`}
+                          />
+                        )}
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">Variation Image</label>
+                          <div className="flex items-center gap-3">
+                            {variationForm.image ? (
+                              <div className="relative">
+                                <img src={variationForm.image} className="w-16 h-16 object-cover rounded border" alt="variation" />
+                                <button onClick={() => setVariationForm(prev => ({ ...prev, image: '' }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">✕</button>
+                              </div>
+                            ) : (
+                              <div className="flex-1">
+                                <input type="file" accept="image/*" onChange={uploadVariationImage} className="hidden" id="variationImageUpload" />
+                                <label htmlFor="variationImageUpload" className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 transition">
+                                  📷 Upload Image
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Upload image for this variation (like shade swatch or size)</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">Selling Price *</label>
+                            <input type="number" value={variationForm.price} onChange={(e) => setVariationForm(prev => ({ ...prev, price: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="499" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">MRP</label>
+                            <input type="number" value={variationForm.mrp} onChange={(e) => setVariationForm(prev => ({ ...prev, mrp: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="599" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">Stock *</label>
+                            <input type="number" value={variationForm.stock} onChange={(e) => setVariationForm(prev => ({ ...prev, stock: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="10" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1.5">SKU</label>
+                            <input type="text" value={variationForm.sku} onChange={(e) => setVariationForm(prev => ({ ...prev, sku: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Auto-generated" />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                          <button onClick={() => setVariationModalOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+                          <button onClick={saveVariation} className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-lg font-medium hover:shadow-md transition">{editingVariation ? 'Update' : 'Add'}</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {renderCategorySpecificFields()}
+
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6 sm:mt-8 pt-4 border-t">
+                  <button onClick={() => validateAndProceed(3)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
+                  <button onClick={() => validateAndProceed(5)} className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium hover:shadow-md transition text-sm">Continue to SEO →</button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 5: SEO */}
+            {step === 5 && (
+              <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">🔍 Google SEO & Permanent URL Structure</h2>
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title <span className="text-xs text-gray-400">(max 60 chars)</span></label>
+                    <input type="text" value={seoData.metaTitle} onChange={(e) => setSeoData({ ...seoData, metaTitle: e.target.value })} maxLength={60} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">{seoData.metaTitle.length}/60 characters</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description <span className="text-xs text-gray-400">(max 155 chars)</span></label>
+                    <textarea value={seoData.metaDescription} onChange={(e) => setSeoData({ ...seoData, metaDescription: e.target.value })} maxLength={155} rows="3" className="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    <p className="text-xs text-gray-400 mt-1">{seoData.metaDescription.length}/155 characters</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Keywords <span className="text-xs text-gray-400">(max 15 phrases)</span></label>
+                    <input type="text" value={seoData.metaKeywords} onChange={(e) => setSeoData({ ...seoData, metaKeywords: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="keyword1, keyword2, keyword3" />
+                    <p className="text-xs text-gray-400 mt-1">{seoData.metaKeywords.split(',').filter(Boolean).length}/15 keywords</p>
+                  </div>
+
+                  <div className="p-4 bg-blue-50 rounded-xl">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-1">📱 Google Search & URL Preview</h3>
+                    <p className="text-blue-600 text-sm font-medium truncate">{seoData.metaTitle}</p>
+                    <p className="text-green-700 text-xs font-mono break-all">https://www.mypinkshop.com/product/{productId}</p>
+                    <p className="text-gray-600 text-xs mt-1 line-clamp-2">{seoData.metaDescription}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-4 border-t">
+                  <button onClick={() => validateAndProceed(4)} className="px-5 sm:px-6 py-2 sm:py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">← Back</button>
+                  <button onClick={submitProduct} disabled={loading} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-2 rounded-lg font-medium shadow-md hover:shadow-lg disabled:opacity-50 text-sm">
+                    {loading ? 'Publishing...' : '✓ Publish & Rank on Google'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default AdminAddProduct;
