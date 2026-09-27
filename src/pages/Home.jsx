@@ -230,7 +230,7 @@ function Home() {
   const [sponsoredProducts, setSponsoredProducts] = useState([]);
   const [bannerAds, setBannerAds] = useState([]);
 
-  // ✅ Backend-driven banner options (sizes + styles)
+  // Backend-driven banner options (sizes + styles)
   const [bannerOptions, setBannerOptions] = useState({ sizes: [], styles: [] });
 
   const [visibleSections, setVisibleSections] = useState({
@@ -461,6 +461,39 @@ function Home() {
     [bannerOptions.sizes]
   );
 
+  /**
+   * Get size + style props for a list of banners.
+   * - Uses the first banner's `size` and `display_style` (admin's choice).
+   * - If multiple banners and admin's style is single/split/overlay,
+   *   fallback to slide (hero) or grid for better UX.
+   */
+  const getBannerProps = useCallback(
+    (banners) => {
+      if (!Array.isArray(banners) || banners.length === 0) {
+        return { sizeConfig: null, style: 'single' };
+      }
+
+      const first = banners[0];
+
+      // Size — admin's choice
+      const sizeConfig = getSizeConfig(first.size || 'large');
+
+      // Style
+      let style = first.display_style || 'single';
+
+      if (banners.length > 1) {
+        // Multiple banners — single/split/overlay can only show one,
+        // so fallback to slide/grid
+        if (style === 'single' || style === 'split' || style === 'overlay') {
+          style = 'slide';
+        }
+      }
+
+      return { sizeConfig, style };
+    },
+    [getSizeConfig]
+  );
+
   /* ---------------- Product slices ---------------- */
   const productSlices = useMemo(() => {
     if (!products.length) {
@@ -588,6 +621,12 @@ function Home() {
   const mid2Banners = bannersByPosition.category_mid_2 || [];
   const mid3Banners = bannersByPosition.category_mid_3 || [];
   const bottomBanners = bannersByPosition.category_bottom || [];
+
+  const heroProps = getBannerProps(homeHeroBanners);
+  const mid1Props = getBannerProps(mid1Banners);
+  const mid2Props = getBannerProps(mid2Banners);
+  const mid3Props = getBannerProps(mid3Banners);
+  const bottomProps = getBannerProps(bottomBanners);
 
   /* ---------------- Render ---------------- */
   return (
@@ -740,8 +779,8 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={homeHeroBanners}
-              size={getSizeConfig('full')}
-              style={homeHeroBanners.length > 1 ? 'slide' : 'single'}
+              size={heroProps.sizeConfig}
+              style={heroProps.style}
             />
           </section>
         ) : (
@@ -783,8 +822,8 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={mid1Banners}
-              size={getSizeConfig('large')}
-              style={mid1Banners.length > 1 ? 'grid' : 'split'}
+              size={mid1Props.sizeConfig}
+              style={mid1Props.style}
             />
           </section>
         )}
@@ -888,8 +927,8 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={mid2Banners}
-              size={getSizeConfig('large')}
-              style={mid2Banners.length > 1 ? 'grid' : 'single'}
+              size={mid2Props.sizeConfig}
+              style={mid2Props.style}
             />
           </section>
         )}
@@ -1004,8 +1043,8 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={mid3Banners}
-              size={getSizeConfig('large')}
-              style={mid3Banners.length > 1 ? 'slide' : 'single'}
+              size={mid3Props.sizeConfig}
+              style={mid3Props.style}
             />
           </section>
         )}
@@ -1015,8 +1054,8 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={bottomBanners}
-              size={getSizeConfig('xl')}
-              style={bottomBanners.length > 1 ? 'grid' : 'overlay'}
+              size={bottomProps.sizeConfig}
+              style={bottomProps.style}
             />
           </section>
         )}
