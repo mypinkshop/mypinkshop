@@ -722,9 +722,13 @@ function ProductDetail() {
             {/* RIGHT: PRODUCT INFO */}
             <div className="lg:col-span-5 space-y-5">
               {product.brand && (
-                <Link to={`/shop?brand=${encodeURIComponent(product.brand)}`} className="inline-block text-xs font-bold text-pink-600 uppercase tracking-wider hover:text-pink-700">
-                  {product.brand}
-                </Link>
+                <Link
+              to={`/brand/${slugify(product.brand)}`}
+              className="inline-block text-xs font-bold text-pink-600 uppercase tracking-wider hover:text-pink-700 hover:underline transition-colors"
+              title={`View all ${product.brand} products`}
+                >
+             {product.brand}
+             </Link>
               )}
 
               <h1 className="text-xl sm:text-2xl lg:text-[28px] font-bold text-gray-900 leading-tight">
