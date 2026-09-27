@@ -1,16 +1,35 @@
+# ============ Static Assets — 1 YEAR IMMUTABLE ============
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# ============ Static Folder — 1 DAY ============
 /static/*
   Cache-Control: public, max-age=86400
 
+# ============ Favicon — 7 DAYS ============
 /favicon.ico
   Cache-Control: public, max-age=604800
 
+# ============ HTML Entry Point — NO CACHE ============
 /index.html
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
   Pragma: no-cache
   Expires: 0
 
+# ============ Admin Panel HTML — NO CACHE ============
+/admin
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/admin/*
+  Cache-Control: no-store, no-cache, must-revalidate
+
+# ============ Vendor Panel HTML — NO CACHE ============
+/vendor
+  Cache-Control: no-store, no-cache, must-revalidate
+
+/vendor/*
+  Cache-Control: no-store, no-cache, must-revalidate
+
+# ============ Any Other Route — NO CACHE ============
 /*
   Cache-Control: no-cache
