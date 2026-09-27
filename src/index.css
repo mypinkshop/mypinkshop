@@ -1,5 +1,5 @@
 /* ================================================================== */
-/* FONTS — Luxury Typography                                          */
+/* FONTS — Premium Typography                                         */
 /* ================================================================== */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500&family=Inter:wght@300;400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap');
 
@@ -12,16 +12,20 @@
 /* ================================================================== */
 @layer base {
   :root {
-    /* Luxury Palette */
-    --gold: #C9A961;
-    --gold-light: #E5D4A8;
-    --gold-dark: #A8893F;
-    --cream: #FAF7F2;
-    --cream-dark: #F0EBE1;
-    --charcoal: #1A1A1A;
-    --charcoal-soft: #2A2A2A;
-    --burgundy: #6B1F2E;
-    --blush: #F8E8E8;
+    /* ============ PINK + WHITE PALETTE ============ */
+    --pink: #EC4899;              /* primary pink-500 */
+    --pink-light: #F472B6;        /* pink-400 */
+    --pink-dark: #BE185D;         /* pink-700 */
+    --pink-soft: #FCE7F3;         /* pink-50 */
+    --pink-cream: #FFF7FA;        /* very light pink bg */
+    --white: #FFFFFF;
+    --text: #1F2937;              /* gray-800 */
+    --text-soft: #6B7280;         /* gray-500 */
+    --text-light: #9CA3AF;        /* gray-400 */
+    --border: #FBCFE8;            /* pink-200 */
+    --border-light: #FCE7F3;      /* pink-50 */
+    --rose: #F43F5E;              /* rose-500 */
+    --blush: #FDF2F8;             /* pink-50 */
   }
 
   html {
@@ -38,7 +42,7 @@
     overflow-x: hidden;
   }
 
-  /* Serif headings — luxury feel */
+  /* Serif headings — premium feel */
   .font-serif,
   h1.font-serif,
   h2.font-serif,
@@ -46,7 +50,7 @@
     font-family: 'Playfair Display', Georgia, serif;
   }
 
-  /* Display font — even more elegant */
+  /* Display font */
   .font-display {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-weight: 400;
@@ -54,31 +58,31 @@
 
   /* Selection */
   ::selection {
-    background: var(--gold);
+    background: var(--pink);
     color: white;
   }
 
-  /* Focus ring — gold */
+  /* Focus ring */
   *:focus-visible {
-    outline: 2px solid var(--gold);
+    outline: 2px solid var(--pink);
     outline-offset: 2px;
     border-radius: 2px;
   }
 
-  /* Images — never overflow */
+  /* Images */
   img {
     max-width: 100%;
     height: auto;
     display: block;
   }
 
-  /* Buttons — reset */
+  /* Buttons */
   button {
     font-family: inherit;
     cursor: pointer;
   }
 
-  /* Inputs — smooth */
+  /* Inputs */
   input,
   textarea,
   select {
@@ -87,7 +91,7 @@
 }
 
 /* ================================================================== */
-/* SCROLLBAR — Premium                                                */
+/* SCROLLBAR — Pink Premium                                           */
 /* ================================================================== */
 ::-webkit-scrollbar {
   width: 5px;
@@ -106,18 +110,18 @@
   background: linear-gradient(180deg, #ff4d8a, #e63d78);
 }
 
-/* Gold scrollbar variant */
-.scrollbar-gold::-webkit-scrollbar-track {
-  background: var(--cream);
+/* Pink scrollbar variant */
+.scrollbar-pink::-webkit-scrollbar-track {
+  background: var(--pink-cream);
 }
-.scrollbar-gold::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+.scrollbar-pink::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--pink-light), var(--pink));
 }
-.scrollbar-gold::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+.scrollbar-pink::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--pink), var(--pink-dark));
 }
 
-/* Hide scrollbar but keep scroll */
+/* Hide scrollbar */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -126,8 +130,23 @@
   scrollbar-width: none;
 }
 
+/* Admin sidebar scrollbar — subtle */
+.admin-sidebar-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+.admin-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(236, 72, 153, 0.3);
+  border-radius: 10px;
+}
+.admin-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(236, 72, 153, 0.6);
+}
+
 /* ================================================================== */
-/* ANIMATIONS — Luxury                                                */
+/* ANIMATIONS — Premium                                               */
 /* ================================================================== */
 
 /* Slow zoom for hero banners */
@@ -163,7 +182,7 @@
   animation: fadeIn 0.6s ease-out forwards;
 }
 
-/* Slide in from left */
+/* Slide in left */
 @keyframes slideInLeft {
   from {
     opacity: 0;
@@ -178,7 +197,7 @@
   animation: slideInLeft 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-/* Slide in from right */
+/* Slide in right */
 @keyframes slideInRight {
   from {
     opacity: 0;
@@ -201,37 +220,37 @@
 .animate-shimmer {
   background: linear-gradient(
     90deg,
-    #f5f5f5 0%,
-    #fafafa 50%,
-    #f5f5f5 100%
+    #fce7f3 0%,
+    #fff7fa 50%,
+    #fce7f3 100%
   );
   background-size: 1000px 100%;
   animation: shimmer 2s infinite;
 }
 
-/* Gold shimmer text */
-@keyframes goldShimmer {
+/* Pink shimmer text */
+@keyframes pinkShimmer {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-.animate-gold-shimmer {
+.animate-pink-shimmer {
   background: linear-gradient(
     90deg,
-    var(--gold-dark) 0%,
-    var(--gold-light) 25%,
-    var(--gold) 50%,
-    var(--gold-light) 75%,
-    var(--gold-dark) 100%
+    var(--pink-dark) 0%,
+    var(--pink-light) 25%,
+    var(--pink) 50%,
+    var(--pink-light) 75%,
+    var(--pink-dark) 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: goldShimmer 4s linear infinite;
+  animation: pinkShimmer 4s linear infinite;
 }
 
-/* Pulse — subtle */
+/* Soft pulse */
 @keyframes softPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
@@ -258,7 +277,7 @@
   animation: rotateSlow 20s linear infinite;
 }
 
-/* Reveal from clip */
+/* Reveal clip */
 @keyframes revealClip {
   from { clip-path: inset(0 100% 0 0); }
   to { clip-path: inset(0 0 0 0); }
@@ -268,33 +287,30 @@
 }
 
 /* ================================================================== */
-/* LUXURY UTILITY CLASSES                                             */
+/* PINK & WHITE UTILITY CLASSES                                       */
 /* ================================================================== */
 
-/* Gold gradient text */
-.text-gold {
-  color: var(--gold);
-}
-.text-gold-gradient {
-  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-light) 50%, var(--gold) 100%);
+/* Pink gradient text */
+.text-pink-gradient {
+  background: linear-gradient(135deg, var(--pink-dark) 0%, var(--pink-light) 50%, var(--pink) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Gold divider */
-.divider-gold {
+/* Pink divider */
+.divider-pink {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--gold);
+  color: var(--pink);
 }
-.divider-gold::before,
-.divider-gold::after {
+.divider-pink::before,
+.divider-pink::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  background: linear-gradient(90deg, transparent, var(--pink), transparent);
 }
 
 /* Letter spacing */
@@ -308,7 +324,7 @@
   letter-spacing: 0.4em;
 }
 
-/* Uppercase small caps */
+/* Small caps */
 .small-caps {
   text-transform: uppercase;
   letter-spacing: 0.15em;
@@ -316,105 +332,104 @@
   font-weight: 500;
 }
 
-/* Luxury button */
-.btn-luxe {
+/* ================================================================== */
+/* BUTTONS — Pink                                                     */
+/* ================================================================== */
+
+/* Primary pink button */
+.btn-pink {
   display: inline-block;
   padding: 14px 32px;
   font-size: 11px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  font-weight: 500;
-  border: 1px solid var(--charcoal);
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--pink) 0%, var(--rose) 100%);
+  color: white;
+  border: none;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.25);
+}
+.btn-pink:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(236, 72, 153, 0.4);
+}
+
+/* Outlined pink button */
+.btn-outline-pink {
+  display: inline-block;
+  padding: 14px 32px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-weight: 600;
   background: transparent;
-  color: var(--charcoal);
-  transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  position: relative;
-  overflow: hidden;
+  color: var(--pink);
+  border: 1px solid var(--pink);
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
   cursor: pointer;
 }
-.btn-luxe::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: var(--charcoal);
-  transition: left 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  z-index: -1;
-}
-.btn-luxe:hover {
+.btn-outline-pink:hover {
+  background: var(--pink);
   color: white;
-}
-.btn-luxe:hover::before {
-  left: 0;
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3);
 }
 
-/* Gold button */
-.btn-gold {
+/* White button (on dark bg) */
+.btn-white {
   display: inline-block;
   padding: 14px 32px;
   font-size: 11px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  font-weight: 500;
-  background: var(--gold);
-  color: white;
-  border: 1px solid var(--gold);
-  transition: all 0.4s ease;
-}
-.btn-gold:hover {
-  background: var(--gold-dark);
-  border-color: var(--gold-dark);
-}
-
-/* Outline gold button */
-.btn-outline-gold {
-  display: inline-block;
-  padding: 14px 32px;
-  font-size: 11px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  font-weight: 500;
-  background: transparent;
-  color: var(--gold);
-  border: 1px solid var(--gold);
-  transition: all 0.4s ease;
-}
-.btn-outline-gold:hover {
-  background: var(--gold);
-  color: white;
-}
-
-/* Luxury card */
-.card-luxe {
+  font-weight: 600;
   background: white;
-  border: 1px solid rgba(201, 169, 97, 0.2);
+  color: var(--pink);
+  border: none;
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+}
+.btn-white:hover {
+  background: var(--pink-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ================================================================== */
+/* CARDS                                                              */
+/* ================================================================== */
+
+/* Premium pink card */
+.card-pink {
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
   transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.card-luxe:hover {
-  border-color: var(--gold);
-  box-shadow: 0 20px 40px -20px rgba(201, 169, 97, 0.3);
+.card-pink:hover {
+  border-color: var(--pink-light);
+  box-shadow: 0 20px 40px -20px rgba(236, 72, 153, 0.3);
   transform: translateY(-4px);
 }
 
 /* Glass effect */
 .glass {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 /* Glass dark */
 .glass-dark {
-  background: rgba(26, 26, 26, 0.7);
+  background: rgba(31, 41, 55, 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Text shadow — for hero text */
+/* Text shadows */
 .text-shadow-lg {
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
@@ -422,15 +437,17 @@
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-/* Drop shadow gold */
-.shadow-gold {
-  box-shadow: 0 10px 40px -10px rgba(201, 169, 97, 0.4);
+/* Pink shadows */
+.shadow-pink {
+  box-shadow: 0 10px 40px -10px rgba(236, 72, 153, 0.4);
 }
-.shadow-gold-lg {
-  box-shadow: 0 20px 60px -15px rgba(201, 169, 97, 0.5);
+.shadow-pink-lg {
+  box-shadow: 0 20px 60px -15px rgba(236, 72, 153, 0.5);
 }
 
-/* Aspect ratios */
+/* ================================================================== */
+/* ASPECT RATIOS                                                      */
+/* ================================================================== */
 .aspect-product {
   aspect-ratio: 3 / 4;
 }
@@ -479,10 +496,10 @@
 }
 .hover-lift:hover {
   transform: translateY(-6px);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 40px -15px rgba(236, 72, 153, 0.2);
 }
 
-/* Zoom image on hover */
+/* Zoom image */
 .hover-zoom img {
   transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -501,7 +518,7 @@
   bottom: -2px;
   width: 0;
   height: 1px;
-  background: var(--gold);
+  background: var(--pink);
   transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .hover-underline:hover::after {
@@ -511,8 +528,6 @@
 /* ================================================================== */
 /* SECTION TRANSITIONS                                                */
 /* ================================================================== */
-
-/* Reveal on scroll (with IntersectionObserver) */
 .reveal {
   opacity: 0;
   transform: translateY(24px);
@@ -542,19 +557,19 @@
 /* LOADING STATES                                                     */
 /* ================================================================== */
 
-/* Gold spinner */
-.spinner-gold {
+/* Pink spinner */
+.spinner-pink {
   width: 48px;
   height: 48px;
-  border: 1px solid rgba(201, 169, 97, 0.2);
-  border-top-color: var(--gold);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  border-top-color: var(--pink);
   border-radius: 50%;
   animation: rotateSlow 1s linear infinite;
 }
 
 /* Skeleton */
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #fce7f3 25%, #fff7fa 50%, #fce7f3 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
@@ -564,16 +579,16 @@
 /* RESPONSIVE FIXES                                                   */
 /* ================================================================== */
 @media (max-width: 768px) {
-  .btn-luxe,
-  .btn-gold,
-  .btn-outline-gold {
+  .btn-pink,
+  .btn-outline-pink,
+  .btn-white {
     padding: 12px 24px;
     font-size: 10px;
     letter-spacing: 0.25em;
   }
 }
 
-/* Reduce motion — accessibility */
+/* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -585,7 +600,7 @@
   }
 }
 
-/* Print — clean */
+/* Print */
 @media print {
   .no-print {
     display: none !important;
