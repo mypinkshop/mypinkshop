@@ -20,6 +20,89 @@ function slugify(str) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Checkbox List Component                                            */
+/* ------------------------------------------------------------------ */
+function CheckboxList({ options, selected = [], onChange, columns = 2, emptyText = 'No options' }) {
+  if (!options || options.length === 0) {
+    return (
+      <div className="text-xs text-gray-400 py-2 px-3 bg-gray-50 rounded-lg">
+        {emptyText}
+      </div>
+    );
+  }
+
+  const toggle = (value) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange(options.map((o) => o.value));
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  return (
+    <div>
+      {/* Actions */}
+      <div className="flex gap-2 mb-2">
+        <button
+          type="button"
+          onClick={selectAll}
+          className="text-[10px] px-2 py-0.5 bg-pink-50 text-pink-600 rounded hover:bg-pink-100 font-medium"
+        >
+          Select All
+        </button>
+        <button
+          type="button"
+          onClick={clearAll}
+          className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium"
+        >
+          Clear
+        </button>
+        <span className="text-[10px] text-gray-400 self-center ml-auto">
+          {selected.length} selected
+        </span>
+      </div>
+
+      {/* Checkboxes */}
+      <div
+        className={`grid gap-1.5 ${
+          columns === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
+        }`}
+      >
+        {options.map((opt) => {
+          const checked = selected.includes(opt.value);
+          return (
+            <label
+              key={opt.value}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition text-xs ${
+                checked
+                  ? 'border-pink-500 bg-pink-50 text-pink-700 font-medium'
+                  : 'border-pink-100 bg-white hover:border-pink-300 hover:bg-pink-50/50'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => toggle(opt.value)}
+                className="w-4 h-4 accent-pink-500 shrink-0"
+              />
+              <span className="truncate">{opt.label}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Main Component                                                     */
 /* ------------------------------------------------------------------ */
 function AdminBanners() {
@@ -30,13 +113,13 @@ function AdminBanners() {
   const [uploading, setUploading] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
   const [previewMode, setPreviewMode] = useState('desktop');
-  const [mobileTab, setMobileTab] = useState('list'); // list | edit | preview
+  const [mobileTab, setMobileTab] = useState('list');
 
   // Search + filter
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // all | active | inactive
+  const [filter, setFilter] = useState('all');
 
-  // ✅ Backend-driven options
+  // Backend-driven options
   const [options, setOptions] = useState({
     sizes: [],
     styles: [],
@@ -63,8 +146,10 @@ function AdminBanners() {
       order: 1,
       active: true,
       showTextOverlay: true,
-      category: '',
-      position: 'home_hero',
+      // ✅ Multi-select arrays
+      categories: [],
+      positions: ['home_hero'],
+      // Single
       size: 'large',
       display_style: 'single',
       link_type: 'custom',
@@ -72,7 +157,7 @@ function AdminBanners() {
     };
   }
 
-  /* ------------------------- Auth ------------------------- */
+  /* ------------------------- Auth + Load ------------------------- */
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
@@ -143,7 +228,7 @@ function AdminBanners() {
         fetch(`${API_BASE}/categories/tree`).then((r) => r.json()),
       ]);
 
-      // ✅ Brands — { success, data } handle
+      // Brands — { success, data }
       if (brandsRes.status === 'fulfilled') {
         const res = brandsRes.value;
         const b = Array.isArray(res) ? res : (res.data || []);
@@ -152,7 +237,7 @@ function AdminBanners() {
         );
       }
 
-      // ✅ Products — { success, data } handle
+      // Products
       if (productsRes.status === 'fulfilled') {
         const res = productsRes.value;
         const list = Array.isArray(res)
@@ -161,7 +246,7 @@ function AdminBanners() {
         setProducts(list);
       }
 
-      // ✅ Categories — { success, data } handle
+      // Categories
       if (catRes.status === 'fulfilled') {
         const res = catRes.value;
         const list = Array.isArray(res)
@@ -207,6 +292,20 @@ function AdminBanners() {
   /* ------------------------- Select / New ------------------------- */
   const handleSelectBanner = (b) => {
     setEditingBanner(b);
+
+    // Backward compat: agar purana single `category` aaya to array me convert karo
+    const categories = Array.isArray(b.categories)
+      ? b.categories
+      : b.category
+      ? [b.category]
+      : [];
+
+    const positions = Array.isArray(b.positions)
+      ? b.positions
+      : b.position
+      ? [b.position]
+      : ['home_hero'];
+
     setFormData({
       title: b.title || '',
       subtitle: b.subtitle || '',
@@ -215,8 +314,8 @@ function AdminBanners() {
       order: b.order || 1,
       active: b.active !== false,
       showTextOverlay: b.showTextOverlay !== false,
-      category: b.category || '',
-      position: b.position || 'home_hero',
+      categories,
+      positions,
       size: b.size || 'large',
       display_style: b.display_style || 'single',
       link_type: b.link_type || 'custom',
@@ -258,9 +357,7 @@ function AdminBanners() {
   };
 
   /* ------------------------- Link generation ------------------------- */
-  const generateLink = () => {
-    return formData.link || '';
-  };
+  const generateLink = () => formData.link || '';
 
   const copyLink = () => {
     const full = `${window.location.origin}${generateLink()}`;
@@ -279,11 +376,17 @@ function AdminBanners() {
     const token = localStorage.getItem('adminToken');
     const form = new FormData();
 
-    ['title', 'subtitle', 'buttonText', 'link', 'category', 'position', 'size', 'display_style', 'link_type'].forEach(
+    // Single fields
+    ['title', 'subtitle', 'buttonText', 'link', 'size', 'display_style', 'link_type'].forEach(
       (k) => {
         form.append(k, data[k] || '');
       }
     );
+
+    // ✅ Multi-select — arrays
+    form.append('categories', JSON.stringify(data.categories || []));
+    form.append('positions', JSON.stringify(data.positions || []));
+
     form.append('order', data.order);
     form.append('active', data.active);
     form.append('showTextOverlay', data.showTextOverlay);
@@ -316,6 +419,9 @@ function AdminBanners() {
     }
     if (!generateLink()) {
       return toast.error('Link generate nahi hua');
+    }
+    if (!formData.positions || formData.positions.length === 0) {
+      return toast.error('Kam se kam 1 position select karo');
     }
 
     setUploading(true);
@@ -390,29 +496,33 @@ function AdminBanners() {
   };
 
   /* ------------------------- Auto-suggest size/style ------------------------- */
-  const applySizeGuide = (position) => {
-    const pos = options.positions.find((p) => p.value === position);
-    if (!pos) {
-      setFormData((p) => ({ ...p, position }));
-      return;
-    }
+  const applySizeGuide = (positions) => {
+    // Pehli selected position se size/style suggest karo
+    if (!positions || positions.length === 0) return;
+    const firstPos = positions[0];
+    const pos = options.positions.find((p) => p.value === firstPos);
+    if (!pos) return;
     setFormData((p) => ({
       ...p,
-      position,
+      positions,
       size: pos.size || p.size,
       display_style: pos.style || p.display_style,
     }));
   };
 
   const currentPositionGuide = useMemo(() => {
-    return options.positions.find((p) => p.value === formData.position);
-  }, [options.positions, formData.position]);
+    if (!formData.positions || formData.positions.length === 0) return null;
+    return options.positions.find((p) => p.value === formData.positions[0]);
+  }, [options.positions, formData.positions]);
 
   /* ------------------------- Preview ------------------------- */
   const previewBanner = useMemo(
     () => ({
       ...formData,
       images: imagePreviews.length ? imagePreviews : formData.images,
+      // Backward compat for BannerRenderer
+      category: formData.categories?.[0] || null,
+      position: formData.positions?.[0] || 'home_hero',
     }),
     [formData, imagePreviews]
   );
@@ -434,7 +544,7 @@ function AdminBanners() {
   /* ------------------------- Render ------------------------- */
   return (
     <div className="min-h-screen bg-[#FFF7FA]">
-      {/* ==================== TOP BAR ==================== */}
+      {/* TOP BAR */}
       <div className="bg-white border-b border-pink-100 sticky top-0 z-30">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -482,11 +592,11 @@ function AdminBanners() {
         </div>
       </div>
 
-      {/* ==================== MAIN 3-COLUMN ==================== */}
+      {/* MAIN 3-COLUMN */}
       <div className="max-w-[1600px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_400px] gap-4 p-4 sm:p-6">
 
-          {/* ==================== COLUMN 1: BANNERS LIST ==================== */}
+          {/* ==================== COLUMN 1: LIST ==================== */}
           <aside
             className={`${
               mobileTab === 'list' ? 'block' : 'hidden'
@@ -531,6 +641,8 @@ function AdminBanners() {
               ) : (
                 filteredBanners.map((b) => {
                   const isActive = editingBanner?.id === b.id || editingBanner?._id === b.id;
+                  const positions = b.positions || (b.position ? [b.position] : []);
+                  const categories = b.categories || (b.category ? [b.category] : []);
                   return (
                     <button
                       key={b._id || b.id}
@@ -557,7 +669,7 @@ function AdminBanners() {
                           {b.title || 'Untitled'}
                         </p>
                         <p className="text-[10px] text-gray-400 truncate">
-                          {b.position || 'home_hero'} · {b.size || 'large'}
+                          {positions.length} pos · {categories.length} cat
                         </p>
                         <div className="flex items-center gap-1 mt-0.5">
                           {b.active ? (
@@ -591,7 +703,12 @@ function AdminBanners() {
               {editingBanner && (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => toggleActive(editingBanner._id || editingBanner.id, editingBanner.active)}
+                    onClick={() =>
+                      toggleActive(
+                        editingBanner._id || editingBanner.id,
+                        editingBanner.active
+                      )
+                    }
                     className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
                       formData.active
                         ? 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -604,8 +721,10 @@ function AdminBanners() {
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto">
-
+            <form
+              onSubmit={handleSubmit}
+              className="p-4 sm:p-6 space-y-5 max-h-[calc(100vh-200px)] overflow-y-auto"
+            >
               {/* Title / Subtitle / Button */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -615,7 +734,9 @@ function AdminBanners() {
                   <input
                     type="text"
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
                     placeholder="e.g. Summer Sale 2024"
                     className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
@@ -627,7 +748,9 @@ function AdminBanners() {
                   <input
                     type="text"
                     value={formData.subtitle}
-                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, subtitle: e.target.value })
+                    }
                     placeholder="e.g. Up to 50% off"
                     className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
@@ -639,7 +762,9 @@ function AdminBanners() {
                   <input
                     type="text"
                     value={formData.buttonText}
-                    onChange={(e) => setFormData({ ...formData, buttonText: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, buttonText: e.target.value })
+                    }
                     placeholder="Shop Now"
                     className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
@@ -680,161 +805,187 @@ function AdminBanners() {
                 )}
               </div>
 
-              {/* SIZE — backend se */}
-              {optionsLoading ? (
-                <div className="text-xs text-gray-400">Loading options...</div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      📐 Size
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {options.sizes.map((s) => (
-                        <label
-                          key={s.value}
-                          className={`cursor-pointer px-3 py-2 rounded-xl border-2 text-xs font-medium transition ${
-                            formData.size === s.value
-                              ? 'border-pink-500 bg-pink-50 text-pink-600'
-                              : 'border-gray-200 hover:border-pink-300'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="size"
-                            value={s.value}
-                            checked={formData.size === s.value}
-                            onChange={(e) =>
-                              setFormData({ ...formData, size: e.target.value })
-                            }
-                            className="sr-only"
-                          />
-                          {s.label}
-                          {s.hint && (
-                            <span className="text-[10px] opacity-60 ml-1">
-                              ({s.hint})
-                            </span>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* STYLE — backend se */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      🎨 Display Style
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {options.styles.map((s) => (
-                        <label
-                          key={s.value}
-                          className={`cursor-pointer px-3 py-2 rounded-xl border-2 text-xs font-medium transition ${
-                            formData.display_style === s.value
-                              ? 'border-pink-500 bg-pink-50 text-pink-600'
-                              : 'border-gray-200 hover:border-pink-300'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="style"
-                            value={s.value}
-                            checked={formData.display_style === s.value}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                display_style: e.target.value,
-                              })
-                            }
-                            className="sr-only"
-                          />
-                          {s.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* POSITION + CATEGORY */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    📍 Position
-                  </label>
-                  <select
-                    value={formData.position}
-                    onChange={(e) => applySizeGuide(e.target.value)}
-                    className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  >
-                    {options.positions.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  {currentPositionGuide && (
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      📏 Recommended: {currentPositionGuide.px} ({currentPositionGuide.ratio})
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    📂 Category <span className="text-gray-400">(optional)</span>
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
-                  >
-                    <option value="">🌐 Global (all pages)</option>
-                    {categories.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* LINK TYPE — backend se */}
+              {/* ============ MULTI-SELECT: POSITIONS ============ */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-2">
-                  🔗 Link Type
+                  📍 Positions{' '}
+                  <span className="text-pink-500 font-bold">
+                    (multi-select — 1+ choose karo)
+                  </span>
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {options.link_types.map((l) => (
-                    <label
-                      key={l.value}
-                      className={`cursor-pointer px-3 py-2 rounded-xl border-2 text-xs transition ${
-                        formData.link_type === l.value
-                          ? 'border-pink-500 bg-pink-50 text-pink-600'
-                          : 'border-gray-200 hover:border-pink-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="link_type"
-                        value={l.value}
-                        checked={formData.link_type === l.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            link_type: e.target.value,
-                            link: '',
-                          })
-                        }
-                        className="sr-only"
-                      />
-                      {l.label}
-                    </label>
-                  ))}
-                </div>
+                {optionsLoading ? (
+                  <div className="text-xs text-gray-400 py-2">
+                    Loading positions...
+                  </div>
+                ) : (
+                  <CheckboxList
+                    options={options.positions}
+                    selected={formData.positions || []}
+                    onChange={(vals) => applySizeGuide(vals)}
+                    columns={2}
+                  />
+                )}
+                {currentPositionGuide && (
+                  <p className="text-[10px] text-gray-500 mt-2">
+                    📏 Recommended (first position): {currentPositionGuide.px} ({currentPositionGuide.ratio})
+                  </p>
+                )}
               </div>
+
+              {/* ============ MULTI-SELECT: CATEGORIES ============ */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  📂 Categories{' '}
+                  <span className="text-gray-400">
+                    (multi-select — khaali = Global)
+                  </span>
+                </label>
+                <CheckboxList
+                  options={categories}
+                  selected={formData.categories || []}
+                  onChange={(vals) =>
+                    setFormData({ ...formData, categories: vals })
+                  }
+                  columns={2}
+                  emptyText="No categories available"
+                />
+                {formData.categories.length === 0 && (
+                  <p className="text-[10px] text-green-600 mt-1">
+                    ✓ Global — saare pages pe dikhega
+                  </p>
+                )}
+              </div>
+
+              {/* ============ MULTI-SELECT: SUBCATEGORIES ============ */}
+              {subcategories.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    📁 Subcategories{' '}
+                    <span className="text-gray-400">
+                      (optional, multi-select)
+                    </span>
+                  </label>
+                  <CheckboxList
+                    options={subcategories}
+                    selected={formData.subcategories || []}
+                    onChange={(vals) =>
+                      setFormData({ ...formData, subcategories: vals })
+                    }
+                    columns={2}
+                  />
+                </div>
+              )}
+
+              {/* SIZE — backend se, single */}
+              {!optionsLoading && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    📐 Size
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {options.sizes.map((s) => (
+                      <label
+                        key={s.value}
+                        className={`cursor-pointer px-3 py-2 rounded-xl border-2 text-xs font-medium transition ${
+                          formData.size === s.value
+                            ? 'border-pink-500 bg-pink-50 text-pink-600'
+                            : 'border-gray-200 hover:border-pink-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="size"
+                          value={s.value}
+                          checked={formData.size === s.value}
+                          onChange={(e) =>
+                            setFormData({ ...formData, size: e.target.value })
+                          }
+                          className="sr-only"
+                        />
+                        {s.label}
+                        {s.hint && (
+                          <span className="text-[10px] opacity-60 ml-1">
+                            ({s.hint})
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* STYLE — backend se, single */}
+              {!optionsLoading && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    🎨 Display Style
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {options.styles.map((s) => (
+                      <label
+                        key={s.value}
+                        className={`cursor-pointer px-3 py-2 rounded-xl border-2 text-xs font-medium transition ${
+                          formData.display_style === s.value
+                            ? 'border-pink-500 bg-pink-50 text-pink-600'
+                            : 'border-gray-200 hover:border-pink-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="style"
+                          value={s.value}
+                          checked={formData.display_style === s.value}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              display_style: e.target.value,
+                            })
+                          }
+                          className="sr-only"
+                        />
+                        {s.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LINK TYPE — single */}
+              {!optionsLoading && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    🔗 Link Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {options.link_types.map((l) => (
+                      <label
+                        key={l.value}
+                        className={`cursor-pointer px-3 py-2 rounded-xl border-2 text-xs transition ${
+                          formData.link_type === l.value
+                            ? 'border-pink-500 bg-pink-50 text-pink-600'
+                            : 'border-gray-200 hover:border-pink-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="link_type"
+                          value={l.value}
+                          checked={formData.link_type === l.value}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              link_type: e.target.value,
+                              link: '',
+                            })
+                          }
+                          className="sr-only"
+                        />
+                        {l.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* LINK VALUE */}
               {formData.link_type === 'category' && (
@@ -842,7 +993,9 @@ function AdminBanners() {
                   label="Category"
                   options={categories}
                   value={formData.link.replace('/category/', '')}
-                  onChange={(v) => setFormData({ ...formData, link: `/category/${v}` })}
+                  onChange={(v) =>
+                    setFormData({ ...formData, link: `/category/${v}` })
+                  }
                   placeholder="Search category..."
                 />
               )}
@@ -852,7 +1005,9 @@ function AdminBanners() {
                   label="Subcategory"
                   options={subcategories}
                   value={formData.link.replace('/category/', '')}
-                  onChange={(v) => setFormData({ ...formData, link: `/category/${v}` })}
+                  onChange={(v) =>
+                    setFormData({ ...formData, link: `/category/${v}` })
+                  }
                   placeholder="Search subcategory..."
                 />
               )}
@@ -862,7 +1017,9 @@ function AdminBanners() {
                   label="Brand"
                   options={brands}
                   value={formData.link.replace('/brand/', '')}
-                  onChange={(v) => setFormData({ ...formData, link: `/brand/${slugify(v)}` })}
+                  onChange={(v) =>
+                    setFormData({ ...formData, link: `/brand/${slugify(v)}` })
+                  }
                   placeholder="Search brand..."
                   allowCustom
                 />
@@ -876,7 +1033,9 @@ function AdminBanners() {
                     label: `${p.title || p.name} ${p.sku ? `(${p.sku})` : ''}`,
                   }))}
                   value={formData.link.replace('/product/', '')}
-                  onChange={(v) => setFormData({ ...formData, link: `/product/${v}` })}
+                  onChange={(v) =>
+                    setFormData({ ...formData, link: `/product/${v}` })
+                  }
                   placeholder="Search product (title/SKU)..."
                 />
               )}
@@ -889,7 +1048,9 @@ function AdminBanners() {
                   <input
                     type="text"
                     value={formData.link}
-                    onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, link: e.target.value })
+                    }
                     placeholder="/shop or https://..."
                     className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                   />
@@ -988,7 +1149,9 @@ function AdminBanners() {
                 {editingBanner && (
                   <button
                     type="button"
-                    onClick={() => handleDelete(editingBanner._id || editingBanner.id)}
+                    onClick={() =>
+                      handleDelete(editingBanner._id || editingBanner.id)
+                    }
                     className="px-4 py-3 border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors text-sm font-medium"
                   >
                     Delete
@@ -1006,7 +1169,9 @@ function AdminBanners() {
           >
             <div className="bg-white rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
               <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-3 flex items-center justify-between">
-                <h3 className="text-white font-semibold text-sm">👁️ Live Preview</h3>
+                <h3 className="text-white font-semibold text-sm">
+                  👁️ Live Preview
+                </h3>
                 <div className="flex gap-1 bg-white/20 rounded-lg p-1">
                   <button
                     onClick={() => setPreviewMode('desktop')}
@@ -1056,10 +1221,20 @@ function AdminBanners() {
                   📐 Size: <b className="text-gray-700">{formData.size}</b>
                 </p>
                 <p>
-                  🎨 Style: <b className="text-gray-700">{formData.display_style}</b>
+                  🎨 Style:{' '}
+                  <b className="text-gray-700">{formData.display_style}</b>
                 </p>
                 <p>
-                  📍 Position: <b className="text-gray-700">{formData.position}</b>
+                  📍 Positions:{' '}
+                  <b className="text-gray-700">
+                    {formData.positions?.length || 0}
+                  </b>
+                </p>
+                <p>
+                  📂 Categories:{' '}
+                  <b className="text-gray-700">
+                    {formData.categories?.length || 0}
+                  </b>
                 </p>
                 <p>
                   🔗 Link:{' '}
