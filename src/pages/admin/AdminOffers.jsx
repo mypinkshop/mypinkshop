@@ -22,9 +22,9 @@ function AdminOffers() {
     endDate: '',
     type: 'top_banner',
     isActive: true,
-    categoryMode: 'global',    // 'global' | 'single' | 'multiple'
-    selectedCategories: [],     // array of slugs (agar single/multiple)
-    position: 'top_banner',
+    categoryMode: 'global',
+    selectedCategories: [],
+    selectedPositions: ['top_banner'],   // ✅ NAYA
     icon: '🎉',
     priority: 0,
   });
@@ -67,7 +67,6 @@ function AdminOffers() {
       return;
     }
     loadOffers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e) => {
@@ -76,7 +75,12 @@ function AdminOffers() {
     if (!formData.title.trim()) return toast.error('Please enter offer title');
     if (!formData.description.trim()) return toast.error('Please enter offer description');
 
-    // ✅ Validate category selection
+    // ✅ Position validate
+    if (formData.selectedPositions.length === 0) {
+      return toast.error('Please select at least one position');
+    }
+
+    // ✅ Category validate
     if (formData.categoryMode !== 'global' && formData.selectedCategories.length === 0) {
       return toast.error('Please select at least one category');
     }
@@ -84,12 +88,20 @@ function AdminOffers() {
     setProcessingId('submitting');
 
     try {
-      // ✅ Category data prepare karo
+      // ✅ Category data prepare
       let categoryData = null;
       if (formData.categoryMode === 'single' && formData.selectedCategories.length > 0) {
         categoryData = formData.selectedCategories[0];
       } else if (formData.categoryMode === 'multiple' && formData.selectedCategories.length > 0) {
         categoryData = JSON.stringify(formData.selectedCategories);
+      }
+
+      // ✅ Position data prepare
+      let positionData = 'top_banner';
+      if (formData.selectedPositions.length === 1) {
+        positionData = formData.selectedPositions[0];
+      } else if (formData.selectedPositions.length > 1) {
+        positionData = JSON.stringify(formData.selectedPositions);
       }
 
       const url = editingOffer
@@ -105,6 +117,7 @@ function AdminOffers() {
         body: JSON.stringify({
           ...formData,
           category: categoryData,
+          position: positionData,
           discountValue: parseInt(formData.discountValue) || 0,
           minOrderValue: parseInt(formData.minOrderValue) || 0,
           priority: parseInt(formData.priority) || 0,
@@ -143,7 +156,7 @@ function AdminOffers() {
       isActive: true,
       categoryMode: 'global',
       selectedCategories: [],
-      position: 'top_banner',
+      selectedPositions: ['top_banner'],
       icon: '🎉',
       priority: 0,
     });
@@ -202,7 +215,19 @@ function AdminOffers() {
     return categoryOptions.find(o => o.value === cat)?.label || cat;
   };
 
-  // ✅ Toggle category selection
+  // ✅ Parse position to display
+  const getPositionLabels = (pos) => {
+    if (!pos) return ['🔥 Top Banner'];
+    try {
+      const parsed = JSON.parse(pos);
+      if (Array.isArray(parsed)) {
+        return parsed.map(p => positionOptions.find(o => o.value === p)?.label || p);
+      }
+    } catch (e) {}
+    return [positionOptions.find(o => o.value === pos)?.label || pos];
+  };
+
+  // ✅ Toggle category
   const toggleCategory = (slug) => {
     setFormData(prev => {
       const exists = prev.selectedCategories.includes(slug);
@@ -215,19 +240,40 @@ function AdminOffers() {
     });
   };
 
-  // ✅ Filtered offers
+  // ✅ Toggle position
+  const togglePosition = (value) => {
+    setFormData(prev => {
+      const exists = prev.selectedPositions.includes(value);
+      return {
+        ...prev,
+        selectedPositions: exists
+          ? prev.selectedPositions.filter(p => p !== value)
+          : [...prev.selectedPositions, value],
+      };
+    });
+  };
+
   const filteredOffers = offers.filter(o => {
     if (filterCategory !== 'all') {
       if (filterCategory === 'global' && o.category) return false;
       if (filterCategory !== 'global' && !o.category) return false;
     }
-    if (filterPosition !== 'all' && o.position !== filterPosition) return false;
+    if (filterPosition !== 'all') {
+      // ✅ Position filter (JSON array support)
+      let positions = [];
+      try {
+        const parsed = JSON.parse(o.position);
+        positions = Array.isArray(parsed) ? parsed : [o.position];
+      } catch (e) {
+        positions = [o.position || 'top_banner'];
+      }
+      if (!positions.includes(filterPosition)) return false;
+    }
     return true;
   });
 
   const activeOffers = offers.filter(o => o.isActive);
 
-  // ✅ Category options
   const categoryOptions = [
     { value: 'skincare', label: '🧴 Skincare' },
     { value: 'makeup', label: '💄 Makeup' },
@@ -241,12 +287,12 @@ function AdminOffers() {
   ];
 
   const positionOptions = [
-    { value: 'top_banner', label: '🔥 Top Banner (Global)' },
+    { value: 'top_banner', label: '🔥 Top Banner' },
     { value: 'category_top', label: '🎯 Category Top' },
     { value: 'category_mid', label: '📢 Category Mid' },
     { value: 'category_bottom', label: '🎯 Category Bottom' },
     { value: 'product_page', label: '📦 Product Page' },
-    { value: 'checkout', label: '💳 Checkout Page' },
+    { value: 'checkout', label: '💳 Checkout' },
   ];
 
   if (loading) {
@@ -272,7 +318,7 @@ function AdminOffers() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">🎯 Offer Management</h1>
-            <p className="text-gray-500 text-sm">Manage offers — global, single, or multi-category</p>
+            <p className="text-gray-500 text-sm">Global, single, multi-category + multi-position</p>
           </div>
           <button
             onClick={() => {
@@ -351,7 +397,6 @@ function AdminOffers() {
                   <th className="px-4 py-3 text-left text-gray-700 font-semibold">Category</th>
                   <th className="px-4 py-3 text-left text-gray-700 font-semibold">Position</th>
                   <th className="px-4 py-3 text-center text-gray-700 font-semibold">Discount</th>
-                  <th className="px-4 py-3 text-center text-gray-700 font-semibold">Priority</th>
                   <th className="px-4 py-3 text-center text-gray-700 font-semibold">Status</th>
                   <th className="px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
                 </tr>
@@ -359,7 +404,7 @@ function AdminOffers() {
               <tbody className="divide-y divide-pink-50">
                 {filteredOffers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                    <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
                       No offers found. Create your first offer!
                     </td>
                   </tr>
@@ -377,17 +422,18 @@ function AdminOffers() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-full font-medium">
-                          {positionOptions.find(p => p.value === offer.position)?.label || offer.position || 'top_banner'}
-                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {getPositionLabels(offer.position).map((label, idx) => (
+                            <span key={idx} className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">
+                              {label}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-pink-600">
                         {offer.discountType === 'percentage' || offer.discount_type === 'percentage'
                           ? `${offer.discountValue || offer.discount_value}%`
                           : `₹${offer.discountValue || offer.discount_value}`}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                        {offer.priority || 0}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
@@ -406,7 +452,7 @@ function AdminOffers() {
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => {
-                              // ✅ Parse category for editing
+                              // ✅ Parse category
                               let categoryMode = 'global';
                               let selectedCategories = [];
                               if (offer.category) {
@@ -425,6 +471,21 @@ function AdminOffers() {
                                 }
                               }
 
+                              // ✅ Parse position
+                              let selectedPositions = ['top_banner'];
+                              if (offer.position) {
+                                try {
+                                  const parsed = JSON.parse(offer.position);
+                                  if (Array.isArray(parsed)) {
+                                    selectedPositions = parsed;
+                                  } else {
+                                    selectedPositions = [offer.position];
+                                  }
+                                } catch (e) {
+                                  selectedPositions = [offer.position];
+                                }
+                              }
+
                               setEditingOffer(offer);
                               setFormData({
                                 title: offer.title,
@@ -438,7 +499,7 @@ function AdminOffers() {
                                 isActive: offer.isActive !== undefined ? offer.isActive : (offer.is_active === 1),
                                 categoryMode,
                                 selectedCategories,
-                                position: offer.position || 'top_banner',
+                                selectedPositions,
                                 icon: offer.icon || '🎉',
                                 priority: offer.priority || 0,
                               });
@@ -515,13 +576,12 @@ function AdminOffers() {
                 />
               </div>
 
-              {/* ✅ CATEGORY MODE SELECTION */}
+              {/* ✅ CATEGORY MODE */}
               <div className="border border-pink-100 rounded-xl p-4 bg-pink-50/30">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  📍 Where should this offer show?
+                  📍 Where should this offer show? (Category)
                 </label>
 
-                {/* Mode Radio Buttons */}
                 <div className="space-y-2 mb-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -547,7 +607,7 @@ function AdminOffers() {
                       className="w-4 h-4 text-pink-500"
                     />
                     <span className="text-sm text-gray-700">
-                      🎯 <strong>Single Category</strong> (only one category page)
+                      🎯 <strong>Single Category</strong>
                     </span>
                   </label>
 
@@ -561,18 +621,15 @@ function AdminOffers() {
                       className="w-4 h-4 text-pink-500"
                     />
                     <span className="text-sm text-gray-700">
-                      🎨 <strong>Multiple Categories</strong> (show on selected categories)
+                      🎨 <strong>Multiple Categories</strong>
                     </span>
                   </label>
                 </div>
 
-                {/* Category Checkboxes — Show if single or multiple */}
                 {formData.categoryMode !== 'global' && (
                   <div className="mt-3 pt-3 border-t border-pink-100">
                     <p className="text-xs text-gray-500 mb-2">
-                      {formData.categoryMode === 'single'
-                        ? '👇 Select 1 category:'
-                        : '👇 Select multiple categories:'}
+                      {formData.categoryMode === 'single' ? '👇 Select 1 category:' : '👇 Select multiple categories:'}
                     </p>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                       {categoryOptions.map(cat => {
@@ -602,18 +659,33 @@ function AdminOffers() {
                 )}
               </div>
 
-              {/* Position */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">📍 Position (Kahan dikhega?)</label>
-                <select
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-pink-500 bg-white"
-                >
-                  {positionOptions.map(p => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
+              {/* ✅ POSITION MULTI-SELECT */}
+              <div className="border border-purple-100 rounded-xl p-4 bg-purple-50/30">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  📍 Where should this offer show? (Position — multiple select karo)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {positionOptions.map(pos => {
+                    const isSelected = formData.selectedPositions.includes(pos.value);
+                    return (
+                      <button
+                        key={pos.value}
+                        type="button"
+                        onClick={() => togglePosition(pos.value)}
+                        className={`px-3 py-2 rounded-lg text-xs font-medium text-left transition ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                            : 'bg-white border border-purple-200 text-gray-700 hover:border-purple-400'
+                        }`}
+                      >
+                        {isSelected ? '✓ ' : ''}{pos.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {formData.selectedPositions.length} position(s) selected
+                </p>
               </div>
 
               {/* Discount + Min Order */}
