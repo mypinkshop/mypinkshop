@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -7,7 +7,6 @@ import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import ProductCard from '../components/ProductCard';
-import toast from 'react-hot-toast';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
@@ -20,6 +19,14 @@ function SkincarePage() {
   const [apiSubcategories, setApiSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // ✅ Banners + Offers state
+  const [heroBanner, setHeroBanner] = useState(null);
+  const [midBanners, setMidBanners] = useState([]);
+  const [bottomBanner, setBottomBanner] = useState(null);
+  const [topOffers, setTopOffers] = useState([]);
+  const [midOffers, setMidOffers] = useState([]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedConcern, setSelectedConcern] = useState('all');
@@ -31,21 +38,44 @@ function SkincarePage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
 
-  // ✅ API se subcategories
+  const SLUG = 'skincare'; // ✅ Category slug
+
+  // ✅ Category + Banners + Offers — ek saath fetch
   useEffect(() => {
-    const loadCategory = async () => {
+    const loadAll = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/categories/tree`);
-        if (!res.ok) throw new Error('Failed to load categories');
-        const json = await res.json();
-        const tree = json.data || json;
-        const found = tree.find(c => c.slug === 'skincare');
+        // 1. Category tree
+        const catRes = await fetch(`${API_URL}/api/categories/tree`);
+        const catJson = await catRes.json();
+        const tree = catJson.data || catJson;
+        const found = tree.find(c => c.slug === SLUG);
         if (found) setApiSubcategories(found.children || []);
+
+        // 2. Banners
+        const bannerRes = await fetch(`${API_URL}/api/banners/active?category=${SLUG}`);
+        const bannerJson = await bannerRes.json();
+        const banners = Array.isArray(bannerJson) ? bannerJson : (bannerJson.data || []);
+
+        setHeroBanner(banners.find(b => b.position === 'category_hero') || null);
+        setMidBanners(
+          banners
+            .filter(b => b.position && b.position.startsWith('category_mid'))
+            .sort((a, b) => (a.position || '').localeCompare(b.position || ''))
+        );
+        setBottomBanner(banners.find(b => b.position === 'category_bottom') || null);
+
+        // 3. Offers
+        const offerRes = await fetch(`${API_URL}/api/offers/active?category=${SLUG}`);
+        const offerJson = await offerRes.json();
+        const offers = Array.isArray(offerJson) ? offerJson : (offerJson.data || []);
+
+        setTopOffers(offers.filter(o => o.position === 'category_top' || o.position === 'top_banner'));
+        setMidOffers(offers.filter(o => o.position === 'category_mid'));
       } catch (err) {
-        console.error('Category load error:', err);
+        console.error('Load error:', err);
       }
     };
-    loadCategory();
+    loadAll();
   }, []);
 
   // ✅ Products
@@ -59,7 +89,7 @@ function SkincarePage() {
         const productsArray = Array.isArray(data) ? data : (data.data || []);
 
         const skincareProducts = productsArray.filter(p =>
-          (p.is_active === 1 || p.isActive === true || p.isActive === 1) &&
+          (p.is_active === 1 || p.isActive === true) &&
           (p.main_category === 'Skincare' || p.mainCategory === 'Skincare' || p.category === 'Skincare')
         ).map(p => {
           let images = p.images;
@@ -218,7 +248,7 @@ function SkincarePage() {
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
-        {/* ═══════════ HEADER ═══════════ */}
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-pink-100/70 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between gap-4">
@@ -272,7 +302,7 @@ function SkincarePage() {
           </div>
         </header>
 
-        {/* ═══════════ ELEGANT HERO ═══════════ */}
+        {/* HERO */}
         <section className="relative bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 py-16 sm:py-20 text-center">
             <p className="text-[11px] tracking-[0.4em] text-pink-500 uppercase mb-4 font-medium">The Skincare Edit</p>
@@ -286,7 +316,50 @@ function SkincarePage() {
           </div>
         </section>
 
-        {/* ═══════════ BREADCRUMB ═══════════ */}
+        {/* ✅ HERO BANNER */}
+        {heroBanner && heroBanner.images?.[0] && (
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <Link to={heroBanner.link || '/shop'}>
+              <div className="relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-500">
+                <img src={heroBanner.images[0]} alt={heroBanner.title} className="w-full h-48 sm:h-64 object-cover" />
+                {heroBanner.showTextOverlay && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent flex items-center">
+                    <div className="px-6 sm:px-12 text-white">
+                      <h2 className="text-2xl sm:text-4xl font-bold mb-2">{heroBanner.title}</h2>
+                      {heroBanner.subtitle && <p className="text-sm sm:text-lg mb-3 opacity-90">{heroBanner.subtitle}</p>}
+                      {heroBanner.buttonText && (
+                        <span className="inline-block bg-white text-pink-600 px-6 py-2 rounded-full text-sm font-semibold shadow-md">
+                          {heroBanner.buttonText}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* ✅ TOP OFFERS STRIP */}
+        {topOffers.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {topOffers.map((offer, idx) => (
+                <div key={offer.id || idx} className="shrink-0 min-w-[260px] sm:min-w-[320px] bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl px-5 py-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{offer.icon || '🎉'}</span>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate">{offer.title}</p>
+                      <p className="text-xs opacity-90 truncate">{offer.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 py-5">
           <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
             <Link to="/" className="hover:text-pink-500 transition-colors">HOME</Link>
@@ -295,30 +368,26 @@ function SkincarePage() {
           </div>
         </div>
 
-        {/* ═══════════ MAIN LAYOUT ═══════════ */}
+        {/* MAIN LAYOUT */}
         <div className="max-w-7xl mx-auto px-4 pb-20">
           <div className="flex gap-8 lg:gap-10">
 
-            {/* ═══ LEFT SIDEBAR ═══ */}
+            {/* SIDEBAR */}
             <aside className={`fixed md:static inset-0 z-40 md:z-0 ${showSidebar ? '' : 'hidden md:block'} md:w-64 shrink-0`}>
               {showSidebar && (
                 <div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-30" onClick={() => setShowSidebar(false)} />
               )}
-
               <div className={`${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto bg-white shadow-2xl' : 'bg-white/70 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-sm'} overflow-hidden`}>
-                {/* Sidebar Header */}
                 <div className="px-5 py-4 border-b border-pink-100/70 bg-gradient-to-r from-pink-50 to-rose-50 flex items-center justify-between">
                   <h3 className="font-semibold text-gray-800 text-sm tracking-wide">Categories</h3>
                   {showSidebar && (
                     <button onClick={() => setShowSidebar(false)} className="md:hidden text-gray-400 text-lg">✕</button>
                   )}
                 </div>
-
-                {/* Sidebar Items */}
-                <nav className="p-2">
+                <nav className="p-2 max-h-[600px] overflow-y-auto">
                   <button
                     onClick={() => { setSelectedSubcategory('all'); setShowSidebar(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 rounded-2xl flex items-center gap-3 mb-1 ${
+                    className={`w-full text-left px-4 py-3 text-sm transition-all rounded-2xl flex items-center gap-3 mb-1 ${
                       selectedSubcategory === 'all'
                         ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-md shadow-pink-200/50'
                         : 'text-gray-700 hover:bg-pink-50'
@@ -327,12 +396,11 @@ function SkincarePage() {
                     <span className="text-base">✨</span>
                     <span>All Products</span>
                   </button>
-
                   {subcategories.map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 rounded-2xl flex items-center gap-3 mb-1 ${
+                      className={`w-full text-left px-4 py-3 text-sm transition-all rounded-2xl flex items-center gap-3 mb-1 ${
                         selectedSubcategory === sub.name
                           ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-md shadow-pink-200/50'
                           : 'text-gray-700 hover:bg-pink-50'
@@ -346,86 +414,53 @@ function SkincarePage() {
               </div>
             </aside>
 
-            {/* ═══ RIGHT: PRODUCTS ═══ */}
+            {/* PRODUCTS */}
             <main className="flex-1 min-w-0">
-
-              {/* Mobile Buttons */}
               <div className="md:hidden mb-5 flex gap-2">
-                <button
-                  onClick={() => setShowSidebar(true)}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md shadow-pink-200/50"
-                >
+                <button onClick={() => setShowSidebar(true)} className="flex-1 px-4 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">
                   Categories
                 </button>
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="px-4 py-3 border border-pink-200 rounded-full text-xs tracking-widest uppercase font-medium text-pink-600 bg-white"
-                >
+                <button onClick={() => setShowFilters(!showFilters)} className="px-4 py-3 border border-pink-200 rounded-full text-xs tracking-widest uppercase font-medium text-pink-600 bg-white">
                   Filters
                 </button>
               </div>
 
-              {/* Shop by Concern */}
               {concerns.length > 0 && (
                 <div className="mb-8">
                   <h3 className="text-[11px] tracking-[0.3em] text-pink-500 uppercase mb-4 font-semibold">Shop by Concern</h3>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setSelectedConcern('all')}
-                      className={`px-4 py-2 rounded-full text-xs tracking-wider transition-all duration-200 border ${
-                        selectedConcern === 'all'
-                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md shadow-pink-200/50'
-                          : 'bg-white text-gray-600 border-pink-200 hover:border-pink-400 hover:text-pink-600'
-                      }`}
-                    >
-                      All
-                    </button>
+                    <button onClick={() => setSelectedConcern('all')} className={`px-4 py-2 rounded-full text-xs tracking-wider border ${selectedConcern === 'all' ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md' : 'bg-white text-gray-600 border-pink-200 hover:border-pink-400'}`}>All</button>
                     {concerns.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedConcern(c)}
-                        className={`px-4 py-2 rounded-full text-xs tracking-wider transition-all duration-200 border ${
-                          selectedConcern === c
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md shadow-pink-200/50'
-                            : 'bg-white text-gray-600 border-pink-200 hover:border-pink-400 hover:text-pink-600'
-                        }`}
-                      >
-                        {c}
-                      </button>
+                      <button key={c} onClick={() => setSelectedConcern(c)} className={`px-4 py-2 rounded-full text-xs tracking-wider border ${selectedConcern === c ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-md' : 'bg-white text-gray-600 border-pink-200 hover:border-pink-400'}`}>{c}</button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Filters Bar */}
               <div className="mb-8 pb-6 border-b border-pink-100">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="hidden md:flex gap-3 flex-wrap">
-                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
                       {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
+                    <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
                       {skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
                       {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                   </div>
-
                   <div className="flex items-center gap-3 ml-auto">
                     {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
-                      <button onClick={clearFilters} className="text-[11px] tracking-wider text-pink-500 uppercase underline underline-offset-4 hover:text-pink-700 transition-colors">
-                        Clear All
-                      </button>
+                      <button onClick={clearFilters} className="text-[11px] tracking-wider text-pink-500 uppercase underline underline-offset-4">Clear All</button>
                     )}
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400 cursor-pointer hover:border-pink-300 transition-colors">
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
                       {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                   </div>
                 </div>
               </div>
 
-              {/* Mobile Filters Modal */}
               {showFilters && (
                 <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
                   <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -436,29 +471,28 @@ function SkincarePage() {
                     <div className="space-y-5">
                       <div>
                         <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Brand</label>
-                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-pink-400">
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
                           {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Skin Type</label>
-                        <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-pink-400">
+                        <select value={selectedSkinType} onChange={(e) => setSelectedSkinType(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
                           {skinTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Price</label>
-                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-pink-400">
+                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
                           {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
                       </div>
-                      <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md shadow-pink-200/50">Clear All</button>
+                      <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">Clear All</button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Results Info */}
               <div className="mb-6">
                 <p className="text-xs tracking-wider text-gray-400">
                   {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
@@ -466,7 +500,6 @@ function SkincarePage() {
                 </p>
               </div>
 
-              {/* Products Grid */}
               {filteredProducts.length === 0 ? (
                 <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-16 text-center border border-pink-100 shadow-sm">
                   <div className="text-4xl mb-4">🌸</div>
@@ -474,16 +507,15 @@ function SkincarePage() {
                   <p className="text-sm text-gray-500 mb-6">
                     {selectedSubcategory !== 'all' ? `We're adding ${selectedSubcategory} soon.` : 'New arrivals coming soon.'}
                   </p>
-                  <button onClick={clearFilters} className="px-8 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md shadow-pink-200/50 hover:shadow-lg transition-shadow">
+                  <button onClick={clearFilters} className="px-8 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">
                     View All
                   </button>
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
-                    {filteredProducts.slice(0, visibleCount).map(product => (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
+                  {filteredProducts.slice(0, visibleCount).map((product, index) => (
+                    <Fragment key={product.id}>
                       <ProductCard
-                        key={product.id}
                         product={product}
                         addToCart={addToCart}
                         isInWishlist={isInWishlist}
@@ -492,32 +524,79 @@ function SkincarePage() {
                         user={user}
                         wishlistContext={wishlist}
                       />
-                    ))}
-                  </div>
 
-                  {visibleCount < filteredProducts.length && (
-                    <div className="text-center mt-12">
-                      <button
-                        onClick={() => setVisibleCount(prev => prev + 16)}
-                        className="px-10 py-3.5 border-2 border-pink-300 text-pink-600 rounded-full text-xs tracking-[0.25em] uppercase font-semibold hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white hover:border-transparent transition-all duration-300 shadow-sm hover:shadow-md hover:shadow-pink-200/50"
-                      >
-                        Load More
-                      </button>
+                      {/* ✅ MID OFFER — every 4 products */}
+                      {(index + 1) % 4 === 0 && midOffers[Math.floor(index / 4)] && (
+                        <div className="col-span-full my-4">
+                          <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-pink-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
+                            <span className="text-3xl">{midOffers[Math.floor(index / 4)].icon || '🎉'}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm sm:text-base truncate">{midOffers[Math.floor(index / 4)].title}</p>
+                              <p className="text-xs opacity-90 truncate">{midOffers[Math.floor(index / 4)].description}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ✅ MID BANNER — every 4 products */}
+                      {(index + 1) % 4 === 0 && midBanners[Math.floor(index / 4)] && (
+                        <div className="col-span-full my-4">
+                          <Link to={midBanners[Math.floor(index / 4)].link || '/shop'}>
+                            <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition">
+                              <img
+                                src={midBanners[Math.floor(index / 4)].images?.[0]}
+                                alt={midBanners[Math.floor(index / 4)].title}
+                                className="w-full h-32 sm:h-40 object-cover"
+                              />
+                            </div>
+                          </Link>
+                        </div>
+                      )}
+                    </Fragment>
+                  ))}
+                </div>
+              )}
+
+              {visibleCount < filteredProducts.length && (
+                <div className="text-center mt-12">
+                  <button
+                    onClick={() => setVisibleCount(prev => prev + 16)}
+                    className="px-10 py-3.5 border-2 border-pink-300 text-pink-600 rounded-full text-xs tracking-[0.25em] uppercase font-semibold hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white hover:border-transparent transition-all duration-300"
+                  >
+                    Load More
+                  </button>
+                </div>
+              )}
+
+              {/* ✅ BOTTOM BANNER */}
+              {bottomBanner && bottomBanner.images?.[0] && (
+                <div className="mt-12">
+                  <Link to={bottomBanner.link || '/shop'}>
+                    <div className="relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition">
+                      <img src={bottomBanner.images[0]} alt={bottomBanner.title} className="w-full h-40 sm:h-56 object-cover" />
+                      {bottomBanner.showTextOverlay && (
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-center">
+                          <div className="text-center text-white px-4">
+                            <h3 className="text-2xl sm:text-3xl font-bold mb-2">{bottomBanner.title}</h3>
+                            {bottomBanner.subtitle && <p className="text-sm sm:text-base opacity-90">{bottomBanner.subtitle}</p>}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </>
+                  </Link>
+                </div>
               )}
             </main>
           </div>
         </div>
 
-        {/* ═══════════ FOOTER ═══════════ */}
+        {/* FOOTER */}
         <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-16 mt-12">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
               <div className="col-span-2 md:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/30">
+                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
                     <span className="text-white font-bold text-sm">M</span>
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
