@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useCart } from '../context/CartContext';
 
 function ProductCard({ 
   product, 
-  addToCart, 
   isInWishlist, 
   addToWishlist, 
   removeFromWishlist, 
@@ -12,12 +12,23 @@ function ProductCard({
   wishlistContext 
 }) {
   const navigate = useNavigate();
-  const [isAdded, setIsAdded] = useState(false);
+
+  // ✅ CartContext se cart nikalo
+  const { cart, addToCart } = useCart();
+
   const [imgError, setImgError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
   const contextWishlist = wishlistContext || [];
+
+  const productId = product._id || product.id;
+
+  // ✅ isAdded — cart se DERIVE karo (local state nahi)
+  const isAdded = cart.some((item) => {
+    const itemId = item.id || item._id;
+    return itemId === productId;
+  });
 
   const getOptimizedImage = (url) => {
     if (!url) return null;
@@ -28,52 +39,51 @@ function ProductCard({
   };
 
   const checkWishlistStatus = useCallback(() => {
-    const productId = product._id || product.id;
-    
     if (user) {
       setIsWishlisted(isInWishlist(productId));
     } else {
-      const exists = contextWishlist.some(item => (item._id === productId || item.id === productId));
+      const exists = contextWishlist.some(
+        (item) => item._id === productId || item.id === productId
+      );
       setIsWishlisted(exists);
     }
-  }, [product, user, isInWishlist, contextWishlist]);
+  }, [productId, user, isInWishlist, contextWishlist]);
 
   useEffect(() => {
     checkWishlistStatus();
-    
+
     const handleUpdate = () => {
       checkWishlistStatus();
     };
-    
+
     window.addEventListener('wishlistUpdated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
-    
+
     return () => {
       window.removeEventListener('wishlistUpdated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
   }, [checkWishlistStatus]);
 
-  // ✅ ADD TO CART - Permanent "Go to Cart" + Toast with Action
+  // ✅ ADD TO CART
   const handleAddToCart = () => {
-    const productId = product._id || product.id;
-    
     if (product.stock === 0) {
       toast.error('Out of stock!');
       return;
     }
-    
+
     addToCart({
       id: productId,
       name: product.name,
       price: product.price,
       quantity: 1,
       image: product.images?.[0],
-      stock: product.stock
+      stock: product.stock,
+      originalPrice: product.originalPrice || product.original_price,
+      category: product.mainCategory || product.category,
+      rating: product.rating,
     });
-    
-    setIsAdded(true);
-    
+
     toast.success((t) => (
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium">Added to cart! 🛒</span>
@@ -104,8 +114,6 @@ function ProductCard({
   };
 
   const handleWishlistToggle = () => {
-    const productId = product._id || product.id;
-    
     if (user) {
       if (isWishlisted) {
         removeFromWishlist(productId);
@@ -134,7 +142,7 @@ function ProductCard({
           badge: product.badge,
           isNew: product.isNew,
           stock: product.stock,
-          emoji: product.emoji
+          emoji: product.emoji,
         };
         addToWishlist(productData);
         setIsWishlisted(true);
@@ -143,12 +151,15 @@ function ProductCard({
     }
   };
 
-  const productId = product._id || product.id;
   const isOutOfStock = product.stock === 0;
 
-  // ✅ MRP aur discount calculate karo (backend se original_price aata hai)
   const price = product.price || product.sellingPrice || 0;
-  const mrp = product.original_price || product.originalPrice || product.mrp || product.comparePrice || 0;
+  const mrp =
+    product.original_price ||
+    product.originalPrice ||
+    product.mrp ||
+    product.comparePrice ||
+    0;
   const discountPercent = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
 
   return (
@@ -158,12 +169,14 @@ function ProductCard({
           {!imageLoaded && !imgError && (
             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-100 to-gray-200" />
           )}
-          
+
           {product.images && product.images[0] && !imgError ? (
-            <img 
-              src={getOptimizedImage(product.images[0])} 
-              alt={product.name} 
-              className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            <img
+              src={getOptimizedImage(product.images[0])}
+              alt={product.name}
+              className={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
               onError={() => setImgError(true)}
               onLoad={() => setImageLoaded(true)}
               loading="lazy"
@@ -176,20 +189,19 @@ function ProductCard({
               {product.emoji || '✨'}
             </div>
           )}
-          
-          {/* ✅ Discount Badge (top-left) */}
+
           {discountPercent > 0 && (
             <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-md z-10">
               {discountPercent}% OFF
             </span>
           )}
-          
+
           {product.isNew && (
             <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
-          
+
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">
@@ -199,14 +211,14 @@ function ProductCard({
           )}
         </div>
       </Link>
-      
+
       <div className="p-4">
         <Link to={`/product/${productId}`}>
           <h3 className="font-semibold text-gray-800 text-sm mb-1 line-clamp-1 hover:text-pink-500 transition">
             {product.name}
           </h3>
         </Link>
-        
+
         <div className="flex items-center gap-1 mb-2">
           <div className="flex text-yellow-400 text-sm">
             {'★'.repeat(Math.floor(product.rating || 4))}
@@ -214,43 +226,47 @@ function ProductCard({
           </div>
           <span className="text-xs text-gray-400">({product.rating || 4})</span>
         </div>
-        
-        {/* ✅ Price + MRP + Discount */}
+
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className="text-lg font-bold text-pink-600">₹{price.toLocaleString()}</span>
+          <span className="text-lg font-bold text-pink-600">
+            ₹{price.toLocaleString()}
+          </span>
           {mrp > price && (
             <>
-              <span className="text-xs text-gray-400 line-through">₹{mrp.toLocaleString()}</span>
+              <span className="text-xs text-gray-400 line-through">
+                ₹{mrp.toLocaleString()}
+              </span>
               <span className="text-xs text-green-600 font-semibold bg-green-50 px-1.5 py-0.5 rounded">
                 {discountPercent}% off
               </span>
             </>
           )}
         </div>
-        
+
         <div className="flex gap-2">
+          {/* ✅ Button — cart se derive hota hai (refresh proof) */}
           {isAdded ? (
-            <button 
+            <button
               onClick={handleGoToCart}
               className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg flex items-center justify-center gap-1"
             >
               <span>✓</span> Go to Cart
             </button>
           ) : (
-            <button 
+            <button
               onClick={handleAddToCart}
               disabled={isOutOfStock}
               className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                !isOutOfStock 
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105' 
+                !isOutOfStock
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
               {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
             </button>
           )}
-          
-          <button 
+
+          <button
             onClick={handleWishlistToggle}
             className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50 hover:border-pink-300"
           >
