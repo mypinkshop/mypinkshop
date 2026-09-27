@@ -20,6 +20,16 @@ const getOptimizedImage = (url) => {
   return url;
 };
 
+// ✅ Brand slug helper — backend se match
+function slugify(str) {
+  return String(str || '')
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 // ✅ Size order (logical, Amazon jaisa)
 const SIZE_ORDER = {
   'XXS': 1, 'XS': 2, 'S': 3, 'M': 4, 'L': 5, 'XL': 6, 'XXL': 7, '3XL': 8, '4XL': 9, '5XL': 10,
@@ -72,7 +82,6 @@ function ProductDetail() {
   const [galleryImages, setGalleryImages] = useState([]);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // ✅ Variant selection state
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState('');
@@ -81,16 +90,12 @@ function ProductDetail() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ============================================================
-  // DERIVED: variants, sizes, colors, selected variant
-  // ============================================================
   const variants = useMemo(() => {
     return Array.isArray(product?.variants) ? product.variants : [];
   }, [product]);
 
   const hasVariants = variants.length > 0;
 
-  // Unique sizes (logical order)
   const availableSizes = useMemo(() => {
     const set = new Set();
     variants.forEach(v => {
@@ -100,7 +105,6 @@ function ProductDetail() {
     return [...set].sort((a, b) => getSizeOrder(a) - getSizeOrder(b));
   }, [variants]);
 
-  // Unique colors (with representative image)
   const availableColors = useMemo(() => {
     const map = new Map();
     variants.forEach(v => {
@@ -120,7 +124,6 @@ function ProductDetail() {
     return [...map.values()].sort((a, b) => getColorOrder(a.name) - getColorOrder(b.name));
   }, [variants]);
 
-  // Selected variant
   const selectedVariant = useMemo(() => {
     if (!hasVariants) return null;
     return variants.find(v => {
@@ -130,7 +133,6 @@ function ProductDetail() {
     }) || null;
   }, [variants, selectedSize, selectedColor, hasVariants]);
 
-  // Current price/stock
   const getCurrentPrice = () => {
     if (selectedVariant?.price) return Number(selectedVariant.price);
     return Number(product?.price || product?.sellingPrice || 0);
@@ -153,13 +155,8 @@ function ProductDetail() {
     return mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
   };
 
-  // ============================================================
-  // Gallery update based on variant
-  // ============================================================
   const updateGalleryForVariant = (variant, productImagesList) => {
     const arr = Array.isArray(productImagesList) ? productImagesList : [productImagesList];
-
-    // ✅ Variant image blank → parent image fallback
     const variantImg = variant?.image || arr[0] || '';
 
     if (!variantImg) {
@@ -169,7 +166,6 @@ function ProductDetail() {
       return;
     }
 
-    // Variant image first, baaki parent images uske baad (duplicate avoid)
     const remaining = arr.filter(img => img !== variantImg);
     const newGallery = [variantImg, ...remaining];
 
@@ -178,9 +174,6 @@ function ProductDetail() {
     setImageLoaded(false);
   };
 
-  // ============================================================
-  // Fetch related products
-  // ============================================================
   const fetchRelatedProducts = async (category) => {
     if (!category) return;
     try {
@@ -192,9 +185,6 @@ function ProductDetail() {
     } catch (e) { console.error(e); }
   };
 
-  // ============================================================
-  // Apply product data
-  // ============================================================
   const applyProduct = (p) => {
     setProduct(p);
     const imgs = p.images?.length ? p.images : [];
@@ -203,13 +193,11 @@ function ProductDetail() {
     setImageLoaded(false);
     fetchRelatedProducts(p.mainCategory || p.category);
 
-    // ✅ Variants initialize
     const vars = Array.isArray(p.variants) ? p.variants : [];
     if (vars.length > 0) {
       setOption1Name(p.option1Name || 'Size');
       setOption2Name(p.option2Name || 'Color');
 
-      // First in-stock variant select karo
       const firstInStock = vars.find(v => v.inStock) || vars[0];
       const s1 = firstInStock.option1?.value || '';
       const s2 = firstInStock.option2?.value || '';
@@ -241,7 +229,7 @@ function ProductDetail() {
         const data = await res.json();
         const p = data.data || data;
         if (p && (p._id || p.id)) {
-          setCacheWithTTL(sessionStorage, `product_${id}`, p, 5 * 60 * 1000); // 5 min cache
+          setCacheWithTTL(sessionStorage, `product_${id}`, p, 5 * 60 * 1000);
           applyProduct(p);
         } else setProduct(null);
       } catch (e) { console.error(e); setProduct(null); }
@@ -251,9 +239,6 @@ function ProductDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // ============================================================
-  // Variant selection handlers
-  // ============================================================
   const handleSizeSelect = (size) => {
     setSelectedSize(size);
     setQuantity(1);
@@ -311,9 +296,6 @@ function ProductDetail() {
     return variants.some(v => v.option2?.value === color && v.inStock);
   };
 
-  // ============================================================
-  // Delivery check
-  // ============================================================
   const checkDelivery = async () => {
     if (!pincode || pincode.length !== 6) return toast.error('Please enter a valid 6-digit pincode');
     setCheckingDelivery(true);
@@ -343,9 +325,6 @@ function ProductDetail() {
     finally { setCheckingDelivery(false); }
   };
 
-  // ============================================================
-  // Cart
-  // ============================================================
   const buildCartItem = () => {
     const item = {
       id: product._id || product.id,
@@ -626,7 +605,6 @@ function ProductDetail() {
             {/* LEFT: IMAGE GALLERY */}
             <div className="lg:col-span-7 lg:sticky lg:top-20 lg:self-start">
               <div className="flex flex-col-reverse md:flex-row gap-4">
-                {/* Sidebar thumbnails (desktop) */}
                 {galleryImages.length > 1 && (
                   <div className="hidden md:flex flex-col gap-3 w-20">
                     {galleryImages.map((img, idx) => (
@@ -649,7 +627,6 @@ function ProductDetail() {
                   </div>
                 )}
 
-                {/* Main image */}
                 <div className="flex-1">
                   <div className="relative bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl overflow-hidden aspect-square flex items-center justify-center group cursor-zoom-in">
                     {!imageLoaded && (
@@ -669,14 +646,12 @@ function ProductDetail() {
                       }}
                     />
 
-                    {/* Discount badge */}
                     {discountPercent > 0 && (
                       <div className="absolute top-4 left-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg">
                         {discountPercent}% OFF
                       </div>
                     )}
 
-                    {/* Wishlist */}
                     <button
                       onClick={handleWishlistToggle}
                       className="absolute top-4 right-4 w-11 h-11 bg-white/95 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all"
@@ -684,7 +659,6 @@ function ProductDetail() {
                       <span className="text-xl">{isInWishlist(product._id || product.id) ? '❤️' : '🤍'}</span>
                     </button>
 
-                    {/* Out of stock overlay */}
                     {isOutOfStock && (
                       <div className="absolute inset-0 bg-white/85 backdrop-blur-sm flex items-center justify-center">
                         <span className="bg-gray-900 text-white font-bold px-6 py-3 rounded-full text-sm">
@@ -693,13 +667,11 @@ function ProductDetail() {
                       </div>
                     )}
 
-                    {/* Zoom hint */}
                     <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm text-[11px] text-gray-600 px-3 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition">
                       🔍 Click to zoom
                     </div>
                   </div>
 
-                  {/* Mobile thumbnails */}
                   {galleryImages.length > 1 && (
                     <div className="flex md:hidden gap-2 mt-4 overflow-x-auto pb-2 scrollbar-hide">
                       {galleryImages.map((img, idx) => (
@@ -723,19 +695,18 @@ function ProductDetail() {
             <div className="lg:col-span-5 space-y-5">
               {product.brand && (
                 <Link
-              to={`/brand/${slugify(product.brand)}`}
-              className="inline-block text-xs font-bold text-pink-600 uppercase tracking-wider hover:text-pink-700 hover:underline transition-colors"
-              title={`View all ${product.brand} products`}
+                  to={`/brand/${slugify(product.brand)}`}
+                  className="inline-block text-xs font-bold text-pink-600 uppercase tracking-wider hover:text-pink-700 hover:underline transition-colors"
+                  title={`View all ${product.brand} products`}
                 >
-             {product.brand}
-             </Link>
+                  {product.brand}
+                </Link>
               )}
 
               <h1 className="text-xl sm:text-2xl lg:text-[28px] font-bold text-gray-900 leading-tight">
                 {product.name}
               </h1>
 
-              {/* Rating */}
               <div className="flex items-center gap-3 flex-wrap pb-3 border-b border-gray-100">
                 {rating > 0 ? (
                   <div className="flex items-center gap-2">
@@ -758,7 +729,6 @@ function ProductDetail() {
                 )}
               </div>
 
-              {/* Price block */}
               <div className="space-y-1">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl sm:text-4xl font-bold text-gray-900">₹{currentPrice.toLocaleString()}</span>
@@ -775,7 +745,6 @@ function ProductDetail() {
                 <p className="text-xs text-gray-500">Inclusive of all taxes</p>
               </div>
 
-              {/* Stock */}
               {isOutOfStock ? (
                 <div className="flex items-center gap-2 text-sm font-semibold text-red-600">
                   <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -793,13 +762,8 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* ============================================================ */}
-              {/* VARIANT SELECTORS */}
-              {/* ============================================================ */}
               {hasVariants && (
                 <div className="pt-4 border-t border-gray-100 space-y-5">
-
-                  {/* SIZE SELECTOR */}
                   {availableSizes.length > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
@@ -816,8 +780,6 @@ function ProductDetail() {
                         {availableSizes.map((size) => {
                           const isSel = selectedSize === size;
                           const avail = isSizeAvailable(size);
-
-                          // Is size ka representative variant (with image)
                           const sizeVariants = variants.filter(v => v.option1?.value === size);
                           const variantWithImage = sizeVariants.find(v => v.image) || sizeVariants[0];
                           const thumbImage = variantWithImage?.image || '';
@@ -835,7 +797,6 @@ function ProductDetail() {
                                   : 'border-gray-300 text-gray-700 hover:border-pink-500 hover:text-pink-600 bg-white'
                               }`}
                             >
-                              {/* Thumbnail — object-contain, no crop */}
                               {variantWithImage?.image ? (
                                 <img
                                   src={getOptimizedImage(thumbImage)}
@@ -861,7 +822,6 @@ function ProductDetail() {
                     </div>
                   )}
 
-                  {/* COLOR SELECTOR */}
                   {availableColors.length > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
@@ -931,7 +891,6 @@ function ProductDetail() {
                     </div>
                   )}
 
-                  {/* Selected variant SKU */}
                   {selectedVariant?.sku && (
                     <p className="text-[11px] text-gray-500">
                       SKU: <span className="font-mono font-semibold text-gray-700">{selectedVariant.sku}</span>
@@ -940,7 +899,6 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* Quantity */}
               {!isOutOfStock && (
                 <div className="pt-4 border-t border-gray-100">
                   <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Quantity</h3>
@@ -963,7 +921,6 @@ function ProductDetail() {
                 </div>
               )}
 
-              {/* CTA */}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <button
                   onClick={handleAddToCart}
@@ -991,7 +948,6 @@ function ProductDetail() {
                 </button>
               </div>
 
-              {/* Delivery */}
               <div className="pt-4 border-t border-gray-100">
                 <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <span>📍</span> Check Delivery
@@ -1024,7 +980,6 @@ function ProductDetail() {
                 )}
               </div>
 
-              {/* Trust icons */}
               <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-100">
                 {[
                   { icon: '🚚', label: 'Free Shipping', sub: 'Above ₹499' },
@@ -1167,13 +1122,13 @@ function ProductDetail() {
                       </div>
                       <div className="p-3">
                         {rp.brand && (
-                       <Link
-                       to={`/brand/${slugify(rp.brand)}`}
-                       onClick={(e) => e.stopPropagation()}
-                       className="text-[10px] text-pink-600 font-bold uppercase tracking-wider mb-1 inline-block hover:underline"
-                        >
-                       {rp.brand}
-                        </Link>
+                          <Link
+                            to={`/brand/${slugify(rp.brand)}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[10px] text-pink-600 font-bold uppercase tracking-wider mb-1 inline-block hover:underline"
+                          >
+                            {rp.brand}
+                          </Link>
                         )}
                         <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 min-h-[2.5rem] mb-2">
                           {rp.name}
@@ -1250,7 +1205,7 @@ function ProductDetail() {
                 <ul className="space-y-2 text-sm">
                   <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
                   <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                  </ul>
+                </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
