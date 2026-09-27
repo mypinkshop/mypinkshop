@@ -43,7 +43,7 @@ function SingleBanner({ banner, sizeClass }) {
           </div>
         )}
 
-        {banner.showTextOverlay && (banner.title || banner.subtitle || banner.buttonText) && (
+        {banner.showTextOverlay === true && (banner.title || banner.subtitle || banner.buttonText) && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent flex items-center justify-center">
             <div className="text-center text-white px-4">
               {banner.title && (
