@@ -19,6 +19,8 @@ function copyCloudflareFiles() {
         if (existsSync(src)) {
           copyFileSync(src, dest);
           console.log(`✅ Copied: ${file}`);
+        } else {
+          console.warn(`⚠️  Missing: ${file}`);
         }
       });
     }
@@ -28,13 +30,15 @@ function copyCloudflareFiles() {
 export default defineConfig({
   plugins: [
     react(),
-    copyCloudflareFiles()   // ✅ Ye add karo
+    copyCloudflareFiles()
   ],
   base: '/',
   build: {
     outDir: 'dist',
     minify: 'esbuild',
     sourcemap: false,
+    cssCodeSplit: true,          // ✅ Multiple CSS chunks
+    assetsInlineLimit: 0,        // ✅ No inline — har file alag
     rollupOptions: {
       output: {
         manualChunks: {
