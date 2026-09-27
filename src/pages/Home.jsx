@@ -230,6 +230,9 @@ function Home() {
   const [sponsoredProducts, setSponsoredProducts] = useState([]);
   const [bannerAds, setBannerAds] = useState([]);
 
+  // ✅ Backend-driven banner options (sizes + styles)
+  const [bannerOptions, setBannerOptions] = useState({ sizes: [], styles: [] });
+
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
     // makeup: false,
@@ -355,6 +358,26 @@ function Home() {
     return () => abortController.abort();
   }, [API_URL]);
 
+  /* ---------------- Load banner options (sizes + styles) ---------------- */
+  useEffect(() => {
+    const fetchBannerOptions = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/banners/options`);
+        const json = await res.json();
+        const data = json.data || json;
+        if (data) {
+          setBannerOptions({
+            sizes: data.sizes || [],
+            styles: data.styles || [],
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load banner options:', err);
+      }
+    };
+    fetchBannerOptions();
+  }, [API_URL]);
+
   /* ---------------- Sponsored products ---------------- */
   useEffect(() => {
     const fetchSponsoredProducts = async () => {
@@ -430,6 +453,14 @@ function Home() {
     [handleSearch]
   );
 
+  /* ---------------- Backend-driven size config ---------------- */
+  const getSizeConfig = useCallback(
+    (sizeValue) => {
+      return bannerOptions.sizes.find((s) => s.value === sizeValue) || null;
+    },
+    [bannerOptions.sizes]
+  );
+
   /* ---------------- Product slices ---------------- */
   const productSlices = useMemo(() => {
     if (!products.length) {
@@ -451,15 +482,32 @@ function Home() {
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
               .slice(0, 8),
       skincareProducts: byCategory('skincare').slice(0, 8),
+      // Commented out - to be added after PhonePe approval
+      // makeupProducts: byCategory('makeup').slice(0, 8),
+      // hairProducts: byCategory('hair').slice(0, 8),
+      // clothingProducts: byCategory('clothing').slice(0, 8),
+      // accessoriesProducts: byCategory('accessories').slice(0, 8),
     };
   }, [products]);
 
-  const { newArrivals, skincareProducts } = productSlices;
+  const {
+    newArrivals,
+    skincareProducts,
+    // makeupProducts,
+    // hairProducts,
+    // clothingProducts,
+    // accessoriesProducts,
+  } = productSlices;
 
   const navLinks = useMemo(
     () => [
       { name: 'All', link: '/shop' },
       { name: 'Skincare', link: '/skincare' },
+      // Commented out - to be added after PhonePe approval
+      // { name: 'Makeup', link: '/makeup' },
+      // { name: 'Hair', link: '/hair' },
+      // { name: 'Clothing', link: '/clothing' },
+      // { name: 'Accessories', link: '/accessories' },
       { name: 'Sale 🔥', link: '/shop?offer=sale' },
       { name: 'New Arrivals', link: '/shop?sort=newest' },
       { name: 'Bestsellers', link: '/shop?sort=bestseller' },
@@ -692,7 +740,7 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={homeHeroBanners}
-              size="full"
+              size={getSizeConfig('full')}
               style={homeHeroBanners.length > 1 ? 'slide' : 'single'}
             />
           </section>
@@ -735,7 +783,7 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={mid1Banners}
-              size="large"
+              size={getSizeConfig('large')}
               style={mid1Banners.length > 1 ? 'grid' : 'split'}
             />
           </section>
@@ -840,7 +888,7 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={mid2Banners}
-              size="large"
+              size={getSizeConfig('large')}
               style={mid2Banners.length > 1 ? 'grid' : 'single'}
             />
           </section>
@@ -956,7 +1004,7 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={mid3Banners}
-              size="large"
+              size={getSizeConfig('large')}
               style={mid3Banners.length > 1 ? 'slide' : 'single'}
             />
           </section>
@@ -967,7 +1015,7 @@ function Home() {
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
               banners={bottomBanners}
-              size="xl"
+              size={getSizeConfig('xl')}
               style={bottomBanners.length > 1 ? 'grid' : 'overlay'}
             />
           </section>
