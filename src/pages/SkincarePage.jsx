@@ -20,7 +20,6 @@ function SkincarePage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Banners + Offers state
   const [heroBanner, setHeroBanner] = useState(null);
   const [midBanners, setMidBanners] = useState([]);
   const [bottomBanner, setBottomBanner] = useState(null);
@@ -38,20 +37,18 @@ function SkincarePage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
 
-  const SLUG = 'skincare'; // ✅ Category slug
+  const SLUG = 'skincare';
 
-  // ✅ Category + Banners + Offers — ek saath fetch
+  // ✅ Category + Banners + Offers
   useEffect(() => {
     const loadAll = async () => {
       try {
-        // 1. Category tree
         const catRes = await fetch(`${API_URL}/api/categories/tree`);
         const catJson = await catRes.json();
         const tree = catJson.data || catJson;
         const found = tree.find(c => c.slug === SLUG);
         if (found) setApiSubcategories(found.children || []);
 
-        // 2. Banners
         const bannerRes = await fetch(`${API_URL}/api/banners/active?category=${SLUG}`);
         const bannerJson = await bannerRes.json();
         const banners = Array.isArray(bannerJson) ? bannerJson : (bannerJson.data || []);
@@ -64,7 +61,6 @@ function SkincarePage() {
         );
         setBottomBanner(banners.find(b => b.position === 'category_bottom') || null);
 
-        // 3. Offers
         const offerRes = await fetch(`${API_URL}/api/offers/active?category=${SLUG}`);
         const offerJson = await offerRes.json();
         const offers = Array.isArray(offerJson) ? offerJson : (offerJson.data || []);
@@ -124,17 +120,34 @@ function SkincarePage() {
     loadProducts();
   }, []);
 
-  // ✅ Subcategories
+  // ✅ Subcategories — case-insensitive dedupe
   const subcategories = useMemo(() => {
+    const seen = new Set();
+    const unique = [];
+
     if (apiSubcategories.length > 0) {
-      return apiSubcategories.map(s => ({
-        id: s.id,
-        name: s.name,
-        icon: s.icon || '🌸',
-      }));
+      apiSubcategories.forEach((s) => {
+        const key = String(s.name || '').trim().toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        unique.push({
+          id: s.id,
+          name: s.name,
+          icon: s.icon || '🌸',
+        });
+      });
+      return unique;
     }
-    const subs = [...new Set(products.map(p => p.subCategory).filter(Boolean))];
-    return subs.map((s, idx) => ({ id: idx, name: s, icon: '🌸' }));
+
+    // Fallback: derive from products
+    products.forEach((p) => {
+      const name = String(p.subCategory || '').trim();
+      const key = name.toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push({ id: unique.length, name, icon: '🌸' });
+    });
+    return unique;
   }, [apiSubcategories, products]);
 
   // ✅ Filters
@@ -316,7 +329,7 @@ function SkincarePage() {
           </div>
         </section>
 
-        {/* ✅ HERO BANNER */}
+        {/* HERO BANNER */}
         {heroBanner && heroBanner.images?.[0] && (
           <div className="max-w-7xl mx-auto px-4 py-6">
             <Link to={heroBanner.link || '/shop'}>
@@ -340,7 +353,7 @@ function SkincarePage() {
           </div>
         )}
 
-        {/* ✅ TOP OFFERS STRIP */}
+        {/* TOP OFFERS STRIP */}
         {topOffers.length > 0 && (
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex gap-3 overflow-x-auto pb-2">
@@ -525,7 +538,6 @@ function SkincarePage() {
                         wishlistContext={wishlist}
                       />
 
-                      {/* ✅ MID OFFER — every 4 products */}
                       {(index + 1) % 4 === 0 && midOffers[Math.floor(index / 4)] && (
                         <div className="col-span-full my-4">
                           <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-pink-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
@@ -538,7 +550,6 @@ function SkincarePage() {
                         </div>
                       )}
 
-                      {/* ✅ MID BANNER — every 4 products */}
                       {(index + 1) % 4 === 0 && midBanners[Math.floor(index / 4)] && (
                         <div className="col-span-full my-4">
                           <Link to={midBanners[Math.floor(index / 4)].link || '/shop'}>
@@ -568,7 +579,6 @@ function SkincarePage() {
                 </div>
               )}
 
-              {/* ✅ BOTTOM BANNER */}
               {bottomBanner && bottomBanner.images?.[0] && (
                 <div className="mt-12">
                   <Link to={bottomBanner.link || '/shop'}>
