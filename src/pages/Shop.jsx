@@ -9,10 +9,17 @@ import OfferBanner from '../components/OfferBanner';
 import toast from 'react-hot-toast';
 import { setCacheWithTTL, getCacheWithTTL } from '../lib/utils';
 
-// ============================================================
-// ✅ PREMIUM PRODUCT CARD
-// ============================================================
-const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
+/* ============================================================ */
+/* PRODUCT CARD                                                 */
+/* ============================================================ */
+const ProductCard = ({
+  product,
+  addToCart,
+  isInWishlist,
+  addToWishlist,
+  removeFromWishlist,
+  user,
+}) => {
   const navigate = useNavigate();
   const [isAdded, setIsAdded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -36,9 +43,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         if (saved) {
           try {
             const wishlist = JSON.parse(saved);
-            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
+            const exists = wishlist.some(
+              (item) => item._id === product._id || item.id === product._id
+            );
             setIsWishlisted(exists);
-          } catch(e) {}
+          } catch (e) {
+            /* ignore */
+          }
         }
       }
     };
@@ -66,7 +77,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
       price: product.price,
       quantity: 1,
       image: product.images?.[0],
-      stock: product.stock
+      stock: product.stock,
     });
     setIsAdded(true);
     toast.success('Added to cart! 🛒');
@@ -107,7 +118,7 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         badge: product.badge,
         isNew: product.isNew,
         stock: product.stock,
-        emoji: product.emoji
+        emoji: product.emoji,
       };
 
       let wishlist = [];
@@ -116,10 +127,14 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         try {
           wishlist = JSON.parse(saved);
           if (!Array.isArray(wishlist)) wishlist = [];
-        } catch(e) { wishlist = []; }
+        } catch (e) {
+          wishlist = [];
+        }
       }
 
-      const exists = wishlist.some(item => (item._id === productId || item.id === productId));
+      const exists = wishlist.some(
+        (item) => item._id === productId || item.id === productId
+      );
 
       if (!exists) {
         wishlist.push(productData);
@@ -127,7 +142,9 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         setIsWishlisted(true);
         toast.success('Added to wishlist! 🤍');
       } else {
-        wishlist = wishlist.filter(item => (item._id !== productId && item.id !== productId));
+        wishlist = wishlist.filter(
+          (item) => item._id !== productId && item.id !== productId
+        );
         localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
         setIsWishlisted(false);
         toast.success('Removed from wishlist');
@@ -138,15 +155,19 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
     }
   };
 
-  const mrp = product.originalPrice || product.mrp || product.original_price || product.comparePrice;
+  const mrp =
+    product.originalPrice ||
+    product.mrp ||
+    product.original_price ||
+    product.comparePrice;
   const price = product.price || product.sellingPrice || 0;
-  const discountPercent = mrp && mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
+  const discountPercent =
+    mrp && mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
   const rating = product.rating || 4.5;
   const isOutOfStock = product.stock === 0;
 
   return (
     <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-pink-50 relative flex flex-col">
-
       {discountPercent > 0 && (
         <div className="absolute top-3 left-3 z-20 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full shadow-md">
           {discountPercent}% OFF
@@ -170,7 +191,9 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
             <img
               src={getOptimizedImage(product.images[0])}
               alt={product.name || 'Product'}
-              className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
               onError={() => setImgError(true)}
               onLoad={() => setImageLoaded(true)}
               loading="lazy"
@@ -219,9 +242,13 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
         </div>
 
         <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-          <span className="text-base sm:text-lg font-bold text-pink-600">₹{price.toLocaleString()}</span>
+          <span className="text-base sm:text-lg font-bold text-pink-600">
+            ₹{price.toLocaleString()}
+          </span>
           {mrp && mrp > price && (
-            <span className="text-xs text-gray-400 line-through">₹{mrp.toLocaleString()}</span>
+            <span className="text-xs text-gray-400 line-through">
+              ₹{mrp.toLocaleString()}
+            </span>
           )}
         </div>
 
@@ -252,9 +279,9 @@ const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFr
   );
 };
 
-// ============================================================
-// ✅ MAIN SHOP COMPONENT
-// ============================================================
+/* ============================================================ */
+/* MAIN SHOP COMPONENT                                          */
+/* ============================================================ */
 function Shop() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -266,7 +293,7 @@ function Shop() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSubcategory, setSelectedSubcategory] = useState('all'); // ✅ NEW
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('all');
@@ -276,7 +303,7 @@ function Shop() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Read URL query params — including `sub` and `brand`
+  // ✅ Read URL query params
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const urlSearch = params.get('search');
@@ -299,8 +326,8 @@ function Shop() {
         const cached = getCacheWithTTL(sessionStorage, 'products_cache');
 
         if (cached) {
-          const productsArray = Array.isArray(cached) ? cached : (cached.data || []);
-          setProducts(productsArray.map(p => ({ ...p, id: p._id })));
+          const productsArray = Array.isArray(cached) ? cached : cached.data || [];
+          setProducts(productsArray.map((p) => ({ ...p, id: p._id })));
           setLoading(false);
           return;
         }
@@ -309,13 +336,13 @@ function Shop() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         let data = await response.json();
-        const productsArray = Array.isArray(data) ? data : (data.data || []);
+        const productsArray = Array.isArray(data) ? data : data.data || [];
 
         setCacheWithTTL(sessionStorage, 'products_cache', data, 5 * 60 * 1000);
 
-        setProducts(productsArray.map(p => ({ ...p, id: p._id })));
+        setProducts(productsArray.map((p) => ({ ...p, id: p._id })));
       } catch (error) {
-        console.error("Error loading products:", error);
+        console.error('Error loading products:', error);
         setProducts([]);
       } finally {
         setLoading(false);
@@ -323,48 +350,49 @@ function Shop() {
     };
 
     loadProducts();
-  }, []);
+  }, [API_URL]);
 
-  // ✅ Filter + sort — with subcategory
+  // ✅ Filter + sort
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
     if (searchTerm) {
-      filtered = filtered.filter(p =>
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(p => {
+      filtered = filtered.filter((p) => {
         const productCategory = (p.mainCategory || p.category || '').toLowerCase();
         return productCategory === selectedCategory.toLowerCase();
       });
     }
 
-    // ✅ Subcategory filter
     if (selectedSubcategory !== 'all') {
-      filtered = filtered.filter(p => {
+      filtered = filtered.filter((p) => {
         const sub = (p.subCategory || p.subcategory || '').toLowerCase().trim();
         return sub === selectedSubcategory.toLowerCase().trim();
       });
     }
 
     if (selectedBrand !== 'all') {
-      filtered = filtered.filter(p => p.brand === selectedBrand);
+      filtered = filtered.filter((p) => p.brand === selectedBrand);
     }
 
     const min = minPrice ? parseFloat(minPrice) : 0;
     const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-    filtered = filtered.filter(p => {
+    filtered = filtered.filter((p) => {
       const price = p.price || p.sellingPrice || 0;
       return price >= min && price <= max;
     });
 
     if (selectedDiscount > 0) {
-      filtered = filtered.filter(p => {
-        const mrp = p.originalPrice || p.mrp || p.original_price || p.comparePrice;
+      filtered = filtered.filter((p) => {
+        const mrp =
+          p.originalPrice || p.mrp || p.original_price || p.comparePrice;
         const price = p.price || p.sellingPrice || 0;
 
         if (!mrp || mrp <= price) return false;
@@ -375,26 +403,70 @@ function Shop() {
     }
 
     switch (sortBy) {
-      case 'price_low': filtered.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
-      case 'price_high': filtered.sort((a, b) => (b.price || 0) - (a.price || 0)); break;
-      case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
-      default: break;
+      case 'price_low':
+        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+        break;
+      case 'price_high':
+        filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+        break;
+      case 'rating':
+        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        break;
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      default:
+        break;
     }
 
     return filtered;
-  }, [products, searchTerm, selectedCategory, selectedSubcategory, selectedBrand, minPrice, maxPrice, selectedDiscount, sortBy]);
+  }, [
+    products,
+    searchTerm,
+    selectedCategory,
+    selectedSubcategory,
+    selectedBrand,
+    minPrice,
+    maxPrice,
+    selectedDiscount,
+    sortBy,
+  ]);
 
-  // ✅ Subcategories — based on selected category
+  // ✅ Subcategories — based on selected category (deduplicated)
   const subcategories = useMemo(() => {
     let pool = products;
     if (selectedCategory !== 'all') {
-      pool = products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === selectedCategory.toLowerCase());
+      pool = products.filter(
+        (p) =>
+          (p.mainCategory || p.category || '').toLowerCase() ===
+          selectedCategory.toLowerCase()
+      );
     }
-    const subs = [...new Set(pool.map(p => p.subCategory || p.subcategory).filter(Boolean))].sort();
+
+    const seen = new Set();
+    const unique = [];
+    pool.forEach((p) => {
+      const name = String(p.subCategory || p.subcategory || '').trim();
+      const key = name.toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push({
+        name,
+        count: pool.filter(
+          (x) =>
+            String(x.subCategory || x.subcategory || '').trim().toLowerCase() ===
+            key
+        ).length,
+      });
+    });
+
     return [
       { id: 'all', name: 'All Subcategories', count: pool.length },
-      ...subs.map(s => ({ id: s, name: s, count: pool.filter(p => (p.subCategory || p.subcategory) === s).length }))
+      ...unique.sort((a, b) => a.name.localeCompare(b.name)).map((u) => ({
+        id: u.name,
+        name: u.name,
+        count: u.count,
+      })),
     ];
   }, [products, selectedCategory]);
 
@@ -416,27 +488,70 @@ function Shop() {
     }
   };
 
-  const categoryChips = [
-    { id: 'all', name: 'All', icon: '✨' },
-    { id: 'skincare', name: 'Skincare', icon: '🧴' },
-    { id: 'makeup', name: 'Makeup', icon: '💄' },
-    { id: 'hair', name: 'Hair', icon: '💇‍♀️' },
-    { id: 'clothing', name: 'Clothing', icon: '👗' },
-    { id: 'accessories', name: 'Accessories', icon: '👜' },
-  ];
+  /* ============================================================ */
+  /* ✅ DYNAMIC CATEGORY CHIPS — from products                    */
+  /* ============================================================ */
+  const categoryChips = useMemo(() => {
+    const unique = [
+      ...new Set(
+        products.map((p) => (p.mainCategory || p.category || '').trim()).filter(Boolean)
+      ),
+    ];
+    const icons = {
+      skincare: '🧴',
+      makeup: '💄',
+      haircare: '💇‍♀️',
+      hair: '💇‍♀️',
+      fashion: '👗',
+      clothing: '👗',
+      dress: '👗',
+      accessories: '👜',
+      electronics: '📱',
+      'home & kitchen': '🏠',
+      'health & wellness': '🌿',
+      'books & stationery': '📚',
+    };
+    return [
+      { id: 'all', name: 'All', icon: '✨' },
+      ...unique.sort().map((cat) => ({
+        id: cat.toLowerCase(),
+        name: cat,
+        icon: icons[cat.toLowerCase()] || '🏷️',
+      })),
+    ];
+  }, [products]);
 
-  const categories = useMemo(() => [
-    { id: 'all', name: 'All Products', count: products.length },
-    { id: 'skincare', name: 'Skincare', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'skincare').length },
-    { id: 'makeup', name: 'Makeup', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'makeup').length },
-    { id: 'hair', name: 'Hair', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'hair').length },
-    { id: 'clothing', name: 'Clothing', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'clothing').length },
-    { id: 'accessories', name: 'Accessories', count: products.filter(p => (p.mainCategory || p.category || '').toLowerCase() === 'accessories').length },
-  ], [products]);
+  /* ============================================================ */
+  /* ✅ DYNAMIC CATEGORIES SIDEBAR — from products                */
+  /* ============================================================ */
+  const categories = useMemo(() => {
+    const counts = {};
+    products.forEach((p) => {
+      const cat = (p.mainCategory || p.category || 'Other').trim();
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return [
+      { id: 'all', name: 'All Products', count: products.length },
+      ...Object.entries(counts)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, count]) => ({
+          id: name.toLowerCase(),
+          name,
+          count,
+        })),
+    ];
+  }, [products]);
 
   const brands = useMemo(() => {
-    const unique = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
-    return [{ id: 'all', name: 'All Brands', count: products.length }, ...unique.map(b => ({ id: b, name: b, count: products.filter(p => p.brand === b).length }))];
+    const unique = [...new Set(products.map((p) => p.brand).filter(Boolean))].sort();
+    return [
+      { id: 'all', name: 'All Brands', count: products.length },
+      ...unique.map((b) => ({
+        id: b,
+        name: b,
+        count: products.filter((p) => p.brand === b).length,
+      })),
+    ];
   }, [products]);
 
   const activeFilterCount = [
@@ -463,13 +578,17 @@ function Shop() {
     <>
       <Helmet>
         <title>Shop All Products - Skincare, Makeup, Hair Care & More | MyPinkShop</title>
-        <meta name="description" content="Shop all products at MyPinkShop. Wide range of skincare, makeup, hair care, clothing, and accessories. ✓ Free shipping ✓ COD ✓ Best prices." />
+        <meta
+          name="description"
+          content="Shop all products at MyPinkShop. Wide range of skincare, makeup, hair care, clothing, and accessories. ✓ Free shipping ✓ COD ✓ Best prices."
+        />
         <link rel="canonical" href="https://www.mypinkshop.com/shop" />
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
         <OfferBanner />
 
+        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -478,8 +597,12 @@ function Shop() {
                   <span className="text-white font-bold text-lg sm:text-xl">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">MyPinkShop</h1>
-                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">FOR THE GIRLIES ✨</p>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    MyPinkShop
+                  </h1>
+                  <p className="text-[9px] sm:text-[10px] text-gray-400 tracking-wider">
+                    FOR THE GIRLIES ✨
+                  </p>
                 </div>
               </Link>
 
@@ -504,27 +627,76 @@ function Shop() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                <button
+                  onClick={() => navigate('/wishlist')}
+                  className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
+                >
+                  <svg
+                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                    />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                      {wishlistCount}
+                    </span>
+                  )}
                 </button>
 
-                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                <Link
+                  to="/cart"
+                  className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
+                >
+                  <svg
+                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                      {cartCount}
+                    </span>
+                  )}
                 </Link>
 
-                {user ? <Avatar user={user} onLogout={logout} /> :
-                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                {user ? (
+                  <Avatar user={user} onLogout={logout} />
+                ) : (
+                  <Link
+                    to="/login"
+                    className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
+                  >
+                    <svg
+                      className="w-5 h-5 sm:w-6 sm:h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
                     </svg>
                   </Link>
-                }
+                )}
               </div>
             </div>
           </div>
@@ -550,16 +722,16 @@ function Shop() {
           </div>
         </div>
 
-        {/* CATEGORY CHIPS */}
+        {/* CATEGORY CHIPS — dynamic */}
         <div className="sticky top-[61px] sm:top-[73px] z-40 bg-white border-b border-pink-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-3 scrollbar-hide">
-              {categoryChips.map(chip => (
+              {categoryChips.map((chip) => (
                 <button
                   key={chip.id}
                   onClick={() => {
                     setSelectedCategory(chip.id);
-                    setSelectedSubcategory('all'); // ✅ Reset subcategory on category change
+                    setSelectedSubcategory('all');
                   }}
                   className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                     selectedCategory === chip.id
@@ -578,19 +750,25 @@ function Shop() {
         {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">
+              Home
+            </Link>
             <span className="text-gray-400">/</span>
             <span className="text-pink-600 font-medium">Shop</span>
             {selectedCategory !== 'all' && (
               <>
                 <span className="text-gray-400">/</span>
-                <span className="text-pink-600 font-medium capitalize">{selectedCategory}</span>
+                <span className="text-pink-600 font-medium capitalize">
+                  {selectedCategory}
+                </span>
               </>
             )}
             {selectedSubcategory !== 'all' && (
               <>
                 <span className="text-gray-400">/</span>
-                <span className="text-pink-600 font-medium">{selectedSubcategory}</span>
+                <span className="text-pink-600 font-medium">
+                  {selectedSubcategory}
+                </span>
               </>
             )}
           </div>
@@ -598,7 +776,6 @@ function Shop() {
 
         {/* MAIN CONTENT */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-
           <div className="mb-6 flex flex-wrap justify-between items-center gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-pink-100 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap">
               <button
@@ -614,7 +791,12 @@ function Shop() {
               </button>
 
               <p className="text-sm text-gray-500">
-                Showing <span className="font-bold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-gray-800">{products.length}</span> products
+                Showing{' '}
+                <span className="font-bold text-pink-600">
+                  {filteredProducts.length}
+                </span>{' '}
+                of <span className="font-semibold text-gray-800">{products.length}</span>{' '}
+                products
               </p>
             </div>
 
@@ -635,48 +817,100 @@ function Shop() {
             <div className="flex flex-wrap gap-2 mb-4">
               {selectedCategory !== 'all' && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedCategory} <button onClick={() => { setSelectedCategory('all'); setSelectedSubcategory('all'); }} className="hover:text-pink-900">×</button>
+                  {selectedCategory}{' '}
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setSelectedSubcategory('all');
+                    }}
+                    className="hover:text-pink-900"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedSubcategory !== 'all' && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')} className="hover:text-pink-900">×</button>
+                  {selectedSubcategory}{' '}
+                  <button
+                    onClick={() => setSelectedSubcategory('all')}
+                    className="hover:text-pink-900"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedBrand !== 'all' && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedBrand} <button onClick={() => setSelectedBrand('all')} className="hover:text-pink-900">×</button>
+                  {selectedBrand}{' '}
+                  <button
+                    onClick={() => setSelectedBrand('all')}
+                    className="hover:text-pink-900"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {selectedDiscount > 0 && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedDiscount}%+ off <button onClick={() => setSelectedDiscount(0)} className="hover:text-pink-900">×</button>
+                  {selectedDiscount}%+ off{' '}
+                  <button
+                    onClick={() => setSelectedDiscount(0)}
+                    className="hover:text-pink-900"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {(minPrice || maxPrice) && (
                 <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  ₹{minPrice || 0} - ₹{maxPrice || '∞'} <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="hover:text-pink-900">×</button>
+                  ₹{minPrice || 0} - ₹{maxPrice || '∞'}{' '}
+                  <button
+                    onClick={() => {
+                      setMinPrice('');
+                      setMaxPrice('');
+                    }}
+                    className="hover:text-pink-900"
+                  >
+                    ×
+                  </button>
                 </span>
               )}
-              <button onClick={clearFilters} className="text-xs text-pink-600 underline hover:text-pink-800 font-semibold">
+              <button
+                onClick={clearFilters}
+                className="text-xs text-pink-600 underline hover:text-pink-800 font-semibold"
+              >
                 Clear all
               </button>
             </div>
           )}
 
           <div className="flex gap-6 lg:gap-8">
-
-            <aside className={`${showFilters ? 'fixed inset-0 z-50 bg-black/50 lg:static lg:bg-transparent lg:z-auto' : 'hidden lg:block'} lg:w-72 xl:w-80 flex-shrink-0`} onClick={() => setShowFilters(false)}>
-
+            <aside
+              className={`${
+                showFilters
+                  ? 'fixed inset-0 z-50 bg-black/50 lg:static lg:bg-transparent lg:z-auto'
+                  : 'hidden lg:block'
+              } lg:w-72 xl:w-80 flex-shrink-0`}
+              onClick={() => setShowFilters(false)}
+            >
               <div
-                className={`${showFilters ? 'absolute right-0 top-0 h-full w-80 bg-white overflow-y-auto p-5 lg:static lg:p-0 lg:w-full lg:bg-transparent' : ''} space-y-4`}
+                className={`${
+                  showFilters
+                    ? 'absolute right-0 top-0 h-full w-80 bg-white overflow-y-auto p-5 lg:static lg:p-0 lg:w-full lg:bg-transparent'
+                    : ''
+                } space-y-4`}
                 onClick={(e) => e.stopPropagation()}
               >
-
                 {showFilters && (
                   <div className="flex justify-between items-center mb-4 lg:hidden">
                     <h3 className="text-lg font-bold text-gray-800">Filters</h3>
-                    <button onClick={() => setShowFilters(false)} className="text-2xl text-gray-400">✕</button>
+                    <button
+                      onClick={() => setShowFilters(false)}
+                      className="text-2xl text-gray-400"
+                    >
+                      ✕
+                    </button>
                   </div>
                 )}
 
@@ -686,8 +920,15 @@ function Shop() {
                     <span>📂</span> Categories
                   </h3>
                   <div className="space-y-1.5">
-                    {categories.map(cat => (
-                      <label key={cat.id} className={`flex items-center justify-between cursor-pointer px-3 py-2 rounded-xl transition ${selectedCategory === cat.id ? 'bg-pink-50 border border-pink-200' : 'hover:bg-pink-50'}`}>
+                    {categories.map((cat) => (
+                      <label
+                        key={cat.id}
+                        className={`flex items-center justify-between cursor-pointer px-3 py-2 rounded-xl transition ${
+                          selectedCategory === cat.id
+                            ? 'bg-pink-50 border border-pink-200'
+                            : 'hover:bg-pink-50'
+                        }`}
+                      >
                         <div className="flex items-center gap-3">
                           <input
                             type="radio"
@@ -699,7 +940,15 @@ function Shop() {
                             }}
                             className="w-4 h-4 text-pink-500 focus:ring-pink-400"
                           />
-                          <span className={`text-sm ${selectedCategory === cat.id ? 'font-semibold text-pink-700' : 'text-gray-700'}`}>{cat.name}</span>
+                          <span
+                            className={`text-sm ${
+                              selectedCategory === cat.id
+                                ? 'font-semibold text-pink-700'
+                                : 'text-gray-700'
+                            }`}
+                          >
+                            {cat.name}
+                          </span>
                         </div>
                         <span className="text-xs text-gray-400">{cat.count}</span>
                       </label>
@@ -707,15 +956,22 @@ function Shop() {
                   </div>
                 </div>
 
-                {/* ✅ Subcategory — only shown when category selected */}
+                {/* Subcategory */}
                 {selectedCategory !== 'all' && subcategories.length > 1 && (
                   <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
                     <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
                       <span>📁</span> Subcategory
                     </h3>
                     <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                      {subcategories.map(sub => (
-                        <label key={sub.id} className={`flex items-center justify-between cursor-pointer px-3 py-2 rounded-xl transition ${selectedSubcategory === sub.id ? 'bg-pink-50 border border-pink-200' : 'hover:bg-pink-50'}`}>
+                      {subcategories.map((sub) => (
+                        <label
+                          key={sub.id}
+                          className={`flex items-center justify-between cursor-pointer px-3 py-2 rounded-xl transition ${
+                            selectedSubcategory === sub.id
+                              ? 'bg-pink-50 border border-pink-200'
+                              : 'hover:bg-pink-50'
+                          }`}
+                        >
                           <div className="flex items-center gap-3">
                             <input
                               type="radio"
@@ -724,7 +980,15 @@ function Shop() {
                               onChange={() => setSelectedSubcategory(sub.id)}
                               className="w-4 h-4 text-pink-500 focus:ring-pink-400"
                             />
-                            <span className={`text-sm ${selectedSubcategory === sub.id ? 'font-semibold text-pink-700' : 'text-gray-700'}`}>{sub.name}</span>
+                            <span
+                              className={`text-sm ${
+                                selectedSubcategory === sub.id
+                                  ? 'font-semibold text-pink-700'
+                                  : 'text-gray-700'
+                              }`}
+                            >
+                              {sub.name}
+                            </span>
                           </div>
                           <span className="text-xs text-gray-400">{sub.count}</span>
                         </label>
@@ -744,8 +1008,10 @@ function Shop() {
                       onChange={(e) => setSelectedBrand(e.target.value)}
                       className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white cursor-pointer"
                     >
-                      {brands.map(b => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.count})</option>
+                      {brands.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.count})
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -781,10 +1047,12 @@ function Shop() {
                     <span>🎁</span> Discount
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {[10, 25, 50, 70].map(d => (
+                    {[10, 25, 50, 70].map((d) => (
                       <button
                         key={d}
-                        onClick={() => setSelectedDiscount(selectedDiscount === d ? 0 : d)}
+                        onClick={() =>
+                          setSelectedDiscount(selectedDiscount === d ? 0 : d)
+                        }
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
                           selectedDiscount === d
                             ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
@@ -805,20 +1073,23 @@ function Shop() {
                     Clear All Filters ✨
                   </button>
                 )}
-
               </div>
             </aside>
 
             {/* PRODUCTS GRID */}
             <div className="flex-1 min-w-0">
-
               {filteredProducts.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 sm:p-16 text-center border border-pink-100 shadow-sm">
                   <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center">
                     <span className="text-6xl">🔍</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">No products found</h3>
-                  <p className="text-gray-500 mb-6 max-w-md mx-auto">Try adjusting your filters or search term to find what you're looking for</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
+                    No products found
+                  </h3>
+                  <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                    Try adjusting your filters or search term to find what you're
+                    looking for
+                  </p>
                   <button
                     onClick={clearFilters}
                     className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition"
@@ -828,7 +1099,7 @@ function Shop() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                  {filteredProducts.map(product => (
+                  {filteredProducts.map((product) => (
                     <ProductCard
                       key={product._id || product.id}
                       product={product}
@@ -856,33 +1127,85 @@ function Shop() {
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+                <p className="text-sm">
+                  Luxury beauty and fashion for the modern woman.
+                </p>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Shop</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                  <li>
+                    <Link to="/skincare" className="hover:text-pink-500 transition">
+                      Skincare
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/makeup" className="hover:text-pink-500 transition">
+                      Makeup
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/hair" className="hover:text-pink-500 transition">
+                      Hair
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/clothing" className="hover:text-pink-500 transition">
+                      Clothing
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/accessories" className="hover:text-pink-500 transition">
+                      Accessories
+                    </Link>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Support</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  <li>
+                    <Link to="/contact" className="hover:text-pink-500 transition">
+                      Contact Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/faqs" className="hover:text-pink-500 transition">
+                      FAQs
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/shipping" className="hover:text-pink-500 transition">
+                      Shipping Info
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/returns" className="hover:text-pink-500 transition">
+                      Returns Policy
+                    </Link>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                  </ul>
+                  <li>
+                    <a
+                      href="https://www.instagram.com/mypinkshopofficial"
+                      className="hover:text-pink-500 transition"
+                    >
+                      Instagram
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://www.facebook.com/mypinkshopofficial"
+                      className="hover:text-pink-500 transition"
+                    >
+                      Facebook
+                    </a>
+                  </li>
+                </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
