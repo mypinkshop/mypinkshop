@@ -816,13 +816,24 @@ function AdminAddProduct() {
   };
 
   const getCurrentSubCategories = () => {
-    const category = formData.category;
-    if (!category) return [];
-    const apiSubs = apiSubCategories[category] || [];
-    const fallbackSubs = fallbackSubCategories[category] || [];
-    const customSubs = customSubCategories[category] || [];
-    return [...new Set([...apiSubs, ...fallbackSubs, ...customSubs])];
-  };
+  const category = formData.category;
+  if (!category) return [];
+  const apiSubs = apiSubCategories[category] || [];
+  const fallbackSubs = fallbackSubCategories[category] || [];
+  const customSubs = customSubCategories[category] || [];
+
+  // Case-insensitive dedupe
+  const seen = new Set();
+  const result = [];
+  [...apiSubs, ...fallbackSubs, ...customSubs].forEach((s) => {
+    const name = String(s || '').trim();
+    const key = name.toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    result.push(name);
+  });
+  return result;
+};
 
   const handleAddNewSubCategory = () => {
     if (newSubCategory.trim() && formData.category) {
