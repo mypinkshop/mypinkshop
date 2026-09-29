@@ -13,7 +13,6 @@ const PaymentSuccess = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Token check
   const token =
     typeof window !== 'undefined'
       ? localStorage.getItem('token') || localStorage.getItem('auth_token')
@@ -23,13 +22,15 @@ const PaymentSuccess = () => {
   const RETRY_DELAY = 5000;
 
   const [isLoading, setIsLoading] = useState(true);
-  // verifying | success | pending | failed | guest | guest_success
   const [status, setStatus] = useState('verifying');
   const [orderData, setOrderData] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
 
+  // ✅ 10-second countdown for auto-redirect
+  const [countdown, setCountdown] = useState(10);
+  const [showCountdown, setShowCountdown] = useState(false);
+
   useEffect(() => {
-    // ✅ Agar token nahi hai → guest mode (verify call hi nahi)
     if (!token) {
       setStatus('guest');
       setIsLoading(false);
@@ -62,11 +63,9 @@ const PaymentSuccess = () => {
         const verifyData = await verifyRes.json();
         console.log(`Verify [attempt ${retryCount + 1}]:`, verifyData);
 
-        // ✅ SUCCESS
         if (verifyData.success && verifyData.data?.verified) {
           const data = verifyData.data;
 
-          // ✅ orderNumber hai → user owner hai → full success page
           if (data.orderNumber) {
             setStatus('success');
             setOrderData({
@@ -81,7 +80,6 @@ const PaymentSuccess = () => {
             localStorage.removeItem('orderTotal');
             localStorage.removeItem('checkoutAddress');
           } else {
-            // ✅ Payment successful, lekin user owner nahi → guest_success
             setStatus('guest_success');
             toast.success('Payment Successful! 🎉');
           }
@@ -90,7 +88,6 @@ const PaymentSuccess = () => {
           return;
         }
 
-        // ⏳ PENDING — retry
         if (verifyData.data?.status === 'pending' && retryCount < MAX_RETRIES) {
           timeoutId = setTimeout(() => {
             if (!cancelled) setRetryCount((c) => c + 1);
@@ -104,7 +101,6 @@ const PaymentSuccess = () => {
           return;
         }
 
-        // ❌ Truly FAILED
         setStatus('failed');
         setIsLoading(false);
         toast.error('Payment failed');
@@ -132,8 +128,59 @@ const PaymentSuccess = () => {
     };
   }, [merchantTransactionId, retryCount, token]);
 
+  // ✅ Auto-redirect countdown — only for terminal states
+  useEffect(() => {
+    const terminalStates = ['success', 'guest', 'guest_success', 'failed', 'pending'];
+    if (!terminalStates.includes(status)) {
+      setShowCountdown(false);
+      return;
+    }
+
+    setShowCountdown(true);
+    setCountdown(10);
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // ✅ Redirect to My Orders
+          navigate('/profile?tab=orders', { replace: true });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  // ✅ Countdown UI component (reusable)
+  const CountdownBar = () => {
+    if (!showCountdown) return null;
+    return (
+      <div className="mt-6 pt-6 border-t border-gray-100">
+        <p className="text-xs text-gray-400 text-center mb-2">
+          Auto-redirecting to My Orders in <strong className="text-pink-600">{countdown}</strong>s
+        </p>
+        <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-1000 ease-linear"
+            style={{ width: `${(countdown / 10) * 100}%` }}
+          />
+        </div>
+        <button
+          onClick={() => navigate('/profile?tab=orders', { replace: true })}
+          className="mt-3 w-full text-xs text-pink-600 hover:text-pink-700 font-semibold py-2 hover:bg-pink-50 rounded-lg transition"
+        >
+          Click here to go now →
+        </button>
+      </div>
+    );
+  };
+
   // ============================================================
-  // ✅ GUEST — user logged in nahi hai (verify call hi nahi hui)
+  // ✅ GUEST
   // ============================================================
   if (status === 'guest') {
     return (
@@ -163,6 +210,8 @@ const PaymentSuccess = () => {
             >
               Go to Homepage
             </Link>
+
+            <CountdownBar />
           </div>
         </div>
       </div>
@@ -170,7 +219,7 @@ const PaymentSuccess = () => {
   }
 
   // ============================================================
-  // ✅ GUEST SUCCESS — payment done, lekin user owner nahi hai
+  // ✅ GUEST SUCCESS
   // ============================================================
   if (status === 'guest_success') {
     return (
@@ -200,6 +249,8 @@ const PaymentSuccess = () => {
             >
               Go to Homepage
             </Link>
+
+            <CountdownBar />
           </div>
         </div>
       </div>
@@ -275,6 +326,8 @@ const PaymentSuccess = () => {
               </Link>
             </div>
 
+            <CountdownBar />
+
             <div className="mt-6 text-center">
               <p className="text-xs text-gray-400">
                 Need help? <Link to="/contact" className="text-pink-500 hover:underline">Contact Support</Link>
@@ -312,18 +365,26 @@ const PaymentSuccess = () => {
 
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => navigate('/cart')}
+                onClick={() => navigate('/profile?tab=orders')}
                 className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-semibold hover:shadow-lg transition-all"
+              >
+                📦 View My Orders
+              </button>
+              <button
+                onClick={() => navigate('/cart')}
+                className="w-full bg-white border-2 border-pink-200 text-pink-600 py-3.5 rounded-xl font-semibold hover:bg-pink-50 transition-all"
               >
                 🔄 Retry Payment
               </button>
               <Link
                 to="/shop"
-                className="w-full bg-white border-2 border-pink-200 text-pink-600 py-3.5 rounded-xl font-semibold text-center hover:bg-pink-50 transition-all"
+                className="w-full bg-white border-2 border-gray-200 text-gray-600 py-3.5 rounded-xl font-semibold text-center hover:bg-gray-50 transition-all"
               >
                 Continue Shopping
               </Link>
             </div>
+
+            <CountdownBar />
 
             <div className="mt-6 text-center">
               <p className="text-xs text-gray-400">
@@ -401,6 +462,8 @@ const PaymentSuccess = () => {
                 Continue Shopping
               </Link>
             </div>
+
+            <CountdownBar />
 
             {orderData?.orderId && (
               <div className="mt-6 text-center">
