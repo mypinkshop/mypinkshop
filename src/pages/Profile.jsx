@@ -56,6 +56,7 @@ function Profile() {
   const [showTracking, setShowTracking] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [liveTrackingData, setLiveTrackingData] = useState(null);
+  const [retryingPayment, setRetryingPayment] = useState(null);
 
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -67,6 +68,9 @@ function Profile() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
+  // ✅ Config
+  const CANCELLED_RETENTION_DAYS = 7;
 
   const withId = (item) =>
     item && typeof item === 'object' ? { ...item, _id: item._id || item.id } : item;
@@ -88,7 +92,7 @@ function Profile() {
     return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  // ============ FETCH FUNCTIONS (useCallback) ============
+  // ============ FETCH FUNCTIONS ============
   const fetchUserData = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -149,6 +153,7 @@ function Profile() {
     }
   }, [API_URL, token]);
 
+  // ✅ FIXED: 7-day filter + payment status normalize
   const fetchOrders = useCallback(async () => {
     setOrdersLoading(true);
     try {
@@ -174,28 +179,60 @@ function Profile() {
           _id: order._id || order.id,
           createdAt: order.createdAt || order.created_at,
           updatedAt: order.updatedAt || order.updated_at,
-          total: order.total || order.total_amount || order.subtotal || 0,
-          shippingAddress: parsedAddress,
-          paymentMethod: order.paymentMethod || order.payment_method,
-          paymentStatus: order.paymentStatus || order.payment_status,
+          total: Number(order.total || order.total_amount || order.subtotal || 0),
+          orderNumber: order.order_number || order.orderNumber,
+          shippingAddress: parsedAddress || {},
+          paymentMethod: (order.paymentMethod || order.payment_method || '').toLowerCase(),
+          paymentStatus: (order.paymentStatus || order.payment_status || 'pending').toLowerCase(),
+          status: (order.status || 'pending').toLowerCase(),
           items: (order.items || []).map((item) => ({
             ...item,
             productId: item.productId || item.product_id || item.id,
             name: item.name || item.product_name,
             image: item.image || item.product_image || item.img,
-            price: item.price || item.unit_price || 0,
+            price: Number(item.price || item.unit_price || 0),
+            quantity: Number(item.quantity || 1),
+            variantId: item.variantId || item.variant_id || null,
+            variantSku: item.variantSku || item.variant_sku || null,
+            variantLabel: item.variantLabel || item.variant_label || null,
+            size: item.size || null,
+            color: item.color || null,
+            option1Name: item.option1Name || item.option1_name || null,
+            option2Name: item.option2Name || item.option2_name || null,
           })),
         };
       });
 
-      setOrders(normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      // ✅ 7-day retention filter
+      const now = Date.now();
+      const cancelledRetentionMs = CANCELLED_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+      const filteredOrders = normalized.filter((order) => {
+        const status = order.status;
+        const paymentStatus = order.paymentStatus;
+        const isCod = order.paymentMethod === 'cod';
+
+        if (status === 'pending' && paymentStatus === 'failed' && !isCod) return true;
+        if (status === 'pending' && paymentStatus === 'pending' && !isCod) return true;
+
+        if (status === 'cancelled' || status === 'failed') {
+          const timeStr = order.updatedAt || order.createdAt;
+          const time = timeStr ? new Date(timeStr).getTime() : now;
+          if (isNaN(time)) return true;
+          return now - time <= cancelledRetentionMs;
+        }
+
+        return true;
+      });
+
+      setOrders(filteredOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
       console.error('Error fetching orders:', error);
       setOrders([]);
     } finally {
       setOrdersLoading(false);
     }
-  }, [API_URL, token]);
+  }, [API_URL, token, CANCELLED_RETENTION_DAYS]);
 
   const fetchReviews = useCallback(async () => {
     setReviewsLoading(true);
@@ -250,14 +287,12 @@ function Profile() {
     setLoading(false);
   }, [fetchUserData, fetchAddresses, fetchOrders, fetchReviews, fetchSavedCards]);
 
-  // ✅ FIXED useEffect — only runs on user ID change
   useEffect(() => {
     if (!user || !token) {
       navigate('/login');
       return;
     }
     fetchAllData();
-    // ✅ Only user._id in deps — prevents infinite loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id, token]);
 
@@ -467,13 +502,47 @@ function Profile() {
     }
   };
 
+  // ✅ Retry payment
+  const handleRetryPayment = async (order) => {
+    setRetryingPayment(order._id);
+    try {
+      const authToken = token || localStorage.getItem('token');
+      const orderNumber =
+        order.orderNumber || order.order_number || order._id || order.id;
+
+      const res = await fetch(`${API_URL}/api/payments/initiate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ orderId: orderNumber }),
+      });
+
+      const data = await res.json();
+      const paymentInfo = data.data || data;
+
+      if (!res.ok || !paymentInfo.redirectUrl) {
+        throw new Error(data.error || 'Failed to initiate payment');
+      }
+
+      toast.success('Redirecting to payment gateway...');
+      window.location.href = paymentInfo.redirectUrl;
+    } catch (err) {
+      console.error('Retry payment error:', err);
+      toast.error(err.message || 'Failed to retry payment');
+    } finally {
+      setRetryingPayment(null);
+    }
+  };
+
   const handleTrackOrder = async (order) => {
     setSelectedOrder(order);
     setShowTracking(true);
     setTrackingLoading(true);
     setLiveTrackingData(null);
 
-    const targetOrderId = order.orderId || order._id || order.id;
+    const targetOrderId = order.orderNumber || order.orderId || order._id || order.id;
 
     try {
       const response = await fetch(`${API_URL}/api/shipping/tracking/${targetOrderId}`, {
@@ -496,12 +565,33 @@ function Profile() {
       delivered: { label: 'Delivered', icon: '✓' },
       shipped: { label: 'Shipped', icon: '🚚' },
       confirmed: { label: 'Confirmed', icon: '📋' },
-      pending: { label: 'Processing', icon: '⏳' },
+      pending: { label: 'Pending', icon: '⏳' },
       processing: { label: 'Processing', icon: '⏳' },
       cancelled: { label: 'Cancelled', icon: '✕' },
       failed: { label: 'Failed', icon: '✕' },
+      refunded: { label: 'Refunded', icon: '↩' },
     };
     return configs[s] || configs.pending;
+  };
+
+  // ✅ Payment status config
+  const getPaymentStatusConfig = (status, method) => {
+    const s = (status || 'pending').toLowerCase();
+    const m = (method || '').toLowerCase();
+
+    if (m === 'cod') {
+      return { label: 'Cash on Delivery', short: 'COD', icon: '💵' };
+    }
+    if (s === 'paid' || s === 'completed') {
+      return { label: 'Paid', short: 'Paid', icon: '✅' };
+    }
+    if (s === 'failed') {
+      return { label: 'Payment Failed', short: 'Failed', icon: '❌' };
+    }
+    if (s === 'refunded') {
+      return { label: 'Refunded', short: 'Refunded', icon: '↩️' };
+    }
+    return { label: 'Payment Pending', short: 'Pending', icon: '⏳' };
   };
 
   const getInitials = (name) => {
@@ -516,6 +606,7 @@ function Profile() {
 
   const getOrderIdDisplay = (order) => {
     if (!order) return 'N/A';
+    if (order.orderNumber) return order.orderNumber;
     if (order.order_number) return order.order_number;
     if (order.orderId) return order.orderId;
     const idVal = order._id || order.id;
@@ -534,7 +625,6 @@ function Profile() {
         });
   };
 
-  // ✅ LOADING SCREEN
   if (!user || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 flex items-center justify-center">
@@ -546,10 +636,19 @@ function Profile() {
     );
   }
 
-  const filteredOrders =
-    filterStatus === 'all'
-      ? orders
-      : orders.filter((o) => o.status?.toLowerCase() === filterStatus);
+  // ✅ Filtered orders
+  const filteredOrders = (() => {
+    if (filterStatus === 'all') return orders;
+    if (filterStatus === 'pending') {
+      return orders.filter((o) =>
+        ['pending', 'processing', 'confirmed', 'shipped'].includes(o.status)
+      );
+    }
+    if (filterStatus === 'cancelled') {
+      return orders.filter((o) => ['cancelled', 'failed'].includes(o.status));
+    }
+    return orders.filter((o) => o.status === filterStatus);
+  })();
 
   const tabs = [
     { id: 'hub', label: 'Dashboard', icon: '🏠' },
@@ -831,7 +930,7 @@ function Profile() {
                       My Orders ({filteredOrders.length})
                     </h3>
                     <div className="flex gap-2 flex-wrap">
-                      {['all', 'pending', 'confirmed', 'shipped', 'delivered'].map((status) => (
+                      {['all', 'pending', 'delivered', 'cancelled'].map((status) => (
                         <button
                           key={status}
                           onClick={() => setFilterStatus(status)}
@@ -841,7 +940,7 @@ function Profile() {
                               : 'bg-white border-2 border-pink-200 text-gray-700 hover:bg-pink-50'
                           }`}
                         >
-                          {status === 'all' ? 'All' : getStatusConfig(status).label}
+                          {status === 'all' ? 'All' : status === 'pending' ? 'In Progress' : status === 'delivered' ? 'Delivered' : 'Cancelled'}
                         </button>
                       ))}
                     </div>
@@ -864,13 +963,18 @@ function Profile() {
                     <div className="p-4 sm:p-6 space-y-5">
                       {filteredOrders.map((order) => {
                         const statusConfig = getStatusConfig(order.status);
-                        const isCancelled = ['cancelled', 'failed'].includes(order.status?.toLowerCase());
-                        const isDelivered = order.status?.toLowerCase() === 'delivered';
-                        const canCancel = ['pending', 'confirmed'].includes(order.status?.toLowerCase()) && order.paymentStatus !== 'failed';
+                        const payConfig = getPaymentStatusConfig(order.paymentStatus, order.paymentMethod);
+                        const isCancelled = ['cancelled', 'failed'].includes(order.status);
+                        const isDelivered = order.status === 'delivered';
+                        const isPaymentFailed = order.paymentStatus === 'failed';
+                        const isPaymentPending = order.paymentStatus === 'pending';
+                        const isCod = order.paymentMethod === 'cod';
+                        const isPaymentOnlinePending = isPaymentPending && !isCod && !isCancelled && !isDelivered;
+                        const canCancel = ['pending', 'processing', 'confirmed'].includes(order.status) && order.paymentStatus !== 'failed' && !isPaymentOnlinePending;
 
                         return (
-                          <div key={order._id} className={`bg-white rounded-3xl border-2 overflow-hidden shadow-sm hover:shadow-xl transition-all ${isCancelled ? 'border-rose-100' : isDelivered ? 'border-emerald-100' : 'border-pink-100'}`}>
-                            <div className="bg-gradient-to-r from-pink-500 to-rose-500 px-5 sm:px-6 py-4">
+                          <div key={order._id} className={`bg-white rounded-3xl border-2 overflow-hidden shadow-sm hover:shadow-xl transition-all ${isCancelled ? 'border-rose-100' : isDelivered ? 'border-emerald-100' : isPaymentFailed ? 'border-rose-200' : 'border-pink-100'}`}>
+                            <div className={`px-5 sm:px-6 py-4 ${isPaymentFailed ? 'bg-gradient-to-r from-rose-500 to-red-500' : 'bg-gradient-to-r from-pink-500 to-rose-500'}`}>
                               <div className="flex flex-wrap justify-between items-center gap-3">
                                 <div className="flex flex-wrap items-center gap-5">
                                   <div>
@@ -886,12 +990,42 @@ function Profile() {
                                     <p className="text-sm font-bold text-white">₹{order.total?.toLocaleString()}</p>
                                   </div>
                                 </div>
-                                <span className="bg-white/25 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                                  <span>{statusConfig.icon}</span>
-                                  {statusConfig.label}
-                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="bg-white/25 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                    <span>{statusConfig.icon}</span>
+                                    {statusConfig.label}
+                                  </span>
+                                  <span className={`backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 ${isPaymentFailed ? 'bg-white text-rose-700' : 'bg-white/25 text-white'}`}>
+                                    <span>{payConfig.icon}</span>
+                                    {payConfig.label}
+                                  </span>
+                                </div>
                               </div>
                             </div>
+
+                            {isPaymentFailed && (
+                              <div className="bg-rose-50 border-b-2 border-rose-200 px-5 sm:px-6 py-3 flex items-start gap-3">
+                                <span className="text-xl flex-shrink-0">⚠️</span>
+                                <div className="flex-1">
+                                  <p className="font-bold text-rose-800 text-sm">Payment was not completed</p>
+                                  <p className="text-xs text-rose-600 mt-0.5">
+                                    Your {order.paymentMethod?.toUpperCase() || 'online'} payment failed. Click "Retry Payment" below to try again.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {isPaymentOnlinePending && (
+                              <div className="bg-amber-50 border-b-2 border-amber-200 px-5 sm:px-6 py-3 flex items-start gap-3">
+                                <span className="text-xl flex-shrink-0">⏳</span>
+                                <div className="flex-1">
+                                  <p className="font-bold text-amber-800 text-sm">Payment pending</p>
+                                  <p className="text-xs text-amber-600 mt-0.5">
+                                    Complete your {order.paymentMethod?.toUpperCase() || 'online'} payment to confirm this order.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
 
                             <div className="px-5 sm:px-6 py-4">
                               {order.items && order.items.map((item, idx) => (
@@ -902,6 +1036,20 @@ function Profile() {
                                   <div className="flex-1 min-w-0">
                                     <Link to={`/product/${item.productId}`} className="font-bold text-gray-900 text-sm hover:text-pink-600 transition line-clamp-2">{item.name}</Link>
                                     <p className="text-xs text-gray-500 mt-1 font-medium">Qty: {item.quantity}</p>
+                                    {(item.size || item.color) && (
+                                      <div className="flex flex-wrap gap-1.5 mt-1">
+                                        {item.size && (
+                                          <span className="inline-flex items-center gap-1 text-[10px] bg-pink-50 text-pink-700 font-bold px-2 py-0.5 rounded-full border border-pink-200">
+                                            {item.option1Name || 'Size'}: {item.size}
+                                          </span>
+                                        )}
+                                        {item.color && (
+                                          <span className="inline-flex items-center gap-1 text-[10px] bg-purple-50 text-purple-700 font-bold px-2 py-0.5 rounded-full border border-purple-200">
+                                            {item.option2Name || 'Color'}: {item.color}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="text-right flex-shrink-0">
                                     <p className="font-bold text-pink-600 text-sm">₹{(item.price * item.quantity)?.toLocaleString()}</p>
@@ -911,7 +1059,44 @@ function Profile() {
                             </div>
 
                             <div className="px-5 sm:px-6 py-3 border-t-2 border-pink-50 bg-gradient-to-r from-pink-50/50 to-rose-50/50 flex flex-wrap gap-2 justify-between items-center">
-                              <button onClick={() => handleTrackOrder(order)} className="px-4 py-2 text-pink-600 bg-white border-2 border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-bold">📍 Track Order</button>
+                              <div className="flex flex-wrap gap-2">
+                                <button onClick={() => handleTrackOrder(order)} className="px-4 py-2 text-pink-600 bg-white border-2 border-pink-200 rounded-full hover:bg-pink-50 transition text-sm font-bold">📍 Track</button>
+
+                                {isPaymentFailed && !isCancelled && (
+                                  <button
+                                    onClick={() => handleRetryPayment(order)}
+                                    disabled={retryingPayment === order._id}
+                                    className="px-4 py-2 bg-gradient-to-r from-rose-500 to-red-500 text-white rounded-full hover:shadow-md transition text-sm font-bold disabled:opacity-50 flex items-center gap-1.5"
+                                  >
+                                    {retryingPayment === order._id ? (
+                                      <>
+                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Redirecting...
+                                      </>
+                                    ) : (
+                                      <>🔄 Retry Payment</>
+                                    )}
+                                  </button>
+                                )}
+
+                                {isPaymentOnlinePending && (
+                                  <button
+                                    onClick={() => handleRetryPayment(order)}
+                                    disabled={retryingPayment === order._id}
+                                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full hover:shadow-md transition text-sm font-bold disabled:opacity-50 flex items-center gap-1.5"
+                                  >
+                                    {retryingPayment === order._id ? (
+                                      <>
+                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Redirecting...
+                                      </>
+                                    ) : (
+                                      <>💳 Complete Payment</>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+
                               {canCancel && !isCancelled && (
                                 <button onClick={() => cancelOrder(order._id)} className="px-4 py-2 text-rose-600 bg-white border-2 border-rose-200 rounded-full hover:bg-rose-50 transition text-sm font-bold">✕ Cancel Order</button>
                               )}
@@ -919,6 +1104,12 @@ function Profile() {
                           </div>
                         );
                       })}
+
+                      <div className="text-center mt-2">
+                        <p className="text-xs text-gray-400 font-medium">
+                          📌 Cancelled orders are shown for {CANCELLED_RETENTION_DAYS} days.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1260,11 +1451,9 @@ function Profile() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-                </ul>
+                  <li><a href="https://instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="https://facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
+                 </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
