@@ -6,12 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import { useSettings } from '../hooks/useSettings';
 import toast from 'react-hot-toast';
 
 function Checkout() {
   const { cart, cartTotal, clearCart, removeFromCart, updateQuantity } = useCart();
   const { user, logout, token } = useAuth();
   const { wishlistCount } = useWishlist();
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
@@ -45,8 +47,6 @@ function Checkout() {
   const [shippingInfo, setShippingInfo] = useState({
     deliverable: true,
     estimatedDelivery: null,
-    shippingCharge: 0,
-    freeShippingThreshold: 499,
     checking: false,
   });
 
@@ -55,12 +55,32 @@ function Checkout() {
   const subtotal = cartTotal();
   const discount = couponDiscount;
 
-  const deliveryCharges =
-    subtotal >= (shippingInfo.freeShippingThreshold || 499)
-      ? 0
-      : Number(shippingInfo.shippingCharge) || 0;
+  const FREE_SHIPPING_ENABLED = settings.freeShippingEnabled !== false;
+  const FREE_SHIPPING_THRESHOLD = settings.freeShippingThreshold;
+  const SHIPPING_CHARGE = Number(settings.shippingCharge) || 0;
+  const TAX_PERCENT = Number(settings.taxPercent) || 0;
+  const COD_CHARGE = Number(settings.codCharge) || 0;
+  const COD_AVAILABLE = settings.codAvailable !== false;
 
-  const total = subtotal + deliveryCharges - discount;
+  // ✅ Shipping — settings based
+  const deliveryCharges = (() => {
+    if (!FREE_SHIPPING_ENABLED) return SHIPPING_CHARGE;
+    return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_CHARGE;
+  })();
+
+  // ✅ COD charge — only if COD selected and available
+  const codCharge = (paymentMethod === 'cod' && COD_AVAILABLE) ? COD_CHARGE : 0;
+
+  // ✅ Tax — on subtotal (after discount, before shipping)
+  const taxableAmount = Math.max(0, subtotal - discount);
+  const taxAmount = Math.round(taxableAmount * (TAX_PERCENT / 100) * 100) / 100;
+
+  // ✅ Final total
+  const total = Math.max(0, taxableAmount + taxAmount + deliveryCharges + codCharge);
+
+  // ✅ Min order check
+  const minOrderValue = Number(settings.minOrderValue) || 0;
+  const belowMinOrder = minOrderValue > 0 && subtotal < minOrderValue;
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -72,25 +92,14 @@ function Checkout() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  // ✅ COD not available — force UPI
   useEffect(() => {
-    const loadShippingSettings = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/shipping/settings`);
-        const data = await response.json();
-        if (data.success || data.data) {
-          const settings = data.data || data.settings || data;
-          setShippingInfo((prev) => ({
-            ...prev,
-            freeShippingThreshold: settings.freeShippingThreshold || 499,
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading shipping settings:', error);
-      }
-    };
-    loadShippingSettings();
-  }, [API_URL]);
+    if (!COD_AVAILABLE && paymentMethod === 'cod') {
+      setPaymentMethod('upi');
+    }
+  }, [COD_AVAILABLE, paymentMethod]);
 
+  // ✅ Pincode delivery check
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -108,12 +117,10 @@ function Checkout() {
           const data = await response.json();
           const deliveryData = data.data || data;
 
-          if (deliveryData.success !== false) {
+          if (deliveryData.deliverable !== false) {
             setShippingInfo({
               deliverable: true,
               estimatedDelivery: deliveryData.estimatedDelivery,
-              shippingCharge: deliveryData.shippingCharge || 0,
-              freeShippingThreshold: deliveryData.freeShippingThreshold || 499,
               checking: false,
             });
           } else {
@@ -129,7 +136,10 @@ function Checkout() {
           setShippingInfo((prev) => ({
             ...prev,
             checking: false,
-            estimatedDelivery: { maxDays: 4 },
+            estimatedDelivery: {
+              minDays: settings.deliveryDaysMin,
+              maxDays: settings.deliveryDaysMax,
+            },
           }));
         }
       }
@@ -137,8 +147,9 @@ function Checkout() {
 
     const timeoutId = setTimeout(checkDelivery, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.pincode, subtotal, API_URL]);
+  }, [formData.pincode, subtotal, API_URL, settings.deliveryDaysMin, settings.deliveryDaysMax]);
 
+  // ✅ Load addresses
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) {
       navigate('/cart');
@@ -186,7 +197,6 @@ function Checkout() {
       );
 
       unique.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
-
       setSavedAddresses(unique);
 
       const defaultAddr = unique.find((a) => a.isDefault);
@@ -325,7 +335,6 @@ function Checkout() {
       localStorage.setItem('savedAddresses', JSON.stringify(updatedAddresses));
       return true;
     }
-    console.log('⚠️ Duplicate address skipped');
     return false;
   };
 
@@ -374,6 +383,10 @@ function Checkout() {
       toast.error('❌ Sorry, we do not deliver to this pincode');
       return false;
     }
+    if (belowMinOrder) {
+      toast.error(`❌ Minimum order value is ₹${minOrderValue}`);
+      return false;
+    }
     return true;
   };
 
@@ -403,7 +416,6 @@ function Checkout() {
           code: couponCode,
           cartTotal: subtotal,
           userId: user?._id || null,
-          // ✅ cartItems bhi bhejo (vendor coupons ke liye)
           cartItems: cart.map((item) => ({
             cartKey: item.cartKey,
             id: item.id,
@@ -445,8 +457,6 @@ function Checkout() {
 
   const handlePhonePePayment = async (newOrderId) => {
     try {
-      console.log('💳 Initiating PhonePe payment for orderId:', newOrderId);
-
       const payResponse = await fetch(`${API_URL}/api/payments/initiate`, {
         method: 'POST',
         headers: {
@@ -457,8 +467,6 @@ function Checkout() {
       });
 
       const payData = await payResponse.json();
-      console.log('💳 PhonePe initiate response:', payData);
-
       const paymentInfo = payData.data || payData;
 
       if (!payResponse.ok || !paymentInfo.redirectUrl) {
@@ -481,7 +489,10 @@ function Checkout() {
       return;
     }
 
-    if (!validateAddress()) {
+    if (!validateAddress()) return;
+
+    if (belowMinOrder) {
+      toast.error(`Minimum order value is ₹${minOrderValue}`);
       return;
     }
 
@@ -502,7 +513,6 @@ function Checkout() {
           image: item.image || null,
           vendorId: item.vendorId || null,
           brand: item.brand || null,
-          // ✅ VARIANT FIELDS — backend ye expect karta hai
           variantId: item.variantId || null,
           variantSku: item.variantSku || null,
           variantLabel: item.variantLabel || null,
@@ -525,7 +535,8 @@ function Checkout() {
         discount: discount || 0,
       };
 
-      const response = await fetch(`${API_URL}/api/orders`, {
+      // ✅ /create endpoint (server-side price validation + stock deduction)
+      const response = await fetch(`${API_URL}/api/orders/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -535,7 +546,6 @@ function Checkout() {
       });
 
       const data = await response.json();
-      console.log('✅ Order response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to place order');
@@ -552,13 +562,11 @@ function Checkout() {
         result.order?.id ||
         result.id;
 
-      console.log('✅ newOrderId (for payment):', newOrderId);
-
       if (!newOrderId) {
-        console.error('❌ No order ID found in response:', data);
         throw new Error('Order ID missing from server response');
       }
 
+      // Save address in background
       if (formData.saveAddress && !selectedAddress && !isEditing) {
         fetch(`${API_URL}/api/users/addresses`, {
           method: 'POST',
@@ -596,13 +604,28 @@ function Checkout() {
     }
   };
 
+  // ✅ Payment options — COD conditionally
   const paymentOptions = [
-    { id: 'cod', name: 'Cash on Delivery', icon: '💵', description: 'Pay when you receive' },
-    { id: 'upi', name: 'PhonePe / UPI', icon: '📱', description: 'PhonePe, Google Pay, Paytm' },
+    ...(COD_AVAILABLE
+      ? [{
+          id: 'cod',
+          name: 'Cash on Delivery',
+          icon: '💵',
+          description: COD_CHARGE > 0 ? `Pay when you receive (+₹${COD_CHARGE})` : 'Pay when you receive',
+        }]
+      : []),
+    {
+      id: 'upi',
+      name: 'PhonePe / UPI',
+      icon: '📱',
+      description: 'PhonePe, Google Pay, Paytm',
+    },
   ];
 
   const getDeliveryDateDisplay = () => {
-    if (!shippingInfo.estimatedDelivery) return 'Check pincode for delivery estimate';
+    if (!shippingInfo.estimatedDelivery) {
+      return `Expected delivery in ${settings.deliveryDaysMin}-${settings.deliveryDaysMax} business days`;
+    }
     if (shippingInfo.estimatedDelivery.minDate && shippingInfo.estimatedDelivery.maxDate) {
       if (shippingInfo.estimatedDelivery.minDate === shippingInfo.estimatedDelivery.maxDate) {
         return `Expected delivery on ${shippingInfo.estimatedDelivery.minDate}`;
@@ -612,10 +635,9 @@ function Checkout() {
     if (shippingInfo.estimatedDelivery.maxDays) {
       return `Expected delivery in ${shippingInfo.estimatedDelivery.maxDays} business days`;
     }
-    return 'Delivery available (4-5 business days)';
+    return `Delivery available (${settings.deliveryDaysMin}-${settings.deliveryDaysMax} business days)`;
   };
 
-  // ✅ Total items count
   const totalItemsCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   // ============================================================
@@ -1116,9 +1138,14 @@ function Checkout() {
                           <span className="animate-spin">⏳</span> Checking...
                         </p>
                       )}
-                      {!shippingInfo.checking && formData.pincode.length === 6 && (
+                      {!shippingInfo.checking && formData.pincode.length === 6 && shippingInfo.deliverable && (
                         <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1 font-medium">
                           ✅ {getDeliveryDateDisplay()}
+                        </p>
+                      )}
+                      {!shippingInfo.checking && formData.pincode.length === 6 && !shippingInfo.deliverable && (
+                        <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1 font-medium">
+                          ❌ Sorry, we don't deliver here
                         </p>
                       )}
                     </div>
@@ -1135,6 +1162,14 @@ function Checkout() {
                       </label>
                     </div>
                   </div>
+
+                  {belowMinOrder && (
+                    <div className="mt-4 p-3 bg-red-50 border-2 border-red-200 rounded-xl">
+                      <p className="text-sm text-red-700 font-bold">
+                        ⚠️ Minimum order value is ₹{minOrderValue}. Add ₹{minOrderValue - subtotal} more to continue.
+                      </p>
+                    </div>
+                  )}
 
                   {editingAddressId && (
                     <div className="mt-4 p-3 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-center justify-between gap-3">
@@ -1158,7 +1193,8 @@ function Checkout() {
 
                   <button
                     onClick={handleContinueToDelivery}
-                    className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition-all"
+                    disabled={belowMinOrder}
+                    className="mt-6 w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue to Delivery 🚚 →
                   </button>
@@ -1208,10 +1244,10 @@ function Checkout() {
                     </label>
                   </div>
 
-                  {subtotal < shippingInfo.freeShippingThreshold && (
+                  {FREE_SHIPPING_ENABLED && subtotal < FREE_SHIPPING_THRESHOLD && deliveryCharges > 0 && (
                     <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
                       <p className="text-sm text-amber-700 flex items-center gap-2 font-medium">
-                        🚚 Add ₹{shippingInfo.freeShippingThreshold - subtotal} more for{' '}
+                        🚚 Add ₹{FREE_SHIPPING_THRESHOLD - subtotal} more for{' '}
                         <strong>FREE delivery</strong>
                       </p>
                     </div>
@@ -1322,7 +1358,6 @@ function Checkout() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-xs text-gray-800 truncate">{item.name}</p>
 
-                        {/* ✅ VARIANT CHIPS */}
                         {(item.size || item.color) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {item.size && (
@@ -1416,6 +1451,13 @@ function Checkout() {
                     </div>
                   )}
 
+                  {TAX_PERCENT > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Tax ({TAX_PERCENT}%)</span>
+                      <span className="font-semibold text-gray-800">₹{taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between">
                     <span className="text-gray-600">Shipping</span>
                     <span
@@ -1427,10 +1469,17 @@ function Checkout() {
                     </span>
                   </div>
 
+                  {codCharge > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">COD Charge</span>
+                      <span className="font-semibold text-gray-800">₹{codCharge}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between pt-3 border-t-2 border-pink-100">
                     <span className="font-bold text-gray-900 text-base">Total</span>
                     <span className="font-bold text-pink-600 text-xl">
-                      ₹{total.toLocaleString()}
+                      ₹{total.toFixed(2)}
                     </span>
                   </div>
 
@@ -1450,7 +1499,7 @@ function Checkout() {
                     </p>
                     <p className="text-xs text-gray-600">📞 {formData.phone}</p>
 
-                    {formData.pincode && formData.pincode.length === 6 && (
+                    {formData.pincode && formData.pincode.length === 6 && shippingInfo.deliverable && (
                       <div className="mt-2 pt-2 border-t border-pink-200">
                         <p className="text-xs font-bold text-green-700 flex items-center gap-1">
                           🚚 {getDeliveryDateDisplay()}
@@ -1471,7 +1520,9 @@ function Checkout() {
                   </div>
                   <div>
                     <div className="text-lg">🚚</div>
-                    <p className="text-[10px] text-gray-500 font-medium">Free ₹499+</p>
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      {FREE_SHIPPING_ENABLED ? `Free ₹${FREE_SHIPPING_THRESHOLD}+` : 'Fast Delivery'}
+                    </p>
                   </div>
                 </div>
               </div>
