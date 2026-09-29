@@ -69,7 +69,6 @@ function Profile() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Config
   const CANCELLED_RETENTION_DAYS = 7;
 
   const withId = (item) =>
@@ -92,7 +91,6 @@ function Profile() {
     return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
-  // ============ FETCH FUNCTIONS ============
   const fetchUserData = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/users/profile`, {
@@ -153,7 +151,6 @@ function Profile() {
     }
   }, [API_URL, token]);
 
-  // ✅ FIXED: 7-day filter + payment status normalize
   const fetchOrders = useCallback(async () => {
     setOrdersLoading(true);
     try {
@@ -203,7 +200,6 @@ function Profile() {
         };
       });
 
-      // ✅ 7-day retention filter
       const now = Date.now();
       const cancelledRetentionMs = CANCELLED_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
@@ -299,28 +295,23 @@ function Profile() {
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image');
       return;
     }
-
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Image size should be less than 2MB');
       return;
     }
-
     setUploadingImage(true);
     const formData = new FormData();
     formData.append('images', file);
-
     try {
       const response = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
       const data = await response.json();
       if (data.success) {
         const imageUrl = data.data?.url || data.url;
@@ -332,13 +323,10 @@ function Profile() {
           },
           body: JSON.stringify({ avatar: imageUrl }),
         });
-
         setProfileImage(imageUrl);
         sessionStorage.setItem('user_profile_image', imageUrl);
         localStorage.setItem('profileImage', imageUrl);
-        if (updateUserProfile) {
-          updateUserProfile({ profileImage: imageUrl });
-        }
+        if (updateUserProfile) updateUserProfile({ profileImage: imageUrl });
         toast.success('Profile picture updated! ✨');
       }
     } catch (error) {
@@ -358,11 +346,9 @@ function Profile() {
         },
         body: JSON.stringify({ [field]: value }),
       });
-
       if (response.ok) {
         setUserData((prev) => ({ ...prev, [field]: value }));
         setEditingField(null);
-
         const fieldLabels = {
           name: 'Name',
           email: 'Email',
@@ -390,7 +376,6 @@ function Profile() {
       toast.error('Passwords do not match');
       return;
     }
-
     try {
       const response = await fetch(`${API_URL}/api/users/change-password`, {
         method: 'PUT',
@@ -400,7 +385,6 @@ function Profile() {
         },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-
       if (response.ok) {
         toast.success('Password Changed Successfully! 🔒');
         setCurrentPassword('');
@@ -422,7 +406,6 @@ function Profile() {
       ? `${API_URL}/api/users/addresses/${editingAddress.id || editingAddress._id}`
       : `${API_URL}/api/users/addresses`;
     const method = editingAddress ? 'PUT' : 'POST';
-
     const payload = {
       name: addressForm.fullName,
       phone: addressForm.phone,
@@ -433,7 +416,6 @@ function Profile() {
       pincode: addressForm.pincode,
       isDefault: addressForm.isDefault,
     };
-
     try {
       const response = await fetch(url, {
         method,
@@ -443,7 +425,6 @@ function Profile() {
         },
         body: JSON.stringify(payload),
       });
-
       if (response.ok) {
         toast.success(editingAddress ? 'Address Updated! ✨' : 'Address Added! ✨');
         fetchAddresses();
@@ -502,14 +483,12 @@ function Profile() {
     }
   };
 
-  // ✅ Retry payment
   const handleRetryPayment = async (order) => {
     setRetryingPayment(order._id);
     try {
       const authToken = token || localStorage.getItem('token');
       const orderNumber =
         order.orderNumber || order.order_number || order._id || order.id;
-
       const res = await fetch(`${API_URL}/api/payments/initiate`, {
         method: 'POST',
         headers: {
@@ -518,14 +497,11 @@ function Profile() {
         },
         body: JSON.stringify({ orderId: orderNumber }),
       });
-
       const data = await res.json();
       const paymentInfo = data.data || data;
-
       if (!res.ok || !paymentInfo.redirectUrl) {
         throw new Error(data.error || 'Failed to initiate payment');
       }
-
       toast.success('Redirecting to payment gateway...');
       window.location.href = paymentInfo.redirectUrl;
     } catch (err) {
@@ -541,9 +517,7 @@ function Profile() {
     setShowTracking(true);
     setTrackingLoading(true);
     setLiveTrackingData(null);
-
     const targetOrderId = order.orderNumber || order.orderId || order._id || order.id;
-
     try {
       const response = await fetch(`${API_URL}/api/shipping/tracking/${targetOrderId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -574,23 +548,13 @@ function Profile() {
     return configs[s] || configs.pending;
   };
 
-  // ✅ Payment status config
   const getPaymentStatusConfig = (status, method) => {
     const s = (status || 'pending').toLowerCase();
     const m = (method || '').toLowerCase();
-
-    if (m === 'cod') {
-      return { label: 'Cash on Delivery', short: 'COD', icon: '💵' };
-    }
-    if (s === 'paid' || s === 'completed') {
-      return { label: 'Paid', short: 'Paid', icon: '✅' };
-    }
-    if (s === 'failed') {
-      return { label: 'Payment Failed', short: 'Failed', icon: '❌' };
-    }
-    if (s === 'refunded') {
-      return { label: 'Refunded', short: 'Refunded', icon: '↩️' };
-    }
+    if (m === 'cod') return { label: 'Cash on Delivery', short: 'COD', icon: '💵' };
+    if (s === 'paid' || s === 'completed') return { label: 'Paid', short: 'Paid', icon: '✅' };
+    if (s === 'failed') return { label: 'Payment Failed', short: 'Failed', icon: '❌' };
+    if (s === 'refunded') return { label: 'Refunded', short: 'Refunded', icon: '↩️' };
     return { label: 'Payment Pending', short: 'Pending', icon: '⏳' };
   };
 
@@ -636,7 +600,6 @@ function Profile() {
     );
   }
 
-  // ✅ Filtered orders
   const filteredOrders = (() => {
     if (filterStatus === 'all') return orders;
     if (filterStatus === 'pending') {
@@ -671,7 +634,6 @@ function Profile() {
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 flex flex-col">
         <OfferBanner />
 
-        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
@@ -738,7 +700,6 @@ function Profile() {
           </div>
         </header>
 
-        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
@@ -747,15 +708,11 @@ function Profile() {
           </div>
         </div>
 
-        {/* MAIN */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex-1 w-full">
-
-          {/* PROFILE HERO */}
           <div className="bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600 rounded-3xl p-6 sm:p-8 mb-6 shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 text-[300px] flex items-center justify-center pointer-events-none select-none">
               💖
             </div>
-
             <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4 sm:gap-5">
                 <div className="relative">
@@ -804,7 +761,6 @@ function Profile() {
             </div>
           </div>
 
-          {/* MOBILE TABS */}
           <div className="lg:hidden mb-6 overflow-x-auto scrollbar-hide">
             <div className="flex gap-2 pb-2">
               {tabs.map((tab) => (
@@ -833,10 +789,7 @@ function Profile() {
             </div>
           </div>
 
-          {/* TWO COLUMN LAYOUT */}
           <div className="grid lg:grid-cols-4 gap-6">
-
-            {/* SIDEBAR */}
             <aside className="hidden lg:block lg:col-span-1">
               <div className="bg-white rounded-3xl border-2 border-pink-100 shadow-sm p-4 sticky top-24">
                 <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 px-2">
@@ -872,10 +825,7 @@ function Profile() {
               </div>
             </aside>
 
-            {/* CONTENT */}
             <main className="lg:col-span-3">
-
-              {/* DASHBOARD */}
               {activeTab === 'hub' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button onClick={() => setActiveTab('orders')} className="bg-white rounded-3xl p-6 border-2 border-pink-100 hover:border-pink-300 hover:shadow-lg transition text-left group">
@@ -884,35 +834,30 @@ function Profile() {
                     <p className="text-sm text-gray-500 mb-3">Track, return, or buy again — {orders.length} total</p>
                     <span className="text-sm font-bold text-pink-600">View Orders →</span>
                   </button>
-
                   <button onClick={() => setActiveTab('addresses')} className="bg-white rounded-3xl p-6 border-2 border-pink-100 hover:border-pink-300 hover:shadow-lg transition text-left group">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-3xl mb-4 shadow-md group-hover:scale-110 transition">📍</div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">My Addresses</h3>
                     <p className="text-sm text-gray-500 mb-3">Manage delivery locations — {addresses.length} saved</p>
                     <span className="text-sm font-bold text-blue-600">Manage →</span>
                   </button>
-
                   <button onClick={() => setActiveTab('profile')} className="bg-white rounded-3xl p-6 border-2 border-pink-100 hover:border-pink-300 hover:shadow-lg transition text-left group">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center text-3xl mb-4 shadow-md group-hover:scale-110 transition">👤</div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">Profile Details</h3>
                     <p className="text-sm text-gray-500 mb-3">Edit name, email, phone and more</p>
                     <span className="text-sm font-bold text-purple-600">Edit Profile →</span>
                   </button>
-
                   <button onClick={() => setActiveTab('wishlist')} className="bg-white rounded-3xl p-6 border-2 border-pink-100 hover:border-pink-300 hover:shadow-lg transition text-left group">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center text-3xl mb-4 shadow-md group-hover:scale-110 transition">❤️</div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">My Wishlist</h3>
                     <p className="text-sm text-gray-500 mb-3">Your favorite saved items — {wishlist?.length || 0} saved</p>
                     <span className="text-sm font-bold text-rose-600">View →</span>
                   </button>
-
                   <button onClick={() => setActiveTab('payments')} className="bg-white rounded-3xl p-6 border-2 border-pink-100 hover:border-pink-300 hover:shadow-lg transition text-left group">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-3xl mb-4 shadow-md group-hover:scale-110 transition">💳</div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">Payment Options</h3>
                     <p className="text-sm text-gray-500 mb-3">Saved cards & payment methods</p>
                     <span className="text-sm font-bold text-emerald-600">Manage →</span>
                   </button>
-
                   <button onClick={() => setActiveTab('security')} className="bg-white rounded-3xl p-6 border-2 border-pink-100 hover:border-pink-300 hover:shadow-lg transition text-left group">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-3xl mb-4 shadow-md group-hover:scale-110 transition">🔐</div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">Security</h3>
@@ -922,7 +867,6 @@ function Profile() {
                 </div>
               )}
 
-              {/* ORDERS TAB */}
               {activeTab === 'orders' && (
                 <div className="bg-white rounded-3xl shadow-sm border-2 border-pink-100 overflow-hidden">
                   <div className="px-5 sm:px-6 py-4 border-b-2 border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 flex flex-wrap justify-between items-center gap-3">
@@ -1115,7 +1059,6 @@ function Profile() {
                 </div>
               )}
 
-              {/* ADDRESSES TAB */}
               {activeTab === 'addresses' && (
                 <div className="bg-white rounded-3xl shadow-sm border-2 border-pink-100 overflow-hidden">
                   <div className="px-5 sm:px-6 py-4 border-b-2 border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50 flex justify-between items-center">
@@ -1164,7 +1107,6 @@ function Profile() {
                 </div>
               )}
 
-              {/* PROFILE TAB */}
               {activeTab === 'profile' && (
                 <div className="bg-white rounded-3xl shadow-sm border-2 border-pink-100 overflow-hidden">
                   <div className="px-5 sm:px-6 py-4 border-b-2 border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50">
@@ -1210,7 +1152,6 @@ function Profile() {
                 </div>
               )}
 
-              {/* WISHLIST TAB */}
               {activeTab === 'wishlist' && (
                 <div className="bg-white rounded-3xl shadow-sm border-2 border-pink-100 overflow-hidden">
                   <div className="px-5 sm:px-6 py-4 border-b-2 border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50">
@@ -1242,7 +1183,6 @@ function Profile() {
                 </div>
               )}
 
-              {/* PAYMENTS TAB */}
               {activeTab === 'payments' && (
                 <div className="bg-white rounded-3xl shadow-sm border-2 border-pink-100 overflow-hidden">
                   <div className="px-5 sm:px-6 py-4 border-b-2 border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50">
@@ -1274,7 +1214,6 @@ function Profile() {
                 </div>
               )}
 
-              {/* SECURITY TAB */}
               {activeTab === 'security' && (
                 <div className="bg-white rounded-3xl shadow-sm border-2 border-pink-100 overflow-hidden max-w-xl">
                   <div className="px-5 sm:px-6 py-4 border-b-2 border-pink-100 bg-gradient-to-r from-pink-50 to-rose-50">
@@ -1300,12 +1239,10 @@ function Profile() {
                   </div>
                 </div>
               )}
-
             </main>
           </div>
         </div>
 
-        {/* TRUST BADGES */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="bg-gradient-to-r from-pink-100 via-rose-100 to-pink-100 border-2 border-pink-200 rounded-3xl p-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -1329,7 +1266,6 @@ function Profile() {
           </div>
         </section>
 
-        {/* TRACKING MODAL */}
         {showTracking && selectedOrder && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowTracking(false)}>
             <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1387,7 +1323,6 @@ function Profile() {
           </div>
         )}
 
-        {/* ADDRESS MODAL */}
         {showAddressModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={() => setShowAddressModal(false)}>
             <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1416,7 +1351,6 @@ function Profile() {
           </div>
         )}
 
-        {/* FOOTER */}
         <footer className="bg-gray-900 text-gray-400 py-12 mt-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
@@ -1453,7 +1387,7 @@ function Profile() {
                 <ul className="space-y-2 text-sm">
                   <li><a href="https://instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
                   <li><a href="https://facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                 </ul>
+                </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
