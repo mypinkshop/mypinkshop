@@ -58,7 +58,6 @@ function Checkout() {
   const subtotal = cartTotal();
   const discount = couponDiscount;
 
-  /* ---------------- SETTINGS-BASED VALUES ---------------- */
   const FREE_SHIPPING_ENABLED = settings.freeShippingEnabled !== false;
   const FREE_SHIPPING_THRESHOLD = Number(settings.freeShippingThreshold) || 499;
   const SHIPPING_CHARGE = Number(settings.shippingCharge) || 0;
@@ -73,13 +72,10 @@ function Checkout() {
     ? settings.paymentMethods
     : ['cod', 'upi', 'card', 'netbanking'];
 
-  /* ---------------- SHIPPING (Express always chargeable) ---------------- */
   const deliveryCharges = (() => {
-    // ⚡ Express — ALWAYS chargeable (never free)
     if (shippingType === 'express' && EXPRESS_ENABLED) {
       return EXPRESS_SHIPPING_CHARGE;
     }
-    // 📦 Standard — FREE if above threshold
     if (FREE_SHIPPING_ENABLED && subtotal >= FREE_SHIPPING_THRESHOLD) {
       return 0;
     }
@@ -87,15 +83,11 @@ function Checkout() {
   })();
 
   const codCharge = paymentMethod === 'cod' && COD_AVAILABLE ? COD_CHARGE : 0;
-
   const taxableAmount = Math.max(0, subtotal - discount);
   const taxAmount = Math.round(taxableAmount * (TAX_PERCENT / 100) * 100) / 100;
-
   const total = Math.max(0, taxableAmount + taxAmount + deliveryCharges + codCharge);
-
   const belowMinOrder = MIN_ORDER > 0 && subtotal < MIN_ORDER;
 
-  /* ---------------- HANDLERS ---------------- */
   const handleSearch = () => {
     if (searchQuery.trim()) navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
   };
@@ -103,7 +95,6 @@ function Checkout() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // ✅ Address basic fill check
   const isAddressBasicFilled = () => {
     return !!(
       formData.fullName?.trim() &&
@@ -118,7 +109,6 @@ function Checkout() {
     );
   };
 
-  // COD not available → switch to first non-COD method
   useEffect(() => {
     if (!COD_AVAILABLE && paymentMethod === 'cod') {
       const fallback = PAYMENT_METHODS.find((m) => m !== 'cod') || 'upi';
@@ -126,14 +116,12 @@ function Checkout() {
     }
   }, [COD_AVAILABLE, paymentMethod, PAYMENT_METHODS]);
 
-  // Express unavailable → reset to standard
   useEffect(() => {
     if (!EXPRESS_ENABLED && shippingType === 'express') {
       setShippingType('standard');
     }
   }, [EXPRESS_ENABLED, shippingType]);
 
-  // Pincode delivery check
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -142,7 +130,11 @@ function Checkout() {
           const response = await fetch(`${API_URL}/api/shipping/check-delivery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pincode: formData.pincode, cartTotal: subtotal, weight: 0.5 }),
+            body: JSON.stringify({
+              pincode: formData.pincode,
+              cartTotal: subtotal,
+              weight: 0.5,
+            }),
           });
           const data = await response.json();
           const deliveryData = data.data || data;
@@ -179,7 +171,6 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL, settings.deliveryDaysMin, settings.deliveryDaysMax]);
 
-  /* ---------------- LOAD ADDRESSES (with last-used auto-fill) ---------------- */
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) navigate('/cart');
 
@@ -227,21 +218,17 @@ function Checkout() {
       unique.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
       setSavedAddresses(unique);
 
-      // ✅ AUTO-FILL LOGIC: last used → default → first
       let addrToUse = null;
 
-      // 1. Last used address ID (stored in localStorage)
       const lastUsedId = localStorage.getItem('lastUsedAddressId');
       if (lastUsedId) {
         addrToUse = unique.find((a) => String(a.id) === String(lastUsedId));
       }
 
-      // 2. Fallback: default address
       if (!addrToUse) {
         addrToUse = unique.find((a) => a.isDefault);
       }
 
-      // 3. Fallback: first address
       if (!addrToUse && unique.length > 0) {
         addrToUse = unique[0];
       }
@@ -292,7 +279,6 @@ function Checkout() {
       state: address.state,
       pincode: address.pincode,
     });
-    // ✅ Save as last used
     localStorage.setItem('lastUsedAddressId', String(address.id));
     setFormErrors({});
     setIsEditing(false);
@@ -355,7 +341,15 @@ function Checkout() {
 
     if (selectedAddress === addressId) {
       setSelectedAddress(null);
-      setFormData({ ...formData, fullName: '', phone: '', address: '', city: '', state: '', pincode: '' });
+      setFormData({
+        ...formData,
+        fullName: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+      });
     }
     toast.success('Address deleted successfully!');
   };
@@ -396,7 +390,6 @@ function Checkout() {
     return false;
   };
 
-  /* ---------------- VALIDATION ---------------- */
   const validateAddress = () => {
     const errs = {};
 
@@ -413,7 +406,8 @@ function Checkout() {
     if (!formData.state?.trim()) errs.state = 'State is required';
 
     if (!formData.pincode?.trim()) errs.pincode = 'Pincode is required';
-    else if (formData.pincode.replace(/\D/g, '').length !== 6) errs.pincode = 'Pincode must be 6 digits';
+    else if (formData.pincode.replace(/\D/g, '').length !== 6)
+      errs.pincode = 'Pincode must be 6 digits';
     else if (!shippingInfo.deliverable) errs.pincode = "Sorry, we don't deliver here";
 
     if (belowMinOrder) errs._global = `Minimum order value is ₹${MIN_ORDER}`;
@@ -438,7 +432,6 @@ function Checkout() {
   const handleContinueToDelivery = () => goToStep(2);
   const handleContinueToPayment = () => goToStep(3);
 
-  /* ---------------- COUPON ---------------- */
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Please enter a coupon code');
@@ -497,7 +490,6 @@ function Checkout() {
     toast.success('Coupon removed');
   };
 
-  /* ---------------- PAYMENT ---------------- */
   const handlePhonePePayment = async (newOrderId) => {
     try {
       const payResponse = await fetch(`${API_URL}/api/payments/initiate`, {
@@ -541,7 +533,6 @@ function Checkout() {
       saveNewAddress();
     }
 
-    // ✅ Save last used address ID
     if (selectedAddress) {
       localStorage.setItem('lastUsedAddressId', String(selectedAddress));
     }
@@ -607,23 +598,42 @@ function Checkout() {
 
       if (!newOrderId) throw new Error('Order ID missing from server response');
 
-      if (formData.saveAddress && !selectedAddress && !isEditing) {
-        fetch(`${API_URL}/api/users/addresses`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name: formData.fullName,
-            phone: formData.phone,
-            line1: formData.address,
-            city: formData.city,
-            state: formData.state,
-            pincode: formData.pincode,
-            isDefault: false,
-          }),
-        }).catch((err) => console.log('Address sync warning:', err));
+      // ✅ FIXED: Save address ONLY if not duplicate
+      if (formData.saveAddress && !isEditing && !selectedAddress) {
+        const addressExists = savedAddresses.some(
+          (addr) =>
+            (addr.pincode || '').trim() === (formData.pincode || '').trim() &&
+            (addr.fullName || '').trim().toLowerCase() ===
+              (formData.fullName || '').trim().toLowerCase() &&
+            (addr.phone || '').trim() === (formData.phone || '').trim() &&
+            ((addr.address || addr.addressLine1 || '').trim().toLowerCase() ===
+              (formData.address || '').trim().toLowerCase())
+        );
+
+        if (!addressExists) {
+          console.log('💾 Saving new address to backend...');
+          fetch(`${API_URL}/api/users/addresses`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name: formData.fullName,
+              phone: formData.phone,
+              line1: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+              isDefault: false,
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => console.log('✅ Address saved:', data))
+            .catch((err) => console.log('❌ Address sync warning:', err));
+        } else {
+          console.log('⏭️ Address already exists — skipping save');
+        }
       }
 
       if (paymentMethod !== 'cod') {
@@ -644,7 +654,6 @@ function Checkout() {
     }
   };
 
-  /* ---------------- PAYMENT OPTIONS ---------------- */
   const ALL_PAYMENT_OPTIONS = [
     {
       id: 'cod',
@@ -698,9 +707,6 @@ function Checkout() {
 
   const totalItemsCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
-  /* ============================================================ */
-  /* ORDER PLACED SUCCESS                                          */
-  /* ============================================================ */
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 flex flex-col">
@@ -809,9 +815,6 @@ function Checkout() {
     );
   }
 
-  /* ============================================================ */
-  /* CHECKOUT FORM                                                 */
-  /* ============================================================ */
   return (
     <>
       <Helmet>
@@ -907,11 +910,7 @@ function Checkout() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-
-            {/* ================= LEFT: FORM ================= */}
             <div className="lg:col-span-2 space-y-5">
-
-              {/* STEPS INDICATOR */}
               <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                 <div className="flex items-center justify-between relative">
                   <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
@@ -950,7 +949,6 @@ function Checkout() {
                 </div>
               </div>
 
-              {/* ========== STEP 1: ADDRESS ========== */}
               {step === 1 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center gap-3 mb-6">
@@ -996,7 +994,9 @@ function Checkout() {
                             <span className="text-gray-500 font-medium">Select a saved address...</span>
                           )}
                         </div>
-                        <span className={`text-pink-500 text-lg transition-transform ${showAddressDropdown ? 'rotate-180' : ''}`}>
+                        <span
+                          className={`text-pink-500 text-lg transition-transform ${showAddressDropdown ? 'rotate-180' : ''}`}
+                        >
                           ▼
                         </span>
                       </button>
@@ -1285,7 +1285,6 @@ function Checkout() {
                 </div>
               )}
 
-              {/* ========== STEP 2: DELIVERY ========== */}
               {step === 2 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1306,7 +1305,6 @@ function Checkout() {
                   </div>
 
                   <div className="space-y-3">
-                    {/* STANDARD */}
                     <label
                       className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
                         shippingType === 'standard'
@@ -1330,14 +1328,19 @@ function Checkout() {
                           <p className="text-sm text-gray-500">{getDeliveryDateDisplay('standard')}</p>
                         </div>
                       </div>
-                      <p className={`font-bold text-lg ${subtotal >= FREE_SHIPPING_THRESHOLD && FREE_SHIPPING_ENABLED ? 'text-green-600' : 'text-gray-800'}`}>
+                      <p
+                        className={`font-bold text-lg ${
+                          subtotal >= FREE_SHIPPING_THRESHOLD && FREE_SHIPPING_ENABLED
+                            ? 'text-green-600'
+                            : 'text-gray-800'
+                        }`}
+                      >
                         {subtotal >= FREE_SHIPPING_THRESHOLD && FREE_SHIPPING_ENABLED
                           ? 'FREE'
                           : `₹${SHIPPING_CHARGE}`}
                       </p>
                     </label>
 
-                    {/* EXPRESS */}
                     {EXPRESS_ENABLED && (
                       <label
                         className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
@@ -1365,9 +1368,7 @@ function Checkout() {
                             <p className="text-sm text-gray-500">Delivered in 1-2 business days</p>
                           </div>
                         </div>
-                        <p className="font-bold text-lg text-gray-800">
-                          ₹{EXPRESS_SHIPPING_CHARGE}
-                        </p>
+                        <p className="font-bold text-lg text-gray-800">₹{EXPRESS_SHIPPING_CHARGE}</p>
                       </label>
                     )}
                   </div>
@@ -1377,8 +1378,7 @@ function Checkout() {
                     shippingType === 'standard' && (
                       <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
                         <p className="text-sm text-amber-700 flex items-center gap-2 font-medium">
-                          🚚 Add ₹{FREE_SHIPPING_THRESHOLD - subtotal} more for{' '}
-                          <strong>FREE delivery</strong>
+                          🚚 Add ₹{FREE_SHIPPING_THRESHOLD - subtotal} more for <strong>FREE delivery</strong>
                         </p>
                       </div>
                     )}
@@ -1394,7 +1394,6 @@ function Checkout() {
                 </div>
               )}
 
-              {/* ========== STEP 3: PAYMENT ========== */}
               {step === 3 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1462,11 +1461,8 @@ function Checkout() {
               )}
             </div>
 
-            {/* ================= RIGHT: SUMMARY + ACTIONS ================= */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-3xl shadow-lg border border-pink-100 p-6 lg:sticky lg:top-24 space-y-4">
-
-                {/* HEADER */}
                 <div className="flex items-center gap-2">
                   <span className="text-xl">🛒</span>
                   <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
@@ -1475,7 +1471,6 @@ function Checkout() {
                   </span>
                 </div>
 
-                {/* CART ITEMS */}
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                   {cart.map((item) => (
                     <div key={item.cartKey} className="flex gap-3 pb-3 border-b border-pink-50">
@@ -1542,7 +1537,6 @@ function Checkout() {
                   ))}
                 </div>
 
-                {/* COUPON */}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -1570,7 +1564,6 @@ function Checkout() {
                   )}
                 </div>
 
-                {/* PRICE BREAKDOWN */}
                 <div className="space-y-2.5 text-sm border-t border-pink-100 pt-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
@@ -1595,7 +1588,9 @@ function Checkout() {
                     <span className="text-gray-600">
                       {shippingType === 'express' ? '⚡ Express Shipping' : '📦 Shipping'}
                     </span>
-                    <span className={`font-semibold ${deliveryCharges === 0 ? 'text-green-600' : 'text-gray-800'}`}>
+                    <span
+                      className={`font-semibold ${deliveryCharges === 0 ? 'text-green-600' : 'text-gray-800'}`}
+                    >
                       {deliveryCharges === 0 ? 'FREE 🎉' : `₹${deliveryCharges}`}
                     </span>
                   </div>
@@ -1617,7 +1612,6 @@ function Checkout() {
                   )}
                 </div>
 
-                {/* ✅ ADDRESS PREVIEW — only when filled */}
                 {isAddressBasicFilled() && (
                   <div className="p-3 bg-pink-50 rounded-xl border border-pink-100">
                     <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
@@ -1639,8 +1633,6 @@ function Checkout() {
                   </div>
                 )}
 
-                {/* ✅ SIDEBAR CONTINUE / PLACE BUTTON (per step, AFTER address) */}
-                {/* Step 1: only show when address is filled */}
                 {step === 1 && isAddressBasicFilled() && (
                   <button
                     onClick={handleContinueToDelivery}
@@ -1668,7 +1660,6 @@ function Checkout() {
                   </button>
                 )}
 
-                {/* TRUST BADGES */}
                 <div className="pt-4 border-t border-pink-100 grid grid-cols-3 gap-2 text-center">
                   <div>
                     <div className="text-lg">🔒</div>
@@ -1726,7 +1717,7 @@ function Checkout() {
                 <ul className="space-y-2 text-sm">
                   <li><a href="https://instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
                   <li><a href="https://facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                  </ul>
+                </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
