@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 function Cart() {
   const navigate = useNavigate();
   const { cart, removeFromCart, updateQuantity, cartTotal } = useCart();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const { wishlistCount } = useWishlist();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [imgErrors, setImgErrors] = useState({});
@@ -37,7 +37,6 @@ function Cart() {
   useEffect(() => {
     const fetchCouponsAndShipping = async () => {
       try {
-        // ✅ cartKey use karo (ab), variant info bhi bhejo
         const cartItemsWithVendor = cart.map((item) => ({
           cartKey: item.cartKey,
           id: item.id,
@@ -115,10 +114,12 @@ function Cart() {
     if (subtotal > 0) fetchLiveShipping();
   }, [subtotal, API_URL]);
 
+  // ✅ FIXED — Strict login check via AuthContext
   const handleCheckout = () => {
-    const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
 
-    if (!token) {
+    if (!isAuthenticated() || !user || !storedToken || !storedUser) {
       toast.error('Please login to continue checkout');
       navigate('/login?redirect=/checkout');
       return;
@@ -128,7 +129,6 @@ function Cart() {
     setTimeout(() => navigate('/checkout'), 500);
   };
 
-  // ✅ cartKey use karo
   const handleImageError = (cartKey) => {
     setImgErrors((prev) => ({ ...prev, [cartKey]: true }));
   };
@@ -143,7 +143,6 @@ function Cart() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // ✅ cartKey use karo
   const handleUpdateQuantity = (cartKey, newQuantity, stock) => {
     if (newQuantity < 1) {
       removeFromCart(cartKey);
@@ -157,7 +156,6 @@ function Cart() {
     updateQuantity(cartKey, newQuantity);
   };
 
-  // ✅ cartKey use karo
   const handleRemoveItem = (cartKey, name) => {
     if (window.confirm(`Remove "${name}" from cart?`)) {
       removeFromCart(cartKey);
@@ -174,7 +172,6 @@ function Cart() {
     setValidatingCoupon(true);
 
     try {
-      // ✅ cartKey + variantId bhejo
       const cartItemsWithVendor = cart.map((item) => ({
         cartKey: item.cartKey,
         id: item.id,
@@ -517,32 +514,30 @@ function Cart() {
             <div className="flex-1 space-y-4">
               {cart.map((item) => (
                 <div
-                  key={item.cartKey}                                       // ✅ cartKey
+                  key={item.cartKey}
                   className="group bg-white rounded-3xl border-2 border-pink-100 hover:border-pink-300 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                 >
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500" />
 
                   <div className="flex gap-4 pt-1">
-                    {/* Image */}
                     <Link
                       to={`/product/${item.id}`}
                       className="block flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 hover:border-pink-300 flex items-center justify-center p-2 transition-all shadow-sm"
                     >
-                      {item.image && !imgErrors[item.cartKey] ? (        // ✅ cartKey
+                      {item.image && !imgErrors[item.cartKey] ? (
                         <img
                           src={item.image}
                           alt={item.name}
                           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
                           decoding="async"
-                          onError={() => handleImageError(item.cartKey)}   // ✅ cartKey
+                          onError={() => handleImageError(item.cartKey)}
                         />
                       ) : (
                         <div className="text-3xl">{item.emoji || '✨'}</div>
                       )}
                     </Link>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0 flex flex-col">
                       {item.vendorId ? (
                         <span className="inline-flex items-center gap-1 text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded-full w-fit mb-1">
@@ -560,7 +555,6 @@ function Cart() {
                         </h3>
                       </Link>
 
-                      {/* ✅ VARIANT INFO — Size / Color */}
                       {(item.size || item.color) && (
                         <div className="flex flex-wrap gap-2 mb-1.5">
                           {item.size && (
@@ -576,7 +570,6 @@ function Cart() {
                         </div>
                       )}
 
-                      {/* Price */}
                       <div className="flex items-baseline gap-2 flex-wrap mt-1">
                         <span className="text-lg font-bold text-pink-600">
                           ₹{item.price.toLocaleString()}
@@ -596,12 +589,11 @@ function Cart() {
                         )}
                       </div>
 
-                      {/* Quantity + Remove */}
                       <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
                         <div className="flex items-center gap-0 bg-gradient-to-r from-pink-50 to-rose-50 border-2 border-pink-200 rounded-full overflow-hidden shadow-sm">
                           <button
                             onClick={() =>
-                              handleUpdateQuantity(item.cartKey, item.quantity - 1, item.stock)   // ✅
+                              handleUpdateQuantity(item.cartKey, item.quantity - 1, item.stock)
                             }
                             className="w-7 h-7 hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center text-base"
                           >
@@ -612,7 +604,7 @@ function Cart() {
                           </span>
                           <button
                             onClick={() =>
-                              handleUpdateQuantity(item.cartKey, item.quantity + 1, item.stock)   // ✅
+                              handleUpdateQuantity(item.cartKey, item.quantity + 1, item.stock)
                             }
                             className="w-7 h-7 hover:bg-pink-200 text-pink-600 font-bold transition flex items-center justify-center text-base"
                           >
@@ -621,7 +613,7 @@ function Cart() {
                         </div>
 
                         <button
-                          onClick={() => handleRemoveItem(item.cartKey, item.name)}             // ✅
+                          onClick={() => handleRemoveItem(item.cartKey, item.name)}
                           className="flex items-center gap-1 text-xs text-rose-500 hover:text-white hover:bg-rose-500 transition-all font-bold px-2.5 py-1 rounded-full border-2 border-rose-200 hover:border-rose-500"
                         >
                           <svg
@@ -641,7 +633,6 @@ function Cart() {
                         </button>
                       </div>
 
-                      {/* Mobile subtotal */}
                       <div className="sm:hidden mt-2 pt-2 border-t border-pink-100 flex justify-between items-center">
                         <span className="text-xs text-gray-500 font-medium">Item Total:</span>
                         <span className="text-sm font-bold text-pink-600">
@@ -674,7 +665,6 @@ function Cart() {
                     <span className="font-semibold">₹{subtotal}</span>
                   </div>
 
-                  {/* Coupon */}
                   {couponApplied ? (
                     <div className="flex flex-col gap-1 py-2 border-t border-pink-100">
                       <div className="flex justify-between text-green-600">
@@ -856,7 +846,7 @@ function Cart() {
                 <ul className="space-y-2 text-sm">
                   <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
                   <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                  </ul>
+                </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
