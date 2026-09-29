@@ -28,7 +28,9 @@ function Checkout() {
     country: 'India',
     saveAddress: true,
   });
+  const [formErrors, setFormErrors] = useState({});
   const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [shippingType, setShippingType] = useState('standard');
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
@@ -55,51 +57,61 @@ function Checkout() {
   const subtotal = cartTotal();
   const discount = couponDiscount;
 
+  /* ---------------- SETTINGS-BASED VALUES ---------------- */
   const FREE_SHIPPING_ENABLED = settings.freeShippingEnabled !== false;
-  const FREE_SHIPPING_THRESHOLD = settings.freeShippingThreshold;
+  const FREE_SHIPPING_THRESHOLD = Number(settings.freeShippingThreshold) || 499;
   const SHIPPING_CHARGE = Number(settings.shippingCharge) || 0;
+  const EXPRESS_SHIPPING_CHARGE = Number(settings.expressShippingCharge) || 0;
+  const EXPRESS_ENABLED = settings.expressShippingEnabled !== false;
   const TAX_PERCENT = Number(settings.taxPercent) || 0;
   const COD_CHARGE = Number(settings.codCharge) || 0;
   const COD_AVAILABLE = settings.codAvailable !== false;
+  const MIN_ORDER = Number(settings.minOrderValue) || 0;
 
-  // ✅ Shipping — settings based
+  const PAYMENT_METHODS = Array.isArray(settings.paymentMethods)
+    ? settings.paymentMethods
+    : ['cod', 'upi', 'card', 'netbanking'];
+
+  /* ---------------- SHIPPING ---------------- */
   const deliveryCharges = (() => {
-    if (!FREE_SHIPPING_ENABLED) return SHIPPING_CHARGE;
-    return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_CHARGE;
+    if (FREE_SHIPPING_ENABLED && subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
+    if (shippingType === 'express' && EXPRESS_ENABLED) return EXPRESS_SHIPPING_CHARGE;
+    return SHIPPING_CHARGE;
   })();
 
-  // ✅ COD charge — only if COD selected and available
-  const codCharge = (paymentMethod === 'cod' && COD_AVAILABLE) ? COD_CHARGE : 0;
+  const codCharge = paymentMethod === 'cod' && COD_AVAILABLE ? COD_CHARGE : 0;
 
-  // ✅ Tax — on subtotal (after discount, before shipping)
   const taxableAmount = Math.max(0, subtotal - discount);
   const taxAmount = Math.round(taxableAmount * (TAX_PERCENT / 100) * 100) / 100;
 
-  // ✅ Final total
   const total = Math.max(0, taxableAmount + taxAmount + deliveryCharges + codCharge);
 
-  // ✅ Min order check
-  const minOrderValue = Number(settings.minOrderValue) || 0;
-  const belowMinOrder = minOrderValue > 0 && subtotal < minOrderValue;
+  const belowMinOrder = MIN_ORDER > 0 && subtotal < MIN_ORDER;
 
+  /* ---------------- HANDLERS ---------------- */
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
+    if (searchQuery.trim()) navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
   };
-
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // ✅ COD not available — force UPI
+  // COD not available → switch to first non-COD method
   useEffect(() => {
     if (!COD_AVAILABLE && paymentMethod === 'cod') {
-      setPaymentMethod('upi');
+      const fallback = PAYMENT_METHODS.find((m) => m !== 'cod') || 'upi';
+      setPaymentMethod(fallback);
     }
-  }, [COD_AVAILABLE, paymentMethod]);
+  }, [COD_AVAILABLE, paymentMethod, PAYMENT_METHODS]);
 
-  // ✅ Pincode delivery check
+  // Express unavailable → reset to standard
+  useEffect(() => {
+    if (!EXPRESS_ENABLED && shippingType === 'express') {
+      setShippingType('standard');
+    }
+  }, [EXPRESS_ENABLED, shippingType]);
+
+  // Pincode delivery check
   useEffect(() => {
     const checkDelivery = async () => {
       if (formData.pincode && formData.pincode.length === 6) {
@@ -108,11 +120,7 @@ function Checkout() {
           const response = await fetch(`${API_URL}/api/shipping/check-delivery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              pincode: formData.pincode,
-              cartTotal: subtotal,
-              weight: 0.5,
-            }),
+            body: JSON.stringify({ pincode: formData.pincode, cartTotal: subtotal, weight: 0.5 }),
           });
           const data = await response.json();
           const deliveryData = data.data || data;
@@ -149,11 +157,9 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL, settings.deliveryDaysMin, settings.deliveryDaysMax]);
 
-  // ✅ Load addresses
+  // Load addresses
   useEffect(() => {
-    if (cart.length === 0 && !orderPlaced) {
-      navigate('/cart');
-    }
+    if (cart.length === 0 && !orderPlaced) navigate('/cart');
 
     const loadAddresses = async () => {
       const localAddresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
@@ -223,7 +229,15 @@ function Checkout() {
   }, [cart.length, navigate, orderPlaced, user, API_URL]);
 
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    if (formErrors[name]) {
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const handleAddressSelect = (address) => {
@@ -237,6 +251,7 @@ function Checkout() {
       state: address.state,
       pincode: address.pincode,
     });
+    setFormErrors({});
     setIsEditing(false);
     setEditingAddressId(null);
     setShowAddressDropdown(false);
@@ -338,65 +353,49 @@ function Checkout() {
     return false;
   };
 
+  /* ---------------- VALIDATION (with inline errors) ---------------- */
   const validateAddress = () => {
-    if (!formData.fullName || !formData.fullName.trim()) {
-      toast.error('❌ Please enter your Full Name');
-      return false;
-    }
-    if (!formData.email || !formData.email.trim()) {
-      toast.error('❌ Please enter your Email Address');
-      return false;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
-      toast.error('❌ Please enter a valid Email Address');
-      return false;
-    }
-    if (!formData.phone || !formData.phone.trim()) {
-      toast.error('❌ Please enter your Phone Number');
-      return false;
-    }
-    if (formData.phone.replace(/\D/g, '').length !== 10) {
-      toast.error('❌ Phone number must be 10 digits');
-      return false;
-    }
-    if (!formData.address || !formData.address.trim()) {
-      toast.error('❌ Please enter your Address');
-      return false;
-    }
-    if (!formData.city || !formData.city.trim()) {
-      toast.error('❌ Please enter your City');
-      return false;
-    }
-    if (!formData.state || !formData.state.trim()) {
-      toast.error('❌ Please enter your State');
-      return false;
-    }
-    if (!formData.pincode || !formData.pincode.trim()) {
-      toast.error('❌ Please enter your Pincode');
-      return false;
-    }
-    if (formData.pincode.replace(/\D/g, '').length !== 6) {
-      toast.error('❌ Pincode must be 6 digits');
-      return false;
-    }
-    if (!shippingInfo.deliverable && formData.pincode.length === 6) {
-      toast.error('❌ Sorry, we do not deliver to this pincode');
-      return false;
-    }
-    if (belowMinOrder) {
-      toast.error(`❌ Minimum order value is ₹${minOrderValue}`);
+    const errs = {};
+
+    if (!formData.fullName?.trim()) errs.fullName = 'Full name is required';
+    if (!formData.email?.trim()) errs.email = 'Email is required';
+    else if (!/^\S+@\S+\.\S+$/.test(formData.email.trim())) errs.email = 'Enter a valid email';
+
+    if (!formData.phone?.trim()) errs.phone = 'Phone is required';
+    else if (formData.phone.replace(/\D/g, '').length !== 10)
+      errs.phone = 'Phone must be 10 digits';
+
+    if (!formData.address?.trim()) errs.address = 'Address is required';
+    if (!formData.city?.trim()) errs.city = 'City is required';
+    if (!formData.state?.trim()) errs.state = 'State is required';
+
+    if (!formData.pincode?.trim()) errs.pincode = 'Pincode is required';
+    else if (formData.pincode.replace(/\D/g, '').length !== 6) errs.pincode = 'Pincode must be 6 digits';
+    else if (!shippingInfo.deliverable) errs.pincode = "Sorry, we don't deliver here";
+
+    if (belowMinOrder) errs._global = `Minimum order value is ₹${MIN_ORDER}`;
+
+    setFormErrors(errs);
+
+    const errorKeys = Object.keys(errs);
+    if (errorKeys.length > 0) {
+      if (errs._global) toast.error(`❌ ${errs._global}`);
+      else toast.error('❌ Please fix the highlighted fields');
       return false;
     }
     return true;
   };
 
-  const handleContinueToDelivery = () => {
-    if (validateAddress()) {
-      setStep(2);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  const goToStep = (target) => {
+    if (target > 1 && !validateAddress()) return;
+    setStep(target);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleContinueToDelivery = () => goToStep(2);
+  const handleContinueToPayment = () => goToStep(3);
+
+  /* ---------------- COUPON ---------------- */
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Please enter a coupon code');
@@ -455,6 +454,7 @@ function Checkout() {
     toast.success('Coupon removed');
   };
 
+  /* ---------------- PAYMENT ---------------- */
   const handlePhonePePayment = async (newOrderId) => {
     try {
       const payResponse = await fetch(`${API_URL}/api/payments/initiate`, {
@@ -473,10 +473,10 @@ function Checkout() {
         throw new Error(payData.error || 'Failed to initiate payment');
       }
 
-      toast.success('Redirecting to PhonePe...');
+      toast.success('Redirecting to payment gateway...');
       window.location.href = paymentInfo.redirectUrl;
     } catch (error) {
-      console.error('PhonePe Payment Error:', error);
+      console.error('Payment Error:', error);
       toast.error(error.message || 'Payment failed. Please try again.');
       throw error;
     }
@@ -490,11 +490,6 @@ function Checkout() {
     }
 
     if (!validateAddress()) return;
-
-    if (belowMinOrder) {
-      toast.error(`Minimum order value is ₹${minOrderValue}`);
-      return;
-    }
 
     setIsPlacingOrder(true);
     setOrderTotal(total);
@@ -522,7 +517,8 @@ function Checkout() {
           option2Name: item.option2Name || null,
         })),
         total: total,
-        address: {
+        // ✅ FIXED: shippingAddress (backend expects this name)
+        shippingAddress: {
           fullName: formData.fullName,
           phone: formData.phone,
           addressLine1: formData.address,
@@ -532,10 +528,10 @@ function Checkout() {
           country: formData.country || 'India',
         },
         paymentMethod: paymentMethod || 'cod',
+        shippingType: shippingType,
         discount: discount || 0,
       };
 
-      // ✅ /create endpoint (server-side price validation + stock deduction)
       const response = await fetch(`${API_URL}/api/orders/create`, {
         method: 'POST',
         headers: {
@@ -562,9 +558,7 @@ function Checkout() {
         result.order?.id ||
         result.id;
 
-      if (!newOrderId) {
-        throw new Error('Order ID missing from server response');
-      }
+      if (!newOrderId) throw new Error('Order ID missing from server response');
 
       // Save address in background
       if (formData.saveAddress && !selectedAddress && !isEditing) {
@@ -586,7 +580,8 @@ function Checkout() {
         }).catch((err) => console.log('Address sync warning:', err));
       }
 
-      if (paymentMethod === 'upi') {
+      // Non-COD → payment gateway
+      if (paymentMethod !== 'cod') {
         await handlePhonePePayment(newOrderId);
         setIsPlacingOrder(false);
         return;
@@ -604,25 +599,43 @@ function Checkout() {
     }
   };
 
-  // ✅ Payment options — COD conditionally
-  const paymentOptions = [
-    ...(COD_AVAILABLE
-      ? [{
-          id: 'cod',
-          name: 'Cash on Delivery',
-          icon: '💵',
-          description: COD_CHARGE > 0 ? `Pay when you receive (+₹${COD_CHARGE})` : 'Pay when you receive',
-        }]
-      : []),
+  /* ---------------- PAYMENT OPTIONS ---------------- */
+  const ALL_PAYMENT_OPTIONS = [
+    {
+      id: 'cod',
+      name: 'Cash on Delivery',
+      icon: '💵',
+      description: COD_CHARGE > 0 ? `Pay when you receive (+₹${COD_CHARGE})` : 'Pay when you receive',
+    },
     {
       id: 'upi',
-      name: 'PhonePe / UPI',
+      name: 'UPI',
       icon: '📱',
       description: 'PhonePe, Google Pay, Paytm',
     },
+    {
+      id: 'card',
+      name: 'Debit / Credit Card',
+      icon: '💳',
+      description: 'Visa, Mastercard, RuPay',
+    },
+    {
+      id: 'netbanking',
+      name: 'Netbanking',
+      icon: '🏦',
+      description: 'All major banks',
+    },
   ];
 
-  const getDeliveryDateDisplay = () => {
+  const paymentOptions = ALL_PAYMENT_OPTIONS.filter((o) => {
+    if (o.id === 'cod') return COD_AVAILABLE;
+    return PAYMENT_METHODS.includes(o.id) || PAYMENT_METHODS.includes('upi');
+  });
+
+  const getDeliveryDateDisplay = (type = 'standard') => {
+    if (type === 'express') {
+      return `Express delivery in 1-2 business days`;
+    }
     if (!shippingInfo.estimatedDelivery) {
       return `Expected delivery in ${settings.deliveryDaysMin}-${settings.deliveryDaysMax} business days`;
     }
@@ -640,9 +653,9 @@ function Checkout() {
 
   const totalItemsCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
-  // ============================================================
-  // ORDER PLACED SUCCESS
-  // ============================================================
+  /* ============================================================ */
+  /* ORDER PLACED SUCCESS                                          */
+  /* ============================================================ */
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 flex flex-col">
@@ -667,48 +680,8 @@ function Checkout() {
                   </p>
                 </div>
               </Link>
-
-              <div className="flex-1 max-w-md lg:max-w-2xl">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search for products..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="w-full px-4 sm:px-5 py-2.5 sm:py-3 border-2 border-pink-200 rounded-full focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all text-sm sm:text-base bg-white"
-                  />
-                  <button
-                    onClick={handleSearch}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-3 sm:px-6 py-1.5 rounded-full text-sm font-medium hover:shadow-lg transition-all"
-                  >
-                    <span className="hidden sm:inline">Search</span>
-                    <span className="sm:hidden">🔍</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
-                      {wishlistCount}
-                    </span>
-                  )}
-                </Link>
-
-                {user ? (
-                  <Avatar user={user} onLogout={logout} />
-                ) : (
-                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </Link>
-                )}
+              <div className="flex items-center gap-2">
+                {user ? <Avatar user={user} onLogout={logout} /> : null}
               </div>
             </div>
           </div>
@@ -734,7 +707,9 @@ function Checkout() {
               <p className="font-semibold text-green-800 mb-1 flex items-center gap-1.5">
                 <span>📦</span> Delivery Estimate
               </p>
-              <p className="text-green-700 text-sm font-medium">{getDeliveryDateDisplay()}</p>
+              <p className="text-green-700 text-sm font-medium">
+                {getDeliveryDateDisplay(shippingType)}
+              </p>
             </div>
 
             <div className="bg-pink-50 rounded-2xl p-5 mb-8 text-left border border-pink-100 shadow-sm space-y-2">
@@ -747,7 +722,7 @@ function Checkout() {
               </div>
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Payment Method:</span>
-                <span className="font-semibold text-gray-800 uppercase">
+                <span className="font-semibold text-gray-800">
                   {paymentOptions.find((m) => m.id === paymentMethod)?.name || paymentMethod}
                 </span>
               </div>
@@ -789,9 +764,9 @@ function Checkout() {
     );
   }
 
-  // ============================================================
-  // CHECKOUT FORM
-  // ============================================================
+  /* ============================================================ */
+  /* CHECKOUT FORM                                                 */
+  /* ============================================================ */
   return (
     <>
       <Helmet>
@@ -888,8 +863,10 @@ function Checkout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
+            {/* ================= LEFT: FORM ================= */}
             <div className="lg:col-span-2 space-y-5">
 
+              {/* STEPS INDICATOR */}
               <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                 <div className="flex items-center justify-between relative">
                   <div className="absolute left-10 right-10 top-5 h-0.5 bg-gray-200 hidden sm:block">
@@ -905,7 +882,12 @@ function Checkout() {
                     { step: 2, label: 'Delivery', icon: '🚚' },
                     { step: 3, label: 'Payment', icon: '💳' },
                   ].map((s) => (
-                    <div key={s.step} className="flex flex-col items-center relative z-10 flex-1">
+                    <button
+                      key={s.step}
+                      onClick={() => s.step < step && goToStep(s.step)}
+                      disabled={s.step > step}
+                      className="flex flex-col items-center relative z-10 flex-1 disabled:cursor-default"
+                    >
                       <div
                         className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-300 ${
                           step >= s.step
@@ -915,18 +897,15 @@ function Checkout() {
                       >
                         {step > s.step ? '✓' : s.icon}
                       </div>
-                      <p
-                        className={`text-xs mt-2 font-medium ${
-                          step >= s.step ? 'text-pink-600' : 'text-gray-400'
-                        }`}
-                      >
+                      <p className={`text-xs mt-2 font-medium ${step >= s.step ? 'text-pink-600' : 'text-gray-400'}`}>
                         {s.label}
                       </p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
+              {/* ========== STEP 1: ADDRESS ========== */}
               {step === 1 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center gap-3 mb-6">
@@ -987,10 +966,7 @@ function Checkout() {
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <div
-                                  className="flex-1"
-                                  onClick={() => handleAddressSelect(addr)}
-                                >
+                                <div className="flex-1" onClick={() => handleAddressSelect(addr)}>
                                   <p className="font-bold text-gray-900 text-sm flex items-center gap-2">
                                     {addr.fullName}
                                     {addr.isDefault && (
@@ -1012,7 +988,6 @@ function Checkout() {
                                       handleEditAddress(addr);
                                     }}
                                     className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition text-xs"
-                                    title="Edit"
                                   >
                                     ✏️
                                   </button>
@@ -1023,7 +998,6 @@ function Checkout() {
                                       handleDeleteAddress(addr.id);
                                     }}
                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition text-xs"
-                                    title="Delete"
                                   >
                                     🗑️
                                   </button>
@@ -1039,9 +1013,7 @@ function Checkout() {
                           <div className="w-full border-t border-pink-100"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                          <span className="px-3 bg-white text-gray-400 font-medium">
-                            or add new address
-                          </span>
+                          <span className="px-3 bg-white text-gray-400 font-medium">or add new address</span>
                         </div>
                       </div>
                     </div>
@@ -1049,31 +1021,49 @@ function Checkout() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Full Name <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         name="fullName"
                         value={formData.fullName}
                         onChange={handleInputChange}
                         placeholder="Enter your full name"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.fullName
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
+                      {formErrors.fullName && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.fullName}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Email Address <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="email"
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
                         placeholder="your@email.com"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.email
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
+                      {formErrors.email && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.email}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="tel"
                         name="phone"
@@ -1081,48 +1071,80 @@ function Checkout() {
                         onChange={handleInputChange}
                         maxLength="10"
                         placeholder="10-digit mobile number"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.phone
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
+                      {formErrors.phone && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.phone}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Address *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Address <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         name="address"
                         value={formData.address}
                         onChange={handleInputChange}
                         placeholder="Street, building, area"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.address
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
+                      {formErrors.address && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.address}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">City *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        City <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         name="city"
                         value={formData.city}
                         onChange={handleInputChange}
                         placeholder="Enter city"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.city
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
+                      {formErrors.city && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.city}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">State *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        State <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         name="state"
                         value={formData.state}
                         onChange={handleInputChange}
                         placeholder="Enter state"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.state
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
+                      {formErrors.state && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.state}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Pincode *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Pincode <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         name="pincode"
@@ -1130,26 +1152,38 @@ function Checkout() {
                         onChange={handleInputChange}
                         maxLength="6"
                         placeholder="6-digit pincode"
-                        className="w-full px-4 py-2.5 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm bg-white"
-                        required
+                        className={`w-full px-4 py-2.5 border-2 rounded-xl focus:outline-none transition text-sm bg-white ${
+                          formErrors.pincode
+                            ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                            : 'border-pink-200 focus:border-pink-500 focus:ring-2 focus:ring-pink-200'
+                        }`}
                       />
-                      {shippingInfo.checking && (
+                      {formErrors.pincode && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">⚠️ {formErrors.pincode}</p>
+                      )}
+                      {!formErrors.pincode && shippingInfo.checking && (
                         <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
                           <span className="animate-spin">⏳</span> Checking...
                         </p>
                       )}
-                      {!shippingInfo.checking && formData.pincode.length === 6 && shippingInfo.deliverable && (
-                        <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1 font-medium">
-                          ✅ {getDeliveryDateDisplay()}
-                        </p>
-                      )}
-                      {!shippingInfo.checking && formData.pincode.length === 6 && !shippingInfo.deliverable && (
-                        <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1 font-medium">
-                          ❌ Sorry, we don't deliver here
-                        </p>
-                      )}
+                      {!formErrors.pincode &&
+                        !shippingInfo.checking &&
+                        formData.pincode.length === 6 &&
+                        shippingInfo.deliverable && (
+                          <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1 font-medium">
+                            ✅ {getDeliveryDateDisplay('standard')}
+                          </p>
+                        )}
+                      {!formErrors.pincode &&
+                        !shippingInfo.checking &&
+                        formData.pincode.length === 6 &&
+                        !shippingInfo.deliverable && (
+                          <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1 font-medium">
+                            ❌ Sorry, we don't deliver here
+                          </p>
+                        )}
                     </div>
-                    <div className="flex items-center mt-6">
+                    <div className="flex items-center mt-6 md:col-span-2">
                       <input
                         type="checkbox"
                         id="saveAddress"
@@ -1166,7 +1200,7 @@ function Checkout() {
                   {belowMinOrder && (
                     <div className="mt-4 p-3 bg-red-50 border-2 border-red-200 rounded-xl">
                       <p className="text-sm text-red-700 font-bold">
-                        ⚠️ Minimum order value is ₹{minOrderValue}. Add ₹{minOrderValue - subtotal} more to continue.
+                        ⚠️ Minimum order value is ₹{MIN_ORDER}. Add ₹{MIN_ORDER - subtotal} more to continue.
                       </p>
                     </div>
                   )}
@@ -1179,7 +1213,7 @@ function Checkout() {
                           onClick={saveEditedAddress}
                           className="px-4 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition font-bold"
                         >
-                          Save Changes
+                          Save
                         </button>
                         <button
                           onClick={cancelEdit}
@@ -1201,6 +1235,7 @@ function Checkout() {
                 </div>
               )}
 
+              {/* ========== STEP 2: DELIVERY ========== */}
               {step === 2 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1221,41 +1256,86 @@ function Checkout() {
                   </div>
 
                   <div className="space-y-3">
-                    <label className="flex items-center justify-between p-4 border-2 border-pink-500 bg-pink-50 shadow-md rounded-xl cursor-pointer">
+                    {/* STANDARD */}
+                    <label
+                      className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        shippingType === 'standard'
+                          ? 'border-pink-500 bg-pink-50 shadow-md'
+                          : 'border-gray-200 hover:border-pink-200'
+                      }`}
+                    >
                       <div className="flex items-center gap-4">
                         <input
                           type="radio"
-                          name="delivery"
-                          defaultChecked
+                          name="shippingType"
+                          value="standard"
+                          checked={shippingType === 'standard'}
+                          onChange={() => setShippingType('standard')}
                           className="w-4 h-4 accent-pink-500"
                         />
                         <div>
-                          <p className="font-semibold text-gray-900">Standard Delivery</p>
-                          <p className="text-sm text-gray-500">📦 {getDeliveryDateDisplay()}</p>
+                          <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                            📦 Standard Delivery
+                          </p>
+                          <p className="text-sm text-gray-500">{getDeliveryDateDisplay('standard')}</p>
                         </div>
                       </div>
-                      <p
-                        className={`font-bold text-lg ${
-                          deliveryCharges === 0 ? 'text-green-600' : 'text-gray-800'
-                        }`}
-                      >
-                        {deliveryCharges === 0 ? 'FREE' : `₹${deliveryCharges}`}
+                      <p className={`font-bold text-lg ${deliveryCharges === 0 && shippingType === 'standard' ? 'text-green-600' : 'text-gray-800'}`}>
+                        {subtotal >= FREE_SHIPPING_THRESHOLD && FREE_SHIPPING_ENABLED
+                          ? 'FREE'
+                          : `₹${SHIPPING_CHARGE}`}
                       </p>
                     </label>
+
+                    {/* EXPRESS (agar enabled) */}
+                    {EXPRESS_ENABLED && (
+                      <label
+                        className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                          shippingType === 'express'
+                            ? 'border-pink-500 bg-pink-50 shadow-md'
+                            : 'border-gray-200 hover:border-pink-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="radio"
+                            name="shippingType"
+                            value="express"
+                            checked={shippingType === 'express'}
+                            onChange={() => setShippingType('express')}
+                            className="w-4 h-4 accent-pink-500"
+                          />
+                          <div>
+                            <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                              ⚡ Express Delivery
+                              <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">
+                                FAST
+                              </span>
+                            </p>
+                            <p className="text-sm text-gray-500">Delivered in 1-2 business days</p>
+                          </div>
+                        </div>
+                        <p className="font-bold text-lg text-gray-800">
+                          ₹{EXPRESS_SHIPPING_CHARGE}
+                        </p>
+                      </label>
+                    )}
                   </div>
 
-                  {FREE_SHIPPING_ENABLED && subtotal < FREE_SHIPPING_THRESHOLD && deliveryCharges > 0 && (
-                    <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                      <p className="text-sm text-amber-700 flex items-center gap-2 font-medium">
-                        🚚 Add ₹{FREE_SHIPPING_THRESHOLD - subtotal} more for{' '}
-                        <strong>FREE delivery</strong>
-                      </p>
-                    </div>
-                  )}
+                  {FREE_SHIPPING_ENABLED &&
+                    subtotal < FREE_SHIPPING_THRESHOLD &&
+                    shippingType === 'standard' && (
+                      <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                        <p className="text-sm text-amber-700 flex items-center gap-2 font-medium">
+                          🚚 Add ₹{FREE_SHIPPING_THRESHOLD - subtotal} more for{' '}
+                          <strong>FREE delivery</strong>
+                        </p>
+                      </div>
+                    )}
 
                   <div className="flex gap-4 mt-6">
                     <button
-                      onClick={() => setStep(3)}
+                      onClick={handleContinueToPayment}
                       className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-xl font-bold hover:shadow-lg transition-all"
                     >
                       Continue to Payment 💳 →
@@ -1264,6 +1344,7 @@ function Checkout() {
                 </div>
               )}
 
+              {/* ========== STEP 3: PAYMENT ========== */}
               {step === 3 && (
                 <div className="bg-white rounded-2xl shadow-sm border border-pink-100 p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -1331,9 +1412,12 @@ function Checkout() {
               )}
             </div>
 
+            {/* ================= RIGHT: SUMMARY + ACTIONS ================= */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-3xl shadow-lg border border-pink-100 p-6 lg:sticky lg:top-24">
-                <div className="flex items-center gap-2 mb-4">
+              <div className="bg-white rounded-3xl shadow-lg border border-pink-100 p-6 lg:sticky lg:top-24 space-y-4">
+
+                {/* HEADER */}
+                <div className="flex items-center gap-2">
                   <span className="text-xl">🛒</span>
                   <h2 className="text-lg font-bold text-gray-900">Order Summary</h2>
                   <span className="ml-auto text-xs bg-pink-100 text-pink-700 px-2.5 py-0.5 rounded-full font-bold">
@@ -1341,7 +1425,8 @@ function Checkout() {
                   </span>
                 </div>
 
-                <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
+                {/* CART ITEMS */}
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                   {cart.map((item) => (
                     <div key={item.cartKey} className="flex gap-3 pb-3 border-b border-pink-50">
                       <div className="w-14 h-14 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-pink-100 p-1">
@@ -1380,9 +1465,7 @@ function Checkout() {
                           >
                             −
                           </button>
-                          <span className="text-sm font-bold text-gray-700">
-                            {item.quantity}
-                          </span>
+                          <span className="text-sm font-bold text-gray-700">{item.quantity}</span>
                           <button
                             onClick={() => updateQuantity(item.cartKey, item.quantity + 1)}
                             className="w-6 h-6 bg-pink-100 rounded text-pink-600 font-bold hover:bg-pink-200"
@@ -1409,35 +1492,35 @@ function Checkout() {
                   ))}
                 </div>
 
-                <div className="mb-4">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Coupon code"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      className="flex-1 px-3.5 py-2.5 border-2 border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition uppercase font-mono bg-white"
-                      disabled={couponApplied}
-                    />
-                    {couponApplied ? (
-                      <button
-                        onClick={removeCoupon}
-                        className="px-4 py-2.5 bg-red-100 text-red-600 rounded-xl text-sm font-bold hover:bg-red-200 transition"
-                      >
-                        Remove
-                      </button>
-                    ) : (
-                      <button
-                        onClick={applyCoupon}
-                        disabled={applyingCoupon || !couponCode.trim()}
-                        className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-bold hover:shadow-md transition disabled:opacity-50"
-                      >
-                        {applyingCoupon ? '...' : 'Apply'}
-                      </button>
-                    )}
-                  </div>
+                {/* COUPON */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Coupon code"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    className="flex-1 px-3.5 py-2.5 border-2 border-pink-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition uppercase font-mono bg-white"
+                    disabled={couponApplied}
+                  />
+                  {couponApplied ? (
+                    <button
+                      onClick={removeCoupon}
+                      className="px-4 py-2.5 bg-red-100 text-red-600 rounded-xl text-sm font-bold hover:bg-red-200 transition"
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      onClick={applyCoupon}
+                      disabled={applyingCoupon || !couponCode.trim()}
+                      className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl text-sm font-bold hover:shadow-md transition disabled:opacity-50"
+                    >
+                      {applyingCoupon ? '...' : 'Apply'}
+                    </button>
+                  )}
                 </div>
 
+                {/* PRICE BREAKDOWN */}
                 <div className="space-y-2.5 text-sm border-t border-pink-100 pt-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal</span>
@@ -1459,12 +1542,10 @@ function Checkout() {
                   )}
 
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Shipping</span>
-                    <span
-                      className={`font-semibold ${
-                        deliveryCharges === 0 ? 'text-green-600' : 'text-gray-800'
-                      }`}
-                    >
+                    <span className="text-gray-600">
+                      {shippingType === 'express' ? 'Express Shipping' : 'Shipping'}
+                    </span>
+                    <span className={`font-semibold ${deliveryCharges === 0 ? 'text-green-600' : 'text-gray-800'}`}>
                       {deliveryCharges === 0 ? 'FREE 🎉' : `₹${deliveryCharges}`}
                     </span>
                   </div>
@@ -1478,18 +1559,45 @@ function Checkout() {
 
                   <div className="flex justify-between pt-3 border-t-2 border-pink-100">
                     <span className="font-bold text-gray-900 text-base">Total</span>
-                    <span className="font-bold text-pink-600 text-xl">
-                      ₹{total.toFixed(2)}
-                    </span>
+                    <span className="font-bold text-pink-600 text-xl">₹{total.toFixed(2)}</span>
                   </div>
 
-                  <p className="text-[11px] text-gray-500 text-right pt-1">
-                    Inclusive of all taxes
-                  </p>
+                  {TAX_PERCENT > 0 && (
+                    <p className="text-[11px] text-gray-500 text-right pt-1">Inclusive of all taxes</p>
+                  )}
                 </div>
 
-                {formData.address && (
-                  <div className="mt-4 p-3 bg-pink-50 rounded-xl border border-pink-100">
+                {/* ✅ SIDEBAR CONTINUE / PLACE BUTTON (per step) */}
+                {step === 1 && (
+                  <button
+                    onClick={handleContinueToDelivery}
+                    disabled={belowMinOrder}
+                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-2xl font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Continue to Delivery 🚚
+                  </button>
+                )}
+                {step === 2 && (
+                  <button
+                    onClick={handleContinueToPayment}
+                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-2xl font-bold hover:shadow-lg transition-all"
+                  >
+                    Continue to Payment 💳
+                  </button>
+                )}
+                {step === 3 && (
+                  <button
+                    onClick={placeOrder}
+                    disabled={isPlacingOrder}
+                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3.5 rounded-2xl font-bold hover:shadow-lg transition-all disabled:opacity-50"
+                  >
+                    {isPlacingOrder ? 'Placing Order...' : `Place Order • ₹${total.toLocaleString()}`}
+                  </button>
+                )}
+
+                {/* ADDRESS PREVIEW */}
+                {formData.address && formData.pincode && (
+                  <div className="p-3 bg-pink-50 rounded-xl border border-pink-100">
                     <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
                       📍 Delivery Address
                     </p>
@@ -1499,24 +1607,25 @@ function Checkout() {
                     </p>
                     <p className="text-xs text-gray-600">📞 {formData.phone}</p>
 
-                    {formData.pincode && formData.pincode.length === 6 && shippingInfo.deliverable && (
+                    {shippingInfo.deliverable && (
                       <div className="mt-2 pt-2 border-t border-pink-200">
                         <p className="text-xs font-bold text-green-700 flex items-center gap-1">
-                          🚚 {getDeliveryDateDisplay()}
+                          🚚 {getDeliveryDateDisplay(shippingType)}
                         </p>
                       </div>
                     )}
                   </div>
                 )}
 
-                <div className="mt-4 pt-4 border-t border-pink-100 grid grid-cols-3 gap-2 text-center">
+                {/* TRUST BADGES */}
+                <div className="pt-4 border-t border-pink-100 grid grid-cols-3 gap-2 text-center">
                   <div>
                     <div className="text-lg">🔒</div>
                     <p className="text-[10px] text-gray-500 font-medium">Secure</p>
                   </div>
                   <div>
                     <div className="text-lg">💳</div>
-                    <p className="text-[10px] text-gray-500 font-medium">UPI / COD</p>
+                    <p className="text-[10px] text-gray-500 font-medium">UPI / Card / COD</p>
                   </div>
                   <div>
                     <div className="text-lg">🚚</div>
