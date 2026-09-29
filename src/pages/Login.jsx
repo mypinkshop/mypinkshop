@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -18,7 +18,7 @@ function Login() {
   const [showSuggestion, setShowSuggestion] = useState(false);
 
   // ========== FORGOT PASSWORD STATE ==========
-  const [resetMethod, setResetMethod] = useState('email'); // 'email' | 'phone'
+  const [resetMethod, setResetMethod] = useState('email');
   const [resetEmail, setResetEmail] = useState('');
   const [resetPhone, setResetPhone] = useState('');
   const [resetSent, setResetSent] = useState(false);
@@ -35,6 +35,10 @@ function Login() {
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // ✅ Redirect param — login ke baad wapas usi page pe
+  const redirectTo = searchParams.get('redirect') || '';
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
@@ -50,6 +54,26 @@ function Login() {
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') handleSearch();
+  };
+
+  // ========== REDIRECT USER — FIXED ==========
+  const redirectUser = (user) => {
+    // Admin / Vendor → apne dashboard pe
+    if (user?.role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+      return;
+    }
+    if (user?.role === 'vendor') {
+      navigate('/vendor/dashboard', { replace: true });
+      return;
+    }
+
+    // ✅ Buyer — redirect param use karo (agar valid hai)
+    if (redirectTo && redirectTo !== '/login' && redirectTo !== '/register') {
+      navigate(redirectTo, { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
   };
 
   // ========== EMAIL + PASSWORD LOGIN ==========
@@ -205,12 +229,11 @@ function Login() {
   };
 
   // ============================================================
-  // FORGOT PASSWORD — दोनों options (Email OR WhatsApp)
+  // FORGOT PASSWORD — Email OR WhatsApp
   // ============================================================
   const handleForgotPassword = async (e) => {
     e.preventDefault();
 
-    // Validation — method के हिसाब से input check करें
     if (resetMethod === 'email') {
       if (!resetEmail || !isEmail(resetEmail)) {
         setError('Please enter a valid email address.');
@@ -228,8 +251,6 @@ function Login() {
     setError('');
 
     try {
-      // दोनों methods के लिए same backend endpoint
-      // Backend email से user ढूँढेगा, फिर email + WhatsApp भेजेगा
       const payload =
         resetMethod === 'email'
           ? { email: resetEmail.trim().toLowerCase() }
@@ -251,7 +272,6 @@ function Login() {
         const whatsappSent = data.channels?.whatsapp === true;
         setResetChannels({ email: emailSent, whatsapp: whatsappSent });
 
-        // Dynamic toast message — कौन-कौन से channel पर भेजा
         let toastMsg = 'Reset link sent!';
         if (emailSent && whatsappSent) {
           toastMsg = 'Reset link sent to your email & WhatsApp 📧📱';
@@ -271,7 +291,6 @@ function Login() {
     }
   };
 
-  // Reset form को initial state में लाएँ
   const resetForgotPasswordForm = () => {
     setShowForgotPassword(false);
     setError('');
@@ -280,16 +299,6 @@ function Login() {
     setResetPhone('');
     setResetMethod('email');
     setResetChannels({ email: false, whatsapp: false });
-  };
-
-  const redirectUser = (user) => {
-    if (user?.role === 'admin') {
-      navigate('/admin/dashboard');
-    } else if (user?.role === 'vendor') {
-      navigate('/vendor/dashboard');
-    } else {
-      navigate('/');
-    }
   };
 
   const generateBreadcrumbSchema = () => ({
@@ -325,7 +334,9 @@ function Login() {
                   <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
                     MyPinkShop
                   </h1>
-                  <p className="text-[9px] sm:text-[10px] text-pink-500 font-semibold tracking-wider">FOR THE GIRLIES ✨</p>
+                  <p className="text-[9px] sm:text-[10px] text-pink-500 font-semibold tracking-wider">
+                    FOR THE GIRLIES ✨
+                  </p>
                 </div>
               </Link>
 
@@ -350,9 +361,22 @@ function Login() {
               </div>
 
               <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
-                <Link to="/wishlist" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                <Link
+                  to="/wishlist"
+                  className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
+                >
+                  <svg
+                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                    />
                   </svg>
                   {wishlistCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
@@ -361,9 +385,22 @@ function Login() {
                   )}
                 </Link>
 
-                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                <Link
+                  to="/cart"
+                  className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
+                >
+                  <svg
+                    className="w-5 h-5 sm:w-6 sm:h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
                   </svg>
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
@@ -379,7 +416,9 @@ function Login() {
         {/* ================= BREADCRUMB ================= */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
+            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">
+              Home
+            </Link>
             <span className="text-gray-400">/</span>
             <span className="text-pink-600 font-medium">Login</span>
           </div>
@@ -388,7 +427,6 @@ function Login() {
         {/* ================= MAIN ================= */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-
             {/* LEFT — BENEFITS */}
             <div className="hidden lg:block">
               <div className="bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600 rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden">
@@ -400,7 +438,8 @@ function Login() {
                     ✨ MEMBER BENEFITS
                   </span>
                   <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight">
-                    Welcome to the <br />Pink Club 💕
+                    Welcome to the <br />
+                    Pink Club 💕
                   </h2>
                   <p className="text-pink-100 mb-8 text-lg">
                     10,000+ happy customers trust us for their beauty needs
@@ -429,10 +468,7 @@ function Login() {
 
             {/* RIGHT — FORM */}
             <div className="w-full max-w-md mx-auto lg:mx-0">
-
-              {/* ============================================================ */}
-              {/* OTP SCREEN                                                    */}
-              {/* ============================================================ */}
+              {/* OTP SCREEN */}
               {showOTP ? (
                 <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
@@ -549,7 +585,10 @@ function Login() {
                     </div>
                   )}
 
-                  <form onSubmit={isPhoneInput ? handleSendOTP : handlePasswordLogin} className="space-y-5">
+                  <form
+                    onSubmit={isPhoneInput ? handleSendOTP : handlePasswordLogin}
+                    className="space-y-5"
+                  >
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                         Email Address / WhatsApp Number
@@ -627,12 +666,14 @@ function Login() {
                       <div className="w-full border-t border-pink-100"></div>
                     </div>
                     <div className="relative flex justify-center text-sm">
-                      <span className="px-3 bg-white text-gray-500 font-medium">New to MyPinkShop?</span>
+                      <span className="px-3 bg-white text-gray-500 font-medium">
+                        New to MyPinkShop?
+                      </span>
                     </div>
                   </div>
 
                   <Link
-                    to="/register"
+                    to={`/register${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`}
                     className="block w-full text-center border-2 border-pink-500 bg-transparent text-pink-600 font-bold py-3.5 rounded-xl hover:bg-pink-50 transition-all"
                   >
                     Create your account
@@ -655,20 +696,21 @@ function Login() {
                 </div>
               ) : (
                 /* ============================================================ */
-                /* FORGOT PASSWORD — EMAIL + WHATSAPP दोनों OPTIONS              */
+                /* FORGOT PASSWORD — EMAIL + WHATSAPP                          */
                 /* ============================================================ */
                 <div className="bg-white rounded-3xl shadow-2xl border border-pink-100 p-6 sm:p-8">
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                       <span className="text-white text-3xl">🔐</span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reset Password</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                      Reset Password
+                    </h1>
                     <p className="text-gray-500 text-sm mt-1">
                       Choose how you want to receive the reset link
                     </p>
                   </div>
 
-                  {/* ============ SUCCESS STATE ============ */}
                   {resetSent ? (
                     <div className="space-y-4">
                       <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-xl text-sm">
@@ -676,10 +718,22 @@ function Login() {
                           <span>✓</span> Reset link sent successfully!
                         </p>
                         <ul className="text-xs space-y-1 ml-5 list-disc">
-                          {resetChannels.email && <li>📧 Check your <strong>Email inbox</strong></li>}
-                          {resetChannels.whatsapp && <li>📱 Check your <strong>WhatsApp messages</strong></li>}
-                          <li>⏰ Link expires in <strong>30 minutes</strong></li>
-                          <li>📁 Also check <strong>spam folder</strong> (email)</li>
+                          {resetChannels.email && (
+                            <li>
+                              📧 Check your <strong>Email inbox</strong>
+                            </li>
+                          )}
+                          {resetChannels.whatsapp && (
+                            <li>
+                              📱 Check your <strong>WhatsApp messages</strong>
+                            </li>
+                          )}
+                          <li>
+                            ⏰ Link expires in <strong>30 minutes</strong>
+                          </li>
+                          <li>
+                            📁 Also check <strong>spam folder</strong> (email)
+                          </li>
                         </ul>
                       </div>
 
@@ -692,7 +746,6 @@ function Login() {
                       </button>
                     </div>
                   ) : (
-                    /* ============ INPUT STATE ============ */
                     <>
                       {error && (
                         <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl mb-4 text-sm flex items-start gap-2">
@@ -700,7 +753,6 @@ function Login() {
                         </div>
                       )}
 
-                      {/* ============ METHOD TOGGLE (Email / WhatsApp) ============ */}
                       <div className="flex gap-2 p-1 bg-pink-50 rounded-2xl mb-5">
                         <button
                           type="button"
@@ -733,7 +785,6 @@ function Login() {
                       </div>
 
                       <form onSubmit={handleForgotPassword} className="space-y-5">
-                        {/* ============ EMAIL INPUT ============ */}
                         {resetMethod === 'email' ? (
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -758,7 +809,6 @@ function Login() {
                             </p>
                           </div>
                         ) : (
-                          /* ============ PHONE INPUT ============ */
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                               WhatsApp Number
@@ -772,7 +822,9 @@ function Login() {
                                 inputMode="numeric"
                                 value={resetPhone}
                                 onChange={(e) => {
-                                  setResetPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                                  setResetPhone(
+                                    e.target.value.replace(/\D/g, '').slice(0, 10)
+                                  );
                                   setError('');
                                 }}
                                 className="w-full pl-14 pr-4 py-3 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition text-sm tracking-wide"
@@ -839,28 +891,77 @@ function Login() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Shop</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                  <li>
+                    <Link to="/skincare" className="hover:text-pink-500 transition">
+                      Skincare
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/makeup" className="hover:text-pink-500 transition">
+                      Makeup
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/hair" className="hover:text-pink-500 transition">
+                      Hair
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/clothing" className="hover:text-pink-500 transition">
+                      Clothing
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/accessories" className="hover:text-pink-500 transition">
+                      Accessories
+                    </Link>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Support</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                  <li>
+                    <Link to="/contact" className="hover:text-pink-500 transition">
+                      Contact Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/faqs" className="hover:text-pink-500 transition">
+                      FAQs
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/shipping" className="hover:text-pink-500 transition">
+                      Shipping Info
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/returns" className="hover:text-pink-500 transition">
+                      Returns Policy
+                    </Link>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                
+                  <li>
+                    <a
+                      href="https://www.instagram.com/mypinkshopofficial"
+                      className="hover:text-pink-500 transition"
+                    >
+                      Instagram
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://www.facebook.com/mypinkshopofficial"
+                      className="hover:text-pink-500 transition"
+                    >
+                      Facebook
+                    </a>
+                  </li>
                 </ul>
               </div>
             </div>
