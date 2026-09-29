@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import { useSettings } from '../hooks/useSettings';
 import toast from 'react-hot-toast';
 
 function Cart() {
@@ -13,6 +14,7 @@ function Cart() {
   const { cart, removeFromCart, updateQuantity, cartTotal } = useCart();
   const { user, logout, isAuthenticated } = useAuth();
   const { wishlistCount } = useWishlist();
+  const { settings, loading: settingsLoading } = useSettings();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [imgErrors, setImgErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,20 +24,18 @@ function Cart() {
   const [discount, setDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
-  const [availableCoupons, setAvailableCoupons] = useState([]);
   const [eligibleCoupons, setEligibleCoupons] = useState([]);
-
-  const [shippingCharge, setShippingCharge] = useState(49);
-  const [freeShippingThreshold, setFreeShippingThreshold] = useState(499);
 
   const API_URL = `${import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com'}/api`;
 
   const subtotal = cartTotal();
-  const FREE_SHIPPING_THRESHOLD = freeShippingThreshold;
+  const FREE_SHIPPING_THRESHOLD = settings.freeShippingThreshold;
+  const SHIPPING_CHARGE = settings.shippingCharge;
+  const FREE_SHIPPING_ENABLED = settings.freeShippingEnabled !== false;
 
-  // ✅ Fetch coupons & shipping
+  // ✅ Fetch eligible coupons
   useEffect(() => {
-    const fetchCouponsAndShipping = async () => {
+    const fetchCoupons = async () => {
       try {
         const cartItemsWithVendor = cart.map((item) => ({
           cartKey: item.cartKey,
@@ -56,8 +56,6 @@ function Cart() {
 
         if (data.success || data.data) {
           const coupons = data.data || data.coupons || [];
-          setAvailableCoupons(coupons);
-
           const eligible = coupons.filter((coupon) => {
             if (!coupon.vendorId) return true;
             return cart.some((item) => item.vendorId === coupon.vendorId);
@@ -67,54 +65,11 @@ function Cart() {
       } catch (error) {
         console.error('Failed to fetch coupons:', error);
       }
-
-      try {
-        const res = await fetch(`${API_URL}/shipping/settings`);
-        const settingsData = await res.json();
-        const settings = settingsData.data || settingsData.settings || settingsData;
-        if (settings.freeShippingThreshold) {
-          setFreeShippingThreshold(Number(settings.freeShippingThreshold));
-        }
-      } catch (err) {
-        console.error('Failed to load shipping settings', err);
-      }
     };
 
-    fetchCouponsAndShipping();
+    if (cart.length > 0) fetchCoupons();
   }, [cart, API_URL]);
 
-  // ✅ Live shipping
-  useEffect(() => {
-    const fetchLiveShipping = async () => {
-      try {
-        const savedAddresses = JSON.parse(localStorage.getItem('savedAddresses') || '[]');
-        const defaultAddr = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
-        const targetPincode = defaultAddr?.pincode || '400072';
-
-        const res = await fetch(`${API_URL}/shipping/check-delivery`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pincode: targetPincode,
-            cartTotal: subtotal,
-            weight: 0.5,
-          }),
-        });
-        const data = await res.json();
-        const deliveryData = data.data || data;
-
-        if (deliveryData.success !== false && deliveryData.shippingCharge !== undefined) {
-          setShippingCharge(Number(deliveryData.shippingCharge));
-        }
-      } catch (err) {
-        console.error('Live shipping calculation error:', err);
-      }
-    };
-
-    if (subtotal > 0) fetchLiveShipping();
-  }, [subtotal, API_URL]);
-
-  // ✅ FIXED — Strict login check via AuthContext
   const handleCheckout = () => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
@@ -232,14 +187,20 @@ function Cart() {
   };
 
   const totalWithDiscount = subtotal - discount;
-  const shipping =
-    totalWithDiscount >= FREE_SHIPPING_THRESHOLD ? 0 : Number(shippingCharge || 49);
+
+  // ✅ Shipping logic — settings se
+  const shipping = (() => {
+    if (!FREE_SHIPPING_ENABLED) return Number(SHIPPING_CHARGE) || 0;
+    return totalWithDiscount >= FREE_SHIPPING_THRESHOLD ? 0 : Number(SHIPPING_CHARGE) || 0;
+  })();
+
   const finalTotal = totalWithDiscount + shipping;
-  const remainingForFree = FREE_SHIPPING_THRESHOLD - totalWithDiscount;
-  const freeShippingProgress = Math.min(
-    100,
-    (totalWithDiscount / FREE_SHIPPING_THRESHOLD) * 100
-  );
+  const remainingForFree = FREE_SHIPPING_ENABLED
+    ? Math.max(0, FREE_SHIPPING_THRESHOLD - totalWithDiscount)
+    : 0;
+  const freeShippingProgress = FREE_SHIPPING_ENABLED
+    ? Math.min(100, (totalWithDiscount / FREE_SHIPPING_THRESHOLD) * 100)
+    : 0;
 
   const generateBreadcrumbSchema = () => ({
     '@context': 'https://schema.org',
@@ -378,7 +339,7 @@ function Cart() {
     <>
       <Helmet>
         <title>Shopping Cart - MyPinkShop | Review Your Order</title>
-        <meta name="description" content="Review your shopping cart at MyPinkShop. Checkout securely with free shipping on orders above ₹499." />
+        <meta name="description" content={`Review your shopping cart at MyPinkShop. Checkout securely with free shipping on orders above ₹${FREE_SHIPPING_THRESHOLD}.`} />
         <link rel="canonical" href="https://www.mypinkshop.com/cart" />
         <script type="application/ld+json">{JSON.stringify(generateBreadcrumbSchema())}</script>
       </Helmet>
@@ -461,7 +422,6 @@ function Cart() {
           </div>
         </header>
 
-        {/* BREADCRUMB */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-2 text-sm overflow-x-auto pb-1">
             <Link to="/" className="text-gray-500 hover:text-pink-500 transition whitespace-nowrap">Home</Link>
@@ -471,7 +431,7 @@ function Cart() {
         </div>
 
         {/* FREE SHIPPING PROGRESS BAR */}
-        {shipping > 0 && (
+        {FREE_SHIPPING_ENABLED && shipping > 0 && remainingForFree > 0 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
             <div className="bg-gradient-to-r from-pink-50 to-rose-50 border-2 border-pink-200 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -490,7 +450,7 @@ function Cart() {
           </div>
         )}
 
-        {shipping === 0 && subtotal > 0 && (
+        {FREE_SHIPPING_ENABLED && shipping === 0 && subtotal > 0 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-4 flex items-center gap-3">
               <span className="text-2xl">🎉</span>
@@ -784,7 +744,9 @@ function Cart() {
                   </div>
                   <div className="text-center">
                     <div className="text-lg">🚚</div>
-                    <p className="text-[10px] text-gray-500 font-bold">Free ₹499+</p>
+                    <p className="text-[10px] text-gray-500 font-bold">
+                      {FREE_SHIPPING_ENABLED ? `Free ₹${FREE_SHIPPING_THRESHOLD}+` : 'Fast Delivery'}
+                    </p>
                   </div>
                 </div>
               </div>
