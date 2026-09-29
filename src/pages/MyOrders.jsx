@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../context/AuthContext';
@@ -56,46 +56,84 @@ function MyOrders() {
       return;
     }
     fetchOrders();
-  }, [user, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const formattedString =
-      dateString.includes(' ') && !dateString.includes('T')
-        ? dateString.replace(' ', 'T') + (dateString.endsWith('Z') ? '' : 'Z')
-        : dateString;
-    const date = new Date(formattedString);
-    return isNaN(date.getTime())
-      ? dateString
-      : date.toLocaleDateString('en-IN', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        });
+    try {
+      const formattedString =
+        dateString.includes(' ') && !dateString.includes('T')
+          ? dateString.replace(' ', 'T') + (dateString.endsWith('Z') ? '' : 'Z')
+          : dateString;
+      const date = new Date(formattedString);
+      return isNaN(date.getTime())
+        ? dateString
+        : date.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          });
+    } catch (e) {
+      return dateString;
+    }
   };
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
+
+      const authToken = token || localStorage.getItem('token');
+      if (!authToken) {
+        console.error('No auth token found');
+        toast.error('Please login again');
+        navigate('/login');
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/orders/user`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch orders');
+      if (response.status === 401) {
+        console.error('401 Unauthorized');
+        toast.error('Session expired. Please login again.');
+        navigate('/login');
+        return;
+      }
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('API error:', response.status, errText);
+        throw new Error(`HTTP ${response.status}`);
+      }
 
       const data = await response.json();
-      const ordersArray = Array.isArray(data.data)
+      console.log('📦 Orders API response:', data);
+
+      // Handle multiple shapes
+      const ordersArray = Array.isArray(data?.data)
         ? data.data
+        : Array.isArray(data?.orders)
+        ? data.orders
         : Array.isArray(data)
         ? data
         : [];
 
+      console.log('📦 Raw orders:', ordersArray.length);
+
+      // Normalize each order
       const normalized = ordersArray.map((order) => {
         let parsedAddress = order.shippingAddress || order.shipping_address;
         if (typeof parsedAddress === 'string') {
           try {
             parsedAddress = JSON.parse(parsedAddress);
-          } catch (e) {}
+          } catch (e) {
+            parsedAddress = {};
+          }
         }
 
         return {
@@ -103,18 +141,20 @@ function MyOrders() {
           _id: order._id || order.id,
           createdAt: order.createdAt || order.created_at,
           updatedAt: order.updatedAt || order.updated_at,
-          total: order.total || order.total_amount || order.subtotal,
+          total: Number(order.total || order.total_amount || order.subtotal || 0),
           orderNumber: order.order_number || order.orderNumber,
-          shippingAddress: parsedAddress,
+          shippingAddress: parsedAddress || {},
           paymentMethod: order.paymentMethod || order.payment_method,
           paymentStatus: order.paymentStatus || order.payment_status,
-          // ✅ VARIANT FIELDS NORMALIZE
+          status: (order.status || 'pending').toLowerCase(),
           items: (order.items || []).map((item) => ({
             ...item,
             productId: item.productId || item.product_id,
             name: item.name || item.product_name,
-            image: item.image || item.product_image || item.img,
-            price: item.price || item.unit_price || 0,
+            image: item.image || item.product_image || item.img || null,
+            price: Number(item.price || item.unit_price || 0),
+            quantity: Number(item.quantity || 1),
+            subtotal: Number(item.subtotal || 0),
             variantId: item.variantId || item.variant_id || null,
             variantSku: item.variantSku || item.variant_sku || null,
             variantLabel: item.variantLabel || item.variant_label || null,
@@ -126,34 +166,48 @@ function MyOrders() {
         };
       });
 
+      // Filter out old cancelled orders (>30 min ago) — but keep if no timestamp
       const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
       const filteredData = normalized.filter((order) => {
         if (order.status === 'cancelled' || order.status === 'failed') {
-          const cancelledTime = new Date(
-            order.updatedAt || order.cancelledAt
-          ).getTime();
+          const timeStr = order.updatedAt || order.cancelledAt;
+          if (!timeStr) return true;
+          const cancelledTime = new Date(timeStr).getTime();
+          if (isNaN(cancelledTime)) return true;
           return cancelledTime >= thirtyMinutesAgo;
         }
         return true;
       });
 
+      console.log('✅ Filtered orders:', filteredData.length);
+      console.log('✅ First order:', filteredData[0]);
+
       setOrders(filteredData);
 
-      for (const order of filteredData) {
-        if (order.status === 'delivered') {
-          for (const item of order.items) {
-            try {
-              const eligibility = await canUserReview(item.productId);
-              setReviewEligibility((prev) => ({
-                ...prev,
-                [`${order._id}_${item.productId}`]: eligibility,
-              }));
-            } catch (err) {}
+      // Background review eligibility (non-blocking)
+      try {
+        for (const order of filteredData) {
+          if (order.status === 'delivered' && Array.isArray(order.items)) {
+            for (const item of order.items) {
+              if (!item.productId) continue;
+              try {
+                const eligibility = await canUserReview(item.productId);
+                setReviewEligibility((prev) => ({
+                  ...prev,
+                  [`${order._id}_${item.productId}`]: eligibility,
+                }));
+              } catch (err) {
+                console.warn('Review eligibility failed:', err);
+              }
+            }
           }
         }
+      } catch (e) {
+        console.warn('Review loop error:', e);
       }
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('❌ Error fetching orders:', error);
+      toast.error(error.message || 'Failed to load orders');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -188,11 +242,12 @@ function MyOrders() {
   const cancelOrder = async (orderId) => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     try {
+      const authToken = token || localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
       if (response.ok) {
@@ -207,8 +262,8 @@ function MyOrders() {
     }
   };
 
-  // ✅ REORDER with variant info
   const reorder = (order) => {
+    if (!Array.isArray(order.items)) return;
     order.items.forEach((item) => {
       addToCart({
         id: item.productId,
@@ -216,7 +271,6 @@ function MyOrders() {
         price: item.price,
         quantity: 1,
         image: item.image,
-        // ✅ Variant fields
         variantId: item.variantId || null,
         variantSku: item.variantSku || null,
         variantLabel: item.variantLabel || null,
@@ -239,8 +293,9 @@ function MyOrders() {
     const targetOrderId = order.orderId || order._id || order.id;
 
     try {
+      const authToken = token || localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/shipping/tracking/${targetOrderId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       const data = await response.json();
       if (data.success && data.trackingData) {
@@ -417,7 +472,7 @@ function MyOrders() {
     <>
       <Helmet>
         <title>My Orders - MyPinkShop | Track & Manage Your Orders</title>
-        <meta name="description" content="View and manage your orders at MyPinkShop. Track delivery status, cancel orders, reorder items, and download invoices." />
+        <meta name="description" content="View and manage your orders at MyPinkShop." />
         <link rel="canonical" href="https://www.mypinkshop.com/my-orders" />
       </Helmet>
 
@@ -599,13 +654,7 @@ function MyOrders() {
                       : 'bg-white border-2 border-pink-200 text-gray-700 hover:bg-pink-50'
                   }`}
                 >
-                  {status === 'all'
-                    ? 'All'
-                    : status === 'pending'
-                    ? 'In Progress'
-                    : status === 'delivered'
-                    ? 'Delivered'
-                    : 'Cancelled'}
+                  {status === 'all' ? 'All' : status === 'pending' ? 'In Progress' : status === 'delivered' ? 'Delivered' : 'Cancelled'}
                 </button>
               ))}
             </div>
@@ -617,9 +666,7 @@ function MyOrders() {
                 <span className="text-6xl">🛍️</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                {filterStatus === 'all'
-                  ? 'No orders yet'
-                  : `No ${getStatusText(filterStatus).toLowerCase()} orders`}
+                {filterStatus === 'all' ? 'No orders yet' : `No ${getStatusText(filterStatus).toLowerCase()} orders`}
               </h2>
               <p className="text-gray-500 mb-8 max-w-md mx-auto font-medium">
                 {filterStatus === 'all'
@@ -649,11 +696,7 @@ function MyOrders() {
                   <div
                     key={order._id}
                     className={`bg-white rounded-3xl border-2 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 ${
-                      isCancelled
-                        ? 'border-rose-100'
-                        : isDelivered
-                        ? 'border-emerald-100'
-                        : 'border-pink-100'
+                      isCancelled ? 'border-rose-100' : isDelivered ? 'border-emerald-100' : 'border-pink-100'
                     }`}
                   >
                     {/* HEADER */}
@@ -679,7 +722,7 @@ function MyOrders() {
                             <span>{statusConfig.icon}</span>
                             {statusConfig.label}
                           </span>
-                          <span className={`bg-white/25 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full`}>
+                          <span className="bg-white/25 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full">
                             {payConfig.label}
                           </span>
                         </div>
@@ -725,7 +768,7 @@ function MyOrders() {
 
                     {/* ITEMS */}
                     <div className="px-5 sm:px-6 py-4">
-                      {order.items &&
+                      {Array.isArray(order.items) && order.items.length > 0 ? (
                         order.items.map((item, idx) => {
                           const eligibilityKey = `${order._id}_${item.productId}`;
                           const canReview =
@@ -763,7 +806,6 @@ function MyOrders() {
                                 <p className="text-xs sm:text-sm text-gray-500 mt-1 font-medium">
                                   Qty: {item.quantity}
                                 </p>
-                                {/* ✅ VARIANT CHIPS */}
                                 {(item.size || item.color) && (
                                   <div className="flex flex-wrap gap-1.5 mt-1">
                                     {item.size && (
@@ -799,7 +841,10 @@ function MyOrders() {
                               </div>
                             </div>
                           );
-                        })}
+                        })
+                      ) : (
+                        <p className="text-sm text-gray-400 text-center py-3">No items in this order</p>
+                      )}
                     </div>
 
                     {/* ACTION BUTTONS */}
@@ -910,13 +955,7 @@ function MyOrders() {
                         >
                           {['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status) ? '✓' : '•'}
                         </div>
-                        <p
-                          className={`font-bold text-sm ${
-                            ['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status)
-                              ? 'text-gray-900'
-                              : 'text-gray-400'
-                          }`}
-                        >
+                        <p className={`font-bold text-sm ${['confirmed', 'shipped', 'delivered'].includes(selectedOrder.status) ? 'text-gray-900' : 'text-gray-400'}`}>
                           Order Confirmed
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5 font-medium">
@@ -958,49 +997,27 @@ function MyOrders() {
                       </p>
                       <div className="text-xs text-gray-600 space-y-1">
                         <p className="font-bold text-gray-900 text-sm">
-                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                            ? selectedOrder.shippingAddress.fullName || user?.fullName || 'Customer'
-                            : user?.fullName || 'Customer'}
+                          {selectedOrder.shippingAddress?.fullName || user?.fullName || 'Customer'}
                         </p>
                         <p className="font-medium">
-                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                            ? selectedOrder.shippingAddress.addressLine1 ||
-                              selectedOrder.shippingAddress.address ||
-                              'N/A'
-                            : String(selectedOrder.shippingAddress || selectedOrder.address || 'N/A')}
+                          {selectedOrder.shippingAddress?.addressLine1 || selectedOrder.shippingAddress?.address || 'N/A'}
                         </p>
                         <p className="font-medium">
-                          {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null ? (
-                            <>
-                              {selectedOrder.shippingAddress.city || 'Mumbai'},{' '}
-                              {selectedOrder.shippingAddress.state || 'Maharashtra'} -{' '}
-                              <span className="font-mono font-bold">
-                                {selectedOrder.shippingAddress.pincode || '400072'}
-                              </span>
-                            </>
-                          ) : (
-                            'Mumbai, Maharashtra - 400072'
-                          )}
+                          {selectedOrder.shippingAddress?.city || 'Mumbai'},{' '}
+                          {selectedOrder.shippingAddress?.state || 'Maharashtra'} -{' '}
+                          <span className="font-mono font-bold">
+                            {selectedOrder.shippingAddress?.pincode || '400072'}
+                          </span>
                         </p>
                         <p className="text-gray-500 pt-1 font-medium">
-                          Phone:{' '}
-                          <span className="font-bold">
-                            {typeof selectedOrder.shippingAddress === 'object' && selectedOrder.shippingAddress !== null
-                              ? selectedOrder.shippingAddress.phone || 'N/A'
-                              : 'N/A'}
-                          </span>
+                          Phone: <span className="font-bold">{selectedOrder.shippingAddress?.phone || 'N/A'}</span>
                         </p>
                       </div>
                       <div className="mt-3 pt-3 border-t border-pink-200 flex justify-between items-center text-[11px]">
                         <span className="text-gray-500 font-medium">
-                          Payment:{' '}
-                          <strong className="uppercase text-gray-700">
-                            {selectedOrder.paymentMethod || 'Online'}
-                          </strong>
+                          Payment: <strong className="uppercase text-gray-700">{selectedOrder.paymentMethod || 'Online'}</strong>
                         </span>
-                        <span
-                          className={`capitalize px-2.5 py-1 rounded-full font-bold ${getPaymentStatusConfig(selectedOrder.paymentStatus).bg} ${getPaymentStatusConfig(selectedOrder.paymentStatus).text}`}
-                        >
+                        <span className={`capitalize px-2.5 py-1 rounded-full font-bold ${getPaymentStatusConfig(selectedOrder.paymentStatus).bg} ${getPaymentStatusConfig(selectedOrder.paymentStatus).text}`}>
                           {getPaymentStatusConfig(selectedOrder.paymentStatus).label}
                         </span>
                       </div>
@@ -1036,18 +1053,13 @@ function MyOrders() {
                 <div className="flex gap-3 pb-4 border-b border-pink-100">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 p-1 flex items-center justify-center">
                     {selectedProduct.image ? (
-                      <img
-                        src={selectedProduct.image}
-                        alt={selectedProduct.name}
-                        className="w-full h-full object-contain"
-                      />
+                      <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-contain" />
                     ) : (
                       <div>🛍️</div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 text-sm line-clamp-2">{selectedProduct.name}</p>
-                    {/* ✅ Variant info in review modal */}
                     {(selectedProduct.size || selectedProduct.color) && (
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {selectedProduct.size && (
@@ -1079,13 +1091,7 @@ function MyOrders() {
                         onClick={() => setRating(star)}
                         className="text-4xl focus:outline-none transition-transform hover:scale-110"
                       >
-                        <span
-                          className={
-                            star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-300'
-                          }
-                        >
-                          ★
-                        </span>
+                        <span className={star <= (hoverRating || rating) ? 'text-yellow-400' : 'text-gray-300'}>★</span>
                       </button>
                     ))}
                   </div>
@@ -1118,10 +1124,7 @@ function MyOrders() {
                   <label className="block text-sm font-bold text-gray-700 mb-2">Add Photos</label>
                   <div className="flex flex-wrap gap-3 mb-3">
                     {images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-pink-100"
-                      >
+                      <div key={idx} className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-pink-100">
                         <img src={img} alt={`Review ${idx}`} className="w-full h-full object-cover" />
                         <button
                           onClick={() => removeImage(idx)}
@@ -1210,11 +1213,9 @@ function MyOrders() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-                </ul>
+                  <li><a href="https://instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="https://facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
+                  </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
