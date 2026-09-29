@@ -45,6 +45,7 @@ function Checkout() {
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [addressLoaded, setAddressLoaded] = useState(false);
 
   const [shippingInfo, setShippingInfo] = useState({
     deliverable: true,
@@ -72,10 +73,16 @@ function Checkout() {
     ? settings.paymentMethods
     : ['cod', 'upi', 'card', 'netbanking'];
 
-  /* ---------------- SHIPPING ---------------- */
+  /* ---------------- SHIPPING (Express always chargeable) ---------------- */
   const deliveryCharges = (() => {
-    if (FREE_SHIPPING_ENABLED && subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
-    if (shippingType === 'express' && EXPRESS_ENABLED) return EXPRESS_SHIPPING_CHARGE;
+    // ⚡ Express — ALWAYS chargeable (never free)
+    if (shippingType === 'express' && EXPRESS_ENABLED) {
+      return EXPRESS_SHIPPING_CHARGE;
+    }
+    // 📦 Standard — FREE if above threshold
+    if (FREE_SHIPPING_ENABLED && subtotal >= FREE_SHIPPING_THRESHOLD) {
+      return 0;
+    }
     return SHIPPING_CHARGE;
   })();
 
@@ -96,7 +103,7 @@ function Checkout() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // ✅ Address basic fill check — sidebar button tabhi dikhe jab zaroori fields bhari hon
+  // ✅ Address basic fill check
   const isAddressBasicFilled = () => {
     return !!(
       formData.fullName?.trim() &&
@@ -172,7 +179,7 @@ function Checkout() {
     return () => clearTimeout(timeoutId);
   }, [formData.pincode, subtotal, API_URL, settings.deliveryDaysMin, settings.deliveryDaysMax]);
 
-  // Load addresses
+  /* ---------------- LOAD ADDRESSES (with last-used auto-fill) ---------------- */
   useEffect(() => {
     if (cart.length === 0 && !orderPlaced) navigate('/cart');
 
@@ -220,25 +227,44 @@ function Checkout() {
       unique.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
       setSavedAddresses(unique);
 
-      const defaultAddr = unique.find((a) => a.isDefault);
-      if (defaultAddr && !selectedAddress) {
-        setSelectedAddress(defaultAddr.id);
+      // ✅ AUTO-FILL LOGIC: last used → default → first
+      let addrToUse = null;
+
+      // 1. Last used address ID (stored in localStorage)
+      const lastUsedId = localStorage.getItem('lastUsedAddressId');
+      if (lastUsedId) {
+        addrToUse = unique.find((a) => String(a.id) === String(lastUsedId));
+      }
+
+      // 2. Fallback: default address
+      if (!addrToUse) {
+        addrToUse = unique.find((a) => a.isDefault);
+      }
+
+      // 3. Fallback: first address
+      if (!addrToUse && unique.length > 0) {
+        addrToUse = unique[0];
+      }
+
+      if (addrToUse && !addressLoaded) {
+        setSelectedAddress(addrToUse.id);
         setFormData((prev) => ({
           ...prev,
-          fullName: defaultAddr.fullName,
-          phone: defaultAddr.phone,
-          address: defaultAddr.address,
-          city: defaultAddr.city,
-          state: defaultAddr.state,
-          pincode: defaultAddr.pincode,
+          fullName: addrToUse.fullName || prev.fullName,
+          phone: addrToUse.phone || prev.phone,
+          address: addrToUse.address || prev.address,
+          city: addrToUse.city || prev.city,
+          state: addrToUse.state || prev.state,
+          pincode: addrToUse.pincode || prev.pincode,
         }));
+        setAddressLoaded(true);
       }
     };
 
     loadAddresses();
 
     if (user) {
-      setFormData((prev) => ({ ...prev, email: user.email, fullName: user.name || '' }));
+      setFormData((prev) => ({ ...prev, email: user.email, fullName: user.name || prev.fullName }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.length, navigate, orderPlaced, user, API_URL]);
@@ -266,6 +292,8 @@ function Checkout() {
       state: address.state,
       pincode: address.pincode,
     });
+    // ✅ Save as last used
+    localStorage.setItem('lastUsedAddressId', String(address.id));
     setFormErrors({});
     setIsEditing(false);
     setEditingAddressId(null);
@@ -511,6 +539,11 @@ function Checkout() {
 
     if (formData.saveAddress && !isEditing && !selectedAddress) {
       saveNewAddress();
+    }
+
+    // ✅ Save last used address ID
+    if (selectedAddress) {
+      localStorage.setItem('lastUsedAddressId', String(selectedAddress));
     }
 
     try {
@@ -931,7 +964,7 @@ function Checkout() {
                   {savedAddresses.length > 0 && (
                     <div className="mb-6 relative">
                       <label className="block text-sm font-bold text-gray-700 mb-2">
-                        📌 Select from saved addresses ({savedAddresses.length})
+                        📌 Saved addresses ({savedAddresses.length})
                       </label>
                       <button
                         type="button"
@@ -986,6 +1019,11 @@ function Checkout() {
                                         ⭐ Default
                                       </span>
                                     )}
+                                    {String(addr.id) === String(localStorage.getItem('lastUsedAddressId')) && (
+                                      <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
+                                        ✓ Last used
+                                      </span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-gray-500 mt-0.5">
                                     {addr.address}, {addr.city}, {addr.state} - {addr.pincode}
@@ -1025,7 +1063,7 @@ function Checkout() {
                           <div className="w-full border-t border-pink-100"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                          <span className="px-3 bg-white text-gray-400 font-medium">or add new address</span>
+                          <span className="px-3 bg-white text-gray-400 font-medium">or edit / add new address</span>
                         </div>
                       </div>
                     </div>
@@ -1292,14 +1330,14 @@ function Checkout() {
                           <p className="text-sm text-gray-500">{getDeliveryDateDisplay('standard')}</p>
                         </div>
                       </div>
-                      <p className={`font-bold text-lg ${deliveryCharges === 0 && shippingType === 'standard' ? 'text-green-600' : 'text-gray-800'}`}>
+                      <p className={`font-bold text-lg ${subtotal >= FREE_SHIPPING_THRESHOLD && FREE_SHIPPING_ENABLED ? 'text-green-600' : 'text-gray-800'}`}>
                         {subtotal >= FREE_SHIPPING_THRESHOLD && FREE_SHIPPING_ENABLED
                           ? 'FREE'
                           : `₹${SHIPPING_CHARGE}`}
                       </p>
                     </label>
 
-                    {/* EXPRESS (agar enabled) */}
+                    {/* EXPRESS */}
                     {EXPRESS_ENABLED && (
                       <label
                         className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
@@ -1555,7 +1593,7 @@ function Checkout() {
 
                   <div className="flex justify-between">
                     <span className="text-gray-600">
-                      {shippingType === 'express' ? 'Express Shipping' : 'Shipping'}
+                      {shippingType === 'express' ? '⚡ Express Shipping' : '📦 Shipping'}
                     </span>
                     <span className={`font-semibold ${deliveryCharges === 0 ? 'text-green-600' : 'text-gray-800'}`}>
                       {deliveryCharges === 0 ? 'FREE 🎉' : `₹${deliveryCharges}`}
@@ -1579,7 +1617,29 @@ function Checkout() {
                   )}
                 </div>
 
-                {/* ✅ SIDEBAR CONTINUE / PLACE BUTTON (per step) */}
+                {/* ✅ ADDRESS PREVIEW — only when filled */}
+                {isAddressBasicFilled() && (
+                  <div className="p-3 bg-pink-50 rounded-xl border border-pink-100">
+                    <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
+                      📍 Delivery Address
+                    </p>
+                    <p className="text-sm text-gray-900 font-semibold">{formData.fullName}</p>
+                    <p className="text-xs text-gray-600">
+                      {formData.address}, {formData.city} - {formData.pincode}
+                    </p>
+                    <p className="text-xs text-gray-600">📞 {formData.phone}</p>
+
+                    {shippingInfo.deliverable && (
+                      <div className="mt-2 pt-2 border-t border-pink-200">
+                        <p className="text-xs font-bold text-green-700 flex items-center gap-1">
+                          🚚 {getDeliveryDateDisplay(shippingType)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ✅ SIDEBAR CONTINUE / PLACE BUTTON (per step, AFTER address) */}
                 {/* Step 1: only show when address is filled */}
                 {step === 1 && isAddressBasicFilled() && (
                   <button
@@ -1606,28 +1666,6 @@ function Checkout() {
                   >
                     {isPlacingOrder ? 'Placing Order...' : `Place Order • ₹${total.toLocaleString()}`}
                   </button>
-                )}
-
-                {/* ADDRESS PREVIEW — only when filled */}
-                {isAddressBasicFilled() && (
-                  <div className="p-3 bg-pink-50 rounded-xl border border-pink-100">
-                    <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
-                      📍 Delivery Address
-                    </p>
-                    <p className="text-sm text-gray-900 font-semibold">{formData.fullName}</p>
-                    <p className="text-xs text-gray-600">
-                      {formData.address}, {formData.city} - {formData.pincode}
-                    </p>
-                    <p className="text-xs text-gray-600">📞 {formData.phone}</p>
-
-                    {shippingInfo.deliverable && (
-                      <div className="mt-2 pt-2 border-t border-pink-200">
-                        <p className="text-xs font-bold text-green-700 flex items-center gap-1">
-                          🚚 {getDeliveryDateDisplay(shippingType)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
                 )}
 
                 {/* TRUST BADGES */}
@@ -1686,9 +1724,9 @@ function Checkout() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="https://instagram.com/mypinkofficial" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="https://facebook.com/mypinkofficial" className="hover:text-pink-500 transition">Facebook</a></li>
-                 </ul>
+                  <li><a href="https://instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="https://facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">Facebook</a></li>
+                  </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
