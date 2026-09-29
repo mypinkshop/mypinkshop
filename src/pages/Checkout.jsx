@@ -96,6 +96,21 @@ function Checkout() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  // ✅ Address basic fill check — sidebar button tabhi dikhe jab zaroori fields bhari hon
+  const isAddressBasicFilled = () => {
+    return !!(
+      formData.fullName?.trim() &&
+      formData.email?.trim() &&
+      formData.phone?.trim() &&
+      formData.phone.replace(/\D/g, '').length === 10 &&
+      formData.address?.trim() &&
+      formData.city?.trim() &&
+      formData.state?.trim() &&
+      formData.pincode?.trim() &&
+      formData.pincode.replace(/\D/g, '').length === 6
+    );
+  };
+
   // COD not available → switch to first non-COD method
   useEffect(() => {
     if (!COD_AVAILABLE && paymentMethod === 'cod') {
@@ -353,7 +368,7 @@ function Checkout() {
     return false;
   };
 
-  /* ---------------- VALIDATION (with inline errors) ---------------- */
+  /* ---------------- VALIDATION ---------------- */
   const validateAddress = () => {
     const errs = {};
 
@@ -517,7 +532,6 @@ function Checkout() {
           option2Name: item.option2Name || null,
         })),
         total: total,
-        // ✅ FIXED: shippingAddress (backend expects this name)
         shippingAddress: {
           fullName: formData.fullName,
           phone: formData.phone,
@@ -560,7 +574,6 @@ function Checkout() {
 
       if (!newOrderId) throw new Error('Order ID missing from server response');
 
-      // Save address in background
       if (formData.saveAddress && !selectedAddress && !isEditing) {
         fetch(`${API_URL}/api/users/addresses`, {
           method: 'POST',
@@ -580,7 +593,6 @@ function Checkout() {
         }).catch((err) => console.log('Address sync warning:', err));
       }
 
-      // Non-COD → payment gateway
       if (paymentMethod !== 'cod') {
         await handlePhonePePayment(newOrderId);
         setIsPlacingOrder(false);
@@ -1568,7 +1580,8 @@ function Checkout() {
                 </div>
 
                 {/* ✅ SIDEBAR CONTINUE / PLACE BUTTON (per step) */}
-                {step === 1 && (
+                {/* Step 1: only show when address is filled */}
+                {step === 1 && isAddressBasicFilled() && (
                   <button
                     onClick={handleContinueToDelivery}
                     disabled={belowMinOrder}
@@ -1595,8 +1608,8 @@ function Checkout() {
                   </button>
                 )}
 
-                {/* ADDRESS PREVIEW */}
-                {formData.address && formData.pincode && (
+                {/* ADDRESS PREVIEW — only when filled */}
+                {isAddressBasicFilled() && (
                   <div className="p-3 bg-pink-50 rounded-xl border border-pink-100">
                     <p className="text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
                       📍 Delivery Address
@@ -1673,11 +1686,9 @@ function Checkout() {
               <div>
                 <h4 className="font-semibold text-white mb-4">Follow Us</h4>
                 <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
-                </ul>
+                  <li><a href="https://instagram.com/mypinkofficial" className="hover:text-pink-500 transition">Instagram</a></li>
+                  <li><a href="https://facebook.com/mypinkofficial" className="hover:text-pink-500 transition">Facebook</a></li>
+                 </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
