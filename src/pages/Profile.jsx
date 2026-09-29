@@ -400,22 +400,55 @@ function Profile() {
     }
   };
 
+  /* =================================================================== */
+  /* ✅ FIXED: handleAddressSubmit - validation + actual error message   */
+  /* =================================================================== */
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
-    const url = editingAddress
-      ? `${API_URL}/api/users/addresses/${editingAddress.id || editingAddress._id}`
+
+    // ✅ Validation
+    if (!addressForm.fullName?.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!/^\d{10}$/.test(addressForm.phone)) {
+      toast.error('Phone must be 10 digits');
+      return;
+    }
+    if (!/^\d{6}$/.test(addressForm.pincode)) {
+      toast.error('Pincode must be 6 digits');
+      return;
+    }
+    if (!addressForm.addressLine1?.trim()) {
+      toast.error('Address Line 1 is required');
+      return;
+    }
+    if (!addressForm.city?.trim() || !addressForm.state?.trim()) {
+      toast.error('City and State are required');
+      return;
+    }
+
+    const addressId = editingAddress?.id || editingAddress?._id;
+    const url = addressId
+      ? `${API_URL}/api/users/addresses/${addressId}`
       : `${API_URL}/api/users/addresses`;
-    const method = editingAddress ? 'PUT' : 'POST';
+    const method = addressId ? 'PUT' : 'POST';
+
+    // ✅ Payload — dono formats bhejo (safety ke liye)
     const payload = {
-      name: addressForm.fullName,
-      phone: addressForm.phone,
-      line1: addressForm.addressLine1,
-      line2: addressForm.addressLine2,
-      city: addressForm.city,
-      state: addressForm.state,
-      pincode: addressForm.pincode,
-      isDefault: addressForm.isDefault,
+      name: addressForm.fullName.trim(),
+      phone: addressForm.phone.trim(),
+      line1: addressForm.addressLine1.trim(),
+      line2: addressForm.addressLine2?.trim() || '',
+      city: addressForm.city.trim(),
+      state: addressForm.state.trim(),
+      pincode: addressForm.pincode.trim(),
+      isDefault: !!addressForm.isDefault,
+      is_default: !!addressForm.isDefault,
     };
+
+    console.log('📤 Sending address:', method, url, payload);
+
     try {
       const response = await fetch(url, {
         method,
@@ -425,16 +458,33 @@ function Profile() {
         },
         body: JSON.stringify(payload),
       });
+
+      const data = await response.json().catch(() => ({}));
+      console.log('📥 Response:', response.status, data);
+
       if (response.ok) {
         toast.success(editingAddress ? 'Address Updated! ✨' : 'Address Added! ✨');
-        fetchAddresses();
+        await fetchAddresses();
         setShowAddressModal(false);
         setEditingAddress(null);
+        // Reset form
+        setAddressForm({
+          fullName: '',
+          phone: '',
+          pincode: '',
+          addressLine1: '',
+          addressLine2: '',
+          city: '',
+          state: '',
+          isDefault: false,
+        });
       } else {
-        toast.error('Failed to save address');
+        // ✅ Actual error message dikhao
+        toast.error(data.error || `Failed to save address (${response.status})`);
       }
     } catch (error) {
-      toast.error('Error saving address');
+      console.error('Address save error:', error);
+      toast.error(error.message || 'Error saving address');
     }
   };
 
@@ -448,21 +498,36 @@ function Profile() {
       if (response.ok) {
         toast.success('Address deleted!');
         fetchAddresses();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.error || 'Failed to delete address');
       }
     } catch (error) {
       toast.error('Error deleting address');
     }
   };
 
+  /* =================================================================== */
+  /* ✅ FIXED: setDefaultAddress - response.ok check karo               */
+  /* =================================================================== */
   const setDefaultAddress = async (id) => {
     try {
-      await fetch(`${API_URL}/api/users/addresses/${id}/default`, {
+      const response = await fetch(`${API_URL}/api/users/addresses/${id}/default`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success('Default address updated!');
-      fetchAddresses();
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to set default');
+        return;
+      }
+
+      toast.success('Default address updated! ✨');
+      await fetchAddresses();
     } catch (error) {
+      console.error('Set default error:', error);
       toast.error('Error setting default');
     }
   };
@@ -1094,7 +1159,26 @@ function Profile() {
                           <p className="text-sm text-gray-700 font-medium mt-2">📞 {addr.phone}</p>
 
                           <div className="mt-4 pt-3 border-t-2 border-pink-100 flex flex-wrap gap-3">
-                            <button onClick={() => { setEditingAddress(addr); setAddressForm(addr); setShowAddressModal(true); }} className="text-sm text-blue-600 font-bold hover:underline">✏️ Edit</button>
+                            {/* ✅ FIXED: Edit button — sahi shape me form set karo */}
+                            <button
+                              onClick={() => {
+                                setEditingAddress(addr);
+                                setAddressForm({
+                                  fullName: addr.fullName || addr.name || '',
+                                  phone: addr.phone || '',
+                                  pincode: addr.pincode || '',
+                                  addressLine1: addr.addressLine1 || addr.line1 || '',
+                                  addressLine2: addr.addressLine2 || addr.line2 || '',
+                                  city: addr.city || '',
+                                  state: addr.state || '',
+                                  isDefault: !!addr.isDefault,
+                                });
+                                setShowAddressModal(true);
+                              }}
+                              className="text-sm text-blue-600 font-bold hover:underline"
+                            >
+                              ✏️ Edit
+                            </button>
                             <button onClick={() => deleteAddress(addr._id)} className="text-sm text-rose-600 font-bold hover:underline">🗑️ Delete</button>
                             {!addr.isDefault && (
                               <button onClick={() => setDefaultAddress(addr._id)} className="text-sm text-gray-600 font-bold hover:underline">⭐ Set Default</button>
