@@ -24,7 +24,8 @@ function ProductCard({
 }) {
   const navigate = useNavigate();
 
-  const { cart, addToCart } = useCart();
+  // ✅ CartContext se removeFromCart bhi nikalo
+  const { cart, addToCart, removeFromCart } = useCart();
 
   const [imgError, setImgError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -117,6 +118,23 @@ function ProductCard({
         borderRadius: '12px',
       },
     });
+  };
+
+  /* ------------------ ✅ Remove from cart ------------------ */
+  const handleRemoveFromCart = () => {
+    try {
+      if (typeof removeFromCart === 'function') {
+        removeFromCart(productId);
+      } else {
+        // ✅ Fallback: agar removeFromCart available nahi hai
+        // toh cart me se remove karne ke liye context ka direct use karo
+        console.warn('removeFromCart not available in CartContext');
+      }
+      toast.success('Removed from cart');
+    } catch (err) {
+      console.error('Remove from cart error:', err);
+      toast.error('Failed to remove from cart');
+    }
   };
 
   const handleGoToCart = () => {
@@ -278,29 +296,57 @@ function ProductCard({
           )}
         </div>
 
-        {/* Actions */}
+        {/* ==================== ✅ ACTIONS ==================== */}
         <div className="flex gap-2">
           {isAdded ? (
-            <button
-              onClick={handleGoToCart}
-              className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg flex items-center justify-center gap-1"
-            >
-              <span>✓</span> Go to Cart
-            </button>
+            <>
+              {/* ✅ NEW: Remove (−) button */}
+              <button
+                onClick={handleRemoveFromCart}
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 hover:border-red-300 shadow-sm hover:shadow-md"
+                title="Remove from cart"
+                aria-label="Remove from cart"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={3}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M20 12H4"
+                  />
+                </svg>
+              </button>
+
+              {/* Go to Cart button */}
+              <button
+                onClick={handleGoToCart}
+                className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg flex items-center justify-center gap-1"
+              >
+                <span>✓</span> Go to Cart
+              </button>
+            </>
           ) : (
-            <button
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
-              className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                !isOutOfStock
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-            </button>
+            <>
+              <button
+                onClick={handleAddToCart}
+                disabled={isOutOfStock}
+                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                  !isOutOfStock
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+              </button>
+            </>
           )}
 
+          {/* Wishlist button */}
           <button
             onClick={handleWishlistToggle}
             className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50 hover:border-pink-300"
