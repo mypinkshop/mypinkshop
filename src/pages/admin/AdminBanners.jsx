@@ -36,6 +36,34 @@ function getErrorMessage(err, defaultMsg = 'Something went wrong') {
   return msg || defaultMsg;
 }
 
+// ✅ Group positions by category (for UI)
+function getPositionGroup(positionValue) {
+  if (!positionValue) return { key: 'other', label: '📄 Other', order: 999 };
+  if (positionValue === 'home_hero') return { key: 'home', label: '🏠 Home', order: 0 };
+  if (positionValue === 'category_hero') return { key: 'global', label: '📄 Global Pages', order: 1 };
+  if (positionValue.startsWith('category_')) return { key: 'global', label: '📄 Global Pages', order: 1 };
+  if (positionValue.startsWith('skincare_')) return { key: 'skincare', label: '🧴 Skincare', order: 10 };
+  if (positionValue.startsWith('makeup_')) return { key: 'makeup', label: '💄 Makeup', order: 11 };
+  if (positionValue.startsWith('haircare_')) return { key: 'haircare', label: '💇‍♀️ Haircare', order: 12 };
+  if (positionValue.startsWith('fashion_')) return { key: 'fashion', label: '👗 Fashion', order: 13 };
+  if (positionValue.startsWith('accessories_')) return { key: 'accessories', label: '👜 Accessories', order: 14 };
+  if (positionValue.startsWith('electronics_')) return { key: 'electronics', label: '📱 Electronics', order: 15 };
+  if (positionValue.startsWith('home_kitchen_')) return { key: 'home_kitchen', label: '🏠 Home & Kitchen', order: 16 };
+  if (positionValue.startsWith('health_')) return { key: 'health', label: '💊 Health', order: 17 };
+  if (positionValue.startsWith('books_')) return { key: 'books', label: '📚 Books', order: 18 };
+  return { key: 'other', label: '📄 Other', order: 999 };
+}
+
+// ✅ Sort positions by group order
+function sortPositions(positions) {
+  return [...positions].sort((a, b) => {
+    const ga = getPositionGroup(a.value);
+    const gb = getPositionGroup(b.value);
+    if (ga.order !== gb.order) return ga.order - gb.order;
+    return a.value.localeCompare(b.value);
+  });
+}
+
 function AdminBanners() {
   const navigate = useNavigate();
 
@@ -51,6 +79,9 @@ function AdminBanners() {
   const [filterPosition, setFilterPosition] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all'); // all | active | inactive
+
+  // ✅ Position filter — grouped
+  const [filterPositionGroup, setFilterPositionGroup] = useState('all');
 
   // Collapsed groups
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -232,6 +263,18 @@ function AdminBanners() {
       });
     }
 
+    // ✅ Position group filter
+    if (filterPositionGroup !== 'all') {
+      list = list.filter((b) => {
+        const positions = Array.isArray(b.positions)
+          ? b.positions
+          : b.position
+          ? [b.position]
+          : [];
+        return positions.some((p) => getPositionGroup(p).key === filterPositionGroup);
+      });
+    }
+
     // Category filter
     if (filterCategory !== 'all') {
       list = list.filter((b) => {
@@ -249,14 +292,32 @@ function AdminBanners() {
     if (filterStatus === 'inactive') list = list.filter((b) => !b.active);
 
     return list;
-  }, [banners, search, filterPosition, filterCategory, filterStatus]);
+  }, [banners, search, filterPosition, filterPositionGroup, filterCategory, filterStatus]);
+
+  /* ------------------------- ✅ Sorted positions (grouped) ------------------------- */
+  const sortedPositions = useMemo(() => {
+    return sortPositions(options.positions || []);
+  }, [options.positions]);
+
+  /* ------------------------- ✅ Position groups for filter dropdown ------------------------- */
+  const positionGroups = useMemo(() => {
+    const groupsMap = new Map();
+    sortedPositions.forEach((p) => {
+      const g = getPositionGroup(p.value);
+      if (!groupsMap.has(g.key)) {
+        groupsMap.set(g.key, { ...g, positions: [] });
+      }
+      groupsMap.get(g.key).positions.push(p);
+    });
+    return Array.from(groupsMap.values());
+  }, [sortedPositions]);
 
   /* ------------------------- Group by position ------------------------- */
   const groupedBanners = useMemo(() => {
     const groups = {};
 
     // Initialize groups for all positions (so empty ones also show)
-    options.positions.forEach((p) => {
+    sortedPositions.forEach((p) => {
       groups[p.value] = {
         value: p.value,
         label: p.label,
@@ -281,20 +342,18 @@ function AdminBanners() {
       if (positions.length === 0) {
         noPositionGroup.banners.push(b);
       } else {
-        // Add to each position group (multi-position support)
         positions.forEach((pos) => {
           if (groups[pos]) {
             groups[pos].banners.push(b);
           } else {
-            // Unknown position — add to noPosition
             noPositionGroup.banners.push(b);
           }
         });
       }
     });
 
-    // Convert to array, sort by options.positions order
-    const result = options.positions
+    // Convert to array (in sorted order)
+    const result = sortedPositions
       .map((p) => groups[p.value])
       .filter(Boolean);
 
@@ -304,7 +363,7 @@ function AdminBanners() {
     }
 
     return result;
-  }, [filteredBanners, options.positions]);
+  }, [filteredBanners, sortedPositions]);
 
   /* ------------------------- Position counts for filter ------------------------- */
   const positionCounts = useMemo(() => {
@@ -325,7 +384,6 @@ function AdminBanners() {
   /* ------------------------- Select / New ------------------------- */
   const handleSelectBanner = async (b) => {
     try {
-      // Fetch fresh data from backend
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/banners/all`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -601,6 +659,22 @@ function AdminBanners() {
     }));
   };
 
+  /* ------------------------- Clear all filters ------------------------- */
+  const clearAllFilters = () => {
+    setSearch('');
+    setFilterPosition('all');
+    setFilterPositionGroup('all');
+    setFilterCategory('all');
+    setFilterStatus('all');
+  };
+
+  const hasActiveFilters =
+    search ||
+    filterPosition !== 'all' ||
+    filterPositionGroup !== 'all' ||
+    filterCategory !== 'all' ||
+    filterStatus !== 'all';
+
   /* ------------------------- Loading ------------------------- */
   if (loading) {
     return (
@@ -684,35 +758,58 @@ function AdminBanners() {
                 className="w-full border border-pink-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
               />
 
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={filterPosition}
-                  onChange={(e) => setFilterPosition(e.target.value)}
-                  className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
-                >
-                  <option value="all">All Positions</option>
-                  {options.positions.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label} ({positionCounts[p.value] || 0})
-                    </option>
-                  ))}
-                </select>
+              {/* ✅ Position GROUP filter */}
+              <select
+                value={filterPositionGroup}
+                onChange={(e) => {
+                  setFilterPositionGroup(e.target.value);
+                  setFilterPosition('all');
+                }}
+                className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
+              >
+                <option value="all">📁 All Categories</option>
+                {positionGroups.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.label} ({g.positions.length})
+                  </option>
+                ))}
+              </select>
 
-                <select
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
-                >
-                  <option value="all">All Categories</option>
-                  {categories.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* ✅ Position filter (filtered by group) */}
+              <select
+                value={filterPosition}
+                onChange={(e) => setFilterPosition(e.target.value)}
+                className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
+              >
+                <option value="all">All Positions</option>
+                {(filterPositionGroup === 'all'
+                  ? sortedPositions
+                  : sortedPositions.filter(
+                      (p) => getPositionGroup(p.value).key === filterPositionGroup
+                    )
+                ).map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label} ({positionCounts[p.value] || 0})
+                  </option>
+                ))}
+              </select>
 
-              <div className="flex gap-1.5">
+              {/* ✅ Category filter */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full border border-pink-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
+              >
+                <option value="all">All Categories (Page)</option>
+                {categories.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+
+              {/* ✅ Status filter */}
+              <div className="flex gap-1.5 items-center">
                 {[
                   { id: 'all', label: 'All' },
                   { id: 'active', label: 'Active' },
@@ -730,6 +827,14 @@ function AdminBanners() {
                     {f.label}
                   </button>
                 ))}
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="ml-auto text-[10px] text-pink-600 hover:underline"
+                  >
+                    Clear all
+                  </button>
+                )}
               </div>
 
               <p className="text-[10px] text-gray-400">
@@ -745,12 +850,7 @@ function AdminBanners() {
                   <p className="text-gray-400 text-sm">No banners found</p>
                   {filteredBanners.length === 0 && banners.length > 0 && (
                     <button
-                      onClick={() => {
-                        setSearch('');
-                        setFilterPosition('all');
-                        setFilterCategory('all');
-                        setFilterStatus('all');
-                      }}
+                      onClick={clearAllFilters}
                       className="mt-3 text-xs text-pink-600 hover:underline"
                     >
                       Clear all filters
@@ -760,6 +860,9 @@ function AdminBanners() {
               ) : (
                 groupedBanners.map((group) => {
                   const isCollapsed = collapsedGroups[group.value];
+                  const groupInfo = getPositionGroup(group.value);
+                  const isEmpty = group.banners.length === 0;
+
                   return (
                     <div key={group.value} className="border-b border-pink-50">
                       {/* Group header */}
@@ -771,10 +874,20 @@ function AdminBanners() {
                           <span className="text-xs text-pink-500 shrink-0">
                             {isCollapsed ? '▶' : '▼'}
                           </span>
-                          <span className="font-semibold text-sm text-gray-800 truncate">
+                          <span
+                            className={`font-semibold text-sm truncate ${
+                              isEmpty ? 'text-gray-400' : 'text-gray-800'
+                            }`}
+                          >
                             {group.label}
                           </span>
-                          <span className="text-[10px] bg-pink-100 text-pink-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+                              isEmpty
+                                ? 'bg-gray-100 text-gray-400'
+                                : 'bg-pink-100 text-pink-700'
+                            }`}
+                          >
                             {group.banners.length}
                           </span>
                         </div>
@@ -783,9 +896,9 @@ function AdminBanners() {
                       {/* Group items */}
                       {!isCollapsed && (
                         <div>
-                          {group.banners.length === 0 ? (
-                            <div className="px-4 py-3 text-[11px] text-gray-400 italic">
-                              No banners in this position
+                          {isEmpty ? (
+                            <div className="px-4 py-2 text-[11px] text-gray-400 italic">
+                              No banners here yet
                             </div>
                           ) : (
                             group.banners.map((b) => {
@@ -991,6 +1104,7 @@ function AdminBanners() {
                 )}
               </div>
 
+              {/* ✅ Position selector — grouped */}
               <div>
                 {optionsLoading ? (
                   <div className="text-xs text-gray-400 py-2">
@@ -999,7 +1113,7 @@ function AdminBanners() {
                 ) : (
                   <SearchableMultiSelect
                     label="Positions"
-                    options={options.positions}
+                    options={sortedPositions}
                     selected={formData.positions || []}
                     onChange={(vals) => applySizeGuide(vals)}
                     placeholder="Search positions..."
