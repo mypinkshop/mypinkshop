@@ -1,3 +1,4 @@
+// src/pages/ProductDetail.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -443,23 +444,146 @@ function ProductDetail() {
     return s;
   };
 
+  // ✅ UPGRADED SCHEMA GENERATOR — Google Rich Results + Shopping ready
   const generateProductSchema = () => {
     if (!product) return null;
-    return {
+
+    const pid = product._id || product.id;
+    const productUrl = `https://www.mypinkshop.com/product/${pid}`;
+    const price = getCurrentPrice();
+    const stock = getCurrentStock();
+
+    // ✅ Images — absolute URLs
+    const allImages = (productImages || [])
+      .filter(Boolean)
+      .map(img => img.startsWith('http') ? img : `https://www.mypinkshop.com${img}`);
+
+    // ✅ Description — multiple sources se
+    let description = '';
+    if (Array.isArray(product.description)) {
+      description = product.description.join(' ').trim();
+    } else if (typeof product.description === 'string') {
+      description = product.description.trim();
+    }
+    if (!description) description = product.shortDescription || product.name;
+    if (description.length > 5000) description = description.substring(0, 5000);
+
+    // ✅ Rating
+    const ratingValue = Number(product.rating || 0);
+    const reviewCount = Number(product.review_count || product.reviewCount || 0);
+
+    // ✅ Variants ka price range
+    const variantPrices = (product.variants || [])
+      .map(v => Number(v.price))
+      .filter(p => p > 0);
+    const lowPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : price;
+    const highPrice = variantPrices.length > 0 ? Math.max(...variantPrices) : price;
+
+    // ✅ Price validity
+    const priceValidUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+
+    const schema = {
       "@context": "https://schema.org/",
       "@type": "Product",
       "name": product.name,
-      "image": productImages[0],
-      "description": product.shortDescription || '',
-      "sku": product._id || product.id,
-      "brand": { "@type": "Brand", "name": product.brand || "MyPinkShop" },
+      "image": allImages.length > 0 ? allImages : undefined,
+      "description": description,
+      "sku": product.sku || pid,
+      "mpn": product.sku || pid,
+      "category": product.mainCategory || product.category || 'Beauty',
+      "brand": {
+        "@type": "Brand",
+        "name": product.brand || "MyPinkShop"
+      },
       "offers": {
         "@type": "Offer",
+        "url": productUrl,
         "priceCurrency": "INR",
-        "price": getCurrentPrice(),
-        "availability": getCurrentStock() > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+        "price": price,
+        "priceValidUntil": priceValidUntil,
+        "availability": stock > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+        "itemCondition": "https://schema.org/NewCondition",
+        "seller": {
+          "@type": "Organization",
+          "name": product.vendorName || "MyPinkShop",
+          "url": "https://www.mypinkshop.com"
+        },
+        "shippingDetails": {
+          "@type": "OfferShippingDetails",
+          "shippingRate": {
+            "@type": "MonetaryAmount",
+            "value": price >= 499 ? 0 : 49,
+            "currency": "INR"
+          },
+          "shippingDestination": {
+            "@type": "DefinedRegion",
+            "addressCountry": "IN"
+          },
+          "deliveryTime": {
+            "@type": "ShippingDeliveryTime",
+            "handlingTime": {
+              "@type": "QuantitativeValue",
+              "minValue": 0,
+              "maxValue": 1,
+              "unitCode": "DAY"
+            },
+            "transitTime": {
+              "@type": "QuantitativeValue",
+              "minValue": 2,
+              "maxValue": 5,
+              "unitCode": "DAY"
+            }
+          }
+        },
+        "hasMerchantReturnPolicy": {
+          "@type": "MerchantReturnPolicy",
+          "applicableCountry": "IN",
+          "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+          "merchantReturnDays": 7,
+          "returnMethod": "https://schema.org/ReturnByMail",
+          "returnFees": "https://schema.org/FreeReturn"
+        }
       }
     };
+
+    // ✅ Aggregate Rating
+    if (ratingValue > 0 && reviewCount > 0) {
+      schema.aggregateRating = {
+        "@type": "AggregateRating",
+        "ratingValue": ratingValue.toFixed(1),
+        "reviewCount": reviewCount,
+        "bestRating": 5,
+        "worstRating": 1
+      };
+    }
+
+    // ✅ AggregateOffer for multiple variants
+    if (variantPrices.length > 1 && lowPrice !== highPrice) {
+      schema.offers = {
+        "@type": "AggregateOffer",
+        "url": productUrl,
+        "priceCurrency": "INR",
+        "lowPrice": lowPrice,
+        "highPrice": highPrice,
+        "offerCount": variantPrices.length,
+        "availability": stock > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+        "offers": variantPrices.map(vp => ({
+          "@type": "Offer",
+          "price": vp,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "itemCondition": "https://schema.org/NewCondition"
+        }))
+      };
+    }
+
+    return schema;
   };
 
   if (loading) {
