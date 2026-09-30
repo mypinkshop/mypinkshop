@@ -1,2 +1,8 @@
+# Google Merchant Feed
+/feed/google.xml  https://api.mypinkshop.com/api/feed/google.xml  200
+
+# Assets
 /assets/*  /assets/:splat  200
+
+# SPA fallback (sabse aakhir me)
 /*         /index.html     200
