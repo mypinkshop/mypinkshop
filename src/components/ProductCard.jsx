@@ -1,5 +1,5 @@
 // src/components/ProductCard.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
@@ -14,6 +14,13 @@ function slugify(str) {
     .replace(/^-|-$/g, '');
 }
 
+/* ✅ Same logic as CartContext */
+function getCartItemKey(product) {
+  const productId = product.id || product._id;
+  const variantId = product.variantId || product.variant_id || '';
+  return variantId ? `${productId}::${variantId}` : productId;
+}
+
 function ProductCard({
   product,
   isInWishlist,
@@ -23,8 +30,6 @@ function ProductCard({
   wishlistContext,
 }) {
   const navigate = useNavigate();
-
-  // ✅ CartContext se removeFromCart bhi nikalo
   const { cart, addToCart, removeFromCart } = useCart();
 
   const [imgError, setImgError] = useState(false);
@@ -35,11 +40,16 @@ function ProductCard({
 
   const productId = product._id || product.id;
 
-  // ✅ isAdded — cart se derive (refresh proof)
-  const isAdded = cart.some((item) => {
-    const itemId = item.id || item._id;
-    return itemId === productId;
-  });
+  // ✅ Product ka cartKey calculate karo (variant support)
+  const productCartKey = useMemo(() => {
+    return getCartItemKey({
+      id: productId,
+      variantId: product.variantId || product.variant_id || null,
+    });
+  }, [productId, product.variantId, product.variant_id]);
+
+  // ✅ isAdded — cart me yeh cartKey hai kya?
+  const isAdded = cart.some((item) => item.cartKey === productCartKey);
 
   const getOptimizedImage = (url) => {
     if (!url) return null;
@@ -93,6 +103,15 @@ function ProductCard({
       originalPrice: product.originalPrice || product.original_price,
       category: product.mainCategory || product.category,
       rating: product.rating,
+      // ✅ Variant fields bhi bhejo (agar hain)
+      variantId: product.variantId || product.variant_id || null,
+      variantSku: product.variantSku || product.variant_sku || null,
+      variantImage: product.variantImage || product.variant_image || null,
+      variantLabel: product.variantLabel || product.variant_label || null,
+      size: product.size || null,
+      color: product.color || null,
+      option1Name: product.option1Name || product.option1_name || null,
+      option2Name: product.option2Name || product.option2_name || null,
     });
 
     toast.success((t) => (
@@ -120,17 +139,16 @@ function ProductCard({
     });
   };
 
-  /* ------------------ ✅ Remove from cart ------------------ */
+  /* ------------------ ✅ Remove from cart (by cartKey) ------------------ */
   const handleRemoveFromCart = () => {
     try {
       if (typeof removeFromCart === 'function') {
-        removeFromCart(productId);
+        removeFromCart(productCartKey);  // ✅ cartKey pass karo
+        toast.success('Removed from cart');
       } else {
-        // ✅ Fallback: agar removeFromCart available nahi hai
-        // toh cart me se remove karne ke liye context ka direct use karo
         console.warn('removeFromCart not available in CartContext');
+        toast.error('Remove function not available');
       }
-      toast.success('Removed from cart');
     } catch (err) {
       console.error('Remove from cart error:', err);
       toast.error('Failed to remove from cart');
@@ -190,7 +208,6 @@ function ProductCard({
     0;
   const discountPercent = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
 
-  /* ✅ Brand slug — backend se match */
   const brandSlug = product.brand ? slugify(product.brand) : '';
 
   return (
@@ -223,21 +240,18 @@ function ProductCard({
             </div>
           )}
 
-          {/* Discount badge — top-left */}
           {discountPercent > 0 && (
             <span className="absolute top-3 left-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-md z-10">
               {discountPercent}% OFF
             </span>
           )}
 
-          {/* NEW badge — top-right */}
           {product.isNew && (
             <span className="absolute top-3 right-3 bg-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-md z-10">
               NEW
             </span>
           )}
 
-          {/* Out of stock overlay */}
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
               <span className="text-white text-sm font-medium px-3 py-1 bg-black/50 rounded-full">
@@ -251,7 +265,6 @@ function ProductCard({
       {/* ==================== INFO ==================== */}
       <div className="p-4">
 
-        {/* ✅ BRAND NAME — Clickable (Amazon/Flipkart style) */}
         {product.brand && (
           <Link
             to={`/brand/${brandSlug}`}
@@ -263,14 +276,12 @@ function ProductCard({
           </Link>
         )}
 
-        {/* Product name */}
         <Link to={`/product/${productId}`}>
           <h3 className="font-semibold text-gray-800 text-sm mb-2 line-clamp-2 min-h-[2.5rem] hover:text-pink-500 transition leading-snug">
             {product.name}
           </h3>
         </Link>
 
-        {/* Rating */}
         <div className="flex items-center gap-1 mb-2">
           <div className="flex text-yellow-400 text-sm">
             {'★'.repeat(Math.floor(product.rating || 4))}
@@ -279,7 +290,6 @@ function ProductCard({
           <span className="text-xs text-gray-400">({product.rating || 4})</span>
         </div>
 
-        {/* Price */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-lg font-bold text-pink-600">
             ₹{price.toLocaleString()}
@@ -296,14 +306,14 @@ function ProductCard({
           )}
         </div>
 
-        {/* ==================== ✅ ACTIONS ==================== */}
+        {/* ==================== ACTIONS ==================== */}
         <div className="flex gap-2">
           {isAdded ? (
             <>
-              {/* ✅ NEW: Remove (−) button */}
+              {/* ✅ Remove (−) button */}
               <button
                 onClick={handleRemoveFromCart}
-                className="w-10 h-10 rounded-full flex items-center justify-center transition-all bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 hover:border-red-300 shadow-sm hover:shadow-md"
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 hover:border-red-300 shadow-sm hover:shadow-md shrink-0"
                 title="Remove from cart"
                 aria-label="Remove from cart"
               >
@@ -314,15 +324,11 @@ function ProductCard({
                   viewBox="0 0 24 24"
                   strokeWidth={3}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M20 12H4"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
                 </svg>
               </button>
 
-              {/* Go to Cart button */}
+              {/* Go to Cart */}
               <button
                 onClick={handleGoToCart}
                 className="flex-1 py-2 rounded-full text-sm font-medium transition-all bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg flex items-center justify-center gap-1"
@@ -331,25 +337,23 @@ function ProductCard({
               </button>
             </>
           ) : (
-            <>
-              <button
-                onClick={handleAddToCart}
-                disabled={isOutOfStock}
-                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                  !isOutOfStock
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-              </button>
-            </>
+            <button
+              onClick={handleAddToCart}
+              disabled={isOutOfStock}
+              className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                !isOutOfStock
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-105'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+            </button>
           )}
 
-          {/* Wishlist button */}
+          {/* Wishlist */}
           <button
             onClick={handleWishlistToggle}
-            className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50 hover:border-pink-300"
+            className="w-10 py-2 rounded-full text-center transition border border-pink-200 hover:bg-pink-50 hover:border-pink-300 shrink-0"
           >
             {isWishlisted ? '❤️' : '🤍'}
           </button>
