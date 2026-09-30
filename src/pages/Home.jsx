@@ -75,59 +75,36 @@ const FooterSection = () => (
         <div>
           <h4 className="font-semibold text-white mb-4">Shop</h4>
           <ul className="space-y-2 text-sm">
-            <li>
-              <Link to="/skincare" className="hover:text-pink-500 transition">
-                Skincare
-              </Link>
-            </li>
-            {/* Commented out - to be added after PhonePe approval */}
-            {/* <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li> */}
-            {/* <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li> */}
-            {/* <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li> */}
-            {/* <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li> */}
+            <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
+            <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
+            <li><Link to="/hair" className="hover:text-pink-500 transition">Haircare</Link></li>
+            <li><Link to="/clothing" className="hover:text-pink-500 transition">Fashion</Link></li>
+            <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+            <li><Link to="/electronics" className="hover:text-pink-500 transition">Electronics</Link></li>
+            <li><Link to="/home-kitchen" className="hover:text-pink-500 transition">Home & Kitchen</Link></li>
+            <li><Link to="/health" className="hover:text-pink-500 transition">Health</Link></li>
+            <li><Link to="/books" className="hover:text-pink-500 transition">Books</Link></li>
           </ul>
         </div>
         <div>
           <h4 className="font-semibold text-white mb-4">Support</h4>
           <ul className="space-y-2 text-sm">
-            <li>
-              <Link to="/contact" className="hover:text-pink-500 transition">
-                Contact Us
-              </Link>
-            </li>
-            <li>
-              <Link to="/faqs" className="hover:text-pink-500 transition">
-                FAQs
-              </Link>
-            </li>
-            <li>
-              <Link to="/shipping" className="hover:text-pink-500 transition">
-                Shipping Info
-              </Link>
-            </li>
-            <li>
-              <Link to="/returns" className="hover:text-pink-500 transition">
-                Returns Policy
-              </Link>
-            </li>
+            <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
+            <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
+            <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
+            <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
           </ul>
         </div>
         <div>
           <h4 className="font-semibold text-white mb-4">Follow Us</h4>
           <ul className="space-y-2 text-sm">
             <li>
-              <a
-                href="https://www.instagram.com/mypinkshopofficial"
-                className="hover:text-pink-500 transition"
-              >
+              <a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-500 transition">
                 Instagram
               </a>
             </li>
             <li>
-              <a
-                href="https://www.facebook.com/mypinkshopofficial"
-                className="hover:text-pink-500 transition"
-              >
+              <a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-500 transition">
                 Facebook
               </a>
             </li>
@@ -189,7 +166,7 @@ const FallbackHero = () => (
           Glow Up <span className="text-pink-600">This Summer</span>
         </h1>
         <p className="text-gray-700 text-base sm:text-lg mb-6">
-          Discover our premium skincare collection.
+          Discover our premium collection.
         </p>
         <Link
           to="/shop"
@@ -201,6 +178,93 @@ const FallbackHero = () => (
     </div>
   </div>
 );
+
+/* ================================================================== */
+/* Category Sections Config                                           */
+/* ================================================================== */
+const CATEGORY_SECTIONS = [
+  {
+    key: 'skincare',
+    name: 'Skincare',
+    icon: '🧴',
+    link: '/skincare',
+    dbName: 'Skincare',
+    bgGradient: 'from-pink-50 to-rose-50',
+    iconBg: 'from-pink-400 to-rose-500',
+  },
+  {
+    key: 'makeup',
+    name: 'Makeup',
+    icon: '💄',
+    link: '/makeup',
+    dbName: 'Makeup',
+    bgGradient: 'from-purple-50 to-pink-50',
+    iconBg: 'from-purple-400 to-pink-500',
+  },
+  {
+    key: 'haircare',
+    name: 'Haircare',
+    icon: '💇‍♀️',
+    link: '/hair',
+    dbName: 'Haircare',
+    bgGradient: 'from-pink-50 to-amber-50',
+    iconBg: 'from-pink-400 to-amber-500',
+  },
+  {
+    key: 'fashion',
+    name: 'Fashion',
+    icon: '👗',
+    link: '/clothing',
+    dbName: 'Fashion',
+    bgGradient: 'from-rose-50 to-pink-50',
+    iconBg: 'from-rose-400 to-pink-500',
+  },
+  {
+    key: 'accessories',
+    name: 'Accessories',
+    icon: '👜',
+    link: '/accessories',
+    dbName: 'Accessories',
+    bgGradient: 'from-amber-50 to-rose-50',
+    iconBg: 'from-amber-400 to-rose-500',
+  },
+  {
+    key: 'electronics',
+    name: 'Electronics',
+    icon: '📱',
+    link: '/electronics',
+    dbName: 'Electronics',
+    bgGradient: 'from-blue-50 to-indigo-50',
+    iconBg: 'from-blue-400 to-indigo-500',
+  },
+  {
+    key: 'homeKitchen',
+    name: 'Home & Kitchen',
+    icon: '🏠',
+    link: '/home-kitchen',
+    dbName: 'Home & Kitchen',
+    bgGradient: 'from-yellow-50 to-orange-50',
+    iconBg: 'from-yellow-400 to-orange-500',
+  },
+  {
+    key: 'health',
+    name: 'Health & Wellness',
+    icon: '💊',
+    link: '/health',
+    dbName: 'Health & Wellness',
+    bgGradient: 'from-green-50 to-emerald-50',
+    iconBg: 'from-green-400 to-emerald-500',
+  },
+  {
+    key: 'books',
+    name: 'Books & Stationery',
+    icon: '📚',
+    link: '/books',
+    dbName: 'Books & Stationery',
+    bgGradient: 'from-cyan-50 to-blue-50',
+    iconBg: 'from-cyan-400 to-blue-500',
+  },
+];
 
 /* ================================================================== */
 /* Home                                                               */
@@ -230,23 +294,32 @@ function Home() {
   const [sponsoredProducts, setSponsoredProducts] = useState([]);
   const [bannerAds, setBannerAds] = useState([]);
 
-  // Backend-driven banner options (sizes + styles)
   const [bannerOptions, setBannerOptions] = useState({ sizes: [], styles: [] });
 
+  // ✅ Saari 9 categories ke liye visibility
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
-    // makeup: false,
-    // hair: false,
-    // clothing: false,
-    // accessories: false,
+    makeup: false,
+    haircare: false,
+    fashion: false,
+    accessories: false,
+    electronics: false,
+    homeKitchen: false,
+    health: false,
+    books: false,
   });
 
+  // ✅ Saari 9 categories ke liye refs
   const sectionRefs = {
     skincare: useRef(null),
-    // makeup: useRef(null),
-    // hair: useRef(null),
-    // clothing: useRef(null),
-    // accessories: useRef(null),
+    makeup: useRef(null),
+    haircare: useRef(null),
+    fashion: useRef(null),
+    accessories: useRef(null),
+    electronics: useRef(null),
+    homeKitchen: useRef(null),
+    health: useRef(null),
+    books: useRef(null),
   };
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
@@ -291,7 +364,7 @@ function Home() {
     return () => abortController.abort();
   }, [API_URL]);
 
-  /* ---------------- Load banners grouped by position ---------------- */
+  /* ---------------- Load banners ---------------- */
   useEffect(() => {
     const abortController = new AbortController();
 
@@ -311,7 +384,6 @@ function Home() {
         const data = await response.json();
         const list = Array.isArray(data) ? data : (data.data || []);
 
-        // Group banners by every position they belong to
         const grouped = {
           home_hero: [],
           category_mid_1: [],
@@ -334,12 +406,7 @@ function Home() {
         });
 
         setBannersByPosition(grouped);
-        setCacheWithTTL(
-          sessionStorage,
-          'home_banners_cache',
-          grouped,
-          2 * 60 * 1000
-        );
+        setCacheWithTTL(sessionStorage, 'home_banners_cache', grouped, 2 * 60 * 1000);
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('Error loading banners:', error);
@@ -358,7 +425,7 @@ function Home() {
     return () => abortController.abort();
   }, [API_URL]);
 
-  /* ---------------- Load banner options (sizes + styles) ---------------- */
+  /* ---------------- Load banner options ---------------- */
   useEffect(() => {
     const fetchBannerOptions = async () => {
       try {
@@ -382,9 +449,7 @@ function Home() {
   useEffect(() => {
     const fetchSponsoredProducts = async () => {
       try {
-        const response = await fetch(
-          `${API_URL}/api/ads/public/sponsored-products?limit=4`
-        );
+        const response = await fetch(`${API_URL}/api/ads/public/sponsored-products?limit=4`);
         const data = await response.json();
         if (data.success && data.products) {
           setSponsoredProducts(data.products);
@@ -453,7 +518,7 @@ function Home() {
     [handleSearch]
   );
 
-  /* ---------------- Backend-driven size config ---------------- */
+  /* ---------------- Banner config ---------------- */
   const getSizeConfig = useCallback(
     (sizeValue) => {
       return bannerOptions.sizes.find((s) => s.value === sizeValue) || null;
@@ -461,12 +526,6 @@ function Home() {
     [bannerOptions.sizes]
   );
 
-  /**
-   * Get size + style props for a list of banners.
-   * - Uses the first banner's `size` and `display_style` (admin's choice).
-   * - If multiple banners and admin's style is single/split/overlay,
-   *   fallback to slide (hero) or grid for better UX.
-   */
   const getBannerProps = useCallback(
     (banners) => {
       if (!Array.isArray(banners) || banners.length === 0) {
@@ -474,16 +533,10 @@ function Home() {
       }
 
       const first = banners[0];
-
-      // Size — admin's choice
       const sizeConfig = getSizeConfig(first.size || 'large');
-
-      // Style
       let style = first.display_style || 'single';
 
       if (banners.length > 1) {
-        // Multiple banners — single/split/overlay can only show one,
-        // so fallback to slide/grid
         if (style === 'single' || style === 'split' || style === 'overlay') {
           style = 'slide';
         }
@@ -494,17 +547,28 @@ function Home() {
     [getSizeConfig]
   );
 
-  /* ---------------- Product slices ---------------- */
+  /* ---------------- Product slices — saari 9 categories ---------------- */
   const productSlices = useMemo(() => {
     if (!products.length) {
-      return { newArrivals: [], skincareProducts: [] };
+      return {
+        newArrivals: [],
+        skincareProducts: [],
+        makeupProducts: [],
+        haircareProducts: [],
+        fashionProducts: [],
+        accessoriesProducts: [],
+        electronicsProducts: [],
+        homeKitchenProducts: [],
+        healthProducts: [],
+        booksProducts: [],
+      };
     }
 
     const byCategory = (cat) =>
       products.filter(
         (p) =>
-          (p.mainCategory || p.category || '').toLowerCase() ===
-            cat.toLowerCase() && p.status === 'active'
+          (p.mainCategory || p.category || p.main_category || '').toLowerCase() ===
+            cat.toLowerCase() && (p.status === 'active' || p.isActive === true)
       );
 
     return {
@@ -512,55 +576,75 @@ function Home() {
         products.filter((p) => p.isNew).length > 0
           ? products.filter((p) => p.isNew).slice(0, 8)
           : [...products]
-              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
               .slice(0, 8),
       skincareProducts: byCategory('skincare').slice(0, 8),
-      // Commented out - to be added after PhonePe approval
-      // makeupProducts: byCategory('makeup').slice(0, 8),
-      // hairProducts: byCategory('hair').slice(0, 8),
-      // clothingProducts: byCategory('clothing').slice(0, 8),
-      // accessoriesProducts: byCategory('accessories').slice(0, 8),
+      makeupProducts: byCategory('makeup').slice(0, 8),
+      haircareProducts: byCategory('haircare').slice(0, 8),
+      fashionProducts: byCategory('fashion').slice(0, 8),
+      accessoriesProducts: byCategory('accessories').slice(0, 8),
+      electronicsProducts: byCategory('electronics').slice(0, 8),
+      homeKitchenProducts: byCategory('home & kitchen').slice(0, 8),
+      healthProducts: byCategory('health & wellness').slice(0, 8),
+      booksProducts: byCategory('books & stationery').slice(0, 8),
     };
   }, [products]);
 
   const {
     newArrivals,
     skincareProducts,
-    // makeupProducts,
-    // hairProducts,
-    // clothingProducts,
-    // accessoriesProducts,
+    makeupProducts,
+    haircareProducts,
+    fashionProducts,
+    accessoriesProducts,
+    electronicsProducts,
+    homeKitchenProducts,
+    healthProducts,
+    booksProducts,
   } = productSlices;
+
+  // ✅ Category sections ke saath products map karo
+  const sectionProductsMap = {
+    skincare: skincareProducts,
+    makeup: makeupProducts,
+    haircare: haircareProducts,
+    fashion: fashionProducts,
+    accessories: accessoriesProducts,
+    electronics: electronicsProducts,
+    homeKitchen: homeKitchenProducts,
+    health: healthProducts,
+    books: booksProducts,
+  };
 
   const navLinks = useMemo(
     () => [
       { name: 'All', link: '/shop' },
       { name: 'Skincare', link: '/skincare' },
-      // Commented out - to be added after PhonePe approval
-      // { name: 'Makeup', link: '/makeup' },
-      // { name: 'Hair', link: '/hair' },
-      // { name: 'Clothing', link: '/clothing' },
-      // { name: 'Accessories', link: '/accessories' },
+      { name: 'Makeup', link: '/makeup' },
+      { name: 'Haircare', link: '/hair' },
+      { name: 'Fashion', link: '/clothing' },
+      { name: 'Accessories', link: '/accessories' },
+      { name: 'Electronics', link: '/electronics' },
+      { name: 'Home', link: '/home-kitchen' },
+      { name: 'Health', link: '/health' },
+      { name: 'Books', link: '/books' },
       { name: 'Sale 🔥', link: '/shop?offer=sale' },
       { name: 'New Arrivals', link: '/shop?sort=newest' },
-      { name: 'Bestsellers', link: '/shop?sort=bestseller' },
     ],
     []
   );
 
   const categories = useMemo(
     () => [
-      {
-        name: 'Skincare',
-        image: '🧴',
-        link: '/skincare',
-        bg: 'from-pink-200 to-rose-200',
-      },
-      // Commented out - to be added after PhonePe approval
-      // { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-200 to-pink-200' },
-      // { name: 'Hair', image: '💇‍♀️', link: '/hair', bg: 'from-pink-200 to-amber-200' },
-      // { name: 'Clothing', image: '👗', link: '/clothing', bg: 'from-rose-200 to-pink-200' },
-      // { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-200 to-rose-200' },
+      { name: 'Skincare', image: '🧴', link: '/skincare', bg: 'from-pink-200 to-rose-200' },
+      { name: 'Makeup', image: '💄', link: '/makeup', bg: 'from-purple-200 to-pink-200' },
+      { name: 'Haircare', image: '💇‍♀️', link: '/hair', bg: 'from-pink-200 to-amber-200' },
+      { name: 'Fashion', image: '👗', link: '/clothing', bg: 'from-rose-200 to-pink-200' },
+      { name: 'Accessories', image: '👜', link: '/accessories', bg: 'from-amber-200 to-rose-200' },
+      { name: 'Electronics', image: '📱', link: '/electronics', bg: 'from-blue-200 to-indigo-200' },
+      { name: 'Home & Kitchen', image: '🏠', link: '/home-kitchen', bg: 'from-yellow-200 to-orange-200' },
+      { name: 'Health', image: '💊', link: '/health', bg: 'from-green-200 to-emerald-200' },
+      { name: 'Books', image: '📚', link: '/books', bg: 'from-cyan-200 to-blue-200' },
     ],
     []
   );
@@ -597,7 +681,7 @@ function Home() {
         <section className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {[1, 2, 3, 4, 5].map((i) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
                 <div key={i} className="bg-gray-200 rounded-2xl h-32 animate-pulse"></div>
               ))}
             </div>
@@ -632,10 +716,10 @@ function Home() {
   return (
     <>
       <Helmet>
-        <title>MyPinkShop - Best Online Shopping for Skincare & Beauty</title>
+        <title>MyPinkShop - Best Online Shopping for Beauty, Fashion & More</title>
         <meta
           name="description"
-          content="Shop the latest skincare and beauty products at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available."
+          content="Shop skincare, makeup, fashion, electronics, and more at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available."
         />
         <link rel="canonical" href="https://www.mypinkshop.com" />
       </Helmet>
@@ -686,18 +770,8 @@ function Home() {
                   onClick={() => navigate('/wishlist')}
                   className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
                 >
-                  <svg
-                    className="w-5 h-5 sm:w-6 sm:h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                   {wishlistCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
@@ -706,22 +780,9 @@ function Home() {
                   )}
                 </button>
 
-                <Link
-                  to="/cart"
-                  className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
-                >
-                  <svg
-                    className="w-5 h-5 sm:w-6 sm:h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                    />
+                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
@@ -733,22 +794,9 @@ function Home() {
                 {user ? (
                   <Avatar user={user} onLogout={logout} />
                 ) : (
-                  <Link
-                    to="/login"
-                    className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition"
-                  >
-                    <svg
-                      className="w-5 h-5 sm:w-6 sm:h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
+                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
                 )}
@@ -774,7 +822,7 @@ function Home() {
           </div>
         </div>
 
-        {/* ==================== HOME HERO BANNERS ==================== */}
+        {/* HOME HERO BANNERS */}
         {homeHeroBanners.length > 0 ? (
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
@@ -799,7 +847,7 @@ function Home() {
               </h2>
               <p className="text-gray-600 font-medium">Discover your favorite products</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
               {categories.map((cat, idx) => (
                 <Link
                   key={idx}
@@ -817,7 +865,7 @@ function Home() {
           </div>
         </section>
 
-        {/* ==================== MID 1 BANNERS ==================== */}
+        {/* MID 1 BANNERS */}
         {mid1Banners.length > 0 && (
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
@@ -865,12 +913,8 @@ function Home() {
 
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
                       <div className="text-white">
-                        <p className="text-sm font-semibold">
-                          {banner.name || 'Sponsored'}
-                        </p>
-                        <p className="text-xs text-white/80">
-                          {banner.vendorName || 'Vendor'}
-                        </p>
+                        <p className="text-sm font-semibold">{banner.name || 'Sponsored'}</p>
+                        <p className="text-xs text-white/80">{banner.vendorName || 'Vendor'}</p>
                         {banner.banner?.ctaText && (
                           <span className="inline-block mt-1 bg-white/20 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full">
                             {banner.banner.ctaText}
@@ -897,10 +941,7 @@ function Home() {
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   🆕 New Arrivals
                 </h2>
-                <Link
-                  to="/shop?sort=newest"
-                  className="text-pink-600 text-sm font-bold hover:underline"
-                >
+                <Link to="/shop?sort=newest" className="text-pink-600 text-sm font-bold hover:underline">
                   View All →
                 </Link>
               </div>
@@ -922,7 +963,7 @@ function Home() {
           </section>
         )}
 
-        {/* ==================== MID 2 BANNERS ==================== */}
+        {/* MID 2 BANNERS */}
         {mid2Banners.length > 0 && (
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
@@ -939,9 +980,7 @@ function Home() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2 mb-6">
                 <span className="text-xl">📢</span>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Sponsored Products
-                </h2>
+                <h2 className="text-2xl font-bold text-gray-900">Sponsored Products</h2>
                 <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">
                   Ads
                 </span>
@@ -968,77 +1007,61 @@ function Home() {
           </section>
         )}
 
-        {/* SKINCARE */}
-        {skincareProducts.length > 0 && (
-          <section
-            ref={sectionRefs.skincare}
-            className="py-12 bg-gradient-to-br from-pink-50 to-rose-50"
-          >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-500 rounded-2xl flex items-center justify-center shadow-md">
-                    <span className="text-2xl">🧴</span>
+        {/* ✅ SAARI 9 CATEGORY SECTIONS — same style */}
+        {CATEGORY_SECTIONS.map((section) => {
+          const sectionProducts = sectionProductsMap[section.key] || [];
+          if (sectionProducts.length === 0) return null;
+
+          return (
+            <section
+              key={section.key}
+              ref={sectionRefs[section.key]}
+              className={`py-12 bg-gradient-to-br ${section.bgGradient}`}
+            >
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 bg-gradient-to-br ${section.iconBg} rounded-2xl flex items-center justify-center shadow-md`}>
+                      <span className="text-2xl">{section.icon}</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900">{section.name}</h2>
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">Skincare</h2>
+                  <Link
+                    to={section.link}
+                    className="text-pink-600 text-sm font-bold hover:underline"
+                  >
+                    View All →
+                  </Link>
                 </div>
-                <Link
-                  to="/skincare"
-                  className="text-pink-600 text-sm font-bold hover:underline"
-                >
-                  View All →
-                </Link>
+
+                {visibleSections[section.key] ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {sectionProducts.map((product) => (
+                      <ProductCard
+                        key={product._id || product.id}
+                        product={product}
+                        addToCart={addToCart}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
+                    ))}
+                  </div>
+                )}
               </div>
-              {visibleSections.skincare ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {skincareProducts.map((product) => (
-                    <ProductCard
-                      key={product._id || product.id}
-                      product={product}
-                      addToCart={addToCart}
-                      isInWishlist={isInWishlist}
-                      addToWishlist={addToWishlist}
-                      removeFromWishlist={removeFromWishlist}
-                      user={user}
-                      wishlistContext={wishlist}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="bg-white rounded-2xl h-64 animate-pulse"
-                    ></div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+            </section>
+          );
+        })}
 
-        {/* ============ COMMENTED OUT - TO BE ADDED AFTER PHONEPE APPROVAL ============ */}
-
-        {/* MAKEUP */}
-        {/* {makeupProducts.length > 0 && (
-          <section ref={sectionRefs.makeup} className="py-12 bg-gradient-to-br from-purple-50 to-pink-50">
-            ...same pattern...
-          </section>
-        )} */}
-
-        {/* HAIR */}
-        {/* {hairProducts.length > 0 && ( ... )} */}
-
-        {/* CLOTHING */}
-        {/* {clothingProducts.length > 0 && ( ... )} */}
-
-        {/* ACCESSORIES */}
-        {/* {accessoriesProducts.length > 0 && ( ... )} */}
-
-        {/* ============ END COMMENTED OUT ============ */}
-
-        {/* ==================== MID 3 BANNERS ==================== */}
+        {/* MID 3 BANNERS */}
         {mid3Banners.length > 0 && (
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
@@ -1049,7 +1072,7 @@ function Home() {
           </section>
         )}
 
-        {/* ==================== BOTTOM BANNERS ==================== */}
+        {/* BOTTOM BANNERS */}
         {bottomBanners.length > 0 && (
           <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
             <BannerRenderer
