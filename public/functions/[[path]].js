@@ -2,7 +2,7 @@ export async function onRequest(context) {
   const { request, next } = context;
   const url = new URL(request.url);
 
-  // ✅ Google Merchant Feed — API pe redirect
+  // ✅ Google Merchant Feed — API se fetch (SABSE UPAR)
   if (url.pathname === '/feed/google.xml') {
     return fetch('https://api.mypinkshop.com/api/feed/google.xml', {
       method: 'GET',
