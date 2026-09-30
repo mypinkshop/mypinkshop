@@ -64,7 +64,6 @@ function AdminCustomers() {
       const data = await res.json();
 
       if (res.ok) {
-        // ✅ API response shape handle karo: { success, data: [...] }
         let customersData = [];
         if (Array.isArray(data)) {
           customersData = data;
@@ -74,9 +73,7 @@ function AdminCustomers() {
           customersData = data.users;
         }
 
-        // ✅ Sirf customers filter karo (admin hata do)
         customersData = customersData.filter(u => u.role === 'customer');
-
         setCustomers(customersData);
       } else {
         setError(data.message || 'Failed to load customers');
@@ -108,7 +105,6 @@ function AdminCustomers() {
     })
       .then(res => res.json())
       .then(data => {
-        // ✅ API response shape handle karo
         let ordersData = [];
         if (Array.isArray(data)) {
           ordersData = data;
@@ -123,7 +119,7 @@ function AdminCustomers() {
   }, []);
 
   /* ---------------------------------------------------------------- */
-  /* ✅ STATS CALCULATION — No setCustomers, no infinite loop          */
+  /* ✅ STATS CALCULATION — total_amount use karo                      */
   /* ---------------------------------------------------------------- */
   useEffect(() => {
     if (!customers || !orders) return;
@@ -136,7 +132,11 @@ function AdminCustomers() {
     ).length;
 
     const totalOrders = orders.length;
-    const totalSpent = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+    // ✅ FIX: total_amount pehle
+    const totalSpent = orders.reduce(
+      (sum, order) => sum + (order.total_amount || order.total || 0),
+      0
+    );
 
     setStats({
       totalCustomers: customers.length,
@@ -148,7 +148,7 @@ function AdminCustomers() {
   }, [customers, orders]);
 
   /* ---------------------------------------------------------------- */
-  /* ✅ CUSTOMERS WITH STATS — useMemo, no infinite loop              */
+  /* ✅ CUSTOMERS WITH STATS — total_amount use karo                  */
   /* ---------------------------------------------------------------- */
   const customersWithStats = useMemo(() => {
     const statsMap = {};
@@ -157,7 +157,8 @@ function AdminCustomers() {
       if (!id) return;
       if (!statsMap[id]) statsMap[id] = { orderCount: 0, totalSpent: 0 };
       statsMap[id].orderCount++;
-      statsMap[id].totalSpent += order.total || 0;
+      // ✅ FIX: total_amount pehle
+      statsMap[id].totalSpent += order.total_amount || order.total || 0;
     });
 
     return customers.map(c => {
@@ -378,7 +379,7 @@ function AdminCustomers() {
   };
 
   /* ---------------------------------------------------------------- */
-  /* ✅ FILTERED CUSTOMERS — customersWithStats use karo              */
+  /* ✅ FILTERED CUSTOMERS                                             */
   /* ---------------------------------------------------------------- */
   const filteredCustomers = useMemo(() => {
     return customersWithStats.filter(c => {
