@@ -678,7 +678,6 @@ function AdminAddProduct() {
         const tree = json.data || json;
         setApiCategories(tree);
 
-        // ✅ Slug-based subcategories map
         const subMap = {};
         tree.forEach(cat => {
           const slug = cat.slug || cat.name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -808,17 +807,14 @@ function AdminAddProduct() {
     const category = formData.category;
     if (!category) return [];
 
-    // ✅ Category name → slug convert karo
     const slug = category
       .toLowerCase()
       .replace(/&/g, 'and')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
 
-    // ✅ API se subcategories lo
     const apiSubs = apiSubCategories[slug] || [];
 
-    // ✅ Case-insensitive dedupe
     const seen = new Set();
     const result = [];
     apiSubs.forEach((s) => {
@@ -840,7 +836,6 @@ function AdminAddProduct() {
       return;
     }
 
-    // ✅ Category name → slug
     const slug = formData.category
       .toLowerCase()
       .replace(/&/g, 'and')
@@ -865,7 +860,6 @@ function AdminAddProduct() {
       const data = await res.json();
 
       if (data.success) {
-        // ✅ State me nayi subcategory add karo
         setApiSubCategories(prev => ({
           ...prev,
           [slug]: [...(prev[slug] || []), {
@@ -1558,11 +1552,11 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* STEP 3: Pricing */}
+            {/* STEP 3: Pricing & Inventory ✅ UPDATED with Stock field */}
             {step === 3 && (
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">💰 Pricing</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">💰 Pricing & Inventory</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">MRP</label>
                     <input type="number" value={formData.mrp} onChange={(e) => setFormData({ ...formData, mrp: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" placeholder="₹ 999" />
@@ -1574,6 +1568,25 @@ function AdminAddProduct() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax (GST) %</label>
                     <input type="number" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
+                  </div>
+                  {/* ✅ NAYA — Stock field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Stock (Pieces) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm"
+                      placeholder="e.g., 50"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      {variations.length > 0
+                        ? '⚠️ Variants hain — total stock variants se calculate hoga'
+                        : 'Kitne pieces available hain'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
