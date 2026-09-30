@@ -1,3 +1,4 @@
+// src/App.jsx
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
@@ -10,8 +11,6 @@ import AdminAdAnalytics from './pages/admin/AdminAdAnalytics';
 import ErrorBoundary from './components/ErrorBoundary';
 import BrandPage from './pages/BrandPage';
 import AdminBrands from './pages/admin/AdminBrands';
-
-
 
 // ============================================================
 // ✅ LAZY WITH RETRY — network hiccup handle karega
@@ -65,14 +64,21 @@ const FAQs = lazyWithRetry(() => import('./pages/FAQs'));
 // ✅ IMPORTANT: PAYMENT SUCCESS PAGE
 const PaymentSuccess = lazyWithRetry(() => import('./pages/PaymentSuccess'));
 
-// ============ CATEGORY PAGES ============
+// ============ CATEGORY PAGES (9 Total) ============
+// Existing 5
 const SkincarePage = lazyWithRetry(() => import('./pages/SkincarePage'));
 const MakeupPage = lazyWithRetry(() => import('./pages/MakeupPage'));
+const HairPage = lazyWithRetry(() => import('./pages/HairPage'));
 const ClothingPage = lazyWithRetry(() => import('./pages/ClothingPage'));
 const AccessoriesPage = lazyWithRetry(() => import('./pages/AccessoriesPage'));
-const HairPage = lazyWithRetry(() => import('./pages/HairPage'));
 
-// ✅ NAYA — Dynamic Category Page (nayi 4+ categories ke liye)
+// ✅ NAYE 4 PAGES
+const ElectronicsPage = lazyWithRetry(() => import('./pages/ElectronicsPage'));
+const HomeKitchenPage = lazyWithRetry(() => import('./pages/HomeKitchenPage'));
+const HealthPage = lazyWithRetry(() => import('./pages/HealthPage'));
+const BooksPage = lazyWithRetry(() => import('./pages/BooksPage'));
+
+// ✅ Dynamic Category Page (fallback / future use)
 const CategoryPage = lazyWithRetry(() => import('./pages/CategoryPage'));
 
 // ============ ADMIN PAGES ============
@@ -174,15 +180,28 @@ function App() {
                     <Route path="/payment-callback" element={<PaymentSuccess />} />
                     <Route path="/brand/:slug" element={<BrandPage />} />
 
-                    {/* ============ CATEGORY PAGES ============ */}
-                    {/* Purane (specific) routes — inse custom filters kaam karte hain */}
+                    {/* ============ CATEGORY PAGES (9 Total) ============ */}
+                    {/* 1. Skincare */}
                     <Route path="/skincare" element={<SkincarePage />} />
+                    {/* 2. Makeup */}
                     <Route path="/makeup" element={<MakeupPage />} />
-                    <Route path="/clothing" element={<ClothingPage />} />
-                    <Route path="/accessories" element={<AccessoriesPage />} />
+                    {/* 3. Haircare */}
                     <Route path="/hair" element={<HairPage />} />
+                    {/* 4. Fashion / Clothing */}
+                    <Route path="/clothing" element={<ClothingPage />} />
+                    {/* 5. Accessories */}
+                    <Route path="/accessories" element={<AccessoriesPage />} />
 
-                    {/* ✅ NAYA — Dynamic route (nayi 4+ categories ke liye) */}
+                    {/* ✅ 6. Electronics */}
+                    <Route path="/electronics" element={<ElectronicsPage />} />
+                    {/* ✅ 7. Home & Kitchen */}
+                    <Route path="/home-kitchen" element={<HomeKitchenPage />} />
+                    {/* ✅ 8. Health & Wellness */}
+                    <Route path="/health" element={<HealthPage />} />
+                    {/* ✅ 9. Books & Stationery */}
+                    <Route path="/books" element={<BooksPage />} />
+
+                    {/* ✅ Dynamic route (fallback / future categories) */}
                     <Route path="/category/:slug" element={<CategoryPage />} />
 
                     {/* ============ ADMIN ROUTES ============ */}
