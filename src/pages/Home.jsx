@@ -180,7 +180,7 @@ const FallbackHero = () => (
 );
 
 /* ================================================================== */
-/* Category Sections Config — Har category ka position prefix         */
+/* Category Sections Config                                           */
 /* ================================================================== */
 const CATEGORY_SECTIONS = [
   {
@@ -289,7 +289,6 @@ function Home() {
   const [bannerAds, setBannerAds] = useState([]);
   const [bannerOptions, setBannerOptions] = useState({ sizes: [], styles: [] });
 
-  // ✅ Saari 9 categories ke liye visibility
   const [visibleSections, setVisibleSections] = useState({
     skincare: false,
     makeup: false,
@@ -302,7 +301,6 @@ function Home() {
     books: false,
   });
 
-  // ✅ Saari 9 categories ke liye refs
   const sectionRefs = {
     skincare: useRef(null),
     makeup: useRef(null),
@@ -371,19 +369,30 @@ function Home() {
         const data = await response.json();
         const list = Array.isArray(data) ? data : (data.data || []);
 
-        // ✅ Dynamic grouping — saari positions handle karega
+        // ✅ FIX: Har position pe SIRF 1 banner, same banner repeat na ho
         const grouped = {};
+        const seenBanners = new Set();
+
         list.forEach((b) => {
+          const bannerId = b._id || b.id;
           const positions =
             Array.isArray(b.positions) && b.positions.length > 0
               ? b.positions
               : b.position
               ? [b.position]
               : [];
-          positions.forEach((pos) => {
-            if (!grouped[pos]) grouped[pos] = [];
-            grouped[pos].push(b);
-          });
+
+          if (positions.length === 0) return;
+
+          // ✅ Sirf first position use karo
+          const pos = positions[0];
+
+          // ✅ Agar same banner already add ho chuka hai toh skip
+          if (seenBanners.has(bannerId)) return;
+
+          if (!grouped[pos]) grouped[pos] = [];
+          grouped[pos].push(b);
+          seenBanners.add(bannerId);
         });
 
         setBannersByPosition(grouped);
@@ -536,7 +545,7 @@ function Home() {
       products.filter(
         (p) =>
           (p.mainCategory || p.category || p.main_category || '').toLowerCase() ===
-            cat.toLowerCase() && (p.status === 'active' || p.isActive === true)
+            cat.toLowerCase() && (p.status === 'active' || p.isActive === true || p.is_active === 1)
       );
 
     return {
@@ -571,7 +580,6 @@ function Home() {
     booksProducts,
   } = productSlices;
 
-  // ✅ Category sections ke saath products map
   const sectionProductsMap = {
     skincare: skincareProducts,
     makeup: makeupProducts,
@@ -806,7 +814,7 @@ function Home() {
         {/* TRUST BADGES */}
         <TrustBadges />
 
-        {/* CATEGORIES */}
+        {/* ✅ CATEGORIES — Mobile horizontal scroll, Desktop grid */}
         <section className="py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8">
@@ -815,7 +823,26 @@ function Home() {
               </h2>
               <p className="text-gray-600 font-medium">Discover your favorite products</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+
+            {/* ✅ Mobile: horizontal scroll */}
+            <div className="sm:hidden flex gap-3 overflow-x-auto pb-3 scrollbar-hide -mx-4 px-4">
+              {categories.map((cat, idx) => (
+                <Link
+                  key={idx}
+                  to={cat.link}
+                  className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.bg} p-4 text-center hover:shadow-2xl transition-all border-2 border-white shadow-lg shrink-0 w-32`}
+                >
+                  <div className="w-14 h-14 mx-auto bg-white rounded-full flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition shadow-md">
+                    {cat.image}
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-xs">{cat.name}</h3>
+                  <p className="text-[10px] text-gray-700 mt-1 font-medium">Shop Now →</p>
+                </Link>
+              ))}
+            </div>
+
+            {/* ✅ Desktop: grid */}
+            <div className="hidden sm:grid sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
               {categories.map((cat, idx) => (
                 <Link
                   key={idx}
@@ -832,17 +859,6 @@ function Home() {
             </div>
           </div>
         </section>
-
-        {/* MID 1 BANNERS */}
-        {mid1Banners.length > 0 && (
-          <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-            <BannerRenderer
-              banners={mid1Banners}
-              size={mid1Props.sizeConfig}
-              style={mid1Props.style}
-            />
-          </section>
-        )}
 
         {/* BANNER ADS */}
         {bannerAds.length > 0 && (
@@ -914,17 +930,6 @@ function Home() {
           </section>
         )}
 
-        {/* MID 2 BANNERS */}
-        {mid2Banners.length > 0 && (
-          <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-            <BannerRenderer
-              banners={mid2Banners}
-              size={mid2Props.sizeConfig}
-              style={mid2Props.style}
-            />
-          </section>
-        )}
-
         {/* SPONSORED PRODUCTS */}
         {sponsoredProducts.length > 0 && (
           <section className="py-12 bg-gradient-to-r from-blue-50 to-purple-50">
@@ -959,10 +964,10 @@ function Home() {
         {/* ✅ SAARI 9 CATEGORY SECTIONS + BANNERS (per category) */}
         {CATEGORY_SECTIONS.map((section) => {
           const sectionProducts = sectionProductsMap[section.key] || [];
-          // Empty categories skip
+          // ✅ Empty categories skip
           if (sectionProducts.length === 0) return null;
 
-          // Banner positions for this category
+          // ✅ Category-specific banners only (global nahi)
           const categoryMid1 = bannersByPosition[`${section.positionPrefix}_mid_1`] || [];
           const categoryMid2 = bannersByPosition[`${section.positionPrefix}_mid_2`] || [];
           const categoryBottom = bannersByPosition[`${section.positionPrefix}_bottom`] || [];
@@ -1051,28 +1056,6 @@ function Home() {
             </div>
           );
         })}
-
-        {/* MID 3 BANNERS */}
-        {mid3Banners.length > 0 && (
-          <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-            <BannerRenderer
-              banners={mid3Banners}
-              size={mid3Props.sizeConfig}
-              style={mid3Props.style}
-            />
-          </section>
-        )}
-
-        {/* BOTTOM BANNERS */}
-        {bottomBanners.length > 0 && (
-          <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-            <BannerRenderer
-              banners={bottomBanners}
-              size={bottomProps.sizeConfig}
-              style={bottomProps.style}
-            />
-          </section>
-        )}
 
         <Suspense fallback={<div className="h-64 bg-pink-600" />}>
           <NewsletterSection />
