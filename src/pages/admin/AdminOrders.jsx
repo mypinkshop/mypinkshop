@@ -1,3 +1,4 @@
+// src/pages/admin/AdminOrders.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -75,7 +76,8 @@ function AdminOrders() {
             ...order,
             _id: order._id || order.id,
             createdAt: order.createdAt || order.created_at,
-            total: order.total || order.total_amount || order.subtotal || 0,
+            // ✅ FIX: total_amount pehle
+            total: order.total_amount || order.total || order.subtotal || 0,
             shippingAddress: parsedAddress,
             paymentMethod: order.paymentMethod || order.payment_method || 'cod',
             paymentStatus: order.paymentStatus || order.payment_status || 'Paid',
@@ -490,7 +492,8 @@ function AdminOrders() {
                               ))}
                             </div>
                           </td>
-                          <td className="p-3 align-top text-right font-bold text-slate-900">₹{(order.total || 0).toLocaleString()}</td>
+                          {/* ✅ FIX: total_amount pehle */}
+                          <td className="p-3 align-top text-right font-bold text-slate-900">₹{(order.total_amount || order.total || 0).toLocaleString()}</td>
                           <td className="p-3 align-top text-center"><span className="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-semibold uppercase">{order.paymentMethod || 'COD'}</span></td>
                           <td className="p-3 align-top text-center">{getStatusBadge(order.status)}</td>
                           <td className="p-3 align-top text-center">
@@ -520,7 +523,7 @@ function AdminOrders() {
                                     city: addr.city || '',
                                     state: addr.state || '',
                                     pincode: addr.pincode || '',
-                                    total: order.total || 0,
+                                    total: order.total_amount || order.total || 0,
                                     paymentMethod: order.paymentMethod || 'cod',
                                     status: order.status || 'pending'
                                   });
@@ -610,7 +613,8 @@ function AdminOrders() {
               </div>
               <div className="flex justify-between pt-2 font-bold text-sm text-slate-900">
                 <span>Grand Total:</span>
-                <span className="text-[#ff9900]">₹{selectedOrder.total}</span>
+                {/* ✅ FIX: total_amount pehle */}
+                <span className="text-[#ff9900]">₹{selectedOrder.total_amount || selectedOrder.total}</span>
               </div>
             </div>
           </div>
