@@ -1,3 +1,4 @@
+// src/pages/admin/AdminEditProduct.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
@@ -164,7 +165,6 @@ function AdminEditProduct() {
   const [showAddSubCategory, setShowAddSubCategory] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState('');
   
-  // ✅ NAYA — API se categories
   const [apiCategories, setApiCategories] = useState([]);
   const [apiSubCategories, setApiSubCategories] = useState({});
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -184,11 +184,6 @@ function AdminEditProduct() {
     'Loreal Paris', 'Maybelline', 'Clinique', 'Estee Lauder', 'Huda Beauty', 'MAC',
     'SKINQ'
   ]);
-  
-  const [customSubCategories, setCustomSubCategories] = useState({
-    Skincare: [], Makeup: [], Haircare: [], Fashion: [], Accessories: [],
-    Electronics: [], 'Home & Kitchen': [], 'Health & Wellness': [], 'Books & Stationery': []
-  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -231,7 +226,6 @@ function AdminEditProduct() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ Fallback subcategories (agar API fail ho)
   const fallbackSubCategories = {
     Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Lip Balm', 'Toner', 'Face Scrub', 'Body Lotion', 'Body Wash'],
     Makeup: ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Compact', 'Mascara', 'Highlighter', 'Lip Liner', 'Concealer', 'Primer', 'Setting Spray'],
@@ -245,8 +239,11 @@ function AdminEditProduct() {
   };
 
   const skinConcerns = ['Acne', 'Aging', 'Pigmentation', 'Dryness', 'Dullness', 'Oil Control', 'Redness', 'Dark Spots'];
+  const makeupFinishes = ['Matte', 'Glossy', 'Satin', 'Shimmer', 'Dewy', 'Metallic', 'Creamy', 'Powder', 'Liquid', 'Velvet'];
+  const makeupCoverage = ['Light', 'Medium', 'Full', 'Sheer', 'Buildable'];
+  const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
+  const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
 
-  // ✅ Helper: purane naam ko naye naam pe map karo
   const getCategoryKey = () => {
     const map = { 'Hair': 'Haircare', 'Clothing': 'Fashion' };
     return map[formData.category] || formData.category;
@@ -274,7 +271,7 @@ function AdminEditProduct() {
 
   const variationAttrs = getVariationAttributes();
 
-  // ✅ API se categories fetch karo
+  /* ------------------ ✅ Fetch Categories (slug-based) ------------------ */
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -286,9 +283,15 @@ function AdminEditProduct() {
 
         setApiCategories(tree);
 
+        // ✅ Slug-based subcategories map
         const subMap = {};
         tree.forEach(cat => {
-          subMap[cat.name] = (cat.children || []).map(child => child.name);
+          const slug = cat.slug || cat.name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          subMap[slug] = (cat.children || []).map(child => ({
+            id: child.id,
+            name: child.name,
+            icon: child.icon || '🌸',
+          }));
         });
         setApiSubCategories(subMap);
       } catch (err) {
@@ -301,7 +304,7 @@ function AdminEditProduct() {
     fetchCategories();
   }, []);
 
-  // ✅ Load product with variants normalization
+  /* ------------------ ✅ Load product ------------------ */
   useEffect(() => {
     const loadProduct = async () => {
       try {
@@ -319,10 +322,7 @@ function AdminEditProduct() {
         if (!response.ok) throw new Error('Failed to load product');
 
         const rawData = await response.json();
-        console.log('📦 RAW API RESPONSE:', rawData);
-
         const product = rawData.data || rawData.product || rawData;
-        console.log('✅ PRODUCT USED:', product);
 
         const descriptionArray = stringToBullets(product.description || product.about_this_item || product.aboutThisItem);
         const keyFeaturesArray = safeParseJSON(product.key_features || product.keyFeatures, []);
@@ -365,12 +365,10 @@ function AdminEditProduct() {
           gender: product.gender || 'unisex'
         });
 
-        // ✅ CRITICAL FIX: variants ko admin ke purane format me normalize karo
         const rawVariants = product.variants || product.variations || [];
         if (Array.isArray(rawVariants) && rawVariants.length > 0) {
           const normalized = normalizeVariantsFromBackend(rawVariants);
           setVariations(normalized);
-          console.log('✅ Variants normalized:', normalized);
         } else {
           setVariations([]);
         }
@@ -392,10 +390,6 @@ function AdminEditProduct() {
     if (savedBrands) {
       try { setBrands(JSON.parse(savedBrands)); } catch (e) { /* ignore */ }
     }
-    const savedSubCategories = localStorage.getItem('customSubCategories');
-    if (savedSubCategories) {
-      try { setCustomSubCategories(JSON.parse(savedSubCategories)); } catch (e) { /* ignore */ }
-    }
   }, []);
 
   const saveBrands = (updatedBrands) => {
@@ -403,36 +397,87 @@ function AdminEditProduct() {
     localStorage.setItem('brandsList', JSON.stringify(updatedBrands));
   };
 
-  const saveCustomSubCategory = (category, newSubCat) => {
-    const updated = { ...customSubCategories, [category]: [...(customSubCategories[category] || []), newSubCat] };
-    setCustomSubCategories(updated);
-    localStorage.setItem('customSubCategories', JSON.stringify(updated));
-  };
-
-  // ✅ API + fallback + custom merge
+  /* ------------------ ✅ getCurrentSubCategories — slug-based API ------------------ */
   const getCurrentSubCategories = () => {
     const category = formData.category;
     if (!category) return [];
 
-    const apiSubs = apiSubCategories[category] || [];
-    const fallbackSubs = fallbackSubCategories[category] || [];
-    const customSubs = customSubCategories[category] || [];
+    // ✅ Category name → slug
+    const slug = category
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
 
-    return [...new Set([...apiSubs, ...fallbackSubs, ...customSubs])];
+    // ✅ API se subcategories
+    const apiSubs = apiSubCategories[slug] || [];
+
+    // ✅ Case-insensitive dedupe
+    const seen = new Set();
+    const result = [];
+    apiSubs.forEach((s) => {
+      const name = typeof s === 'string' ? s : (s.name || '');
+      const clean = String(name).trim();
+      const key = clean.toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      result.push(clean);
+    });
+    return result;
   };
 
-  const handleAddNewSubCategory = () => {
-    if (newSubCategory.trim() && formData.category) {
-      const currentOptions = getCurrentSubCategories();
-      if (!currentOptions.includes(newSubCategory.trim())) {
-        saveCustomSubCategory(formData.category, newSubCategory.trim());
-        setFormData({ ...formData, subCategory: newSubCategory.trim() });
+  /* ------------------ ✅ handleAddNewSubCategory — API call ------------------ */
+  const handleAddNewSubCategory = async () => {
+    const name = newSubCategory.trim();
+    if (!name || !formData.category) {
+      toast.error('Please select a category first');
+      return;
+    }
+
+    // ✅ Category name → slug
+    const slug = formData.category
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_URL}/api/subcategories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          category_slug: slug,
+          name: name,
+          icon: '🌸',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setApiSubCategories(prev => ({
+          ...prev,
+          [slug]: [...(prev[slug] || []), {
+            id: data.data.id,
+            name: data.data.name,
+            icon: data.data.icon,
+          }],
+        }));
+
+        setFormData({ ...formData, subCategory: name });
         setNewSubCategory('');
         setShowAddSubCategory(false);
-        toast.success(`✅ Sub-category "${newSubCategory.trim()}" added!`);
+        toast.success(`✅ Subcategory "${name}" added!`);
       } else {
-        toast.error('⚠️ Already exists!');
+        toast.error(data.error || 'Failed to add subcategory');
       }
+    } catch (err) {
+      console.error('Add subcategory error:', err);
+      toast.error('Network error. Please try again.');
     }
   };
 
@@ -773,6 +818,152 @@ function AdminEditProduct() {
   const IconBack = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
   const IconUpload = () => (<svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
   const IconPlus = () => (<svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
+
+  /* ------------------ ✅ Category Specific Fields ------------------ */
+  const renderCategorySpecificFields = () => {
+    const categoryKey = getCategoryKey();
+    switch (categoryKey) {
+      case 'Skincare':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">🧴 Skincare Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Skin Type</label>
+                <select value={formData.skinType} onChange={(e) => setFormData({ ...formData, skinType: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="all">All Skin Types</option>
+                  <option value="oily">Oily</option>
+                  <option value="dry">Dry</option>
+                  <option value="combination">Combination</option>
+                  <option value="sensitive">Sensitive</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Key Ingredients</label>
+                <input type="text" value={formData.ingredients} onChange={(e) => setFormData({ ...formData, ingredients: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Vitamin C, Hyaluronic Acid" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns</label>
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                {skinConcerns.map(c => (
+                  <label key={c} className="flex items-center gap-1.5 text-sm">
+                    <input type="checkbox" checked={formData.concerns.includes(c)} onChange={(e) => {
+                      const updated = e.target.checked ? [...formData.concerns, c] : formData.concerns.filter(cn => cn !== c);
+                      setFormData({ ...formData, concerns: updated });
+                    }} />
+                    <span className="text-gray-600">{c}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Makeup':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">💄 Makeup Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Shade / Color</label>
+                <input type="text" value={formData.shade} onChange={(e) => setFormData({ ...formData, shade: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Ruby Red" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Finish</label>
+                <select value={formData.finish} onChange={(e) => setFormData({ ...formData, finish: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="">Select Finish</option>
+                  {makeupFinishes.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Coverage</label>
+              <select value={formData.coverage} onChange={(e) => setFormData({ ...formData, coverage: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">Select Coverage</option>
+                {makeupCoverage.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+        );
+
+      case 'Haircare':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">💇 Hair Care Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Hair Type</label>
+                <select value={formData.hairType} onChange={(e) => setFormData({ ...formData, hairType: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  {hairTypes.map(t => <option key={t} value={t.toLowerCase()}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hair Concerns</label>
+                <div className="flex flex-wrap gap-2 sm:gap-3">
+                  {hairConcernsList.map(c => (
+                    <label key={c} className="flex items-center gap-1.5 text-sm">
+                      <input type="checkbox" checked={(formData.hairConcerns || []).includes(c)} onChange={(e) => {
+                        const updated = e.target.checked ? [...(formData.hairConcerns || []), c] : (formData.hairConcerns || []).filter(cn => cn !== c);
+                        setFormData({ ...formData, hairConcerns: updated });
+                      }} />
+                      <span className="text-gray-600">{c}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Fashion':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">👗 Fashion Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Fabric / Material</label>
+                <input type="text" value={formData.fabric} onChange={(e) => setFormData({ ...formData, fabric: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Cotton, Silk, Polyester" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
+                <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="unisex">Unisex</option>
+                  <option value="men">Men</option>
+                  <option value="women">Women</option>
+                  <option value="kids">Kids</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Accessories':
+        return (
+          <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
+            <h3 className="font-medium text-gray-800">💍 Accessories Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Material</label>
+                <input type="text" value={formData.material} onChange={(e) => setFormData({ ...formData, material: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Silver, Gold, Leather" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Gender</label>
+                <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="unisex">Unisex</option>
+                  <option value="men">Men</option>
+                  <option value="women">Women</option>
+                  <option value="kids">Kids</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   if (loading) {
     return (
@@ -1155,6 +1346,9 @@ function AdminEditProduct() {
                   <button type="button" onClick={addSpecification} className="px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium">Add</button>
                 </div>
               </div>
+
+              {/* ✅ Category Specific Fields */}
+              {renderCategorySpecificFields()}
 
               {/* SEO */}
               <div>
