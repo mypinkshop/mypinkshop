@@ -94,7 +94,7 @@ function SkincarePage() {
 
   const SLUG = 'skincare';
 
-  /* ---------------- Load category + banners + offers ---------------- */
+  /* ---------------- ✅ Load category + banners + offers ---------------- */
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -102,7 +102,16 @@ function SkincarePage() {
         const catJson = await catRes.json();
         const tree = catJson.data || catJson;
         const found = Array.isArray(tree) ? tree.find((c) => c.slug === SLUG) : null;
-        if (found) setApiSubcategories(found.children || []);
+        if (found) {
+          // ✅ Proper mapping — subcategories
+          setApiSubcategories(
+            (found.children || []).map(child => ({
+              id: child.id,
+              name: child.name,
+              icon: child.icon || '🌸',
+            }))
+          );
+        }
 
         const bannerRes = await fetch(`${API_URL}/api/banners/active?category=${SLUG}`);
         const bannerJson = await bannerRes.json();
@@ -119,6 +128,28 @@ function SkincarePage() {
       }
     };
     loadAll();
+  }, []);
+
+  /* ✅ NAYA — Subcategories dedicated API */
+  useEffect(() => {
+    const loadSubs = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/subcategories/${SLUG}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setApiSubcategories(
+            json.data.map(s => ({
+              id: s.id,
+              name: s.name,
+              icon: s.icon || '🌸',
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Subcategories fetch error:', err);
+      }
+    };
+    loadSubs();
   }, []);
 
   /* ---------------- Load products ---------------- */
@@ -146,21 +177,27 @@ function SkincarePage() {
     loadProducts();
   }, []);
 
-  /* ---------------- Subcategories ---------------- */
+  /* ---------------- ✅ Subcategories (dedupe) ---------------- */
   const subcategories = useMemo(() => {
     const seen = new Set();
     const unique = [];
 
     if (apiSubcategories.length > 0) {
       apiSubcategories.forEach((s) => {
-        const key = String(s.name || '').trim().toLowerCase();
+        const name = typeof s === 'string' ? s : (s.name || '');
+        const key = String(name).trim().toLowerCase();
         if (!key || seen.has(key)) return;
         seen.add(key);
-        unique.push({ id: s.id, name: s.name, icon: s.icon || '🌸' });
+        unique.push({
+          id: s.id || unique.length,
+          name: String(name).trim(),
+          icon: s.icon || '🌸',
+        });
       });
       return unique;
     }
 
+    // ✅ Fallback — products se derive
     products.forEach((p) => {
       const name = String(p.subCategory || '').trim();
       const key = name.toLowerCase();
@@ -272,7 +309,7 @@ function SkincarePage() {
     const topIds = new Set(topProducts.map((p) => p.id));
     const groups = {};
     filteredProducts
-      .filter((p) => !topIds.has(p.id))   // ✅ top 4 hata do
+      .filter((p) => !topIds.has(p.id))
       .forEach((p) => {
         const sub = p.subCategory || 'Other';
         if (!groups[sub]) groups[sub] = [];
