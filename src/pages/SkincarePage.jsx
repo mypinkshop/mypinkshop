@@ -12,7 +12,7 @@ import BannerRenderer from '../components/BannerRenderer';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-/* ✅ Category normalizer — & vs and, spaces, hyphens */
+/* ✅ Category normalizer */
 const normalizeCategory = (s) =>
   String(s || '')
     .toLowerCase()
@@ -20,7 +20,7 @@ const normalizeCategory = (s) =>
     .replace(/[^a-z0-9]+/g, '')
     .trim();
 
-/* ✅ Active check — DB ke hisaab se */
+/* ✅ Active check */
 const isProductActive = (p) =>
   p.is_active === 1 ||
   p.is_active === true ||
@@ -50,7 +50,7 @@ const normalizeProduct = (p) => {
   };
 };
 
-/* ✅ Banner grouping helper (positions array support) */
+/* ✅ Banner grouping */
 function groupBanners(list) {
   const grouped = {};
   list.forEach((b) => {
@@ -76,12 +76,8 @@ function SkincarePage() {
 
   const [apiSubcategories, setApiSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [allProducts, setAllProducts] = useState([]); // ✅ Top Picks ke liye saare products
   const [loading, setLoading] = useState(true);
-
-  // ✅ Banners (grouped by position)
   const [bannersByPosition, setBannersByPosition] = useState({});
-
   const [topOffers, setTopOffers] = useState([]);
   const [midOffers, setMidOffers] = useState([]);
 
@@ -102,20 +98,17 @@ function SkincarePage() {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        // Category tree
         const catRes = await fetch(`${API_URL}/api/categories/tree`);
         const catJson = await catRes.json();
         const tree = catJson.data || catJson;
         const found = Array.isArray(tree) ? tree.find((c) => c.slug === SLUG) : null;
         if (found) setApiSubcategories(found.children || []);
 
-        // ✅ Banners — category-specific
         const bannerRes = await fetch(`${API_URL}/api/banners/active?category=${SLUG}`);
         const bannerJson = await bannerRes.json();
         const banners = Array.isArray(bannerJson) ? bannerJson : (bannerJson.data || []);
         setBannersByPosition(groupBanners(banners));
 
-        // Offers
         const offerRes = await fetch(`${API_URL}/api/offers/active?category=${SLUG}`);
         const offerJson = await offerRes.json();
         const offers = Array.isArray(offerJson) ? offerJson : (offerJson.data || []);
@@ -139,10 +132,6 @@ function SkincarePage() {
         const productsArray = (Array.isArray(data) ? data : (data.data || []))
           .map(normalizeProduct);
 
-        // ✅ Saare active products — Top Picks ke liye
-        setAllProducts(productsArray.filter(isProductActive));
-
-        // ✅ Sirf skincare products
         const skincareProducts = productsArray.filter(
           (p) => isProductActive(p) && normalizeCategory(p.mainCategory) === 'skincare'
         );
@@ -150,7 +139,6 @@ function SkincarePage() {
       } catch (error) {
         console.error('Error loading products:', error);
         setProducts([]);
-        setAllProducts([]);
       } finally {
         setLoading(false);
       }
@@ -274,46 +262,26 @@ function SkincarePage() {
     setSortBy('default');
   };
 
-  /* ---------------- ✅ Top Picks — mixed categories ---------------- */
-  const topPicks = useMemo(() => {
-    if (!allProducts.length) return [];
-    const byCat = {};
-    allProducts.forEach((p) => {
-      const cat = p.mainCategory || 'Other';
-      if (!byCat[cat]) byCat[cat] = [];
-      byCat[cat].push(p);
-    });
-    // Har category se 1 random
-    const picks = [];
-    Object.values(byCat).forEach((arr) => {
-      if (arr.length > 0) {
-        picks.push(arr[Math.floor(Math.random() * arr.length)]);
-      }
-    });
-    return picks.slice(0, 4);
-  }, [allProducts]);
-
-  /* ---------------- ✅ Subcategory groups — har 4 products ke baad ---------------- */
-  const groupedBySubcategory = useMemo(() => {
-    const groups = {};
-    filteredProducts.forEach((p) => {
-      const sub = p.subCategory || 'Other';
-      if (!groups[sub]) groups[sub] = [];
-      groups[sub].push(p);
-    });
-    return groups;
+  /* ---------------- ✅ Top 4 products ---------------- */
+  const topProducts = useMemo(() => {
+    return filteredProducts.slice(0, 4);
   }, [filteredProducts]);
 
-  /* ---------------- ✅ Top 4 products (jab subcategory filter nahi hai) ---------------- */
-  const topProducts = useMemo(() => {
-    if (selectedSubcategory !== 'all' || searchTerm || selectedConcern !== 'all' ||
-        selectedBrand !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all') {
-      return filteredProducts.slice(0, visibleCount);
-    }
-    return filteredProducts.slice(0, 4);
-  }, [filteredProducts, selectedSubcategory, searchTerm, selectedConcern, selectedBrand, selectedSkinType, priceRange, visibleCount]);
+  /* ---------------- ✅ Baaki products ko subcategory-wise group ---------------- */
+  const groupedBySubcategory = useMemo(() => {
+    const topIds = new Set(topProducts.map((p) => p.id));
+    const groups = {};
+    filteredProducts
+      .filter((p) => !topIds.has(p.id))   // ✅ top 4 hata do
+      .forEach((p) => {
+        const sub = p.subCategory || 'Other';
+        if (!groups[sub]) groups[sub] = [];
+        groups[sub].push(p);
+      });
+    return groups;
+  }, [filteredProducts, topProducts]);
 
-  /* ---------------- Banner props ---------------- */
+  /* ---------------- Banner groups ---------------- */
   const heroBanners = bannersByPosition.category_hero || bannersByPosition.skincare_hero || [];
   const midBanners1 = bannersByPosition.skincare_mid_1 || bannersByPosition.category_mid_1 || [];
   const midBanners2 = bannersByPosition.skincare_mid_2 || bannersByPosition.category_mid_2 || [];
@@ -330,7 +298,14 @@ function SkincarePage() {
     );
   }
 
-  /* ---------------- Render ---------------- */
+  const hasActiveFilters =
+    selectedSubcategory !== 'all' ||
+    searchTerm ||
+    selectedConcern !== 'all' ||
+    selectedBrand !== 'all' ||
+    selectedSkinType !== 'all' ||
+    priceRange !== 'all';
+
   return (
     <>
       <Helmet>
@@ -417,7 +392,7 @@ function SkincarePage() {
           </section>
         )}
 
-        {/* TOP OFFERS STRIP */}
+        {/* TOP OFFERS */}
         {topOffers.length > 0 && (
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -444,33 +419,6 @@ function SkincarePage() {
             <span className="text-pink-600 font-medium">SKINCARE</span>
           </div>
         </div>
-
-        {/* ✅ TOP PICKS — MIXED CATEGORIES (1 line) */}
-        {topPicks.length > 0 && (
-          <section className="py-8 sm:py-12 bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center mb-5 sm:mb-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  ✨ Top Picks
-                </h2>
-                <span className="text-[10px] sm:text-xs text-pink-500 font-medium">Across Categories</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-5">
-                {topPicks.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    isInWishlist={isInWishlist}
-                    addToWishlist={addToWishlist}
-                    removeFromWishlist={removeFromWishlist}
-                    user={user}
-                    wishlistContext={wishlist}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* MAIN LAYOUT */}
         <div className="max-w-7xl mx-auto px-4 pb-20">
@@ -558,7 +506,7 @@ function SkincarePage() {
                     </select>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-                    {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || selectedConcern !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all' || searchTerm) && (
+                    {hasActiveFilters && (
                       <button onClick={clearFilters} className="text-[10px] sm:text-[11px] tracking-wider text-pink-500 uppercase underline underline-offset-4">Clear</button>
                     )}
                     <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
@@ -621,124 +569,100 @@ function SkincarePage() {
                     View All
                   </button>
                 </div>
+              ) : hasActiveFilters ? (
+                /* ✅ Filter active — flat grid */
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                  {filteredProducts.slice(0, visibleCount).map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                      wishlistContext={wishlist}
+                    />
+                  ))}
+                </div>
               ) : (
+                /* ✅ No filter — Top 4 + Subcategory sections */
                 <>
-                  {/* ✅ Filter active hai toh flat grid */}
-                  {(selectedSubcategory !== 'all' || searchTerm || selectedConcern !== 'all' ||
-                    selectedBrand !== 'all' || selectedSkinType !== 'all' || priceRange !== 'all') ? (
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
-                      {filteredProducts.slice(0, visibleCount).map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          isInWishlist={isInWishlist}
-                          addToWishlist={addToWishlist}
-                          removeFromWishlist={removeFromWishlist}
-                          user={user}
-                          wishlistContext={wishlist}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      {/* ✅ TOP 4 — first row */}
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6 mb-6 sm:mb-8">
-                        {topProducts.map((product) => (
-                          <ProductCard
-                            key={product.id}
-                            product={product}
-                            isInWishlist={isInWishlist}
-                            addToWishlist={addToWishlist}
-                            removeFromWishlist={removeFromWishlist}
-                            user={user}
-                            wishlistContext={wishlist}
-                          />
-                        ))}
-                      </div>
+                  {/* Top 4 */}
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6 mb-6 sm:mb-8">
+                    {topProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        isInWishlist={isInWishlist}
+                        addToWishlist={addToWishlist}
+                        removeFromWishlist={removeFromWishlist}
+                        user={user}
+                        wishlistContext={wishlist}
+                      />
+                    ))}
+                  </div>
 
-                      {/* ✅ MID BANNER 1 — full width */}
-                      {midBanners1.length > 0 && (
-                        <section className="w-full my-6 sm:my-8">
-                          <BannerRenderer banners={midBanners1} />
-                        </section>
-                      )}
-
-                      {/* ✅ SUBCATEGORY SECTIONS */}
-                      {Object.entries(groupedBySubcategory).map(([subName, subProducts], idx) => {
-                        // Skip "Other" if empty
-                        if (!subProducts.length) return null;
-                        // Skip top 4 already shown
-                        const remaining = subProducts.filter(
-                          (p) => !topProducts.slice(0, 4).some((tp) => tp.id === p.id)
-                        );
-                        if (remaining.length === 0) return null;
-
-                        return (
-                          <Fragment key={subName}>
-                            <section className="my-8 sm:my-10">
-                              {/* Subcategory header */}
-                              <div className="flex items-center gap-3 mb-4 sm:mb-5">
-                                <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
-                                <h3 className="text-lg sm:text-xl font-bold text-gray-800">{subName}</h3>
-                                <span className="text-xs text-pink-400 font-medium">({remaining.length})</span>
-                              </div>
-                              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
-                                {remaining.slice(0, 8).map((product) => (
-                                  <ProductCard
-                                    key={product.id}
-                                    product={product}
-                                    isInWishlist={isInWishlist}
-                                    addToWishlist={addToWishlist}
-                                    removeFromWishlist={removeFromWishlist}
-                                    user={user}
-                                    wishlistContext={wishlist}
-                                  />
-                                ))}
-                              </div>
-                            </section>
-
-                            {/* Mid banner 2 — after first subcategory */}
-                            {idx === 0 && midBanners2.length > 0 && (
-                              <section className="w-full my-6 sm:my-8">
-                                <BannerRenderer banners={midBanners2} />
-                              </section>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-
-                      {/* Mid offers inline */}
-                      {midOffers.length > 0 && (
-                        <div className="my-6 sm:my-8 space-y-3">
-                          {midOffers.map((offer, i) => (
-                            <div key={offer.id || i} className="bg-gradient-to-r from-pink-500 via-rose-500 to-pink-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
-                              <span className="text-3xl">{offer.icon || '🎉'}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-sm sm:text-base truncate">{offer.title}</p>
-                                <p className="text-xs opacity-90 truncate">{offer.description}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                  {/* Mid Banner 1 — full width */}
+                  {midBanners1.length > 0 && (
+                    <section className="w-full my-6 sm:my-8">
+                      <BannerRenderer banners={midBanners1} />
+                    </section>
                   )}
 
-                  {/* Load More */}
-                  {visibleCount < filteredProducts.length && (
-                    <div className="text-center mt-10 sm:mt-12">
-                      <button
-                        onClick={() => setVisibleCount((prev) => prev + 16)}
-                        className="px-8 sm:px-10 py-3 sm:py-3.5 border-2 border-pink-300 text-pink-600 rounded-full text-xs tracking-[0.25em] uppercase font-semibold hover:bg-gradient-to-r hover:from-pink-500 hover:to-rose-500 hover:text-white hover:border-transparent transition-all duration-300"
-                      >
-                        Load More
-                      </button>
+                  {/* Subcategory sections */}
+                  {Object.entries(groupedBySubcategory).map(([subName, subProducts], idx) => {
+                    if (!subProducts.length) return null;
+                    return (
+                      <Fragment key={subName}>
+                        <section className="my-8 sm:my-10">
+                          <div className="flex items-center gap-3 mb-4 sm:mb-5">
+                            <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
+                            <h3 className="text-lg sm:text-xl font-bold text-gray-800">{subName}</h3>
+                            <span className="text-xs text-pink-400 font-medium">({subProducts.length})</span>
+                          </div>
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                            {subProducts.slice(0, 8).map((product) => (
+                              <ProductCard
+                                key={product.id}
+                                product={product}
+                                isInWishlist={isInWishlist}
+                                addToWishlist={addToWishlist}
+                                removeFromWishlist={removeFromWishlist}
+                                user={user}
+                                wishlistContext={wishlist}
+                              />
+                            ))}
+                          </div>
+                        </section>
+
+                        {/* Mid Banner 2 — after first subcategory */}
+                        {idx === 0 && midBanners2.length > 0 && (
+                          <section className="w-full my-6 sm:my-8">
+                            <BannerRenderer banners={midBanners2} />
+                          </section>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+
+                  {/* Mid offers */}
+                  {midOffers.length > 0 && (
+                    <div className="my-6 sm:my-8 space-y-3">
+                      {midOffers.map((offer, i) => (
+                        <div key={offer.id || i} className="bg-gradient-to-r from-pink-500 via-rose-500 to-pink-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
+                          <span className="text-3xl">{offer.icon || '🎉'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm sm:text-base truncate">{offer.title}</p>
+                            <p className="text-xs opacity-90 truncate">{offer.description}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </>
               )}
 
-              {/* ✅ BOTTOM BANNER — full width */}
+              {/* BOTTOM BANNER — full width */}
               {bottomBanners.length > 0 && (
                 <section className="w-full mt-10 sm:mt-12">
                   <BannerRenderer banners={bottomBanners} />
