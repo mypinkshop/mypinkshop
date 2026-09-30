@@ -1,3 +1,4 @@
+// src/pages/MyOrders.jsx
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -144,7 +145,8 @@ function MyOrders() {
           _id: order._id || order.id,
           createdAt: order.createdAt || order.created_at,
           updatedAt: order.updatedAt || order.updated_at,
-          total: Number(order.total || order.total_amount || order.subtotal || 0),
+          // ✅ FIX: total_amount pehle
+          total: Number(order.total_amount || order.total || order.subtotal || 0),
           orderNumber: order.order_number || order.orderNumber,
           shippingAddress: parsedAddress || {},
           paymentMethod: (order.paymentMethod || order.payment_method || '').toLowerCase(),
@@ -187,8 +189,8 @@ function MyOrders() {
         ) {
           const timeStr = order.updatedAt || order.createdAt;
           const time = timeStr ? new Date(timeStr).getTime() : now;
-          if (isNaN(time)) return true; // timestamp invalid → dikhao
-          return now - time <= retryWindowMs; // 30 min ke andar
+          if (isNaN(time)) return true;
+          return now - time <= retryWindowMs;
         }
 
         // ✅ 2. Online payment pending + order pending → dikhao (In Progress tab)
@@ -197,7 +199,7 @@ function MyOrders() {
           paymentStatus === 'pending' &&
           !isCod
         ) {
-          return true; // Pending payments hamesha dikhein (user complete kar sakta)
+          return true;
         }
 
         // ✅ 3. Cancelled / failed orders → 7 din tak dikhao
@@ -205,10 +207,10 @@ function MyOrders() {
           const timeStr = order.updatedAt || order.createdAt;
           const time = timeStr ? new Date(timeStr).getTime() : now;
           if (isNaN(time)) return true;
-          return now - time <= cancelledRetentionMs; // 7 din ke andar
+          return now - time <= cancelledRetentionMs;
         }
 
-        // ✅ 4. Baaki sab (confirmed, shipped, delivered, processing, COD pending) → always show
+        // ✅ 4. Baaki sab → always show
         return true;
       });
 
@@ -327,7 +329,7 @@ function MyOrders() {
       });
       if (response.ok) {
         toast.success('Order cancelled successfully!');
-        fetchOrders();
+        await fetchOrders();
       } else {
         toast.error('Failed to cancel order');
       }
@@ -843,7 +845,8 @@ function MyOrders() {
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Total</p>
-                            <p className="text-sm sm:text-base font-bold text-white">₹{order.total?.toLocaleString()}</p>
+                            {/* ✅ FIX: total_amount pehle */}
+                            <p className="text-sm sm:text-base font-bold text-white">₹{(order.total_amount || order.total || 0).toLocaleString()}</p>
                           </div>
                         </div>
 
@@ -1110,12 +1113,6 @@ function MyOrders() {
             </div>
           </div>
         </section>
-
-        {/* LIVE TRACKING MODAL — same as before (not shown here for brevity) */}
-        {/* ... existing tracking modal ... */}
-
-        {/* REVIEW MODAL — same as before (not shown here for brevity) */}
-        {/* ... existing review modal ... */}
 
         {/* FOOTER */}
         <footer className="bg-gray-900 text-gray-400 py-12">
