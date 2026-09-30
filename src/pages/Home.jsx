@@ -183,87 +183,15 @@ const FallbackHero = () => (
 /* Category Sections Config                                           */
 /* ================================================================== */
 const CATEGORY_SECTIONS = [
-  {
-    key: 'skincare',
-    name: 'Skincare',
-    icon: '🧴',
-    link: '/skincare',
-    positionPrefix: 'skincare',
-    bgGradient: 'from-pink-50 to-rose-50',
-    iconBg: 'from-pink-400 to-rose-500',
-  },
-  {
-    key: 'makeup',
-    name: 'Makeup',
-    icon: '💄',
-    link: '/makeup',
-    positionPrefix: 'makeup',
-    bgGradient: 'from-purple-50 to-pink-50',
-    iconBg: 'from-purple-400 to-pink-500',
-  },
-  {
-    key: 'haircare',
-    name: 'Haircare',
-    icon: '💇‍♀️',
-    link: '/hair',
-    positionPrefix: 'haircare',
-    bgGradient: 'from-pink-50 to-amber-50',
-    iconBg: 'from-pink-400 to-amber-500',
-  },
-  {
-    key: 'fashion',
-    name: 'Fashion',
-    icon: '👗',
-    link: '/clothing',
-    positionPrefix: 'fashion',
-    bgGradient: 'from-rose-50 to-pink-50',
-    iconBg: 'from-rose-400 to-pink-500',
-  },
-  {
-    key: 'accessories',
-    name: 'Accessories',
-    icon: '👜',
-    link: '/accessories',
-    positionPrefix: 'accessories',
-    bgGradient: 'from-amber-50 to-rose-50',
-    iconBg: 'from-amber-400 to-rose-500',
-  },
-  {
-    key: 'electronics',
-    name: 'Electronics',
-    icon: '📱',
-    link: '/electronics',
-    positionPrefix: 'electronics',
-    bgGradient: 'from-blue-50 to-indigo-50',
-    iconBg: 'from-blue-400 to-indigo-500',
-  },
-  {
-    key: 'homeKitchen',
-    name: 'Home & Kitchen',
-    icon: '🏠',
-    link: '/home-kitchen',
-    positionPrefix: 'home_kitchen',
-    bgGradient: 'from-yellow-50 to-orange-50',
-    iconBg: 'from-yellow-400 to-orange-500',
-  },
-  {
-    key: 'health',
-    name: 'Health & Wellness',
-    icon: '💊',
-    link: '/health',
-    positionPrefix: 'health',
-    bgGradient: 'from-green-50 to-emerald-50',
-    iconBg: 'from-green-400 to-emerald-500',
-  },
-  {
-    key: 'books',
-    name: 'Books & Stationery',
-    icon: '📚',
-    link: '/books',
-    positionPrefix: 'books',
-    bgGradient: 'from-cyan-50 to-blue-50',
-    iconBg: 'from-cyan-400 to-blue-500',
-  },
+  { key: 'skincare', name: 'Skincare', icon: '🧴', link: '/skincare', positionPrefix: 'skincare', bgGradient: 'from-pink-50 to-rose-50', iconBg: 'from-pink-400 to-rose-500' },
+  { key: 'makeup', name: 'Makeup', icon: '💄', link: '/makeup', positionPrefix: 'makeup', bgGradient: 'from-purple-50 to-pink-50', iconBg: 'from-purple-400 to-pink-500' },
+  { key: 'haircare', name: 'Haircare', icon: '💇‍♀️', link: '/hair', positionPrefix: 'haircare', bgGradient: 'from-pink-50 to-amber-50', iconBg: 'from-pink-400 to-amber-500' },
+  { key: 'fashion', name: 'Fashion', icon: '👗', link: '/clothing', positionPrefix: 'fashion', bgGradient: 'from-rose-50 to-pink-50', iconBg: 'from-rose-400 to-pink-500' },
+  { key: 'accessories', name: 'Accessories', icon: '👜', link: '/accessories', positionPrefix: 'accessories', bgGradient: 'from-amber-50 to-rose-50', iconBg: 'from-amber-400 to-rose-500' },
+  { key: 'electronics', name: 'Electronics', icon: '📱', link: '/electronics', positionPrefix: 'electronics', bgGradient: 'from-blue-50 to-indigo-50', iconBg: 'from-blue-400 to-indigo-500' },
+  { key: 'homeKitchen', name: 'Home & Kitchen', icon: '🏠', link: '/home-kitchen', positionPrefix: 'home_kitchen', bgGradient: 'from-yellow-50 to-orange-50', iconBg: 'from-yellow-400 to-orange-500' },
+  { key: 'health', name: 'Health & Wellness', icon: '💊', link: '/health', positionPrefix: 'health', bgGradient: 'from-green-50 to-emerald-50', iconBg: 'from-green-400 to-emerald-500' },
+  { key: 'books', name: 'Books & Stationery', icon: '📚', link: '/books', positionPrefix: 'books', bgGradient: 'from-cyan-50 to-blue-50', iconBg: 'from-cyan-400 to-blue-500' },
 ];
 
 /* ================================================================== */
@@ -290,27 +218,15 @@ function Home() {
   const [bannerOptions, setBannerOptions] = useState({ sizes: [], styles: [] });
 
   const [visibleSections, setVisibleSections] = useState({
-    skincare: false,
-    makeup: false,
-    haircare: false,
-    fashion: false,
-    accessories: false,
-    electronics: false,
-    homeKitchen: false,
-    health: false,
-    books: false,
+    skincare: false, makeup: false, haircare: false, fashion: false,
+    accessories: false, electronics: false, homeKitchen: false,
+    health: false, books: false,
   });
 
   const sectionRefs = {
-    skincare: useRef(null),
-    makeup: useRef(null),
-    haircare: useRef(null),
-    fashion: useRef(null),
-    accessories: useRef(null),
-    electronics: useRef(null),
-    homeKitchen: useRef(null),
-    health: useRef(null),
-    books: useRef(null),
+    skincare: useRef(null), makeup: useRef(null), haircare: useRef(null),
+    fashion: useRef(null), accessories: useRef(null), electronics: useRef(null),
+    homeKitchen: useRef(null), health: useRef(null), books: useRef(null),
   };
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
@@ -369,12 +285,11 @@ function Home() {
         const data = await response.json();
         const list = Array.isArray(data) ? data : (data.data || []);
 
-        // ✅ FIX: Har position pe SIRF 1 banner, same banner repeat na ho
+        // ✅ Banner grouping — har position pe sirf 1 banner
         const grouped = {};
-        const seenBanners = new Set();
+        const addedPositions = new Set();
 
         list.forEach((b) => {
-          const bannerId = b._id || b.id;
           const positions =
             Array.isArray(b.positions) && b.positions.length > 0
               ? b.positions
@@ -382,17 +297,12 @@ function Home() {
               ? [b.position]
               : [];
 
-          if (positions.length === 0) return;
-
-          // ✅ Sirf first position use karo
-          const pos = positions[0];
-
-          // ✅ Agar same banner already add ho chuka hai toh skip
-          if (seenBanners.has(bannerId)) return;
-
-          if (!grouped[pos]) grouped[pos] = [];
-          grouped[pos].push(b);
-          seenBanners.add(bannerId);
+          positions.forEach((pos) => {
+            if (addedPositions.has(pos)) return;
+            if (!grouped[pos]) grouped[pos] = [];
+            grouped[pos].push(b);
+            addedPositions.add(pos);
+          });
         });
 
         setBannersByPosition(grouped);
@@ -524,7 +434,7 @@ function Home() {
     [getSizeConfig]
   );
 
-  /* ---------------- Product slices ---------------- */
+  /* ---------------- ✅ Product slices — subcategory-wise balanced ---------------- */
   const productSlices = useMemo(() => {
     if (!products.length) {
       return {
@@ -541,29 +451,68 @@ function Home() {
       };
     }
 
+    // ✅ Active check
+    const isActive = (p) =>
+      p.status === 'active' || p.isActive === true || p.is_active === 1;
+
+    // ✅ Category filter
     const byCategory = (cat) =>
       products.filter(
         (p) =>
           (p.mainCategory || p.category || p.main_category || '').toLowerCase() ===
-            cat.toLowerCase() && (p.status === 'active' || p.isActive === true || p.is_active === 1)
+            cat.toLowerCase() && isActive(p)
       );
+
+    // ✅ Balanced selection — har subcategory se 2-2 random
+    const balancedByCategory = (cat, perSub = 2, maxTotal = 8) => {
+      const categoryProducts = byCategory(cat);
+      if (categoryProducts.length === 0) return [];
+
+      // Subcategory ke hisaab se group
+      const bySub = {};
+      categoryProducts.forEach((p) => {
+        const sub = p.subCategory || p.sub_category || 'Other';
+        if (!bySub[sub]) bySub[sub] = [];
+        bySub[sub].push(p);
+      });
+
+      const subKeys = Object.keys(bySub);
+
+      // Agar sirf 1 subcategory hai toh seedha random
+      if (subKeys.length === 1) {
+        return [...bySub[subKeys[0]]]
+          .sort(() => Math.random() - 0.5)
+          .slice(0, maxTotal);
+      }
+
+      // Har subcategory se 2-2 random lo
+      const picked = [];
+      subKeys.forEach((sub) => {
+        const shuffled = [...bySub[sub]].sort(() => Math.random() - 0.5);
+        picked.push(...shuffled.slice(0, perSub));
+      });
+
+      // ✅ Final random shuffle — mix ho jaye
+      return picked.sort(() => Math.random() - 0.5).slice(0, maxTotal);
+    };
 
     return {
       newArrivals:
-        products.filter((p) => p.isNew).length > 0
-          ? products.filter((p) => p.isNew).slice(0, 4)
+        products.filter((p) => p.isNew && isActive(p)).length > 0
+          ? products.filter((p) => p.isNew && isActive(p)).slice(0, 4)
           : [...products]
+              .filter(isActive)
               .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
               .slice(0, 4),
-      skincareProducts: byCategory('skincare').slice(0, 8),
-      makeupProducts: byCategory('makeup').slice(0, 8),
-      haircareProducts: byCategory('haircare').slice(0, 8),
-      fashionProducts: byCategory('fashion').slice(0, 8),
-      accessoriesProducts: byCategory('accessories').slice(0, 8),
-      electronicsProducts: byCategory('electronics').slice(0, 8),
-      homeKitchenProducts: byCategory('home & kitchen').slice(0, 8),
-      healthProducts: byCategory('health & wellness').slice(0, 8),
-      booksProducts: byCategory('books & stationery').slice(0, 8),
+      skincareProducts: balancedByCategory('skincare'),
+      makeupProducts: balancedByCategory('makeup'),
+      haircareProducts: balancedByCategory('haircare'),
+      fashionProducts: balancedByCategory('fashion'),
+      accessoriesProducts: balancedByCategory('accessories'),
+      electronicsProducts: balancedByCategory('electronics'),
+      homeKitchenProducts: balancedByCategory('home & kitchen'),
+      healthProducts: balancedByCategory('health & wellness'),
+      booksProducts: balancedByCategory('books & stationery'),
     };
   }, [products]);
 
@@ -693,10 +642,7 @@ function Home() {
     <>
       <Helmet>
         <title>MyPinkShop - Best Online Shopping for Beauty, Fashion & More</title>
-        <meta
-          name="description"
-          content="Shop skincare, makeup, fashion, electronics, and more at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available."
-        />
+        <meta name="description" content="Shop skincare, makeup, fashion, electronics, and more at MyPinkShop. Best prices, free shipping on orders above ₹499, COD available." />
         <link rel="canonical" href="https://www.mypinkshop.com" />
       </Helmet>
 
@@ -814,7 +760,7 @@ function Home() {
         {/* TRUST BADGES */}
         <TrustBadges />
 
-        {/* ✅ CATEGORIES — Mobile horizontal scroll, Desktop grid */}
+        {/* ✅ CATEGORIES — Mobile scroll with blink arrow */}
         <section className="py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-8">
@@ -824,21 +770,28 @@ function Home() {
               <p className="text-gray-600 font-medium">Discover your favorite products</p>
             </div>
 
-            {/* ✅ Mobile: horizontal scroll */}
-            <div className="sm:hidden flex gap-3 overflow-x-auto pb-3 scrollbar-hide -mx-4 px-4">
-              {categories.map((cat, idx) => (
-                <Link
-                  key={idx}
-                  to={cat.link}
-                  className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.bg} p-4 text-center hover:shadow-2xl transition-all border-2 border-white shadow-lg shrink-0 w-32`}
-                >
-                  <div className="w-14 h-14 mx-auto bg-white rounded-full flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition shadow-md">
-                    {cat.image}
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-xs">{cat.name}</h3>
-                  <p className="text-[10px] text-gray-700 mt-1 font-medium">Shop Now →</p>
-                </Link>
-              ))}
+            {/* ✅ Mobile: horizontal scroll with blink arrow */}
+            <div className="sm:hidden relative">
+              <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide -mx-4 px-4">
+                {categories.map((cat, idx) => (
+                  <Link
+                    key={idx}
+                    to={cat.link}
+                    className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cat.bg} p-4 text-center hover:shadow-2xl transition-all border-2 border-white shadow-lg shrink-0 w-32`}
+                  >
+                    <div className="w-14 h-14 mx-auto bg-white rounded-full flex items-center justify-center text-2xl mb-2 group-hover:scale-110 transition shadow-md">
+                      {cat.image}
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-xs">{cat.name}</h3>
+                    <p className="text-[10px] text-gray-700 mt-1 font-medium">Shop Now →</p>
+                  </Link>
+                ))}
+              </div>
+
+              {/* ✅ Right fade + blink arrow */}
+              <div className="absolute right-0 top-0 bottom-3 w-16 bg-gradient-to-l from-white to-transparent pointer-events-none flex items-center justify-end pr-1">
+                <div className="animate-bounce-right text-pink-500 text-3xl font-bold">›</div>
+              </div>
             </div>
 
             {/* ✅ Desktop: grid */}
@@ -904,7 +857,7 @@ function Home() {
           </section>
         )}
 
-        {/* NEW ARRIVALS — 1 line (4 products) */}
+        {/* NEW ARRIVALS */}
         {newArrivals.length > 0 && (
           <section className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -961,13 +914,11 @@ function Home() {
           </section>
         )}
 
-        {/* ✅ SAARI 9 CATEGORY SECTIONS + BANNERS (per category) */}
+        {/* ✅ CATEGORY SECTIONS + PER-CATEGORY BANNERS */}
         {CATEGORY_SECTIONS.map((section) => {
           const sectionProducts = sectionProductsMap[section.key] || [];
-          // ✅ Empty categories skip
           if (sectionProducts.length === 0) return null;
 
-          // ✅ Category-specific banners only (global nahi)
           const categoryMid1 = bannersByPosition[`${section.positionPrefix}_mid_1`] || [];
           const categoryMid2 = bannersByPosition[`${section.positionPrefix}_mid_2`] || [];
           const categoryBottom = bannersByPosition[`${section.positionPrefix}_bottom`] || [];
@@ -978,11 +929,7 @@ function Home() {
 
           return (
             <div key={section.key}>
-              {/* CATEGORY SECTION */}
-              <section
-                ref={sectionRefs[section.key]}
-                className={`py-12 bg-gradient-to-br ${section.bgGradient}`}
-              >
+              <section ref={sectionRefs[section.key]} className={`py-12 bg-gradient-to-br ${section.bgGradient}`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
@@ -1021,36 +968,21 @@ function Home() {
                 </div>
               </section>
 
-              {/* ✅ CATEGORY MID 1 BANNER */}
               {categoryMid1.length > 0 && (
                 <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-                  <BannerRenderer
-                    banners={categoryMid1}
-                    size={catMid1Props.sizeConfig}
-                    style={catMid1Props.style}
-                  />
+                  <BannerRenderer banners={categoryMid1} size={catMid1Props.sizeConfig} style={catMid1Props.style} />
                 </section>
               )}
 
-              {/* ✅ CATEGORY MID 2 BANNER */}
               {categoryMid2.length > 0 && (
                 <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-                  <BannerRenderer
-                    banners={categoryMid2}
-                    size={catMid2Props.sizeConfig}
-                    style={catMid2Props.style}
-                  />
+                  <BannerRenderer banners={categoryMid2} size={catMid2Props.sizeConfig} style={catMid2Props.style} />
                 </section>
               )}
 
-              {/* ✅ CATEGORY BOTTOM BANNER */}
               {categoryBottom.length > 0 && (
                 <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-                  <BannerRenderer
-                    banners={categoryBottom}
-                    size={catBottomProps.sizeConfig}
-                    style={catBottomProps.style}
-                  />
+                  <BannerRenderer banners={categoryBottom} size={catBottomProps.sizeConfig} style={catBottomProps.style} />
                 </section>
               )}
             </div>
@@ -1068,6 +1000,13 @@ function Home() {
         <style>{`
           .scrollbar-hide::-webkit-scrollbar { display: none; }
           .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+          @keyframes bounce-right {
+            0%, 100% { transform: translateX(0); opacity: 1; }
+            50% { transform: translateX(6px); opacity: 0.4; }
+          }
+          .animate-bounce-right {
+            animation: bounce-right 1.5s ease-in-out infinite;
+          }
         `}</style>
       </div>
     </>
