@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// src/pages/admin/AdminCustomers.jsx
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AdminSidebar from './components/AdminSidebar';
 import toast from 'react-hot-toast';
@@ -27,7 +28,9 @@ function AdminCustomers() {
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  // ✅ SAFE LOAD: Sirf ek baar load karo
+  /* ---------------------------------------------------------------- */
+  /* ✅ SAFE LOAD: Sirf ek baar                                                 */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
@@ -35,8 +38,11 @@ function AdminCustomers() {
       return;
     }
     loadCustomers(token);
-  }, []); // ✅ Empty array = Sirf ek baar chalega
+  }, []);
 
+  /* ---------------------------------------------------------------- */
+  /* ✅ LOAD CUSTOMERS — API response shape handle karo               */
+  /* ---------------------------------------------------------------- */
   const loadCustomers = async (token) => {
     try {
       setLoading(true);
@@ -58,7 +64,19 @@ function AdminCustomers() {
       const data = await res.json();
 
       if (res.ok) {
-        const customersData = data.users || data || [];
+        // ✅ API response shape handle karo: { success, data: [...] }
+        let customersData = [];
+        if (Array.isArray(data)) {
+          customersData = data;
+        } else if (Array.isArray(data.data)) {
+          customersData = data.data;
+        } else if (Array.isArray(data.users)) {
+          customersData = data.users;
+        }
+
+        // ✅ Sirf customers filter karo (admin hata do)
+        customersData = customersData.filter(u => u.role === 'customer');
+
         setCustomers(customersData);
       } else {
         setError(data.message || 'Failed to load customers');
@@ -75,7 +93,9 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ SAFE ORDERS LOAD: Sirf ek baar orders load karo
+  /* ---------------------------------------------------------------- */
+  /* ✅ SAFE ORDERS LOAD: Sirf ek baar                                 */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) return;
@@ -86,63 +106,74 @@ function AdminCustomers() {
         'Content-Type': 'application/json'
       }
     })
-    .then(res => res.json())
-    .then(data => {
-      if (Array.isArray(data)) {
-        setOrders(data);
-        calculateStats(customers, data);
-      }
-    })
-    .catch(err => console.error('Error loading orders:', err));
-  }, []); // ✅ Empty array = Sirf ek baar chalega
+      .then(res => res.json())
+      .then(data => {
+        // ✅ API response shape handle karo
+        let ordersData = [];
+        if (Array.isArray(data)) {
+          ordersData = data;
+        } else if (Array.isArray(data.data)) {
+          ordersData = data.data;
+        } else if (Array.isArray(data.orders)) {
+          ordersData = data.orders;
+        }
+        setOrders(ordersData);
+      })
+      .catch(err => console.error('Error loading orders:', err));
+  }, []);
 
-  // ✅ SAFE STATS CALCULATION: Customers ya Orders change hone par chalega
+  /* ---------------------------------------------------------------- */
+  /* ✅ STATS CALCULATION — No setCustomers, no infinite loop          */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
-    calculateStats(customers, orders);
-  }, [customers, orders]);
+    if (!customers || !orders) return;
 
-  const calculateStats = (customersList, ordersList) => {
-    if (!customersList || !ordersList) return;
+    const active = customers.filter(
+      c => c.status === 'active' || c.status === 'approved'
+    ).length;
+    const blocked = customers.filter(
+      c => c.status === 'blocked' || c.status === 'suspended'
+    ).length;
 
-    const active = customersList.filter(c => c.status === 'active' || c.status === 'approved').length;
-    const blocked = customersList.filter(c => c.status === 'blocked' || c.status === 'suspended').length;
-    
-    const customerStats = {};
-    ordersList.forEach(order => {
-      const customerId = order.userId?._id || order.buyerId;
-      if (!customerId) return;
-      
-      if (!customerStats[customerId]) {
-        customerStats[customerId] = { orderCount: 0, totalSpent: 0 };
-      }
-      customerStats[customerId].orderCount++;
-      customerStats[customerId].totalSpent += order.total || 0;
-    });
-
-    const updatedCustomers = customersList.map(customer => {
-      const stats = customerStats[customer._id] || customerStats[customer.id] || { orderCount: 0, totalSpent: 0 };
-      return {
-        ...customer,
-        orderCount: stats.orderCount,
-        totalSpent: stats.totalSpent
-      };
-    });
-
-    setCustomers(updatedCustomers);
-
-    const totalOrders = ordersList.length;
-    const totalSpent = ordersList.reduce((sum, order) => sum + (order.total || 0), 0);
+    const totalOrders = orders.length;
+    const totalSpent = orders.reduce((sum, order) => sum + (order.total || 0), 0);
 
     setStats({
-      totalCustomers: customersList.length,
+      totalCustomers: customers.length,
       activeCustomers: active,
       blockedCustomers: blocked,
       totalOrders,
       totalSpent
     });
-  };
+  }, [customers, orders]);
 
-  // ✅ Block customer
+  /* ---------------------------------------------------------------- */
+  /* ✅ CUSTOMERS WITH STATS — useMemo, no infinite loop              */
+  /* ---------------------------------------------------------------- */
+  const customersWithStats = useMemo(() => {
+    const statsMap = {};
+    orders.forEach(order => {
+      const id = order.userId?._id || order.userId || order.buyerId;
+      if (!id) return;
+      if (!statsMap[id]) statsMap[id] = { orderCount: 0, totalSpent: 0 };
+      statsMap[id].orderCount++;
+      statsMap[id].totalSpent += order.total || 0;
+    });
+
+    return customers.map(c => {
+      const key = c._id || c.id;
+      const s = statsMap[key] || { orderCount: 0, totalSpent: 0 };
+      return {
+        ...c,
+        orderCount: s.orderCount,
+        totalSpent: s.totalSpent
+      };
+    });
+  }, [customers, orders]);
+
+  /* ---------------------------------------------------------------- */
+  /* ✅ BLOCK CUSTOMER                                                 */
+  /* ---------------------------------------------------------------- */
   const blockCustomer = async (id) => {
     if (!window.confirm('Are you sure you want to block this customer?')) return;
 
@@ -174,7 +205,9 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ Unblock customer
+  /* ---------------------------------------------------------------- */
+  /* ✅ UNBLOCK CUSTOMER                                               */
+  /* ---------------------------------------------------------------- */
   const unblockCustomer = async (id) => {
     const token = localStorage.getItem('adminToken');
     setProcessingId(id);
@@ -204,8 +237,10 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ Reset password
-  const resetPassword = async (customer) => {
+  /* ---------------------------------------------------------------- */
+  /* ✅ RESET PASSWORD                                                 */
+  /* ---------------------------------------------------------------- */
+  const resetPassword = (customer) => {
     setSelectedCustomer(customer);
     setNewPassword('');
     setConfirmPassword('');
@@ -226,14 +261,17 @@ function AdminCustomers() {
     setProcessingId(selectedCustomer._id || selectedCustomer.id);
 
     try {
-      const res = await fetch(`${API_URL}/api/users/${selectedCustomer._id || selectedCustomer.id}/reset-password`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ password: newPassword })
-      });
+      const res = await fetch(
+        `${API_URL}/api/users/${selectedCustomer._id || selectedCustomer.id}/reset-password`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ password: newPassword })
+        }
+      );
 
       const data = await res.json();
 
@@ -254,7 +292,9 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ Edit customer name
+  /* ---------------------------------------------------------------- */
+  /* ✅ EDIT CUSTOMER NAME                                             */
+  /* ---------------------------------------------------------------- */
   const editCustomer = async (customer) => {
     const newName = window.prompt('Enter new name:', customer.name);
     if (!newName || !newName.trim()) return;
@@ -288,7 +328,9 @@ function AdminCustomers() {
     }
   };
 
-  // ✅ Delete customer
+  /* ---------------------------------------------------------------- */
+  /* ✅ DELETE CUSTOMER                                                */
+  /* ---------------------------------------------------------------- */
   const deleteCustomer = async (id) => {
     if (!window.confirm('⚠️ Are you sure you want to permanently delete this customer?')) return;
 
@@ -320,6 +362,9 @@ function AdminCustomers() {
     }
   };
 
+  /* ---------------------------------------------------------------- */
+  /* ✅ HELPERS                                                        */
+  /* ---------------------------------------------------------------- */
   const viewCustomerDetails = (customer) => {
     setSelectedCustomer(customer);
     setShowDetailsModal(true);
@@ -332,24 +377,32 @@ function AdminCustomers() {
     return 'bg-gray-100 text-gray-700';
   };
 
-  const filteredCustomers = customers.filter(c => {
-    if (filterStatus !== 'all') {
-      if (filterStatus === 'active' && c.status !== 'active' && c.status !== 'approved') return false;
-      if (filterStatus === 'blocked' && c.status !== 'blocked' && c.status !== 'suspended') return false;
-      if (filterStatus === 'pending' && c.status !== 'pending') return false;
-    }
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        (c.name && c.name.toLowerCase().includes(searchLower)) ||
-        (c.email && c.email.toLowerCase().includes(searchLower)) ||
-        (c.phone && c.phone.includes(searchTerm)) ||
-        (c._id && c._id.toString().includes(searchTerm))
-      );
-    }
-    return true;
-  });
+  /* ---------------------------------------------------------------- */
+  /* ✅ FILTERED CUSTOMERS — customersWithStats use karo              */
+  /* ---------------------------------------------------------------- */
+  const filteredCustomers = useMemo(() => {
+    return customersWithStats.filter(c => {
+      if (filterStatus !== 'all') {
+        if (filterStatus === 'active' && c.status !== 'active' && c.status !== 'approved') return false;
+        if (filterStatus === 'blocked' && c.status !== 'blocked' && c.status !== 'suspended') return false;
+        if (filterStatus === 'pending' && c.status !== 'pending') return false;
+      }
+      if (searchTerm) {
+        const s = searchTerm.toLowerCase();
+        return (
+          (c.name && c.name.toLowerCase().includes(s)) ||
+          (c.email && c.email.toLowerCase().includes(s)) ||
+          (c.phone && c.phone.includes(searchTerm)) ||
+          (c._id && c._id.toString().includes(searchTerm))
+        );
+      }
+      return true;
+    });
+  }, [customersWithStats, filterStatus, searchTerm]);
 
+  /* ---------------------------------------------------------------- */
+  /* ✅ LOADING / ERROR                                                */
+  /* ---------------------------------------------------------------- */
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -368,8 +421,8 @@ function AdminCustomers() {
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
           <p className="text-gray-500 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
           >
             Try Again
@@ -379,22 +432,29 @@ function AdminCustomers() {
     );
   }
 
+  /* ---------------------------------------------------------------- */
+  /* ✅ RENDER                                                         */
+  /* ---------------------------------------------------------------- */
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <AdminSidebar />
-      
+
       {/* Header */}
       <div className="bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 fixed top-0 right-0 left-0 md:left-64 z-40 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">👥 Customer Management</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Manage, monitor, and control customer accounts</p>
+            <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+              👥 Customer Management
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Manage, monitor, and control customer accounts
+            </p>
           </div>
           <div className="w-full sm:w-auto">
             <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Search by name, email, phone or ID..." 
+              <input
+                type="text"
+                placeholder="Search by name, email, phone or ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full sm:w-64 lg:w-80 pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-gray-50"
@@ -408,8 +468,8 @@ function AdminCustomers() {
       {/* Main Content */}
       <div className="md:ml-64">
         <div className="pt-20 sm:pt-24 md:pt-24 px-3 sm:px-4 md:px-6 pb-6">
-          
-          {/* Clickable Stats Cards */}
+
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
             <Link to="/admin/customers" className="bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition">
               <div className="flex items-center justify-between mb-1 sm:mb-2">
@@ -510,7 +570,7 @@ function AdminCustomers() {
                           <span className="font-semibold text-pink-600 text-xs sm:text-sm">₹{(customer.totalSpent || 0).toLocaleString()}</span>
                         </td>
                         <td className="hidden md:table-cell px-3 sm:px-5 py-2 sm:py-3 text-center">
-                          <span className="text-[10px] sm:text-xs text-gray-500">{customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : 'N/A'}</span>
+                          <span className="text-[10px] sm:text-xs text-gray-500">{customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : (customer.created_at ? new Date(customer.created_at).toLocaleDateString() : 'N/A')}</span>
                         </td>
                         <td className="px-3 sm:px-5 py-2 sm:py-3 text-center">
                           <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getStatusColor(customer.status)}`}>
@@ -522,7 +582,7 @@ function AdminCustomers() {
                             <button onClick={() => viewCustomerDetails(customer)} className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="View Details">👁️</button>
                             <button onClick={() => editCustomer(customer)} className="p-1 text-purple-500 hover:bg-purple-50 rounded-lg transition" title="Edit">✏️</button>
                             <button onClick={() => resetPassword(customer)} className="p-1 text-yellow-500 hover:bg-yellow-50 rounded-lg transition" title="Reset Password">🔑</button>
-                            {(customer.status === 'active' || customer.status === 'approved') ? (
+                            {(customer.status === 'active' || customer.status === 'approved' || !customer.status) ? (
                               <button onClick={() => blockCustomer(customer._id || customer.id)} disabled={processingId === (customer._id || customer.id)} className="p-1 text-orange-500 hover:bg-orange-50 rounded-lg transition disabled:opacity-50" title="Block">🔒</button>
                             ) : (customer.status === 'blocked' || customer.status === 'suspended') ? (
                               <button onClick={() => unblockCustomer(customer._id || customer.id)} disabled={processingId === (customer._id || customer.id)} className="p-1 text-green-500 hover:bg-green-50 rounded-lg transition disabled:opacity-50" title="Unblock">🔓</button>
@@ -559,7 +619,7 @@ function AdminCustomers() {
                 </div>
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-gray-800">{selectedCustomer.name}</h2>
-                  <p className="text-xs text-gray-500">Since {selectedCustomer.createdAt ? new Date(selectedCustomer.createdAt).toLocaleDateString() : 'N/A'}</p>
+                  <p className="text-xs text-gray-500">Since {selectedCustomer.createdAt || selectedCustomer.created_at ? new Date(selectedCustomer.createdAt || selectedCustomer.created_at).toLocaleDateString() : 'N/A'}</p>
                   <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>{selectedCustomer.status || 'active'}</span>
                 </div>
               </div>
@@ -586,7 +646,7 @@ function AdminCustomers() {
                 <Link to={`/admin/orders?customer=${selectedCustomer.email}`} className="text-center bg-pink-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-pink-600 transition">View Orders</Link>
                 <button onClick={() => { editCustomer(selectedCustomer); setShowDetailsModal(false); }} className="text-center bg-purple-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-purple-600 transition">Edit Profile</button>
                 <button onClick={() => { resetPassword(selectedCustomer); setShowDetailsModal(false); }} className="text-center bg-yellow-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-yellow-600 transition">Reset Password</button>
-                {(selectedCustomer.status === 'active' || selectedCustomer.status === 'approved') ? (
+                {(selectedCustomer.status === 'active' || selectedCustomer.status === 'approved' || !selectedCustomer.status) ? (
                   <button onClick={() => { blockCustomer(selectedCustomer._id || selectedCustomer.id); setShowDetailsModal(false); }} disabled={processingId === (selectedCustomer._id || selectedCustomer.id)} className="text-center bg-orange-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-orange-600 transition disabled:opacity-50">Block</button>
                 ) : (selectedCustomer.status === 'blocked' || selectedCustomer.status === 'suspended') ? (
                   <button onClick={() => { unblockCustomer(selectedCustomer._id || selectedCustomer.id); setShowDetailsModal(false); }} disabled={processingId === (selectedCustomer._id || selectedCustomer.id)} className="text-center bg-green-500 text-white py-2 rounded-xl text-xs sm:text-sm font-medium hover:bg-green-600 transition disabled:opacity-50">Unblock</button>
