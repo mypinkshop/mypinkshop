@@ -642,11 +642,6 @@ function AdminAddProduct() {
 
   const [productId] = useState(() => `prod_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`);
 
-  const [customSubCategories, setCustomSubCategories] = useState({
-    Skincare: [], Makeup: [], Haircare: [], Fashion: [], Accessories: [],
-    Electronics: [], 'Home & Kitchen': [], 'Health & Wellness': [], 'Books & Stationery': []
-  });
-
   const [activeTab, setActiveTab] = useState('manual');
 
   const [seoData, setSeoData] = useState({ metaTitle: '', metaDescription: '', metaKeywords: '', slug: '' });
@@ -672,7 +667,7 @@ function AdminAddProduct() {
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  /* ------------------ Fetch Categories ------------------ */
+  /* ------------------ ✅ Fetch Categories (slug-based subMap) ------------------ */
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -682,9 +677,16 @@ function AdminAddProduct() {
         const json = await res.json();
         const tree = json.data || json;
         setApiCategories(tree);
+
+        // ✅ Slug-based subcategories map
         const subMap = {};
         tree.forEach(cat => {
-          subMap[cat.name] = (cat.children || []).map(child => child.name);
+          const slug = cat.slug || cat.name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          subMap[slug] = (cat.children || []).map(child => ({
+            id: child.id,
+            name: child.name,
+            icon: child.icon || '🌸',
+          }));
         });
         setApiSubCategories(subMap);
       } catch (err) {
@@ -715,7 +717,6 @@ function AdminAddProduct() {
           } catch (e) { customBrands = []; }
         }
 
-        // Brand objects → names
         const apiBrands = Array.isArray(brandList)
           ? brandList.map(b => (typeof b === 'string' ? b : b.name)).filter(Boolean)
           : [];
@@ -796,59 +797,94 @@ function AdminAddProduct() {
 
   const variationAttrs = getVariationAttributes();
 
-  useEffect(() => {
-    const savedSubCategories = localStorage.getItem('customSubCategories');
-    if (savedSubCategories) {
-      try { setCustomSubCategories(JSON.parse(savedSubCategories)); } catch (e) { /* ignore */ }
-    }
-  }, []);
-
   const saveBrands = (updatedBrands) => {
     setBrands(updatedBrands);
     const customBrands = updatedBrands.filter(b => !FALLBACK_BRANDS.includes(b));
     localStorage.setItem('brandsList', JSON.stringify(customBrands));
   };
 
-  const saveCustomSubCategory = (category, newSubCat) => {
-    const updated = { ...customSubCategories, [category]: [...(customSubCategories[category] || []), newSubCat] };
-    setCustomSubCategories(updated);
-    localStorage.setItem('customSubCategories', JSON.stringify(updated));
+  /* ------------------ ✅ getCurrentSubCategories — slug-based API ------------------ */
+  const getCurrentSubCategories = () => {
+    const category = formData.category;
+    if (!category) return [];
+
+    // ✅ Category name → slug convert karo
+    const slug = category
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // ✅ API se subcategories lo
+    const apiSubs = apiSubCategories[slug] || [];
+
+    // ✅ Case-insensitive dedupe
+    const seen = new Set();
+    const result = [];
+    apiSubs.forEach((s) => {
+      const name = typeof s === 'string' ? s : (s.name || '');
+      const clean = String(name).trim();
+      const key = clean.toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      result.push(clean);
+    });
+    return result;
   };
 
-  const getCurrentSubCategories = () => {
-  const category = formData.category;
-  if (!category) return [];
-  const apiSubs = apiSubCategories[category] || [];
-  const fallbackSubs = fallbackSubCategories[category] || [];
-  const customSubs = customSubCategories[category] || [];
+  /* ------------------ ✅ handleAddNewSubCategory — API call ------------------ */
+  const handleAddNewSubCategory = async () => {
+    const name = newSubCategory.trim();
+    if (!name || !formData.category) {
+      toast.error('Please select a category first');
+      return;
+    }
 
-  // Case-insensitive dedupe
-  const seen = new Set();
-  const result = [];
-  [...apiSubs, ...fallbackSubs, ...customSubs].forEach((s) => {
-    const name = String(s || '').trim();
-    const key = name.toLowerCase();
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    result.push(name);
-  });
-  return result;
-};
+    // ✅ Category name → slug
+    const slug = formData.category
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
 
-  const handleAddNewSubCategory = () => {
-    if (newSubCategory.trim() && formData.category) {
-      const currentOptions = getCurrentSubCategories();
-      if (!currentOptions.includes(newSubCategory.trim())) {
-        saveCustomSubCategory(formData.category, newSubCategory.trim());
-        setFormData({ ...formData, subCategory: newSubCategory.trim() });
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_URL}/api/subcategories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          category_slug: slug,
+          name: name,
+          icon: '🌸',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // ✅ State me nayi subcategory add karo
+        setApiSubCategories(prev => ({
+          ...prev,
+          [slug]: [...(prev[slug] || []), {
+            id: data.data.id,
+            name: data.data.name,
+            icon: data.data.icon,
+          }],
+        }));
+
+        setFormData({ ...formData, subCategory: name });
         setNewSubCategory('');
         setShowAddSubCategory(false);
-        toast.success(`✅ Sub-category "${newSubCategory.trim()}" added!`);
+        toast.success(`✅ Subcategory "${name}" added!`);
       } else {
-        toast.error('⚠️ Already exists!');
+        toast.error(data.error || 'Failed to add subcategory');
       }
-    } else {
-      toast.error('Please select a category first');
+    } catch (err) {
+      console.error('Add subcategory error:', err);
+      toast.error('Network error. Please try again.');
     }
   };
 
@@ -1076,7 +1112,7 @@ function AdminAddProduct() {
   };
 
   /* ============================================================ */
-  /* ✅ SUBMIT — Backend mapping FIXED                              */
+  /* ✅ SUBMIT                                                     */
   /* ============================================================ */
   const submitProduct = async () => {
     if (!formData.productName.trim() || !formData.brand.trim() || !formData.category || !formData.subCategory || !formData.images.length || !formData.sellingPrice) {
@@ -1105,7 +1141,6 @@ function AdminAddProduct() {
     const finalSku = formData.sku || generateSKU();
     const attrs = getVariationAttributes();
 
-    // ✅ FIXED: Backend field names
     const productData = {
       id: productId,
       name: formData.productName.trim(),
@@ -1117,10 +1152,8 @@ function AdminAddProduct() {
       keyFeatures: formData.keyFeatures,
       productDetails: {},
 
-      // ✅ PRICE FIX
       price: parseFloat(formData.sellingPrice) || 0,
       originalPrice: parseFloat(formData.mrp) || parseFloat(formData.sellingPrice) * 1.2 || 0,
-      // discountPercent backend auto-calculate karega
 
       tax: parseFloat(formData.tax) || 18,
       stock: totalStock > 0 ? totalStock : (parseInt(formData.stock) || 10),
@@ -1129,7 +1162,6 @@ function AdminAddProduct() {
       dimensions: formData.dimensions || '',
       images: formData.images,
 
-      // Category-specific
       skinType: formData.skinType || 'all',
       concerns: formData.concerns || [],
       ingredients: formData.ingredients || '',
@@ -1142,7 +1174,6 @@ function AdminAddProduct() {
       material: formData.material || '',
       gender: formData.gender || 'unisex',
 
-      // Variations
       hasVariations: variations.length > 0,
       option1Name: attrs.type,
       option2Name: attrs.secondary || '',
@@ -1156,7 +1187,6 @@ function AdminAddProduct() {
         image: v.image || '',
       })),
 
-      // SEO
       metaTitle: seoData.metaTitle,
       metaDescription: seoData.metaDescription,
       metaKeywords: seoData.metaKeywords,
