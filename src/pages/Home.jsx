@@ -180,7 +180,7 @@ const FallbackHero = () => (
 );
 
 /* ================================================================== */
-/* Category Sections Config                                           */
+/* Category Sections Config — Har category ka position prefix         */
 /* ================================================================== */
 const CATEGORY_SECTIONS = [
   {
@@ -188,7 +188,7 @@ const CATEGORY_SECTIONS = [
     name: 'Skincare',
     icon: '🧴',
     link: '/skincare',
-    dbName: 'Skincare',
+    positionPrefix: 'skincare',
     bgGradient: 'from-pink-50 to-rose-50',
     iconBg: 'from-pink-400 to-rose-500',
   },
@@ -197,7 +197,7 @@ const CATEGORY_SECTIONS = [
     name: 'Makeup',
     icon: '💄',
     link: '/makeup',
-    dbName: 'Makeup',
+    positionPrefix: 'makeup',
     bgGradient: 'from-purple-50 to-pink-50',
     iconBg: 'from-purple-400 to-pink-500',
   },
@@ -206,7 +206,7 @@ const CATEGORY_SECTIONS = [
     name: 'Haircare',
     icon: '💇‍♀️',
     link: '/hair',
-    dbName: 'Haircare',
+    positionPrefix: 'haircare',
     bgGradient: 'from-pink-50 to-amber-50',
     iconBg: 'from-pink-400 to-amber-500',
   },
@@ -215,7 +215,7 @@ const CATEGORY_SECTIONS = [
     name: 'Fashion',
     icon: '👗',
     link: '/clothing',
-    dbName: 'Fashion',
+    positionPrefix: 'fashion',
     bgGradient: 'from-rose-50 to-pink-50',
     iconBg: 'from-rose-400 to-pink-500',
   },
@@ -224,7 +224,7 @@ const CATEGORY_SECTIONS = [
     name: 'Accessories',
     icon: '👜',
     link: '/accessories',
-    dbName: 'Accessories',
+    positionPrefix: 'accessories',
     bgGradient: 'from-amber-50 to-rose-50',
     iconBg: 'from-amber-400 to-rose-500',
   },
@@ -233,7 +233,7 @@ const CATEGORY_SECTIONS = [
     name: 'Electronics',
     icon: '📱',
     link: '/electronics',
-    dbName: 'Electronics',
+    positionPrefix: 'electronics',
     bgGradient: 'from-blue-50 to-indigo-50',
     iconBg: 'from-blue-400 to-indigo-500',
   },
@@ -242,7 +242,7 @@ const CATEGORY_SECTIONS = [
     name: 'Home & Kitchen',
     icon: '🏠',
     link: '/home-kitchen',
-    dbName: 'Home & Kitchen',
+    positionPrefix: 'home_kitchen',
     bgGradient: 'from-yellow-50 to-orange-50',
     iconBg: 'from-yellow-400 to-orange-500',
   },
@@ -251,7 +251,7 @@ const CATEGORY_SECTIONS = [
     name: 'Health & Wellness',
     icon: '💊',
     link: '/health',
-    dbName: 'Health & Wellness',
+    positionPrefix: 'health',
     bgGradient: 'from-green-50 to-emerald-50',
     iconBg: 'from-green-400 to-emerald-500',
   },
@@ -260,7 +260,7 @@ const CATEGORY_SECTIONS = [
     name: 'Books & Stationery',
     icon: '📚',
     link: '/books',
-    dbName: 'Books & Stationery',
+    positionPrefix: 'books',
     bgGradient: 'from-cyan-50 to-blue-50',
     iconBg: 'from-cyan-400 to-blue-500',
   },
@@ -283,17 +283,10 @@ function Home() {
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [bannersByPosition, setBannersByPosition] = useState({
-    home_hero: [],
-    category_mid_1: [],
-    category_mid_2: [],
-    category_mid_3: [],
-    category_bottom: [],
-  });
+  const [bannersByPosition, setBannersByPosition] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [sponsoredProducts, setSponsoredProducts] = useState([]);
   const [bannerAds, setBannerAds] = useState([]);
-
   const [bannerOptions, setBannerOptions] = useState({ sizes: [], styles: [] });
 
   // ✅ Saari 9 categories ke liye visibility
@@ -331,7 +324,6 @@ function Home() {
     const loadProducts = async () => {
       try {
         setLoading(true);
-
         const cached = getCacheWithTTL(sessionStorage, 'products_cache');
         if (cached) {
           const productsArray = Array.isArray(cached) ? cached : (cached.data || []);
@@ -339,15 +331,12 @@ function Home() {
           setLoading(false);
           return;
         }
-
         const response = await fetch(`${API_URL}/api/products`, {
           signal: abortController.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
         const data = await response.json();
         const productsArray = Array.isArray(data) ? data : (data.data || []);
-
         setCacheWithTTL(sessionStorage, 'products_cache', data, 60 * 1000);
         setProducts(productsArray);
       } catch (error) {
@@ -375,23 +364,15 @@ function Home() {
           setBannersByPosition(cached);
           return;
         }
-
         const response = await fetch(`${API_URL}/api/banners/active`, {
           signal: abortController.signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
         const data = await response.json();
         const list = Array.isArray(data) ? data : (data.data || []);
 
-        const grouped = {
-          home_hero: [],
-          category_mid_1: [],
-          category_mid_2: [],
-          category_mid_3: [],
-          category_bottom: [],
-        };
-
+        // ✅ Dynamic grouping — saari positions handle karega
+        const grouped = {};
         list.forEach((b) => {
           const positions =
             Array.isArray(b.positions) && b.positions.length > 0
@@ -399,9 +380,9 @@ function Home() {
               : b.position
               ? [b.position]
               : [];
-
           positions.forEach((pos) => {
-            if (grouped[pos]) grouped[pos].push(b);
+            if (!grouped[pos]) grouped[pos] = [];
+            grouped[pos].push(b);
           });
         });
 
@@ -410,13 +391,7 @@ function Home() {
       } catch (error) {
         if (error.name !== 'AbortError') {
           console.error('Error loading banners:', error);
-          setBannersByPosition({
-            home_hero: [],
-            category_mid_1: [],
-            category_mid_2: [],
-            category_mid_3: [],
-            category_bottom: [],
-          });
+          setBannersByPosition({});
         }
       }
     };
@@ -451,9 +426,7 @@ function Home() {
       try {
         const response = await fetch(`${API_URL}/api/ads/public/sponsored-products?limit=4`);
         const data = await response.json();
-        if (data.success && data.products) {
-          setSponsoredProducts(data.products);
-        }
+        if (data.success && data.products) setSponsoredProducts(data.products);
       } catch (error) {
         console.error('Error fetching sponsored products:', error);
       }
@@ -469,9 +442,7 @@ function Home() {
           `${API_URL}/api/ads/public/banners?position=homepage_top&limit=3`
         );
         const data = await response.json();
-        if (data.success && data.banners) {
-          setBannerAds(data.banners);
-        }
+        if (data.success && data.banners) setBannerAds(data.banners);
       } catch (error) {
         console.error('Error fetching banner ads:', error);
       }
@@ -531,23 +502,20 @@ function Home() {
       if (!Array.isArray(banners) || banners.length === 0) {
         return { sizeConfig: null, style: 'single' };
       }
-
       const first = banners[0];
       const sizeConfig = getSizeConfig(first.size || 'large');
       let style = first.display_style || 'single';
-
       if (banners.length > 1) {
         if (style === 'single' || style === 'split' || style === 'overlay') {
           style = 'slide';
         }
       }
-
       return { sizeConfig, style };
     },
     [getSizeConfig]
   );
 
-  /* ---------------- Product slices — saari 9 categories ---------------- */
+  /* ---------------- Product slices ---------------- */
   const productSlices = useMemo(() => {
     if (!products.length) {
       return {
@@ -574,10 +542,10 @@ function Home() {
     return {
       newArrivals:
         products.filter((p) => p.isNew).length > 0
-          ? products.filter((p) => p.isNew).slice(0, 8)
+          ? products.filter((p) => p.isNew).slice(0, 4)
           : [...products]
               .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
-              .slice(0, 8),
+              .slice(0, 4),
       skincareProducts: byCategory('skincare').slice(0, 8),
       makeupProducts: byCategory('makeup').slice(0, 8),
       haircareProducts: byCategory('haircare').slice(0, 8),
@@ -603,7 +571,7 @@ function Home() {
     booksProducts,
   } = productSlices;
 
-  // ✅ Category sections ke saath products map karo
+  // ✅ Category sections ke saath products map
   const sectionProductsMap = {
     skincare: skincareProducts,
     makeup: makeupProducts,
@@ -690,7 +658,7 @@ function Home() {
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              {[1, 2, 3, 4].map((i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
@@ -883,9 +851,7 @@ function Home() {
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-lg">📢</span>
                 <h2 className="text-xl font-bold text-gray-900">Sponsored</h2>
-                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                  Ads
-                </span>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">Ads</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {bannerAds.map((banner) => (
@@ -897,32 +863,21 @@ function Home() {
                     className="group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all hover:scale-[1.01]"
                   >
                     {banner.banner?.imageUrl ? (
-                      <img
-                        src={banner.banner.imageUrl}
-                        alt={banner.name || 'Sponsored banner'}
-                        loading="lazy"
-                        className="w-full h-48 sm:h-56 md:h-64 object-cover"
-                      />
+                      <img src={banner.banner.imageUrl} alt={banner.name || 'Sponsored banner'} loading="lazy" className="w-full h-48 sm:h-56 md:h-64 object-cover" />
                     ) : (
                       <div className="w-full h-48 sm:h-56 md:h-64 bg-gradient-to-r from-blue-400 to-purple-400 flex items-center justify-center">
-                        <span className="text-white text-2xl font-bold">
-                          📢 {banner.name || 'Sponsored'}
-                        </span>
+                        <span className="text-white text-2xl font-bold">📢 {banner.name || 'Sponsored'}</span>
                       </div>
                     )}
-
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
                       <div className="text-white">
                         <p className="text-sm font-semibold">{banner.name || 'Sponsored'}</p>
                         <p className="text-xs text-white/80">{banner.vendorName || 'Vendor'}</p>
                         {banner.banner?.ctaText && (
-                          <span className="inline-block mt-1 bg-white/20 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full">
-                            {banner.banner.ctaText}
-                          </span>
+                          <span className="inline-block mt-1 bg-white/20 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full">{banner.banner.ctaText}</span>
                         )}
                       </div>
                     </div>
-
                     <div className="absolute top-3 right-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
                       <span>📢</span> Sponsored
                     </div>
@@ -933,17 +888,13 @@ function Home() {
           </section>
         )}
 
-        {/* NEW ARRIVALS */}
+        {/* NEW ARRIVALS — 1 line (4 products) */}
         {newArrivals.length > 0 && (
           <section className="py-12 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  🆕 New Arrivals
-                </h2>
-                <Link to="/shop?sort=newest" className="text-pink-600 text-sm font-bold hover:underline">
-                  View All →
-                </Link>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">🆕 New Arrivals</h2>
+                <Link to="/shop?sort=newest" className="text-pink-600 text-sm font-bold hover:underline">View All →</Link>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {newArrivals.map((product) => (
@@ -981,9 +932,7 @@ function Home() {
               <div className="flex items-center gap-2 mb-6">
                 <span className="text-xl">📢</span>
                 <h2 className="text-2xl font-bold text-gray-900">Sponsored Products</h2>
-                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                  Ads
-                </span>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">Ads</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {sponsoredProducts.map((product) => (
@@ -1007,57 +956,99 @@ function Home() {
           </section>
         )}
 
-        {/* ✅ SAARI 9 CATEGORY SECTIONS — same style */}
+        {/* ✅ SAARI 9 CATEGORY SECTIONS + BANNERS (per category) */}
         {CATEGORY_SECTIONS.map((section) => {
           const sectionProducts = sectionProductsMap[section.key] || [];
+          // Empty categories skip
           if (sectionProducts.length === 0) return null;
 
-          return (
-            <section
-              key={section.key}
-              ref={sectionRefs[section.key]}
-              className={`py-12 bg-gradient-to-br ${section.bgGradient}`}
-            >
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${section.iconBg} rounded-2xl flex items-center justify-center shadow-md`}>
-                      <span className="text-2xl">{section.icon}</span>
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900">{section.name}</h2>
-                  </div>
-                  <Link
-                    to={section.link}
-                    className="text-pink-600 text-sm font-bold hover:underline"
-                  >
-                    View All →
-                  </Link>
-                </div>
+          // Banner positions for this category
+          const categoryMid1 = bannersByPosition[`${section.positionPrefix}_mid_1`] || [];
+          const categoryMid2 = bannersByPosition[`${section.positionPrefix}_mid_2`] || [];
+          const categoryBottom = bannersByPosition[`${section.positionPrefix}_bottom`] || [];
 
-                {visibleSections[section.key] ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                    {sectionProducts.map((product) => (
-                      <ProductCard
-                        key={product._id || product.id}
-                        product={product}
-                        addToCart={addToCart}
-                        isInWishlist={isInWishlist}
-                        addToWishlist={addToWishlist}
-                        removeFromWishlist={removeFromWishlist}
-                        user={user}
-                        wishlistContext={wishlist}
-                      />
-                    ))}
+          const catMid1Props = getBannerProps(categoryMid1);
+          const catMid2Props = getBannerProps(categoryMid2);
+          const catBottomProps = getBannerProps(categoryBottom);
+
+          return (
+            <div key={section.key}>
+              {/* CATEGORY SECTION */}
+              <section
+                ref={sectionRefs[section.key]}
+                className={`py-12 bg-gradient-to-br ${section.bgGradient}`}
+              >
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 bg-gradient-to-br ${section.iconBg} rounded-2xl flex items-center justify-center shadow-md`}>
+                        <span className="text-2xl">{section.icon}</span>
+                      </div>
+                      <h2 className="text-2xl font-bold text-gray-900">{section.name}</h2>
+                    </div>
+                    <Link to={section.link} className="text-pink-600 text-sm font-bold hover:underline">
+                      View All →
+                    </Link>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
+
+                  {visibleSections[section.key] ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                      {sectionProducts.map((product) => (
+                        <ProductCard
+                          key={product._id || product.id}
+                          product={product}
+                          addToCart={addToCart}
+                          isInWishlist={isInWishlist}
+                          addToWishlist={addToWishlist}
+                          removeFromWishlist={removeFromWishlist}
+                          user={user}
+                          wishlistContext={wishlist}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="bg-white rounded-2xl h-64 animate-pulse"></div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* ✅ CATEGORY MID 1 BANNER */}
+              {categoryMid1.length > 0 && (
+                <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
+                  <BannerRenderer
+                    banners={categoryMid1}
+                    size={catMid1Props.sizeConfig}
+                    style={catMid1Props.style}
+                  />
+                </section>
+              )}
+
+              {/* ✅ CATEGORY MID 2 BANNER */}
+              {categoryMid2.length > 0 && (
+                <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
+                  <BannerRenderer
+                    banners={categoryMid2}
+                    size={catMid2Props.sizeConfig}
+                    style={catMid2Props.style}
+                  />
+                </section>
+              )}
+
+              {/* ✅ CATEGORY BOTTOM BANNER */}
+              {categoryBottom.length > 0 && (
+                <section className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
+                  <BannerRenderer
+                    banners={categoryBottom}
+                    size={catBottomProps.sizeConfig}
+                    style={catBottomProps.style}
+                  />
+                </section>
+              )}
+            </div>
           );
         })}
 
