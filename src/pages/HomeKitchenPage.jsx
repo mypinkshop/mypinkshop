@@ -155,7 +155,6 @@ function HomeKitchenPage() {
         const productsArray = (Array.isArray(data) ? data : (data.data || []))
           .map(normalizeProduct);
 
-        // ✅ 'Home & Kitchen' category check (normalized)
         const homeKitchenProducts = productsArray.filter(
           (p) => isProductActive(p) && normalizeCategory(p.mainCategory) === 'homeandkitchen'
         );
@@ -591,6 +590,7 @@ function HomeKitchenPage() {
                       removeFromWishlist={removeFromWishlist}
                       user={user}
                       wishlistContext={wishlist}
+                      theme="orange"
                     />
                   ))}
                 </div>
@@ -617,6 +617,7 @@ function HomeKitchenPage() {
                             removeFromWishlist={removeFromWishlist}
                             user={user}
                             wishlistContext={wishlist}
+                            theme="orange"
                           />
                         ))}
                       </div>
@@ -662,6 +663,7 @@ function HomeKitchenPage() {
                                 removeFromWishlist={removeFromWishlist}
                                 user={user}
                                 wishlistContext={wishlist}
+                                theme="orange"
                               />
                             ))}
                           </div>
@@ -701,7 +703,7 @@ function HomeKitchenPage() {
           </div>
         </div>
 
-        {/* FOOTER — same as SkincarePage */}
+        {/* FOOTER */}
         <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
