@@ -74,6 +74,8 @@ function ClothingPage() {
   const { user, logout } = useAuth();
   const { wishlist, wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
+  /* ✅ FIX 1: Do alag state — tree aur dedicated API ke liye */
+  const [treeSubcategories, setTreeSubcategories] = useState([]);
   const [apiSubcategories, setApiSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ function ClothingPage() {
 
   const SLUG = 'fashion';
 
-  /* ---------------- ✅ Load category + banners + offers ---------------- */
+  /* ---------------- ✅ Load category tree + banners + offers ---------------- */
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -104,7 +106,7 @@ function ClothingPage() {
         const tree = catJson.data || catJson;
         const found = Array.isArray(tree) ? tree.find((c) => c.slug === SLUG) : null;
         if (found) {
-          setApiSubcategories(
+          setTreeSubcategories(
             (found.children || []).map(child => ({
               id: child.id,
               name: child.name,
@@ -163,7 +165,6 @@ function ClothingPage() {
         const productsArray = (Array.isArray(data) ? data : (data.data || []))
           .map(normalizeProduct);
 
-        // ✅ 'Fashion' category check
         const fashionProducts = productsArray.filter(
           (p) => isProductActive(p) && normalizeCategory(p.mainCategory) === 'fashion'
         );
@@ -178,35 +179,43 @@ function ClothingPage() {
     loadProducts();
   }, []);
 
-  /* ---------------- Subcategories (dedupe) ---------------- */
+  /* ✅ FIX 2 & 3: Sirf wahi subcategories dikhao jisme products hain */
   const subcategories = useMemo(() => {
+    // Products me jo sub_category actually hain unka normalized set
+    const productSubs = new Set(
+      products
+        .map(p => normalizeCategory(p.subCategory))
+        .filter(Boolean)
+    );
+
+    // Source: dedicated API ko priority, warna tree, warna products
+    const source =
+      apiSubcategories.length > 0
+        ? apiSubcategories
+        : treeSubcategories.length > 0
+        ? treeSubcategories
+        : products.map(p => ({ id: p.id, name: p.subCategory, icon: '👗' }));
+
     const seen = new Set();
     const unique = [];
 
-    if (apiSubcategories.length > 0) {
-      apiSubcategories.forEach((s) => {
-        const name = typeof s === 'string' ? s : (s.name || '');
-        const key = String(name).trim().toLowerCase();
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        unique.push({
-          id: s.id || unique.length,
-          name: String(name).trim(),
-          icon: s.icon || '👗',
-        });
-      });
-      return unique;
-    }
-
-    products.forEach((p) => {
-      const name = String(p.subCategory || '').trim();
-      const key = name.toLowerCase();
+    source.forEach((s) => {
+      const name = typeof s === 'string' ? s : (s.name || '');
+      const trimmed = String(name).trim();
+      const key = normalizeCategory(trimmed);
       if (!key || seen.has(key)) return;
+      // ✅ Sirf wahi subcategory dikhao jisme product hai
+      if (!productSubs.has(key)) return;
       seen.add(key);
-      unique.push({ id: unique.length, name, icon: '👗' });
+      unique.push({
+        id: s.id || unique.length,
+        name: trimmed,
+        icon: s.icon || '👗',
+      });
     });
+
     return unique;
-  }, [apiSubcategories, products]);
+  }, [apiSubcategories, treeSubcategories, products]);
 
   /* ---------------- Filters ---------------- */
   const filteredProducts = useMemo(() => {
@@ -304,7 +313,7 @@ function ClothingPage() {
     setSortBy('default');
   };
 
-  /* ---------------- MIXED Random Products — 3 products (1 line) ---------------- */
+  /* ---------------- MIXED Random Products — 3 products ---------------- */
   const mixedRandomProducts = useMemo(() => {
     if (filteredProducts.length === 0) return [];
 
@@ -345,7 +354,7 @@ function ClothingPage() {
     return groups;
   }, [filteredProducts]);
 
-  /* ---------------- Subcategory Random — 6 products (2 lines) ---------------- */
+  /* ---------------- Subcategory Random — 6 products ---------------- */
   const subcategoryRandomMap = useMemo(() => {
     const map = {};
     Object.entries(groupedBySubcategory).forEach(([subName, subProducts]) => {
