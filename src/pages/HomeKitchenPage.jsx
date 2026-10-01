@@ -8,8 +8,59 @@ import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
 import ProductCard from '../components/ProductCard';
+import BannerRenderer from '../components/BannerRenderer';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+
+/* ✅ Category normalizer */
+const normalizeCategory = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+
+/* ✅ Active check */
+const isProductActive = (p) =>
+  p.is_active === 1 ||
+  p.is_active === true ||
+  p.isActive === true ||
+  p.status === 'active';
+
+/* ✅ Product normalizer */
+const normalizeProduct = (p) => {
+  let images = p.images;
+  if (typeof images === 'string') {
+    try { images = JSON.parse(images || '[]'); } catch { images = []; }
+  }
+  return {
+    ...p,
+    id: p.id || p._id,
+    _id: p._id || p.id,
+    images: Array.isArray(images) ? images : [],
+    mainCategory: p.main_category || p.mainCategory || p.category || '',
+    subCategory: p.sub_category || p.subCategory || p.subcategory || '',
+    originalPrice: p.original_price || p.originalPrice || 0,
+  };
+};
+
+/* ✅ Banner grouping */
+function groupBanners(list) {
+  const grouped = {};
+  list.forEach((b) => {
+    const positions =
+      Array.isArray(b.positions) && b.positions.length > 0
+        ? b.positions
+        : b.position
+        ? [b.position]
+        : [];
+    positions.forEach((pos) => {
+      if (!grouped[pos]) grouped[pos] = [];
+      grouped[pos].push(b);
+    });
+  });
+  return grouped;
+}
 
 function HomeKitchenPage() {
   const navigate = useNavigate();
@@ -20,10 +71,7 @@ function HomeKitchenPage() {
   const [apiSubcategories, setApiSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const [heroBanner, setHeroBanner] = useState(null);
-  const [midBanners, setMidBanners] = useState([]);
-  const [bottomBanner, setBottomBanner] = useState(null);
+  const [bannersByPosition, setBannersByPosition] = useState({});
   const [topOffers, setTopOffers] = useState([]);
   const [midOffers, setMidOffers] = useState([]);
 
@@ -35,36 +83,38 @@ function HomeKitchenPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
+  const [randomSeed] = useState(Date.now());
 
-  const SLUG = 'home-kitchen';
+  const SLUG = 'home-and-kitchen';
 
+  /* ---------------- ✅ Load category + banners + offers ---------------- */
   useEffect(() => {
     const loadAll = async () => {
       try {
         const catRes = await fetch(`${API_URL}/api/categories/tree`);
         const catJson = await catRes.json();
         const tree = catJson.data || catJson;
-        const found = tree.find(c => c.slug === SLUG);
-        if (found) setApiSubcategories(found.children || []);
+        const found = Array.isArray(tree) ? tree.find((c) => c.slug === SLUG) : null;
+        if (found) {
+          setApiSubcategories(
+            (found.children || []).map(child => ({
+              id: child.id,
+              name: child.name,
+              icon: child.icon || '🏠',
+            }))
+          );
+        }
 
         const bannerRes = await fetch(`${API_URL}/api/banners/active?category=${SLUG}`);
         const bannerJson = await bannerRes.json();
         const banners = Array.isArray(bannerJson) ? bannerJson : (bannerJson.data || []);
-
-        setHeroBanner(banners.find(b => b.position === 'category_hero') || null);
-        setMidBanners(
-          banners
-            .filter(b => b.position && b.position.startsWith('category_mid'))
-            .sort((a, b) => (a.position || '').localeCompare(b.position || ''))
-        );
-        setBottomBanner(banners.find(b => b.position === 'category_bottom') || null);
+        setBannersByPosition(groupBanners(banners));
 
         const offerRes = await fetch(`${API_URL}/api/offers/active?category=${SLUG}`);
         const offerJson = await offerRes.json();
         const offers = Array.isArray(offerJson) ? offerJson : (offerJson.data || []);
-
-        setTopOffers(offers.filter(o => o.position === 'category_top' || o.position === 'top_banner'));
-        setMidOffers(offers.filter(o => o.position === 'category_mid'));
+        setTopOffers(offers.filter((o) => o.position === 'category_top' || o.position === 'top_banner'));
+        setMidOffers(offers.filter((o) => o.position === 'category_mid'));
       } catch (err) {
         console.error('Load error:', err);
       }
@@ -72,34 +122,44 @@ function HomeKitchenPage() {
     loadAll();
   }, []);
 
+  /* ✅ Subcategories dedicated API */
+  useEffect(() => {
+    const loadSubs = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/subcategories/${SLUG}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setApiSubcategories(
+            json.data.map(s => ({
+              id: s.id,
+              name: s.name,
+              icon: s.icon || '🏠',
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Subcategories fetch error:', err);
+      }
+    };
+    loadSubs();
+  }, []);
+
+  /* ---------------- Load products ---------------- */
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(
-          `${API_URL}/api/products?category=${encodeURIComponent('Home & Kitchen')}&limit=200`
-        );
+        const response = await fetch(`${API_URL}/api/products`);
         if (!response.ok) throw new Error('Failed to load products');
         const data = await response.json();
-        const productsArray = Array.isArray(data) ? data : (data.data || []);
+        const productsArray = (Array.isArray(data) ? data : (data.data || []))
+          .map(normalizeProduct);
 
-        const filtered = productsArray.map(p => {
-          let images = p.images;
-          if (typeof images === 'string') {
-            try { images = JSON.parse(images || '[]'); } catch { images = []; }
-          }
-          return {
-            ...p,
-            id: p.id || p._id,
-            _id: p._id || p.id,
-            images: images || [],
-            subCategory: p.sub_category || p.subCategory || '',
-            mainCategory: p.main_category || p.mainCategory || '',
-            originalPrice: p.original_price || p.originalPrice || 0,
-          };
-        });
-
-        setProducts(filtered);
+        // ✅ 'Home & Kitchen' category check (normalized)
+        const homeKitchenProducts = productsArray.filter(
+          (p) => isProductActive(p) && normalizeCategory(p.mainCategory) === 'homeandkitchen'
+        );
+        setProducts(homeKitchenProducts);
       } catch (error) {
         console.error('Error loading products:', error);
         setProducts([]);
@@ -110,18 +170,26 @@ function HomeKitchenPage() {
     loadProducts();
   }, []);
 
+  /* ---------------- ✅ Subcategories (dedupe) ---------------- */
   const subcategories = useMemo(() => {
     const seen = new Set();
     const unique = [];
+
     if (apiSubcategories.length > 0) {
       apiSubcategories.forEach((s) => {
-        const key = String(s.name || '').trim().toLowerCase();
+        const name = typeof s === 'string' ? s : (s.name || '');
+        const key = String(name).trim().toLowerCase();
         if (!key || seen.has(key)) return;
         seen.add(key);
-        unique.push({ id: s.id, name: s.name, icon: s.icon || '🏠' });
+        unique.push({
+          id: s.id || unique.length,
+          name: String(name).trim(),
+          icon: s.icon || '🏠',
+        });
       });
       return unique;
     }
+
     products.forEach((p) => {
       const name = String(p.subCategory || '').trim();
       const key = name.toLowerCase();
@@ -132,21 +200,22 @@ function HomeKitchenPage() {
     return unique;
   }, [apiSubcategories, products]);
 
+  /* ---------------- Filters ---------------- */
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
-      filtered = filtered.filter(p =>
-        p.name?.toLowerCase().includes(t) || p.brand?.toLowerCase().includes(t)
+      filtered = filtered.filter(
+        (p) => p.name?.toLowerCase().includes(t) || p.brand?.toLowerCase().includes(t)
       );
     }
     if (selectedSubcategory !== 'all') {
-      filtered = filtered.filter(p =>
-        (p.subCategory || '').toLowerCase() === selectedSubcategory.toLowerCase()
+      filtered = filtered.filter(
+        (p) => normalizeCategory(p.subCategory) === normalizeCategory(selectedSubcategory)
       );
     }
     if (selectedBrand !== 'all') {
-      filtered = filtered.filter(p => p.brand === selectedBrand);
+      filtered = filtered.filter((p) => p.brand === selectedBrand);
     }
     let min = 0, max = Infinity;
     if (priceRange !== 'all') {
@@ -158,19 +227,21 @@ function HomeKitchenPage() {
         case 'above5000': min = 5000; break;
       }
     }
-    filtered = filtered.filter(p => p.price >= min && p.price <= max);
+    filtered = filtered.filter((p) => p.price >= min && p.price <= max);
     switch (sortBy) {
       case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
       case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); break;
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
+        break;
     }
     return filtered;
   }, [products, searchTerm, selectedSubcategory, selectedBrand, priceRange, sortBy]);
 
   const brands = useMemo(() => {
-    const unique = [...new Set(products.map(p => p.brand).filter(Boolean))];
-    return [{ id: 'all', name: 'All Brands' }, ...unique.map(b => ({ id: b, name: b }))];
+    const unique = [...new Set(products.map((p) => p.brand).filter(Boolean))];
+    return [{ id: 'all', name: 'All Brands' }, ...unique.map((b) => ({ id: b, name: b }))];
   }, [products]);
 
   const priceRanges = [
@@ -198,6 +269,64 @@ function HomeKitchenPage() {
     setSortBy('default');
   };
 
+  /* ---------------- ✅ MIXED Random Products — 3 products (1 line) ---------------- */
+  const mixedRandomProducts = useMemo(() => {
+    if (filteredProducts.length === 0) return [];
+
+    const bySub = {};
+    filteredProducts.forEach((p) => {
+      const sub = p.subCategory || 'Other';
+      if (!bySub[sub]) bySub[sub] = [];
+      bySub[sub].push(p);
+    });
+
+    const subKeys = Object.keys(bySub).sort(() => Math.random() - 0.5);
+    const picks = [];
+
+    subKeys.forEach((sub) => {
+      if (picks.length >= 3) return;
+      const shuffled = [...bySub[sub]].sort(() => Math.random() - 0.5);
+      if (shuffled[0]) picks.push(shuffled[0]);
+    });
+
+    if (picks.length < 3) {
+      const usedIds = new Set(picks.map(p => p.id));
+      const remaining = filteredProducts.filter(p => !usedIds.has(p.id));
+      const shuffled = remaining.sort(() => Math.random() - 0.5);
+      picks.push(...shuffled.slice(0, 3 - picks.length));
+    }
+
+    return picks.sort(() => Math.random() - 0.5).slice(0, 3);
+  }, [filteredProducts, randomSeed]);
+
+  /* ---------------- ✅ Subcategory-wise Group ---------------- */
+  const groupedBySubcategory = useMemo(() => {
+    const groups = {};
+    filteredProducts.forEach((p) => {
+      const sub = p.subCategory || 'Other';
+      if (!groups[sub]) groups[sub] = [];
+      groups[sub].push(p);
+    });
+    return groups;
+  }, [filteredProducts]);
+
+  /* ---------------- ✅ Subcategory Random — 6 products (2 lines) ---------------- */
+  const subcategoryRandomMap = useMemo(() => {
+    const map = {};
+    Object.entries(groupedBySubcategory).forEach(([subName, subProducts]) => {
+      map[subName] = [...subProducts]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6);
+    });
+    return map;
+  }, [groupedBySubcategory, randomSeed]);
+
+  /* ---------------- Banner groups ---------------- */
+  const heroBanners = bannersByPosition.category_hero || bannersByPosition.home_kitchen_hero || [];
+  const midBanners1 = bannersByPosition.home_kitchen_mid_1 || bannersByPosition.category_mid_1 || [];
+  const midBanners2 = bannersByPosition.home_kitchen_mid_2 || bannersByPosition.category_mid_2 || [];
+  const bottomBanners = bannersByPosition.home_kitchen_bottom || bannersByPosition.category_bottom || [];
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-orange-50 flex items-center justify-center">
@@ -208,6 +337,12 @@ function HomeKitchenPage() {
       </div>
     );
   }
+
+  const hasActiveFilters =
+    selectedSubcategory !== 'all' ||
+    searchTerm ||
+    selectedBrand !== 'all' ||
+    priceRange !== 'all';
 
   return (
     <>
@@ -222,10 +357,10 @@ function HomeKitchenPage() {
 
         {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-orange-100/70 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <Link to="/" className="flex items-center gap-3 shrink-0 group">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200/50 group-hover:scale-105 transition-transform duration-300">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+              <Link to="/" className="flex items-center gap-2 sm:gap-3 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 via-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200/50 group-hover:scale-105 transition-transform duration-300">
                   <span className="text-white font-bold text-lg">M</span>
                 </div>
                 <div className="hidden sm:block">
@@ -241,29 +376,29 @@ function HomeKitchenPage() {
                     placeholder="Search home & kitchen..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-5 py-2.5 bg-orange-50/50 border border-orange-100 rounded-full text-sm text-gray-700 placeholder-orange-300 focus:outline-none focus:border-orange-400 focus:bg-white transition-all"
+                    className="w-full px-4 sm:px-5 py-2 sm:py-2.5 bg-orange-50/50 border border-orange-100 rounded-full text-sm text-gray-700 placeholder-orange-300 focus:outline-none focus:border-orange-400 focus:bg-white transition-all"
                   />
-                  <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
-                <button onClick={() => navigate('/wishlist')} className="relative p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                <button onClick={() => navigate('/wishlist')} className="relative p-2 sm:p-2.5 hover:bg-pink-50 rounded-full transition-colors">
                   <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                   {wishlistCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{wishlistCount}</span>}
                 </button>
-                <Link to="/cart" className="relative p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                <Link to="/cart" className="relative p-2 sm:p-2.5 hover:bg-pink-50 rounded-full transition-colors">
                   <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                   {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{cartCount}</span>}
                 </Link>
                 {user ? <Avatar user={user} onLogout={logout} /> :
-                  <Link to="/login" className="p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                  <Link to="/login" className="p-2 sm:p-2.5 hover:bg-pink-50 rounded-full transition-colors">
                     <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
@@ -274,46 +409,31 @@ function HomeKitchenPage() {
           </div>
         </header>
 
-        {/* HERO */}
+        {/* HERO TEXT */}
         <section className="relative bg-gradient-to-br from-yellow-100 via-orange-50 to-amber-100 border-b border-orange-100">
-          <div className="max-w-7xl mx-auto px-4 py-16 sm:py-20 text-center">
-            <p className="text-[11px] tracking-[0.4em] text-orange-500 uppercase mb-4 font-medium">The Home & Kitchen Edit</p>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-light text-gray-800 mb-5 leading-tight">
+          <div className="max-w-7xl mx-auto px-4 py-10 sm:py-20 text-center">
+            <p className="text-[11px] tracking-[0.4em] text-orange-500 uppercase mb-3 sm:mb-4 font-medium">The Home & Kitchen Edit</p>
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-light text-gray-800 mb-4 sm:mb-5 leading-tight">
               Make Your <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent font-semibold">Home</span> Beautiful
             </h1>
-            <div className="w-16 h-px bg-gradient-to-r from-orange-400 to-amber-400 mx-auto mb-5"></div>
-            <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto font-light leading-relaxed">
+            <div className="w-16 h-px bg-gradient-to-r from-orange-400 to-amber-400 mx-auto mb-4 sm:mb-5"></div>
+            <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto font-light leading-relaxed px-2">
               Beautiful essentials for every corner of your home.
             </p>
           </div>
         </section>
 
-        {heroBanner && heroBanner.images?.[0] && (
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <Link to={heroBanner.link || '/shop'}>
-              <div className="relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-500">
-                <img src={heroBanner.images[0]} alt={heroBanner.title} className="w-full h-48 sm:h-64 object-cover" />
-                {heroBanner.showTextOverlay && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent flex items-center">
-                    <div className="px-6 sm:px-12 text-white">
-                      <h2 className="text-2xl sm:text-4xl font-bold mb-2">{heroBanner.title}</h2>
-                      {heroBanner.subtitle && <p className="text-sm sm:text-lg mb-3 opacity-90">{heroBanner.subtitle}</p>}
-                      {heroBanner.buttonText && (
-                        <span className="inline-block bg-white text-orange-600 px-6 py-2 rounded-full text-sm font-semibold shadow-md">
-                          {heroBanner.buttonText}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Link>
-          </div>
+        {/* HERO BANNER */}
+        {heroBanners.length > 0 && (
+          <section className="w-full">
+            <BannerRenderer banners={heroBanners} />
+          </section>
         )}
 
+        {/* TOP OFFERS */}
         {topOffers.length > 0 && (
           <div className="max-w-7xl mx-auto px-4 py-4">
-            <div className="flex gap-3 overflow-x-auto pb-2">
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
               {topOffers.map((offer, idx) => (
                 <div key={offer.id || idx} className="shrink-0 min-w-[260px] sm:min-w-[320px] bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl px-5 py-3 shadow-md">
                   <div className="flex items-center gap-3">
@@ -329,7 +449,8 @@ function HomeKitchenPage() {
           </div>
         )}
 
-        <div className="max-w-7xl mx-auto px-4 py-5">
+        {/* BREADCRUMB */}
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:py-5">
           <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
             <Link to="/" className="hover:text-orange-500 transition-colors">HOME</Link>
             <span className="text-orange-300">/</span>
@@ -337,8 +458,11 @@ function HomeKitchenPage() {
           </div>
         </div>
 
+        {/* MAIN LAYOUT */}
         <div className="max-w-7xl mx-auto px-4 pb-20">
-          <div className="flex gap-8 lg:gap-10">
+          <div className="flex gap-6 lg:gap-10">
+
+            {/* SIDEBAR */}
             <aside className={`fixed md:static inset-0 z-40 md:z-0 ${showSidebar ? '' : 'hidden md:block'} md:w-64 shrink-0`}>
               {showSidebar && (
                 <div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-30" onClick={() => setShowSidebar(false)} />
@@ -362,7 +486,7 @@ function HomeKitchenPage() {
                     <span className="text-base">✨</span>
                     <span>All Products</span>
                   </button>
-                  {subcategories.map(sub => (
+                  {subcategories.map((sub) => (
                     <button
                       key={sub.id}
                       onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
@@ -380,38 +504,65 @@ function HomeKitchenPage() {
               </div>
             </aside>
 
+            {/* PRODUCTS */}
             <main className="flex-1 min-w-0">
-              <div className="md:hidden mb-5 flex gap-2">
-                <button onClick={() => setShowSidebar(true)} className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">
+              <div className="md:hidden mb-4 flex gap-2">
+                <button onClick={() => setShowSidebar(true)} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">
                   Categories
                 </button>
-                <button onClick={() => setShowFilters(!showFilters)} className="px-4 py-3 border border-orange-200 rounded-full text-xs tracking-widest uppercase font-medium text-orange-600 bg-white">
+                <button onClick={() => setShowFilters(!showFilters)} className="px-4 py-2.5 border border-orange-200 rounded-full text-xs tracking-widest uppercase font-medium text-orange-600 bg-white">
                   Filters
                 </button>
               </div>
 
-              <div className="mb-8 pb-6 border-b border-orange-100">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="hidden md:flex gap-3 flex-wrap">
-                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-4 py-2.5 bg-white border border-orange-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-orange-400">
-                      {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              <div className="mb-6 pb-5 border-b border-orange-100">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="hidden md:flex gap-2 flex-wrap">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-orange-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-orange-400">
+                      {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-4 py-2.5 bg-white border border-orange-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-orange-400">
-                      {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-orange-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-orange-400">
+                      {priceRanges.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                   </div>
-                  <div className="flex items-center gap-3 ml-auto">
-                    {(selectedSubcategory !== 'all' || selectedBrand !== 'all' || priceRange !== 'all' || searchTerm) && (
-                      <button onClick={clearFilters} className="text-[11px] tracking-wider text-orange-500 uppercase underline underline-offset-4">Clear All</button>
+                  <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+                    {hasActiveFilters && (
+                      <button onClick={clearFilters} className="text-[10px] sm:text-[11px] tracking-wider text-orange-500 uppercase underline underline-offset-4">Clear</button>
                     )}
-                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 bg-white border border-orange-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-orange-400">
-                      {sortOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-orange-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-orange-400">
+                      {sortOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                   </div>
                 </div>
               </div>
 
-              <div className="mb-6">
+              {showFilters && (
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+                  <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-orange-100">
+                      <h3 className="font-semibold text-gray-800 text-base">Refine</h3>
+                      <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
+                    </div>
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-orange-500 uppercase mb-2 font-semibold">Brand</label>
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-orange-50/50 border border-orange-100 rounded-xl text-sm">
+                          {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-orange-500 uppercase mb-2 font-semibold">Price</label>
+                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-orange-50/50 border border-orange-100 rounded-xl text-sm">
+                          {priceRanges.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">Clear All</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mb-4 sm:mb-6">
                 <p className="text-xs tracking-wider text-gray-400">
                   {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
                   {selectedSubcategory !== 'all' && <span className="text-orange-600 font-medium"> · {selectedSubcategory}</span>}
@@ -419,7 +570,7 @@ function HomeKitchenPage() {
               </div>
 
               {filteredProducts.length === 0 ? (
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-16 text-center border border-orange-100 shadow-sm">
+                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 sm:p-16 text-center border border-orange-100 shadow-sm">
                   <div className="text-4xl mb-4">🏠</div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">Coming Soon</h3>
                   <p className="text-sm text-gray-500 mb-6">
@@ -429,76 +580,131 @@ function HomeKitchenPage() {
                     View All
                   </button>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
-                  {filteredProducts.slice(0, visibleCount).map((product, index) => (
-                    <Fragment key={product.id}>
-                      <ProductCard
-                        product={product}
-                        addToCart={addToCart}
-                        isInWishlist={isInWishlist}
-                        addToWishlist={addToWishlist}
-                        removeFromWishlist={removeFromWishlist}
-                        user={user}
-                        wishlistContext={wishlist}
-                      />
-                      {(index + 1) % 4 === 0 && midOffers[Math.floor(index / 4)] && (
-                        <div className="col-span-full my-4">
-                          <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
-                            <span className="text-3xl">{midOffers[Math.floor(index / 4)].icon || '🎉'}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-sm sm:text-base truncate">{midOffers[Math.floor(index / 4)].title}</p>
-                              <p className="text-xs opacity-90 truncate">{midOffers[Math.floor(index / 4)].description}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {(index + 1) % 4 === 0 && midBanners[Math.floor(index / 4)] && (
-                        <div className="col-span-full my-4">
-                          <Link to={midBanners[Math.floor(index / 4)].link || '/shop'}>
-                            <div className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition">
-                              <img src={midBanners[Math.floor(index / 4)].images?.[0]} alt={midBanners[Math.floor(index / 4)].title} className="w-full h-32 sm:h-40 object-cover" />
-                            </div>
-                          </Link>
-                        </div>
-                      )}
-                    </Fragment>
+              ) : hasActiveFilters ? (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                  {filteredProducts.slice(0, visibleCount).map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isInWishlist={isInWishlist}
+                      addToWishlist={addToWishlist}
+                      removeFromWishlist={removeFromWishlist}
+                      user={user}
+                      wishlistContext={wishlist}
+                    />
                   ))}
                 </div>
-              )}
+              ) : (
+                <>
+                  {mixedRandomProducts.length > 0 && (
+                    <section className="my-8 sm:my-10">
+                      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-orange-400 to-amber-500 rounded-full"></div>
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-800">✨ Featured Products</h3>
+                        </div>
+                        <Link to="/shop" className="text-orange-600 text-sm font-bold hover:underline whitespace-nowrap">
+                          View All →
+                        </Link>
+                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                        {mixedRandomProducts.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            isInWishlist={isInWishlist}
+                            addToWishlist={addToWishlist}
+                            removeFromWishlist={removeFromWishlist}
+                            user={user}
+                            wishlistContext={wishlist}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
-              {visibleCount < filteredProducts.length && (
-                <div className="text-center mt-12">
-                  <button onClick={() => setVisibleCount(prev => prev + 16)} className="px-10 py-3.5 border-2 border-orange-300 text-orange-600 rounded-full text-xs tracking-[0.25em] uppercase font-semibold hover:bg-gradient-to-r hover:from-orange-500 hover:to-amber-500 hover:text-white hover:border-transparent transition-all duration-300">
-                    Load More
-                  </button>
-                </div>
-              )}
+                  {midBanners1.length > 0 && (
+                    <section className="w-full my-6 sm:my-8">
+                      <BannerRenderer banners={midBanners1} />
+                    </section>
+                  )}
 
-              {bottomBanner && bottomBanner.images?.[0] && (
-                <div className="mt-12">
-                  <Link to={bottomBanner.link || '/shop'}>
-                    <div className="relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition">
-                      <img src={bottomBanner.images[0]} alt={bottomBanner.title} className="w-full h-40 sm:h-56 object-cover" />
-                      {bottomBanner.showTextOverlay && (
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-center">
-                          <div className="text-center text-white px-4">
-                            <h3 className="text-2xl sm:text-3xl font-bold mb-2">{bottomBanner.title}</h3>
-                            {bottomBanner.subtitle && <p className="text-sm sm:text-base opacity-90">{bottomBanner.subtitle}</p>}
+                  {Object.entries(groupedBySubcategory).map(([subName, subProducts], idx) => {
+                    if (!subProducts.length) return null;
+                    const randomProducts = subcategoryRandomMap[subName] || [];
+
+                    return (
+                      <Fragment key={subName}>
+                        <section className="my-8 sm:my-10">
+                          <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-orange-400 to-amber-500 rounded-full"></div>
+                              <h3 className="text-lg sm:text-xl font-bold text-gray-800">{subName}</h3>
+                              <span className="text-xs text-orange-400 font-medium">({subProducts.length})</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedSubcategory(subName);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="text-orange-600 text-sm font-bold hover:underline whitespace-nowrap"
+                            >
+                              View All →
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                            {randomProducts.map((product) => (
+                              <ProductCard
+                                key={product.id}
+                                product={product}
+                                isInWishlist={isInWishlist}
+                                addToWishlist={addToWishlist}
+                                removeFromWishlist={removeFromWishlist}
+                                user={user}
+                                wishlistContext={wishlist}
+                              />
+                            ))}
+                          </div>
+                        </section>
+
+                        {idx === 0 && midBanners2.length > 0 && (
+                          <section className="w-full my-6 sm:my-8">
+                            <BannerRenderer banners={midBanners2} />
+                          </section>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+
+                  {midOffers.length > 0 && (
+                    <div className="my-6 sm:my-8 space-y-3">
+                      {midOffers.map((offer, i) => (
+                        <div key={offer.id || i} className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
+                          <span className="text-3xl">{offer.icon || '🎉'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm sm:text-base truncate">{offer.title}</p>
+                            <p className="text-xs opacity-90 truncate">{offer.description}</p>
                           </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  </Link>
-                </div>
+                  )}
+                </>
+              )}
+
+              {bottomBanners.length > 0 && (
+                <section className="w-full mt-10 sm:mt-12">
+                  <BannerRenderer banners={bottomBanners} />
+                </section>
               )}
             </main>
           </div>
         </div>
 
-        <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-16 mt-12">
+        {/* FOOTER — same as SkincarePage */}
+        <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-12 sm:py-16">
           <div className="max-w-7xl mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
               <div className="col-span-2 md:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -506,7 +712,7 @@ function HomeKitchenPage() {
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-xs leading-relaxed text-gray-500">Luxe essentials, thoughtfully curated for the girlies ✨</p>
+                <p className="text-xs leading-relaxed text-gray-500">Premium beauty essentials, thoughtfully curated for the girlies ✨</p>
               </div>
               <div>
                 <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Shop</h4>
@@ -516,10 +722,7 @@ function HomeKitchenPage() {
                   <li><Link to="/hair" className="hover:text-pink-400 transition-colors">Haircare</Link></li>
                   <li><Link to="/clothing" className="hover:text-pink-400 transition-colors">Fashion</Link></li>
                   <li><Link to="/accessories" className="hover:text-pink-400 transition-colors">Accessories</Link></li>
-                  <li><Link to="/electronics" className="hover:text-pink-400 transition-colors">Electronics</Link></li>
                   <li><Link to="/home-kitchen" className="hover:text-pink-400 transition-colors">Home & Kitchen</Link></li>
-                  <li><Link to="/health" className="hover:text-pink-400 transition-colors">Health</Link></li>
-                  <li><Link to="/books" className="hover:text-pink-400 transition-colors">Books</Link></li>
                 </ul>
               </div>
               <div>
@@ -534,8 +737,8 @@ function HomeKitchenPage() {
               <div>
                 <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Follow</h4>
                 <ul className="space-y-2.5 text-xs">
-                  <li><a href="#" className="hover:text-pink-400 transition-colors">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-400 transition-colors">Pinterest</a></li>
+                  <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-400 transition-colors">Instagram</a></li>
+                  <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-400 transition-colors">Facebook</a></li>
                 </ul>
               </div>
             </div>
@@ -544,6 +747,11 @@ function HomeKitchenPage() {
             </div>
           </div>
         </footer>
+
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
       </div>
     </>
   );
