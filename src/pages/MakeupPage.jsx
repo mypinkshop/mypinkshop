@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+// src/pages/MakeupPage.jsx
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '../context/CartContext';
@@ -6,305 +7,163 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import Avatar from '../components/Avatar';
 import OfferBanner from '../components/OfferBanner';
+import ProductCard from '../components/ProductCard';
+import BannerRenderer from '../components/BannerRenderer';
 import toast from 'react-hot-toast';
 import { setCacheWithTTL, getCacheWithTTL } from '../lib/utils';
 
-// ============================================================
-// ✅ PREMIUM PRODUCT CARD
-// ============================================================
-const ProductCard = ({ product, addToCart, isInWishlist, addToWishlist, removeFromWishlist, user }) => {
-  const navigate = useNavigate();
-  const [isAdded, setIsAdded] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
 
-  const getOptimizedImage = (url) => {
-    if (!url) return null;
-    if (url.includes('amazon') || url.includes('media-amazon')) {
-      return url.replace('_SL1500_.jpg', '_SL500_.jpg').replace('_SL1500_', '_SL500_');
-    }
-    return url;
+/* ✅ Category normalizer */
+const normalizeCategory = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+
+/* ✅ Active check */
+const isProductActive = (p) =>
+  p.is_active === 1 ||
+  p.is_active === true ||
+  p.isActive === true ||
+  p.status === 'active';
+
+/* ✅ Product normalizer */
+const normalizeProduct = (p) => {
+  let images = p.images;
+  if (typeof images === 'string') {
+    try { images = JSON.parse(images || '[]'); } catch { images = []; }
+  }
+  return {
+    ...p,
+    id: p.id || p._id,
+    _id: p._id || p.id,
+    images: Array.isArray(images) ? images : [],
+    mainCategory: p.main_category || p.mainCategory || p.category || '',
+    subCategory: p.sub_category || p.subCategory || p.subcategory || '',
+    originalPrice: p.original_price || p.originalPrice || 0,
+    finish: p.finish || '',
+    coverage: p.coverage || '',
   };
-
-  useEffect(() => {
-    const checkWishlist = () => {
-      if (user) {
-        setIsWishlisted(isInWishlist(product._id || product.id));
-      } else {
-        const saved = localStorage.getItem('guestWishlist');
-        if (saved) {
-          try {
-            const wishlist = JSON.parse(saved);
-            const exists = wishlist.some(item => (item._id === product._id || item.id === product._id));
-            setIsWishlisted(exists);
-          } catch(e) {}
-        }
-      }
-    };
-    checkWishlist();
-
-    const handleUpdate = () => checkWishlist();
-
-    window.addEventListener('wishlistUpdated', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-
-    return () => {
-      window.removeEventListener('wishlistUpdated', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, [product, user, isInWishlist]);
-
-  const handleAddToCart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (product.stock === 0) return;
-
-    addToCart({
-      id: product._id || product.id,
-      name: product.name,
-      price: product.price,
-      quantity: 1,
-      image: product.images?.[0],
-      stock: product.stock
-    });
-    setIsAdded(true);
-    toast.success('Added to cart! 🛒');
-    setTimeout(() => setIsAdded(false), 2000);
-  };
-
-  const handleGoToCart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    navigate('/cart');
-  };
-
-  const handleWishlistToggle = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const productId = product._id || product.id;
-
-    if (user) {
-      if (isWishlisted) {
-        removeFromWishlist(productId);
-        setIsWishlisted(false);
-        toast.success('Removed from wishlist');
-      } else {
-        addToWishlist(product);
-        setIsWishlisted(true);
-        toast.success('Added to wishlist ❤️');
-      }
-    } else {
-      let wishlist = [];
-      const saved = localStorage.getItem('guestWishlist');
-      if (saved) {
-        try {
-          wishlist = JSON.parse(saved);
-          if (!Array.isArray(wishlist)) wishlist = [];
-        } catch(e) { wishlist = []; }
-      }
-
-      const exists = wishlist.some(item => (item._id === productId || item.id === productId));
-
-      if (!exists) {
-        wishlist.push({
-          _id: productId,
-          id: productId,
-          name: product.name,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          images: product.images,
-          rating: product.rating,
-          brand: product.brand,
-          stock: product.stock
-        });
-        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
-        setIsWishlisted(true);
-        toast.success('Added to wishlist! 🤍');
-      } else {
-        wishlist = wishlist.filter(item => (item._id !== productId && item.id !== productId));
-        localStorage.setItem('guestWishlist', JSON.stringify(wishlist));
-        setIsWishlisted(false);
-        toast.success('Removed from wishlist');
-      }
-
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new CustomEvent('wishlistUpdated'));
-    }
-  };
-
-  const mrp = product.originalPrice || product.mrp || product.original_price;
-  const price = product.price || product.sellingPrice || 0;
-  const discountPercent = mrp && mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0;
-  const rating = product.rating || 4.5;
-  const isOutOfStock = product.stock === 0;
-
-  return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-pink-50 relative flex flex-col">
-
-      {/* Discount Badge */}
-      {discountPercent > 0 && (
-        <div className="absolute top-3 left-3 z-20 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full shadow-md">
-          {discountPercent}% OFF
-        </div>
-      )}
-
-      {/* Wishlist Heart */}
-      <button
-        onClick={handleWishlistToggle}
-        className="absolute top-3 right-3 z-20 w-9 h-9 bg-white/95 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center hover:scale-110 transition-transform border border-pink-100"
-      >
-        <span className="text-base">{isWishlisted ? '❤️' : '🤍'}</span>
-      </button>
-
-      <Link to={`/product/${product._id || product.id}`} className="block">
-        <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-          {!imageLoaded && !imgError && (
-            <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-pink-50 via-white to-purple-50" />
-          )}
-
-          {product.images && product.images[0] && !imgError ? (
-            <img
-              src={getOptimizedImage(product.images[0])}
-              alt={product.name || 'Product'}
-              className={`w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onError={() => setImgError(true)}
-              onLoad={() => setImageLoaded(true)}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl">
-              {product.emoji || '💄'}
-            </div>
-          )}
-
-          {isOutOfStock && (
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10">
-              <span className="bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-full">
-                Out of Stock
-              </span>
-            </div>
-          )}
-
-          {product.isNew && !isOutOfStock && (
-            <span className="absolute bottom-3 left-3 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
-              ✨ NEW
-            </span>
-          )}
-        </div>
-      </Link>
-
-      <div className="p-3 sm:p-4 flex flex-col flex-1">
-        {product.brand && (
-          <p className="text-[10px] sm:text-xs font-semibold text-pink-600 uppercase tracking-wider mb-1">
-            {product.brand}
-          </p>
-        )}
-
-        <Link to={`/product/${product._id || product.id}`}>
-          <h3 className="font-semibold text-gray-800 text-xs sm:text-sm mb-2 line-clamp-2 hover:text-pink-600 transition min-h-[2.5rem]">
-            {product.name}
-          </h3>
-        </Link>
-
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="bg-green-50 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-            {rating.toFixed(1)} <span className="text-yellow-500">★</span>
-          </span>
-          <span className="text-[10px] text-gray-400">(50+)</span>
-        </div>
-
-        <div className="flex items-baseline gap-2 mb-3 flex-wrap">
-          <span className="text-base sm:text-lg font-bold text-pink-600">₹{price.toLocaleString()}</span>
-          {mrp && mrp > price && (
-            <span className="text-xs text-gray-400 line-through">₹{mrp.toLocaleString()}</span>
-          )}
-        </div>
-
-        <div className="mt-auto flex gap-2">
-          {isAdded ? (
-            <button
-              onClick={handleGoToCart}
-              className="flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all bg-green-500 text-white hover:bg-green-600 shadow-sm"
-            >
-              ✓ Go to Cart
-            </button>
-          ) : (
-            <button
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
-              className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
-                !isOutOfStock
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:shadow-lg hover:scale-[1.02]'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {!isOutOfStock ? '🛒 Add to Cart' : 'Out of Stock'}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 };
 
-// ============================================================
-// ✅ MAIN MAKEUP PAGE
-// ============================================================
+/* ✅ Banner grouping */
+function groupBanners(list) {
+  const grouped = {};
+  list.forEach((b) => {
+    const positions =
+      Array.isArray(b.positions) && b.positions.length > 0
+        ? b.positions
+        : b.position
+        ? [b.position]
+        : [];
+    positions.forEach((pos) => {
+      if (!grouped[pos]) grouped[pos] = [];
+      grouped[pos].push(b);
+    });
+  });
+  return grouped;
+}
+
 function MakeupPage() {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { user, logout } = useAuth();
-  const { wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
+  const { wishlist, wishlistCount, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
+  const [apiSubcategories, setApiSubcategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [bannersByPosition, setBannersByPosition] = useState({});
+  const [topOffers, setTopOffers] = useState([]);
+  const [midOffers, setMidOffers] = useState([]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [selectedFinish, setSelectedFinish] = useState('all');
   const [selectedCoverage, setSelectedCoverage] = useState('all');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [selectedDiscount, setSelectedDiscount] = useState(0);
+  const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [showFilters, setShowFilters] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(16);
+  const [randomSeed] = useState(Date.now());
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
+  const SLUG = 'makeup';
 
-  // Load products
+  /* ---------------- ✅ Load category + banners + offers ---------------- */
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const catRes = await fetch(`${API_URL}/api/categories/tree`);
+        const catJson = await catRes.json();
+        const tree = catJson.data || catJson;
+        const found = Array.isArray(tree) ? tree.find((c) => c.slug === SLUG) : null;
+        if (found) {
+          setApiSubcategories(
+            (found.children || []).map(child => ({
+              id: child.id,
+              name: child.name,
+              icon: child.icon || '💄',
+            }))
+          );
+        }
+
+        const bannerRes = await fetch(`${API_URL}/api/banners/active?category=${SLUG}`);
+        const bannerJson = await bannerRes.json();
+        const banners = Array.isArray(bannerJson) ? bannerJson : (bannerJson.data || []);
+        setBannersByPosition(groupBanners(banners));
+
+        const offerRes = await fetch(`${API_URL}/api/offers/active?category=${SLUG}`);
+        const offerJson = await offerRes.json();
+        const offers = Array.isArray(offerJson) ? offerJson : (offerJson.data || []);
+        setTopOffers(offers.filter((o) => o.position === 'category_top' || o.position === 'top_banner'));
+        setMidOffers(offers.filter((o) => o.position === 'category_mid'));
+      } catch (err) {
+        console.error('Load error:', err);
+      }
+    };
+    loadAll();
+  }, []);
+
+  /* ✅ Subcategories dedicated API */
+  useEffect(() => {
+    const loadSubs = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/subcategories/${SLUG}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setApiSubcategories(
+            json.data.map(s => ({
+              id: s.id,
+              name: s.name,
+              icon: s.icon || '💄',
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Subcategories fetch error:', err);
+      }
+    };
+    loadSubs();
+  }, []);
+
+  /* ---------------- Load products ---------------- */
   useEffect(() => {
     const loadProducts = async () => {
       try {
         setLoading(true);
+        const response = await fetch(`${API_URL}/api/products`);
+        if (!response.ok) throw new Error('Failed to load products');
+        const data = await response.json();
+        const productsArray = (Array.isArray(data) ? data : (data.data || []))
+          .map(normalizeProduct);
 
-        const cached = getCacheWithTTL(sessionStorage, 'products_cache');
-
-        let productsArray;
-        if (cached) {
-          productsArray = Array.isArray(cached) ? cached : (cached.data || []);
-        } else {
-          const response = await fetch(`${API_URL}/api/products`);
-          if (!response.ok) throw new Error('Failed to load products');
-          const data = await response.json();
-          productsArray = Array.isArray(data) ? data : (data.data || []);
-          setCacheWithTTL(sessionStorage, 'products_cache', data, 5 * 60 * 1000);
-        }
-
-        const makeupProducts = productsArray
-          .filter(p =>
-            (p.mainCategory === 'Makeup' || p.category === 'Makeup' || p.category === 'makeup') &&
-            p.status === 'active'
-          )
-          .map(p => ({
-            ...p,
-            id: p._id,
-            subcategory: p.subCategory || p.subcategory || p.category,
-            finish: p.finish || '',
-            coverage: p.coverage || ''
-          }));
-
+        const makeupProducts = productsArray.filter(
+          (p) => isProductActive(p) && normalizeCategory(p.mainCategory) === 'makeup'
+        );
         setProducts(makeupProducts);
       } catch (error) {
         console.error('Error loading products:', error);
@@ -313,68 +172,108 @@ function MakeupPage() {
         setLoading(false);
       }
     };
-
     loadProducts();
   }, []);
 
-  // ✅ Filter + sort
+  /* ---------------- ✅ Subcategories (dedupe) ---------------- */
+  const subcategories = useMemo(() => {
+    const seen = new Set();
+    const unique = [];
+
+    if (apiSubcategories.length > 0) {
+      apiSubcategories.forEach((s) => {
+        const name = typeof s === 'string' ? s : (s.name || '');
+        const key = String(name).trim().toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        unique.push({
+          id: s.id || unique.length,
+          name: String(name).trim(),
+          icon: s.icon || '💄',
+        });
+      });
+      return unique;
+    }
+
+    products.forEach((p) => {
+      const name = String(p.subCategory || '').trim();
+      const key = name.toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push({ id: unique.length, name, icon: '💄' });
+    });
+    return unique;
+  }, [apiSubcategories, products]);
+
+  /* ---------------- Filters ---------------- */
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
-
     if (searchTerm) {
-      filtered = filtered.filter(p =>
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+      const t = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (p) => p.name?.toLowerCase().includes(t) || p.brand?.toLowerCase().includes(t)
       );
     }
-
     if (selectedSubcategory !== 'all') {
-      filtered = filtered.filter(p => {
-        const sub = (p.subCategory || p.subcategory || p.category || '').toLowerCase();
-        return sub === selectedSubcategory.toLowerCase();
-      });
+      filtered = filtered.filter(
+        (p) => normalizeCategory(p.subCategory) === normalizeCategory(selectedSubcategory)
+      );
     }
-
     if (selectedBrand !== 'all') {
-      filtered = filtered.filter(p => p.brand === selectedBrand);
+      filtered = filtered.filter((p) => p.brand === selectedBrand);
     }
-
     if (selectedFinish !== 'all') {
-      filtered = filtered.filter(p => p.finish?.toLowerCase() === selectedFinish.toLowerCase());
+      filtered = filtered.filter((p) => (p.finish || '').toLowerCase() === selectedFinish.toLowerCase());
     }
-
     if (selectedCoverage !== 'all') {
-      filtered = filtered.filter(p => p.coverage?.toLowerCase() === selectedCoverage.toLowerCase());
+      filtered = filtered.filter((p) => (p.coverage || '').toLowerCase() === selectedCoverage.toLowerCase());
     }
-
-    const min = minPrice ? parseFloat(minPrice) : 0;
-    const max = maxPrice ? parseFloat(maxPrice) : Infinity;
-    filtered = filtered.filter(p => {
-      const price = p.price || p.sellingPrice || 0;
-      return price >= min && price <= max;
-    });
-
-    // ✅ Discount filter
-    if (selectedDiscount > 0) {
-      filtered = filtered.filter(p => {
-        const mrp = p.originalPrice || p.mrp || p.original_price;
-        const price = p.price || p.sellingPrice || 0;
-        if (!mrp || mrp <= price) return false;
-        const disc = Math.round(((mrp - price) / mrp) * 100);
-        return disc >= selectedDiscount;
-      });
+    let min = 0, max = Infinity;
+    if (priceRange !== 'all') {
+      switch (priceRange) {
+        case 'under500': max = 500; break;
+        case '500-1000': min = 500; max = 1000; break;
+        case '1000-2000': min = 1000; max = 2000; break;
+        case '2000-5000': min = 2000; max = 5000; break;
+        case 'above5000': min = 5000; break;
+      }
     }
-
+    filtered = filtered.filter((p) => p.price >= min && p.price <= max);
     switch (sortBy) {
-      case 'price_low': filtered.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
-      case 'price_high': filtered.sort((a, b) => (b.price || 0) - (a.price || 0)); break;
+      case 'price_low': filtered.sort((a, b) => a.price - b.price); break;
+      case 'price_high': filtered.sort((a, b) => b.price - a.price); break;
       case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'newest': filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
-      default: break;
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
+        break;
     }
-
     return filtered;
-  }, [products, searchTerm, selectedSubcategory, selectedBrand, selectedFinish, selectedCoverage, minPrice, maxPrice, selectedDiscount, sortBy]);
+  }, [products, searchTerm, selectedSubcategory, selectedBrand, selectedFinish, selectedCoverage, priceRange, sortBy]);
+
+  const brands = useMemo(() => {
+    const unique = [...new Set(products.map((p) => p.brand).filter(Boolean))];
+    return [{ id: 'all', name: 'All Brands' }, ...unique.map((b) => ({ id: b, name: b }))];
+  }, [products]);
+
+  const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy', 'Metallic'];
+  const coverageTypes = ['Light', 'Medium', 'Full', 'Sheer'];
+
+  const priceRanges = [
+    { id: 'all', name: 'All Prices' },
+    { id: 'under500', name: 'Under ₹500' },
+    { id: '500-1000', name: '₹500 – ₹1000' },
+    { id: '1000-2000', name: '₹1000 – ₹2000' },
+    { id: '2000-5000', name: '₹2000 – ₹5000' },
+    { id: 'above5000', name: 'Above ₹5000' },
+  ];
+
+  const sortOptions = [
+    { id: 'default', name: 'Featured' },
+    { id: 'price_low', name: 'Price: Low to High' },
+    { id: 'price_high', name: 'Price: High to Low' },
+    { id: 'rating', name: 'Top Rated' },
+    { id: 'newest', name: 'Newest First' },
+  ];
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -382,50 +281,91 @@ function MakeupPage() {
     setSelectedBrand('all');
     setSelectedFinish('all');
     setSelectedCoverage('all');
-    setMinPrice('');
-    setMaxPrice('');
-    setSelectedDiscount(0);
+    setPriceRange('all');
     setSortBy('default');
   };
 
-  const subcategories = useMemo(() => {
-    const subs = [...new Set(products.map(p => p.subCategory || p.subcategory || p.category).filter(Boolean))].sort();
-    return [{ id: 'all', name: 'All Subcategories', count: products.length }, ...subs.map(s => ({ id: s, name: s, count: products.filter(p => (p.subCategory || p.subcategory || p.category) === s).length }))];
-  }, [products]);
+  /* ---------------- ✅ MIXED Random Products — 3 products (1 line) ---------------- */
+  const mixedRandomProducts = useMemo(() => {
+    if (filteredProducts.length === 0) return [];
 
-  const brands = useMemo(() => {
-    const unique = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
-    return [{ id: 'all', name: 'All Brands', count: products.length }, ...unique.map(b => ({ id: b, name: b, count: products.filter(p => p.brand === b).length }))];
-  }, [products]);
+    const bySub = {};
+    filteredProducts.forEach((p) => {
+      const sub = p.subCategory || 'Other';
+      if (!bySub[sub]) bySub[sub] = [];
+      bySub[sub].push(p);
+    });
 
-  const finishTypes = ['Matte', 'Glossy', 'Shimmer', 'Satin', 'Dewy', 'Metallic'];
-  const coverageTypes = ['Light', 'Medium', 'Full', 'Sheer'];
+    const subKeys = Object.keys(bySub).sort(() => Math.random() - 0.5);
+    const picks = [];
 
-  const activeFilterCount = [
-    selectedSubcategory !== 'all',
-    selectedBrand !== 'all',
-    selectedFinish !== 'all',
-    selectedCoverage !== 'all',
-    minPrice,
-    maxPrice,
-    selectedDiscount > 0,
-  ].filter(Boolean).length;
+    subKeys.forEach((sub) => {
+      if (picks.length >= 3) return;
+      const shuffled = [...bySub[sub]].sort(() => Math.random() - 0.5);
+      if (shuffled[0]) picks.push(shuffled[0]);
+    });
+
+    if (picks.length < 3) {
+      const usedIds = new Set(picks.map(p => p.id));
+      const remaining = filteredProducts.filter(p => !usedIds.has(p.id));
+      const shuffled = remaining.sort(() => Math.random() - 0.5);
+      picks.push(...shuffled.slice(0, 3 - picks.length));
+    }
+
+    return picks.sort(() => Math.random() - 0.5).slice(0, 3);
+  }, [filteredProducts, randomSeed]);
+
+  /* ---------------- ✅ Subcategory-wise Group ---------------- */
+  const groupedBySubcategory = useMemo(() => {
+    const groups = {};
+    filteredProducts.forEach((p) => {
+      const sub = p.subCategory || 'Other';
+      if (!groups[sub]) groups[sub] = [];
+      groups[sub].push(p);
+    });
+    return groups;
+  }, [filteredProducts]);
+
+  /* ---------------- ✅ Subcategory Random — 6 products (2 lines) ---------------- */
+  const subcategoryRandomMap = useMemo(() => {
+    const map = {};
+    Object.entries(groupedBySubcategory).forEach(([subName, subProducts]) => {
+      map[subName] = [...subProducts]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6);
+    });
+    return map;
+  }, [groupedBySubcategory, randomSeed]);
+
+  /* ---------------- Banner groups ---------------- */
+  const heroBanners = bannersByPosition.category_hero || bannersByPosition.makeup_hero || [];
+  const midBanners1 = bannersByPosition.makeup_mid_1 || bannersByPosition.category_mid_1 || [];
+  const midBanners2 = bannersByPosition.makeup_mid_2 || bannersByPosition.category_mid_2 || [];
+  const bottomBanners = bannersByPosition.makeup_bottom || bannersByPosition.category_bottom || [];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading makeup products...</p>
+          <p className="text-gray-500 text-sm tracking-widest uppercase">Loading</p>
         </div>
       </div>
     );
   }
 
+  const hasActiveFilters =
+    selectedSubcategory !== 'all' ||
+    searchTerm ||
+    selectedBrand !== 'all' ||
+    selectedFinish !== 'all' ||
+    selectedCoverage !== 'all' ||
+    priceRange !== 'all';
+
   return (
     <>
       <Helmet>
-        <title>Buy Makeup Products Online - Lipstick, Foundation, Kajal & More | MyPinkShop</title>
+        <title>Makeup — Premium Beauty | MyPinkShop</title>
         <meta name="description" content="Shop premium makeup products at MyPinkShop. Lipsticks, foundations, kajal, eyeliners, eyeshadows, mascara, and more." />
         <link rel="canonical" href="https://www.mypinkshop.com/makeup" />
       </Helmet>
@@ -434,16 +374,16 @@ function MakeupPage() {
         <OfferBanner />
 
         {/* HEADER */}
-        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-pink-100">
+        <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-pink-100/70 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-3 sm:gap-4 lg:gap-6">
-              <Link to="/" className="flex items-center gap-2 shrink-0 group">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                  <span className="text-white font-bold text-lg sm:text-xl">M</span>
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
+              <Link to="/" className="flex items-center gap-2 sm:gap-3 shrink-0 group">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-pink-500 via-rose-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-200/50 group-hover:scale-105 transition-transform duration-300">
+                  <span className="text-white font-bold text-lg">M</span>
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight">MyPinkShop</h1>
-                  <p className="text-[9px] text-gray-400">FOR THE GIRLIES ✨</p>
+                  <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">MyPinkShop</h1>
+                  <p className="text-[9px] tracking-[0.25em] text-pink-400 uppercase">For the Girlies ✨</p>
                 </div>
               </Link>
 
@@ -454,31 +394,31 @@ function MakeupPage() {
                     placeholder="Search makeup..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-full focus:outline-none focus:border-pink-500 bg-gray-50"
+                    className="w-full px-4 sm:px-5 py-2 sm:py-2.5 bg-pink-50/50 border border-pink-100 rounded-full text-sm text-gray-700 placeholder-pink-300 focus:outline-none focus:border-pink-400 focus:bg-white transition-all"
                   />
-                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</button>
+                  <svg className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-4">
-                <button onClick={() => navigate('/wishlist')} className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                <button onClick={() => navigate('/wishlist')} className="relative p-2 sm:p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  {wishlistCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{wishlistCount}</span>}
+                  {wishlistCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{wishlistCount}</span>}
                 </button>
-
-                <Link to="/cart" className="relative p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                <Link to="/cart" className="relative p-2 sm:p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
-                  {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">{cartCount}</span>}
+                  {cartCount > 0 && <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center shadow-sm">{cartCount}</span>}
                 </Link>
-
                 {user ? <Avatar user={user} onLogout={logout} /> :
-                  <Link to="/login" className="p-1.5 sm:p-2 text-gray-700 hover:text-pink-500 transition">
-                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <Link to="/login" className="p-2 sm:p-2.5 hover:bg-pink-50 rounded-full transition-colors">
+                    <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
                 }
@@ -487,375 +427,382 @@ function MakeupPage() {
           </div>
         </header>
 
-        {/* HERO */}
-        <div className="relative bg-gradient-to-r from-purple-200 via-pink-200 to-rose-200 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center relative">
-            <div className="absolute inset-0 flex items-center justify-center opacity-5 text-[200px] pointer-events-none select-none">
-              💄
-            </div>
-            <div className="relative z-10">
-              <span className="inline-block bg-white/80 backdrop-blur-sm text-pink-600 text-xs font-bold px-3 py-1.5 rounded-full mb-3">
-                ✨ MAKEUP COLLECTION ✨
-              </span>
-              <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">
-                Glam Up <span className="text-pink-600">Your Look</span>
-              </h1>
-              <p className="text-gray-600 text-sm sm:text-base">
-                {products.length}+ premium products • Free shipping above ₹499
-              </p>
+        {/* HERO TEXT */}
+        <section className="relative bg-gradient-to-br from-pink-100 via-rose-50 to-pink-100 border-b border-pink-100">
+          <div className="max-w-7xl mx-auto px-4 py-10 sm:py-20 text-center">
+            <p className="text-[11px] tracking-[0.4em] text-pink-500 uppercase mb-3 sm:mb-4 font-medium">The Makeup Edit</p>
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-light text-gray-800 mb-4 sm:mb-5 leading-tight">
+              Glam, <span className="bg-gradient-to-r from-pink-500 to-rose-500 bg-clip-text text-transparent font-semibold">Beautifully</span>
+            </h1>
+            <div className="w-16 h-px bg-gradient-to-r from-pink-400 to-rose-400 mx-auto mb-4 sm:mb-5"></div>
+            <p className="text-gray-500 text-sm sm:text-base max-w-xl mx-auto font-light leading-relaxed px-2">
+              Premium makeup for every mood — thoughtfully curated for the modern woman.
+            </p>
+          </div>
+        </section>
+
+        {/* HERO BANNER — FULL WIDTH */}
+        {heroBanners.length > 0 && (
+          <section className="w-full">
+            <BannerRenderer banners={heroBanners} />
+          </section>
+        )}
+
+        {/* TOP OFFERS */}
+        {topOffers.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+              {topOffers.map((offer, idx) => (
+                <div key={offer.id || idx} className="shrink-0 min-w-[260px] sm:min-w-[320px] bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl px-5 py-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{offer.icon || '🎉'}</span>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate">{offer.title}</p>
+                      <p className="text-xs opacity-90 truncate">{offer.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
 
         {/* BREADCRUMB */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-2 text-sm">
-            <Link to="/" className="text-gray-500 hover:text-pink-500 transition">Home</Link>
-            <span className="text-gray-400">/</span>
-            <span className="text-pink-600 font-medium">Makeup</span>
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:py-5">
+          <div className="flex items-center gap-2 text-xs tracking-wider text-gray-400">
+            <Link to="/" className="hover:text-pink-500 transition-colors">HOME</Link>
+            <span className="text-pink-300">/</span>
+            <span className="text-pink-600 font-medium">MAKEUP</span>
           </div>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        {/* MAIN LAYOUT */}
+        <div className="max-w-7xl mx-auto px-4 pb-20">
+          <div className="flex gap-6 lg:gap-10">
 
-          {/* Top Bar */}
-          <div className="mb-6 flex flex-wrap justify-between items-center gap-3 bg-white rounded-2xl p-3 sm:p-4 border border-pink-100 shadow-sm">
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="lg:hidden flex items-center gap-2 px-4 py-2 bg-pink-50 text-pink-600 border border-pink-200 rounded-full text-sm font-semibold hover:bg-pink-100 transition"
-              >
-                <span>🎛️</span> Filters
-                {activeFilterCount > 0 && (
-                  <span className="bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-
-              <p className="text-sm text-gray-500">
-                Showing <span className="font-bold text-pink-600">{filteredProducts.length}</span> of <span className="font-semibold text-gray-800">{products.length}</span> products
-              </p>
-            </div>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white cursor-pointer"
-            >
-              <option value="default">Sort: Recommended</option>
-              <option value="price_low">Price: Low to High</option>
-              <option value="price_high">Price: High to Low</option>
-              <option value="rating">Customer Rating</option>
-              <option value="newest">Newest First</option>
-            </select>
-          </div>
-
-          {/* Active Filter Chips */}
-          {activeFilterCount > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {selectedSubcategory !== 'all' && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedSubcategory} <button onClick={() => setSelectedSubcategory('all')} className="hover:text-pink-900">×</button>
-                </span>
+            {/* SIDEBAR */}
+            <aside className={`fixed md:static inset-0 z-40 md:z-0 ${showSidebar ? '' : 'hidden md:block'} md:w-64 shrink-0`}>
+              {showSidebar && (
+                <div className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-30" onClick={() => setShowSidebar(false)} />
               )}
-              {selectedBrand !== 'all' && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedBrand} <button onClick={() => setSelectedBrand('all')} className="hover:text-pink-900">×</button>
-                </span>
-              )}
-              {selectedFinish !== 'all' && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedFinish} <button onClick={() => setSelectedFinish('all')} className="hover:text-pink-900">×</button>
-                </span>
-              )}
-              {selectedCoverage !== 'all' && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedCoverage} <button onClick={() => setSelectedCoverage('all')} className="hover:text-pink-900">×</button>
-                </span>
-              )}
-              {selectedDiscount > 0 && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  {selectedDiscount}%+ off <button onClick={() => setSelectedDiscount(0)} className="hover:text-pink-900">×</button>
-                </span>
-              )}
-              {(minPrice || maxPrice) && (
-                <span className="flex items-center gap-1.5 bg-pink-100 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  ₹{minPrice || 0} - ₹{maxPrice || '∞'} <button onClick={() => { setMinPrice(''); setMaxPrice(''); }} className="hover:text-pink-900">×</button>
-                </span>
-              )}
-              <button onClick={clearFilters} className="text-xs text-pink-600 underline hover:text-pink-800 font-semibold">
-                Clear all
-              </button>
-            </div>
-          )}
-
-          <div className="flex gap-6 lg:gap-8">
-
-            {/* SIDEBAR FILTERS */}
-            <aside className={`${showFilters ? 'fixed inset-0 z-50 bg-black/50 lg:static lg:bg-transparent lg:z-auto' : 'hidden lg:block'} lg:w-72 xl:w-80 flex-shrink-0`} onClick={() => setShowFilters(false)}>
-
-              <div
-                className={`${showFilters ? 'absolute right-0 top-0 h-full w-80 bg-white overflow-y-auto p-5 lg:static lg:p-0 lg:w-full lg:bg-transparent' : ''} space-y-4`}
-                onClick={(e) => e.stopPropagation()}
-              >
-
-                {showFilters && (
-                  <div className="flex justify-between items-center mb-4 lg:hidden">
-                    <h3 className="text-lg font-bold text-gray-800">Filters</h3>
-                    <button onClick={() => setShowFilters(false)} className="text-2xl text-gray-400">✕</button>
-                  </div>
-                )}
-
-                {/* Subcategory */}
-                <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <span>📂</span> Subcategory
-                  </h3>
-                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                    {subcategories.map(cat => (
-                      <label key={cat.id} className={`flex items-center justify-between cursor-pointer px-3 py-2 rounded-xl transition ${selectedSubcategory === cat.id ? 'bg-pink-50 border border-pink-200' : 'hover:bg-pink-50'}`}>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="subcategory"
-                            checked={selectedSubcategory === cat.id}
-                            onChange={() => setSelectedSubcategory(cat.id)}
-                            className="w-4 h-4 text-pink-500 focus:ring-pink-400"
-                          />
-                          <span className={`text-sm ${selectedSubcategory === cat.id ? 'font-semibold text-pink-700' : 'text-gray-700'}`}>{cat.name}</span>
-                        </div>
-                        <span className="text-xs text-gray-400">{cat.count}</span>
-                      </label>
-                    ))}
-                  </div>
+              <div className={`${showSidebar ? 'fixed top-0 left-0 h-full w-72 z-40 overflow-y-auto bg-white shadow-2xl' : 'bg-white/70 backdrop-blur-sm rounded-3xl border border-pink-100 shadow-sm'} overflow-hidden`}>
+                <div className="px-5 py-4 border-b border-pink-100/70 bg-gradient-to-r from-pink-50 to-rose-50 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-800 text-sm tracking-wide">Categories</h3>
+                  {showSidebar && (
+                    <button onClick={() => setShowSidebar(false)} className="md:hidden text-gray-400 text-lg">✕</button>
+                  )}
                 </div>
-
-                {/* Brand */}
-                {brands.length > 1 && (
-                  <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                    <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                      <span>🏷️</span> Brands
-                    </h3>
-                    <select
-                      value={selectedBrand}
-                      onChange={(e) => setSelectedBrand(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500 bg-white cursor-pointer"
-                    >
-                      {brands.map(b => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.count})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Finish */}
-                <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <span>✨</span> Finish
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setSelectedFinish('all')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                        selectedFinish === 'all'
-                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
-                          : 'bg-pink-50 text-pink-600 border border-pink-200 hover:bg-pink-100'
-                      }`}
-                    >
-                      All
-                    </button>
-                    {finishTypes.map(f => (
-                      <button
-                        key={f}
-                        onClick={() => setSelectedFinish(f.toLowerCase())}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                          selectedFinish === f.toLowerCase()
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                            : 'bg-pink-50 text-pink-600 border border-pink-200 hover:bg-pink-100'
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Coverage */}
-                <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <span>🎨</span> Coverage
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setSelectedCoverage('all')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                        selectedCoverage === 'all'
-                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
-                          : 'bg-pink-50 text-pink-600 border border-pink-200 hover:bg-pink-100'
-                      }`}
-                    >
-                      All
-                    </button>
-                    {coverageTypes.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedCoverage(c.toLowerCase())}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                          selectedCoverage === c.toLowerCase()
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                            : 'bg-pink-50 text-pink-600 border border-pink-200 hover:bg-pink-100'
-                        }`}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Price */}
-                <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <span>💰</span> Price Range
-                  </h3>
-                  <div className="flex gap-3">
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      value={minPrice}
-                      onChange={(e) => setMinPrice(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                    />
-                    <span className="text-gray-400 self-center">—</span>
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-pink-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Discount */}
-                <div className="bg-white rounded-2xl p-5 border border-pink-100 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-3 text-sm flex items-center gap-2">
-                    <span>🎁</span> Discount
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {[10, 25, 50, 70].map(d => (
-                      <button
-                        key={d}
-                        onClick={() => setSelectedDiscount(selectedDiscount === d ? 0 : d)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                          selectedDiscount === d
-                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                            : 'bg-pink-50 text-pink-600 border border-pink-200 hover:bg-pink-100'
-                        }`}
-                      >
-                        {d}% or more
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {activeFilterCount > 0 && (
+                <nav className="p-2 max-h-[600px] overflow-y-auto">
                   <button
-                    onClick={clearFilters}
-                    className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-2xl text-sm font-bold hover:shadow-lg transition-all"
+                    onClick={() => { setSelectedSubcategory('all'); setShowSidebar(false); }}
+                    className={`w-full text-left px-4 py-3 text-sm transition-all rounded-2xl flex items-center gap-3 mb-1 ${
+                      selectedSubcategory === 'all'
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-md shadow-pink-200/50'
+                        : 'text-gray-700 hover:bg-pink-50'
+                    }`}
                   >
-                    Clear All Filters ✨
+                    <span className="text-base">✨</span>
+                    <span>All Products</span>
                   </button>
-                )}
-
+                  {subcategories.map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => { setSelectedSubcategory(sub.name); setShowSidebar(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm transition-all rounded-2xl flex items-center gap-3 mb-1 ${
+                        selectedSubcategory === sub.name
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-md shadow-pink-200/50'
+                          : 'text-gray-700 hover:bg-pink-50'
+                      }`}
+                    >
+                      <span className="text-base">{sub.icon || '💄'}</span>
+                      <span className="truncate">{sub.name}</span>
+                    </button>
+                  ))}
+                </nav>
               </div>
             </aside>
 
-            {/* PRODUCTS GRID */}
-            <div className="flex-1 min-w-0">
+            {/* PRODUCTS */}
+            <main className="flex-1 min-w-0">
+              {/* Mobile filter buttons */}
+              <div className="md:hidden mb-4 flex gap-2">
+                <button onClick={() => setShowSidebar(true)} className="flex-1 px-4 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">
+                  Categories
+                </button>
+                <button onClick={() => setShowFilters(!showFilters)} className="px-4 py-2.5 border border-pink-200 rounded-full text-xs tracking-widest uppercase font-medium text-pink-600 bg-white">
+                  Filters
+                </button>
+              </div>
 
-              {filteredProducts.length === 0 ? (
-                <div className="bg-white rounded-3xl p-12 sm:p-16 text-center border border-pink-100 shadow-sm">
-                  <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-pink-100 to-rose-100 rounded-full flex items-center justify-center">
-                    <span className="text-6xl">💄</span>
+              {/* Filter bar (desktop) */}
+              <div className="mb-6 pb-5 border-b border-pink-100">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="hidden md:flex gap-2 flex-wrap">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
+                      {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                    <select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
+                      <option value="all">All Finishes</option>
+                      {finishTypes.map((f) => <option key={f} value={f.toLowerCase()}>{f}</option>)}
+                    </select>
+                    <select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
+                      <option value="all">All Coverage</option>
+                      {coverageTypes.map((c) => <option key={c} value={c.toLowerCase()}>{c}</option>)}
+                    </select>
+                    <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
+                      {priceRanges.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">No makeup products found</h3>
-                  <p className="text-gray-500 mb-6 max-w-md mx-auto">Try adjusting your filters or search term</p>
-                  <button
-                    onClick={clearFilters}
-                    className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-3 rounded-full font-semibold hover:shadow-lg transition"
-                  >
-                    Clear Filters ✨
+                  <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+                    {hasActiveFilters && (
+                      <button onClick={clearFilters} className="text-[10px] sm:text-[11px] tracking-wider text-pink-500 uppercase underline underline-offset-4">Clear</button>
+                    )}
+                    <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-3 sm:px-4 py-2 bg-white border border-pink-200 rounded-full text-xs tracking-wider text-gray-700 focus:outline-none focus:border-pink-400">
+                      {sortOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mobile filters drawer */}
+              {showFilters && (
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setShowFilters(false)}>
+                  <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-pink-100">
+                      <h3 className="font-semibold text-gray-800 text-base">Refine</h3>
+                      <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
+                    </div>
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Brand</label>
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
+                          {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Finish</label>
+                        <select value={selectedFinish} onChange={(e) => setSelectedFinish(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
+                          <option value="all">All Finishes</option>
+                          {finishTypes.map((f) => <option key={f} value={f.toLowerCase()}>{f}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Coverage</label>
+                        <select value={selectedCoverage} onChange={(e) => setSelectedCoverage(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
+                          <option value="all">All Coverage</option>
+                          {coverageTypes.map((c) => <option key={c} value={c.toLowerCase()}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-pink-500 uppercase mb-2 font-semibold">Price</label>
+                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-pink-50/50 border border-pink-100 rounded-xl text-sm">
+                          {priceRanges.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">Clear All</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Count */}
+              <div className="mb-4 sm:mb-6">
+                <p className="text-xs tracking-wider text-gray-400">
+                  {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+                  {selectedSubcategory !== 'all' && <span className="text-pink-600 font-medium"> · {selectedSubcategory}</span>}
+                </p>
+              </div>
+
+              {/* ✅ EMPTY STATE */}
+              {filteredProducts.length === 0 ? (
+                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-12 sm:p-16 text-center border border-pink-100 shadow-sm">
+                  <div className="text-4xl mb-4">💄</div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Nothing here yet</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    {selectedSubcategory !== 'all' ? `We're adding ${selectedSubcategory} soon.` : 'New arrivals coming soon.'}
+                  </p>
+                  <button onClick={clearFilters} className="px-8 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">
+                    View All
                   </button>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                  {filteredProducts.map(product => (
+              ) : hasActiveFilters ? (
+                /* ✅ Filter active — flat grid */
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                  {filteredProducts.slice(0, visibleCount).map((product) => (
                     <ProductCard
-                      key={product._id}
+                      key={product.id}
                       product={product}
-                      addToCart={addToCart}
                       isInWishlist={isInWishlist}
                       addToWishlist={addToWishlist}
                       removeFromWishlist={removeFromWishlist}
                       user={user}
+                      wishlistContext={wishlist}
                     />
                   ))}
                 </div>
+              ) : (
+                /* ✅ No filter — Mixed (1 line) + Subcategory sections (2 lines each) */
+                <>
+                  {/* MIXED SECTION — 1 LINE */}
+                  {mixedRandomProducts.length > 0 && (
+                    <section className="my-8 sm:my-10">
+                      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-800">✨ Featured Products</h3>
+                        </div>
+                        <Link to="/shop" className="text-pink-600 text-sm font-bold hover:underline whitespace-nowrap">
+                          View All →
+                        </Link>
+                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                        {mixedRandomProducts.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            isInWishlist={isInWishlist}
+                            addToWishlist={addToWishlist}
+                            removeFromWishlist={removeFromWishlist}
+                            user={user}
+                            wishlistContext={wishlist}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Mid Banner 1 */}
+                  {midBanners1.length > 0 && (
+                    <section className="w-full my-6 sm:my-8">
+                      <BannerRenderer banners={midBanners1} />
+                    </section>
+                  )}
+
+                  {/* Subcategory sections */}
+                  {Object.entries(groupedBySubcategory).map(([subName, subProducts], idx) => {
+                    if (!subProducts.length) return null;
+                    const randomProducts = subcategoryRandomMap[subName] || [];
+
+                    return (
+                      <Fragment key={subName}>
+                        <section className="my-8 sm:my-10">
+                          <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
+                              <h3 className="text-lg sm:text-xl font-bold text-gray-800">{subName}</h3>
+                              <span className="text-xs text-pink-400 font-medium">({subProducts.length})</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedSubcategory(subName);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="text-pink-600 text-sm font-bold hover:underline whitespace-nowrap"
+                            >
+                              View All →
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                            {randomProducts.map((product) => (
+                              <ProductCard
+                                key={product.id}
+                                product={product}
+                                isInWishlist={isInWishlist}
+                                addToWishlist={addToWishlist}
+                                removeFromWishlist={removeFromWishlist}
+                                user={user}
+                                wishlistContext={wishlist}
+                              />
+                            ))}
+                          </div>
+                        </section>
+
+                        {idx === 0 && midBanners2.length > 0 && (
+                          <section className="w-full my-6 sm:my-8">
+                            <BannerRenderer banners={midBanners2} />
+                          </section>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+
+                  {/* Mid offers */}
+                  {midOffers.length > 0 && (
+                    <div className="my-6 sm:my-8 space-y-3">
+                      {midOffers.map((offer, i) => (
+                        <div key={offer.id || i} className="bg-gradient-to-r from-pink-500 via-rose-500 to-pink-500 text-white rounded-2xl p-4 flex items-center gap-4 shadow-md">
+                          <span className="text-3xl">{offer.icon || '🎉'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm sm:text-base truncate">{offer.title}</p>
+                            <p className="text-xs opacity-90 truncate">{offer.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
-            </div>
+
+              {/* BOTTOM BANNER */}
+              {bottomBanners.length > 0 && (
+                <section className="w-full mt-10 sm:mt-12">
+                  <BannerRenderer banners={bottomBanners} />
+                </section>
+              )}
+            </main>
           </div>
         </div>
 
         {/* FOOTER */}
-        <footer className="bg-gray-900 text-gray-400 py-12 sm:py-16 mt-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
+        <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-400 py-12 sm:py-16">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 mb-10 sm:mb-12">
+              <div className="col-span-2 md:col-span-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center shadow-lg">
                     <span className="text-white font-bold text-sm">M</span>
                   </div>
                   <h3 className="font-bold text-white text-lg">MyPinkShop</h3>
                 </div>
-                <p className="text-sm">Luxury beauty and fashion for the modern woman.</p>
+                <p className="text-xs leading-relaxed text-gray-500">Premium beauty essentials, thoughtfully curated for the girlies ✨</p>
               </div>
               <div>
-                <h4 className="font-semibold text-white mb-4">Shop</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><Link to="/skincare" className="hover:text-pink-500 transition">Skincare</Link></li>
-                  <li><Link to="/makeup" className="hover:text-pink-500 transition">Makeup</Link></li>
-                  <li><Link to="/hair" className="hover:text-pink-500 transition">Hair</Link></li>
-                  <li><Link to="/clothing" className="hover:text-pink-500 transition">Clothing</Link></li>
-                  <li><Link to="/accessories" className="hover:text-pink-500 transition">Accessories</Link></li>
+                <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Shop</h4>
+                <ul className="space-y-2.5 text-xs">
+                  <li><Link to="/skincare" className="hover:text-pink-400 transition-colors">Skincare</Link></li>
+                  <li><Link to="/makeup" className="hover:text-pink-400 transition-colors">Makeup</Link></li>
+                  <li><Link to="/hair" className="hover:text-pink-400 transition-colors">Haircare</Link></li>
+                  <li><Link to="/clothing" className="hover:text-pink-400 transition-colors">Fashion</Link></li>
+                  <li><Link to="/accessories" className="hover:text-pink-400 transition-colors">Accessories</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-white mb-4">Support</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><Link to="/contact" className="hover:text-pink-500 transition">Contact Us</Link></li>
-                  <li><Link to="/faqs" className="hover:text-pink-500 transition">FAQs</Link></li>
-                  <li><Link to="/shipping" className="hover:text-pink-500 transition">Shipping Info</Link></li>
-                  <li><Link to="/returns" className="hover:text-pink-500 transition">Returns Policy</Link></li>
+                <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Support</h4>
+                <ul className="space-y-2.5 text-xs">
+                  <li><Link to="/contact" className="hover:text-pink-400 transition-colors">Contact</Link></li>
+                  <li><Link to="/faqs" className="hover:text-pink-400 transition-colors">FAQs</Link></li>
+                  <li><Link to="/shipping-info" className="hover:text-pink-400 transition-colors">Shipping</Link></li>
+                  <li><Link to="/returns-policy" className="hover:text-pink-400 transition-colors">Returns</Link></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold text-white mb-4">Follow Us</h4>
-                <ul className="space-y-2 text-sm">
-                  <li><a href="#" className="hover:text-pink-500 transition">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Facebook</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">Pinterest</a></li>
-                  <li><a href="#" className="hover:text-pink-500 transition">YouTube</a></li>
+                <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Follow</h4>
+                <ul className="space-y-2.5 text-xs">
+                  <li><a href="https://www.instagram.com/mypinkshopofficial" className="hover:text-pink-400 transition-colors">Instagram</a></li>
+                  <li><a href="https://www.facebook.com/mypinkshopofficial" className="hover:text-pink-400 transition-colors">Facebook</a></li>
                 </ul>
               </div>
             </div>
             <div className="text-center pt-8 border-t border-gray-800">
-              <p className="text-sm">© 2026 MyPinkShop. All rights reserved.</p>
-              <p className="text-xs text-gray-600 mt-2">Made with 💖 for the girlies</p>
+              <p className="text-[11px] tracking-widest text-gray-500 uppercase">© 2026 MyPinkShop · All Rights Reserved</p>
             </div>
           </div>
         </footer>
+
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
       </div>
     </>
   );
