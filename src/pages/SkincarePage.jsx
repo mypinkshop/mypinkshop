@@ -91,6 +91,7 @@ function SkincarePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [visibleCount, setVisibleCount] = useState(16);
+  const [randomSeed, setRandomSeed] = useState(Date.now());
 
   const SLUG = 'skincare';
 
@@ -103,7 +104,6 @@ function SkincarePage() {
         const tree = catJson.data || catJson;
         const found = Array.isArray(tree) ? tree.find((c) => c.slug === SLUG) : null;
         if (found) {
-          // ✅ Proper mapping — subcategories
           setApiSubcategories(
             (found.children || []).map(child => ({
               id: child.id,
@@ -130,7 +130,7 @@ function SkincarePage() {
     loadAll();
   }, []);
 
-  /* ✅ NAYA — Subcategories dedicated API */
+  /* ✅ Subcategories dedicated API */
   useEffect(() => {
     const loadSubs = async () => {
       try {
@@ -197,7 +197,6 @@ function SkincarePage() {
       return unique;
     }
 
-    // ✅ Fallback — products se derive
     products.forEach((p) => {
       const name = String(p.subCategory || '').trim();
       const key = name.toLowerCase();
@@ -299,24 +298,59 @@ function SkincarePage() {
     setSortBy('default');
   };
 
-  /* ---------------- ✅ Top 4 products ---------------- */
-  const topProducts = useMemo(() => {
-    return filteredProducts.slice(0, 4);
+  /* ---------------- ✅ MIXED Random Products — 3 products (1 line) ---------------- */
+  const mixedRandomProducts = useMemo(() => {
+    if (filteredProducts.length === 0) return [];
+
+    const bySub = {};
+    filteredProducts.forEach((p) => {
+      const sub = p.subCategory || 'Other';
+      if (!bySub[sub]) bySub[sub] = [];
+      bySub[sub].push(p);
+    });
+
+    const subKeys = Object.keys(bySub).sort(() => Math.random() - 0.5);
+    const picks = [];
+
+    // Har subcategory se 1-1 random
+    subKeys.forEach((sub) => {
+      if (picks.length >= 3) return;
+      const shuffled = [...bySub[sub]].sort(() => Math.random() - 0.5);
+      if (shuffled[0]) picks.push(shuffled[0]);
+    });
+
+    // Agar 3 se kam hain toh baaki se fill karo
+    if (picks.length < 3) {
+      const usedIds = new Set(picks.map(p => p.id));
+      const remaining = filteredProducts.filter(p => !usedIds.has(p.id));
+      const shuffled = remaining.sort(() => Math.random() - 0.5);
+      picks.push(...shuffled.slice(0, 3 - picks.length));
+    }
+
+    return picks.sort(() => Math.random() - 0.5).slice(0, 3);
+  }, [filteredProducts, randomSeed]);
+
+  /* ---------------- ✅ Subcategory-wise Group (saare products) ---------------- */
+  const groupedBySubcategory = useMemo(() => {
+    const groups = {};
+    filteredProducts.forEach((p) => {
+      const sub = p.subCategory || 'Other';
+      if (!groups[sub]) groups[sub] = [];
+      groups[sub].push(p);
+    });
+    return groups;
   }, [filteredProducts]);
 
-  /* ---------------- ✅ Baaki products ko subcategory-wise group ---------------- */
-  const groupedBySubcategory = useMemo(() => {
-    const topIds = new Set(topProducts.map((p) => p.id));
-    const groups = {};
-    filteredProducts
-      .filter((p) => !topIds.has(p.id))
-      .forEach((p) => {
-        const sub = p.subCategory || 'Other';
-        if (!groups[sub]) groups[sub] = [];
-        groups[sub].push(p);
-      });
-    return groups;
-  }, [filteredProducts, topProducts]);
+  /* ---------------- ✅ Subcategory Random Products Map — 6 products (2 lines) ---------------- */
+  const subcategoryRandomMap = useMemo(() => {
+    const map = {};
+    Object.entries(groupedBySubcategory).forEach(([subName, subProducts]) => {
+      map[subName] = [...subProducts]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6);
+    });
+    return map;
+  }, [groupedBySubcategory, randomSeed]);
 
   /* ---------------- Banner groups ---------------- */
   const heroBanners = bannersByPosition.category_hero || bannersByPosition.skincare_hero || [];
@@ -422,7 +456,7 @@ function SkincarePage() {
           </div>
         </section>
 
-        {/* ✅ HERO BANNER — FULL WIDTH */}
+        {/* HERO BANNER — FULL WIDTH */}
         {heroBanners.length > 0 && (
           <section className="w-full">
             <BannerRenderer banners={heroBanners} />
@@ -622,22 +656,40 @@ function SkincarePage() {
                   ))}
                 </div>
               ) : (
-                /* ✅ No filter — Top 4 + Subcategory sections */
+                /* ✅ No filter — Mixed (1 line) + Subcategory sections (2 lines each) */
                 <>
-                  {/* Top 4 */}
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6 mb-6 sm:mb-8">
-                    {topProducts.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        isInWishlist={isInWishlist}
-                        addToWishlist={addToWishlist}
-                        removeFromWishlist={removeFromWishlist}
-                        user={user}
-                        wishlistContext={wishlist}
-                      />
-                    ))}
-                  </div>
+                  {/* ✅ MIXED SECTION — 1 LINE — Saari Subcategories Se Random */}
+                  {mixedRandomProducts.length > 0 && (
+                    <section className="my-8 sm:my-10">
+                      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
+                          <h3 className="text-lg sm:text-xl font-bold text-gray-800">✨ Featured Products</h3>
+                        </div>
+                        <Link
+                          to="/shop"
+                          className="text-pink-600 text-sm font-bold hover:underline whitespace-nowrap"
+                        >
+                          View All →
+                        </Link>
+                      </div>
+
+                      {/* ✅ 1 LINE ONLY — 3 products desktop */}
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
+                        {mixedRandomProducts.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            isInWishlist={isInWishlist}
+                            addToWishlist={addToWishlist}
+                            removeFromWishlist={removeFromWishlist}
+                            user={user}
+                            wishlistContext={wishlist}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
                   {/* Mid Banner 1 — full width */}
                   {midBanners1.length > 0 && (
@@ -646,19 +698,34 @@ function SkincarePage() {
                     </section>
                   )}
 
-                  {/* Subcategory sections */}
+                  {/* ✅ Subcategory sections — 2 LINES each */}
                   {Object.entries(groupedBySubcategory).map(([subName, subProducts], idx) => {
                     if (!subProducts.length) return null;
+
+                    const randomProducts = subcategoryRandomMap[subName] || [];
+
                     return (
                       <Fragment key={subName}>
                         <section className="my-8 sm:my-10">
-                          <div className="flex items-center gap-3 mb-4 sm:mb-5">
-                            <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-800">{subName}</h3>
-                            <span className="text-xs text-pink-400 font-medium">({subProducts.length})</span>
+                          <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-1 h-6 sm:h-8 bg-gradient-to-b from-pink-400 to-rose-500 rounded-full"></div>
+                              <h3 className="text-lg sm:text-xl font-bold text-gray-800">{subName}</h3>
+                              <span className="text-xs text-pink-400 font-medium">({subProducts.length})</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedSubcategory(subName);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="text-pink-600 text-sm font-bold hover:underline whitespace-nowrap"
+                            >
+                              View All →
+                            </button>
                           </div>
+
                           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-6">
-                            {subProducts.slice(0, 8).map((product) => (
+                            {randomProducts.map((product) => (
                               <ProductCard
                                 key={product.id}
                                 product={product}
