@@ -4,6 +4,24 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AdminSidebar from './components/AdminSidebar';
 
+// ✅ Sab possible positions (checkbox ke liye)
+const POSITION_OPTIONS = [
+  { value: 'hero', label: '🎯 Hero Carousel (top)', group: 'Top' },
+  { value: 'after_trending', label: '📢 After Trending Section', group: 'Home' },
+  { value: 'after_category_skincare', label: '📢 After Skincare', group: 'Categories' },
+  { value: 'after_category_makeup', label: '📢 After Makeup', group: 'Categories' },
+  { value: 'after_category_hair', label: '📢 After Haircare', group: 'Categories' },
+  { value: 'after_category_fashion', label: '📢 After Fashion', group: 'Categories' },
+  { value: 'after_category_accessories', label: '📢 After Accessories', group: 'Categories' },
+  { value: 'after_category_home', label: '📢 After Home & Kitchen', group: 'Categories' },
+  { value: 'after_category_health', label: '📢 After Health & Wellness', group: 'Categories' },
+  { value: 'after_category_electronics', label: '📢 After Electronics', group: 'Categories' },
+  { value: 'after_category_books', label: '📢 After Books & Stationery', group: 'Categories' },
+  { value: 'between_categories', label: '📢 Between Categories', group: 'Middle' },
+  { value: 'bottom', label: '📢 Page Bottom', group: 'Bottom' },
+  { value: 'empty', label: '⛔ Empty (disabled)', group: 'Other' },
+];
+
 function AdminAppBanners() {
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState([]);
@@ -17,9 +35,11 @@ function AdminAppBanners() {
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const getToken = () => localStorage.getItem('adminToken');
 
-  // ============ FORM STATE (with new fields) ============
+  // ============ FORM STATE ============
   const emptyForm = {
     type: 'hero',
+    position: 'hero',           // ✅ Single position (dropdown)
+    positions: ['hero'],        // ✅ Multiple positions (checkbox)
     title: '',
     subtitle: '',
     description: '',
@@ -35,7 +55,6 @@ function AdminAppBanners() {
     isActive: true,
     startDate: '',
     endDate: '',
-    // ✅ NEW FIELDS
     textSize: 'medium',
     textWeight: 'bold',
     textOpacity: 1.0,
@@ -82,7 +101,6 @@ function AdminAppBanners() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file
     if (!file.type.startsWith('image/')) {
       toast.error('Please select a valid image file');
       return;
@@ -135,8 +153,18 @@ function AdminAppBanners() {
 
   const handleEdit = (banner) => {
     setEditing(banner);
+    // Parse positions — agar array hai to, warna single position
+    let positions = ['hero'];
+    if (Array.isArray(banner.positions)) {
+      positions = banner.positions;
+    } else if (banner.position) {
+      positions = [banner.position];
+    }
+
     setForm({
       type: banner.type || 'hero',
+      position: banner.position || 'hero',
+      positions: positions,
       title: banner.title || '',
       subtitle: banner.subtitle || '',
       description: banner.description || '',
@@ -152,7 +180,6 @@ function AdminAppBanners() {
       isActive: banner.is_active === 1,
       startDate: banner.start_date || '',
       endDate: banner.end_date || '',
-      // ✅ NEW FIELDS
       textSize: banner.text_size || 'medium',
       textWeight: banner.text_weight || 'bold',
       textOpacity: banner.text_opacity ?? 1.0,
@@ -165,10 +192,27 @@ function AdminAppBanners() {
     setShowModal(true);
   };
 
+  // ============ TOGGLE POSITION CHECKBOX ============
+  const togglePosition = (posValue) => {
+    setForm((prev) => {
+      const current = prev.positions || [];
+      const isSelected = current.includes(posValue);
+      const updated = isSelected
+        ? current.filter((p) => p !== posValue)
+        : [...current, posValue];
+      return { ...prev, positions: updated };
+    });
+  };
+
   // ============ SAVE ============
   const handleSave = async () => {
     if (!form.title && !form.image) {
       toast.error('Title or image is required');
+      return;
+    }
+
+    if (!form.positions || form.positions.length === 0) {
+      toast.error('Please select at least one position');
       return;
     }
 
@@ -180,24 +224,40 @@ function AdminAppBanners() {
         : `${API_URL}/api/app-banners`;
       const method = editing ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(form),
-      });
+      // ✅ Multiple positions ke liye alag rows create karo
+      const positions = form.positions || ['hero'];
 
-      if (res.ok) {
-        toast.success(editing ? 'Banner updated!' : 'Banner created!');
+      const responses = await Promise.all(
+        positions.map((pos) =>
+          fetch(url, {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              ...form,
+              position: pos,
+              positions: undefined,  // Not needed in backend
+            }),
+          })
+        )
+      );
+
+      const allOk = responses.every((r) => r.ok);
+
+      if (allOk) {
+        toast.success(
+          editing
+            ? `Banner updated in ${positions.length} position(s)!`
+            : `Banner created in ${positions.length} position(s)!`
+        );
         setShowModal(false);
         setForm(emptyForm);
         setEditing(null);
         loadBanners();
       } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to save');
+        toast.error('Failed to save (some positions failed)');
       }
     } catch (err) {
       console.error(err);
@@ -284,7 +344,7 @@ function AdminAppBanners() {
     }
   };
 
-  // ============ HELPERS — STYLE MAPPING ============
+  // ============ HELPERS ============
   const getTextSizeClass = (size) => {
     switch (size) {
       case 'small': return 'text-sm';
@@ -305,7 +365,6 @@ function AdminAppBanners() {
   };
 
   const getPositionClasses = (pos) => {
-    // Returns { container: 'flex-...', text: 'text-...' }
     const map = {
       'top-left': 'items-start justify-start text-left',
       'top-center': 'items-start justify-center text-center',
@@ -318,6 +377,10 @@ function AdminAppBanners() {
       'bottom-right': 'items-end justify-end text-right',
     };
     return map[pos] || map['center-left'];
+  };
+
+  const getPositionLabel = (pos) => {
+    return POSITION_OPTIONS.find((p) => p.value === pos)?.label || pos;
   };
 
   // ============ FILTER ============
@@ -335,7 +398,13 @@ function AdminAppBanners() {
     section: banners.filter((b) => b.type === 'section').length,
   };
 
-  // ============ LOADING ============
+  // Group positions for UI
+  const positionGroups = POSITION_OPTIONS.reduce((acc, pos) => {
+    if (!acc[pos.group]) acc[pos.group] = [];
+    acc[pos.group].push(pos);
+    return acc;
+  }, {});
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-pink-50/30">
@@ -359,7 +428,7 @@ function AdminAppBanners() {
       <AdminSidebar />
 
       <div className="lg:ml-64">
-        {/* ============ HEADER ============ */}
+        {/* HEADER */}
         <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-40">
           <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -373,7 +442,7 @@ function AdminAppBanners() {
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Manage banners shown in the mobile app home screen
+                  Manage banners + display positions for the mobile app
                 </p>
               </div>
 
@@ -398,7 +467,7 @@ function AdminAppBanners() {
         </div>
 
         <div className="p-4 sm:p-6 lg:p-8">
-          {/* ============ STATS ============ */}
+          {/* STATS */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             {[
               { key: 'all', label: 'All', icon: '📋', color: 'from-slate-500 to-slate-700' },
@@ -433,7 +502,7 @@ function AdminAppBanners() {
             ))}
           </div>
 
-          {/* ============ BANNERS GRID ============ */}
+          {/* BANNERS GRID */}
           {filteredBanners.length === 0 ? (
             <div className="bg-white rounded-3xl border border-slate-200/60 p-16 text-center">
               <div className="text-6xl mb-4">📱</div>
@@ -460,14 +529,13 @@ function AdminAppBanners() {
                     banner.is_active ? 'border-slate-200/60' : 'border-red-200 bg-red-50/30'
                   }`}
                 >
-                  {/* Preview (with new styling) */}
+                  {/* Preview */}
                   <div
                     className="relative h-40 overflow-hidden"
                     style={{
                       background: `linear-gradient(135deg, ${banner.gradient_start || '#EC4899'}, ${banner.gradient_end || '#F43F5E'})`,
                     }}
                   >
-                    {/* Background image */}
                     {banner.image && banner.image_position === 'background' && (
                       <img
                         src={banner.image}
@@ -483,7 +551,6 @@ function AdminAppBanners() {
                           : 'flex-row'
                       } ${getPositionClasses(banner.text_position || 'center-left')}`}
                     >
-                      {/* Side image */}
                       {banner.image && banner.image_position === 'left' && (
                         <img
                           src={banner.image}
@@ -520,16 +587,12 @@ function AdminAppBanners() {
                           {banner.title}
                         </p>
                         {banner.subtitle && (
-                          <p
-                            className="text-xs"
-                            style={{ opacity: 0.9 }}
-                          >
+                          <p className="text-xs" style={{ opacity: 0.9 }}>
                             {banner.subtitle}
                           </p>
                         )}
                       </div>
 
-                      {/* Side image (right) */}
                       {banner.image && banner.image_position === 'right' && (
                         <img
                           src={banner.image}
@@ -538,7 +601,6 @@ function AdminAppBanners() {
                         />
                       )}
 
-                      {/* Emoji fallback */}
                       {!banner.image && banner.emoji && (
                         <div className="text-6xl opacity-90">
                           {banner.emoji}
@@ -546,12 +608,10 @@ function AdminAppBanners() {
                       )}
                     </div>
 
-                    {/* Order index badge */}
                     <div className="absolute top-2 left-2 bg-black/40 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm z-10">
                       #{banner.order_index}
                     </div>
 
-                    {/* Active indicator */}
                     <button
                       onClick={() => handleToggle(banner)}
                       className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-1 rounded-lg transition z-10 ${
@@ -573,6 +633,29 @@ function AdminAppBanners() {
                       <p className="text-xs font-mono text-slate-700">
                         {banner.id}
                       </p>
+                    </div>
+
+                    {/* ✅ Position badges */}
+                    <div className="mb-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        Position
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(banner.positions) ? (
+                          banner.positions.map((p) => (
+                            <span
+                              key={p}
+                              className="inline-block bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold"
+                            >
+                              {getPositionLabel(p).split(' ').slice(1).join(' ')}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="inline-block bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                            {getPositionLabel(banner.position || 'hero')}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Color swatches */}
@@ -649,10 +732,10 @@ function AdminAppBanners() {
         </div>
       </div>
 
-      {/* ============ MODAL ============ */}
+      {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center z-10">
               <h2 className="text-xl font-bold text-slate-900">
@@ -672,7 +755,7 @@ function AdminAppBanners() {
 
             {/* Form — 2 Columns */}
             <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* LEFT — Form Fields */}
+              {/* LEFT — Form */}
               <div className="space-y-4">
                 {/* Type */}
                 <div>
@@ -690,6 +773,51 @@ function AdminAppBanners() {
                     <option value="category">📁 Category</option>
                     <option value="section">📊 Product Section</option>
                   </select>
+                </div>
+
+                {/* ✅ MULTIPLE POSITIONS — Checkboxes */}
+                <div className="border-2 border-pink-200 bg-pink-50/30 rounded-xl p-4">
+                  <label className="block text-xs font-bold text-slate-700 mb-3 uppercase">
+                    📍 Display Positions * (select multiple)
+                  </label>
+
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {Object.entries(positionGroups).map(([group, positions]) => (
+                      <div key={group}>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">
+                          {group}
+                        </p>
+                        <div className="space-y-1.5">
+                          {positions.map((pos) => {
+                            const checked = (form.positions || []).includes(
+                              pos.value
+                            );
+                            return (
+                              <label
+                                key={pos.value}
+                                className="flex items-center gap-2 cursor-pointer hover:bg-white/50 p-1.5 rounded-lg transition"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => togglePosition(pos.value)}
+                                  className="w-4 h-4 accent-pink-500 cursor-pointer"
+                                />
+                                <span className="text-xs font-semibold text-slate-700">
+                                  {pos.label}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Selected count */}
+                  <p className="text-[10px] font-bold text-pink-600 mt-3">
+                    ✓ {(form.positions || []).length} position(s) selected
+                  </p>
                 </div>
 
                 {/* Title */}
@@ -825,7 +953,7 @@ function AdminAppBanners() {
                   </div>
                 </div>
 
-                {/* Colors — 3 columns */}
+                {/* Colors */}
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
@@ -941,7 +1069,7 @@ function AdminAppBanners() {
                     </div>
                   </div>
 
-                  {/* Text Position 3x3 Grid */}
+                  {/* Text Position 3x3 */}
                   <div className="mt-3">
                     <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
                       Position
@@ -988,7 +1116,6 @@ function AdminAppBanners() {
                     />
                   </div>
 
-                  {/* Shadow toggle */}
                   <button
                     type="button"
                     onClick={() =>
@@ -1067,7 +1194,7 @@ function AdminAppBanners() {
                   </select>
                 </div>
 
-                {/* Order + Active + Dates */}
+                {/* Order + Active */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
@@ -1113,14 +1240,11 @@ function AdminAppBanners() {
                     📱 Mobile Preview
                   </p>
 
-                  {/* Phone mockup */}
                   <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
-                    {/* Phone notch */}
                     <div className="flex justify-center pt-2 pb-1 bg-slate-100">
                       <div className="w-16 h-4 bg-slate-900 rounded-full"></div>
                     </div>
 
-                    {/* Banner Preview */}
                     <div
                       className="relative h-56 overflow-hidden"
                       style={{
@@ -1130,7 +1254,6 @@ function AdminAppBanners() {
                             : '#000',
                       }}
                     >
-                      {/* Background image */}
                       {form.image && form.imagePosition === 'background' && (
                         <img
                           src={form.image}
@@ -1146,7 +1269,6 @@ function AdminAppBanners() {
                             : 'flex-row'
                         } ${getPositionClasses(form.textPosition)}`}
                       >
-                        {/* Image left */}
                         {form.image && form.imagePosition === 'left' && (
                           <img
                             src={form.image}
@@ -1209,7 +1331,6 @@ function AdminAppBanners() {
                           )}
                         </div>
 
-                        {/* Image right */}
                         {form.image && form.imagePosition === 'right' && (
                           <img
                             src={form.image}
@@ -1224,7 +1345,6 @@ function AdminAppBanners() {
                           />
                         )}
 
-                        {/* Emoji fallback */}
                         {!form.image && form.emoji && (
                           <div className="text-6xl opacity-90">
                             {form.emoji}
@@ -1233,7 +1353,6 @@ function AdminAppBanners() {
                       </div>
                     </div>
 
-                    {/* Fake app content below */}
                     <div className="p-3 bg-slate-50">
                       <div className="h-3 w-24 bg-slate-200 rounded mb-2"></div>
                       <div className="grid grid-cols-4 gap-2">
@@ -1254,9 +1373,9 @@ function AdminAppBanners() {
                     💡 Tips
                   </p>
                   <ul className="text-xs text-pink-600 space-y-1">
+                    <li>• Multiple positions select kar sakte ho</li>
+                    <li>• Same banner alag-alag jagah dikhega</li>
                     <li>• Image on right with text on left looks best</li>
-                    <li>• Use "background" for full-bleed images</li>
-                    <li>• Enable text shadow on busy backgrounds</li>
                   </ul>
                 </div>
               </div>
