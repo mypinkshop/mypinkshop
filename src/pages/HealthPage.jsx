@@ -110,7 +110,6 @@ function HealthPage() {
     loadProducts();
   }, []);
 
-  /* ✅ FIXED: Sirf wahi subcategories dikhao jisme products hain */
   const subcategories = useMemo(() => {
     const normalize = (s) => String(s || '').toLowerCase().trim();
 
@@ -126,7 +125,6 @@ function HealthPage() {
         const name = String(s.name || '').trim();
         const key = normalize(name);
         if (!key || seen.has(key)) return;
-        // ✅ Sirf wahi subcategory dikhao jisme product hai
         if (productSubs.size > 0 && !productSubs.has(key)) return;
         seen.add(key);
         unique.push({ id: s.id, name, icon: s.icon || '💊' });
@@ -232,7 +230,6 @@ function HealthPage() {
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
         <OfferBanner />
 
-        {/* HEADER */}
         <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-emerald-100/70 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between gap-4">
@@ -286,7 +283,6 @@ function HealthPage() {
           </div>
         </header>
 
-        {/* HERO */}
         <section className="relative bg-gradient-to-br from-green-100 via-emerald-50 to-green-100 border-b border-emerald-100">
           <div className="max-w-7xl mx-auto px-4 py-16 sm:py-20 text-center">
             <p className="text-[11px] tracking-[0.4em] text-emerald-500 uppercase mb-4 font-medium">The Health & Wellness Edit</p>
@@ -479,7 +475,7 @@ function HealthPage() {
                         removeFromWishlist={removeFromWishlist}
                         user={user}
                         wishlistContext={wishlist}
-                        theme="green"        {/* ✅ GREEN THEME */}
+                        theme="green"
                       />
                       {(index + 1) % 4 === 0 && midOffers[Math.floor(index / 4)] && (
                         <div className="col-span-full my-4">
