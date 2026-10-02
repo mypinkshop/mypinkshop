@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import AdminSidebar from '../../components/AdminSidebar';
+import AdminSidebar from './components/AdminSidebar';
 
 function AdminAppBanners() {
   const [loading, setLoading] = useState(true);
