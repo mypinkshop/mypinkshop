@@ -1,5 +1,5 @@
 // AdminAppBanners.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AdminSidebar from './components/AdminSidebar';
@@ -10,12 +10,14 @@ function AdminAppBanners() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [filterType, setFilterType] = useState('all');
+  const fileInputRef = useRef(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'https://api.mypinkshop.com';
   const getToken = () => localStorage.getItem('adminToken');
 
-  // ============ FORM STATE ============
+  // ============ FORM STATE (with new fields) ============
   const emptyForm = {
     type: 'hero',
     title: '',
@@ -33,6 +35,15 @@ function AdminAppBanners() {
     isActive: true,
     startDate: '',
     endDate: '',
+    // ✅ NEW FIELDS
+    textSize: 'medium',
+    textWeight: 'bold',
+    textOpacity: 1.0,
+    textPosition: 'center-left',
+    textShadow: 0,
+    imagePosition: 'right',
+    imageSize: 'medium',
+    layout: 'gradient',
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -66,6 +77,55 @@ function AdminAppBanners() {
     loadBanners();
   }, []);
 
+  // ============ IMAGE UPLOAD ============
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const token = getToken();
+      const formData = new FormData();
+      formData.append('images', file);
+
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const url = data.data?.url || data.url;
+        setForm({ ...form, image: url });
+        toast.success('Image uploaded!');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Network error during upload');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm({ ...form, image: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // ============ OPEN MODAL ============
   const handleAdd = () => {
     setEditing(null);
@@ -92,6 +152,15 @@ function AdminAppBanners() {
       isActive: banner.is_active === 1,
       startDate: banner.start_date || '',
       endDate: banner.end_date || '',
+      // ✅ NEW FIELDS
+      textSize: banner.text_size || 'medium',
+      textWeight: banner.text_weight || 'bold',
+      textOpacity: banner.text_opacity ?? 1.0,
+      textPosition: banner.text_position || 'center-left',
+      textShadow: banner.text_shadow ?? 0,
+      imagePosition: banner.image_position || 'right',
+      imageSize: banner.image_size || 'medium',
+      layout: banner.layout || 'gradient',
     });
     setShowModal(true);
   };
@@ -195,10 +264,8 @@ function AdminAppBanners() {
       newOrder[currentIdx],
     ];
 
-    // Update local state
     setBanners(newOrder.map((b, i) => ({ ...b, order_index: i + 1 })));
 
-    // Send to backend
     try {
       const token = getToken();
       await fetch(`${API_URL}/api/app-banners/reorder/bulk`, {
@@ -215,6 +282,42 @@ function AdminAppBanners() {
     } catch (err) {
       toast.error('Failed to reorder');
     }
+  };
+
+  // ============ HELPERS — STYLE MAPPING ============
+  const getTextSizeClass = (size) => {
+    switch (size) {
+      case 'small': return 'text-sm';
+      case 'large': return 'text-2xl';
+      case 'xlarge': return 'text-3xl';
+      case 'medium':
+      default: return 'text-lg';
+    }
+  };
+
+  const getTextWeightClass = (weight) => {
+    switch (weight) {
+      case 'regular': return 'font-normal';
+      case 'black': return 'font-black';
+      case 'bold':
+      default: return 'font-bold';
+    }
+  };
+
+  const getPositionClasses = (pos) => {
+    // Returns { container: 'flex-...', text: 'text-...' }
+    const map = {
+      'top-left': 'items-start justify-start text-left',
+      'top-center': 'items-start justify-center text-center',
+      'top-right': 'items-start justify-end text-right',
+      'center-left': 'items-center justify-start text-left',
+      'center': 'items-center justify-center text-center',
+      'center-right': 'items-center justify-end text-right',
+      'bottom-left': 'items-end justify-start text-left',
+      'bottom-center': 'items-end justify-center text-center',
+      'bottom-right': 'items-end justify-end text-right',
+    };
+    return map[pos] || map['center-left'];
   };
 
   // ============ FILTER ============
@@ -357,41 +460,101 @@ function AdminAppBanners() {
                     banner.is_active ? 'border-slate-200/60' : 'border-red-200 bg-red-50/30'
                   }`}
                 >
-                  {/* Preview */}
+                  {/* Preview (with new styling) */}
                   <div
                     className="relative h-40 overflow-hidden"
                     style={{
                       background: `linear-gradient(135deg, ${banner.gradient_start || '#EC4899'}, ${banner.gradient_end || '#F43F5E'})`,
                     }}
                   >
-                    <div className="absolute inset-0 flex items-center justify-between p-6">
-                      <div className="flex-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-white/80 mb-1">
+                    {/* Background image */}
+                    {banner.image && banner.image_position === 'background' && (
+                      <img
+                        src={banner.image}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover opacity-40"
+                      />
+                    )}
+
+                    <div
+                      className={`absolute inset-0 flex p-6 ${
+                        banner.image_position === 'left'
+                          ? 'flex-row-reverse'
+                          : 'flex-row'
+                      } ${getPositionClasses(banner.text_position || 'center-left')}`}
+                    >
+                      {/* Side image */}
+                      {banner.image && banner.image_position === 'left' && (
+                        <img
+                          src={banner.image}
+                          alt=""
+                          className="h-24 w-24 object-cover rounded-lg shadow-lg mr-3"
+                        />
+                      )}
+
+                      <div
+                        className="flex-1"
+                        style={{
+                          color: banner.text_color || '#FFFFFF',
+                          opacity: banner.text_opacity ?? 1.0,
+                          textShadow: banner.text_shadow
+                            ? '0 2px 4px rgba(0,0,0,0.3)'
+                            : 'none',
+                        }}
+                      >
+                        <p
+                          className={`text-[10px] uppercase tracking-wider mb-1 ${getTextWeightClass(
+                            banner.text_weight
+                          )}`}
+                          style={{ opacity: 0.85 }}
+                        >
                           {banner.type}
                         </p>
-                        <p className="text-white font-bold text-lg leading-tight mb-1">
+                        <p
+                          className={`${getTextSizeClass(
+                            banner.text_size
+                          )} leading-tight mb-1 ${getTextWeightClass(
+                            banner.text_weight
+                          )}`}
+                        >
                           {banner.title}
                         </p>
                         {banner.subtitle && (
-                          <p className="text-white/90 text-xs">
+                          <p
+                            className="text-xs"
+                            style={{ opacity: 0.9 }}
+                          >
                             {banner.subtitle}
                           </p>
                         )}
                       </div>
-                      {banner.emoji && (
-                        <div className="text-6xl opacity-90">{banner.emoji}</div>
+
+                      {/* Side image (right) */}
+                      {banner.image && banner.image_position === 'right' && (
+                        <img
+                          src={banner.image}
+                          alt=""
+                          className="h-24 w-24 object-cover rounded-lg shadow-lg ml-3"
+                        />
+                      )}
+
+                      {/* Emoji fallback */}
+                      {!banner.image && banner.emoji && (
+                        <div className="text-6xl opacity-90">
+                          {banner.emoji}
+                        </div>
                       )}
                     </div>
 
                     {/* Order index badge */}
-                    <div className="absolute top-2 left-2 bg-black/40 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm">
+                    <div className="absolute top-2 left-2 bg-black/40 text-white text-[10px] font-bold px-2 py-1 rounded-lg backdrop-blur-sm z-10">
                       #{banner.order_index}
                     </div>
 
                     {/* Active indicator */}
                     <button
                       onClick={() => handleToggle(banner)}
-                      className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-1 rounded-lg transition ${
+                      className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-1 rounded-lg transition z-10 ${
                         banner.is_active
                           ? 'bg-emerald-500 text-white'
                           : 'bg-red-500 text-white'
@@ -412,6 +575,25 @@ function AdminAppBanners() {
                       </p>
                     </div>
 
+                    {/* Color swatches */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">
+                        Colors:
+                      </span>
+                      <div
+                        className="w-5 h-5 rounded border border-slate-200"
+                        style={{ background: banner.gradient_start || '#EC4899' }}
+                      />
+                      <div
+                        className="w-5 h-5 rounded border border-slate-200"
+                        style={{ background: banner.gradient_end || '#F43F5E' }}
+                      />
+                      <div
+                        className="w-5 h-5 rounded border border-slate-200"
+                        style={{ background: banner.text_color || '#FFFFFF' }}
+                      />
+                    </div>
+
                     {(banner.cta_text || banner.cta_link) && (
                       <div className="mb-3 text-xs">
                         {banner.cta_text && (
@@ -420,7 +602,7 @@ function AdminAppBanners() {
                           </span>
                         )}
                         {banner.cta_link && (
-                          <span className="text-slate-500 font-mono">
+                          <span className="text-slate-500 font-mono truncate">
                             {banner.cta_link}
                           </span>
                         )}
@@ -429,12 +611,10 @@ function AdminAppBanners() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {/* Order buttons */}
                       <button
                         onClick={() => handleMoveOrder(banner, 'up')}
                         disabled={idx === 0}
                         className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 flex items-center justify-center text-xs transition"
-                        title="Move up"
                       >
                         ↑
                       </button>
@@ -442,22 +622,18 @@ function AdminAppBanners() {
                         onClick={() => handleMoveOrder(banner, 'down')}
                         disabled={idx === filteredBanners.length - 1}
                         className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 flex items-center justify-center text-xs transition"
-                        title="Move down"
                       >
                         ↓
                       </button>
 
                       <div className="flex-1"></div>
 
-                      {/* Edit */}
                       <button
                         onClick={() => handleEdit(banner)}
                         className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition"
                       >
                         ✏️ Edit
                       </button>
-
-                      {/* Delete */}
                       <button
                         onClick={() => handleDelete(banner)}
                         className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-bold transition"
@@ -476,7 +652,7 @@ function AdminAppBanners() {
       {/* ============ MODAL ============ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center z-10">
               <h2 className="text-xl font-bold text-slate-900">
@@ -494,58 +670,59 @@ function AdminAppBanners() {
               </button>
             </div>
 
-            {/* Form */}
-            <div className="p-6 space-y-4">
-              {/* Type */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                  Banner Type *
-                </label>
-                <select
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                >
-                  <option value="hero">✨ Hero (main carousel)</option>
-                  <option value="offer">📢 Offer Strip (thin)</option>
-                  <option value="promo">🎉 Promo (full-width)</option>
-                  <option value="category">📁 Category</option>
-                  <option value="section">📊 Product Section</option>
-                </select>
-              </div>
+            {/* Form — 2 Columns */}
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* LEFT — Form Fields */}
+              <div className="space-y-4">
+                {/* Type */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                    Banner Type *
+                  </label>
+                  <select
+                    value={form.type}
+                    onChange={(e) => setForm({ ...form, type: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                  >
+                    <option value="hero">✨ Hero (main carousel)</option>
+                    <option value="offer">📢 Offer Strip (thin)</option>
+                    <option value="promo">🎉 Promo (full-width)</option>
+                    <option value="category">📁 Category</option>
+                    <option value="section">📊 Product Section</option>
+                  </select>
+                </div>
 
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="GLOW UP SALE"
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                />
-              </div>
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="GLOW UP SALE"
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                  />
+                </div>
 
-              {/* Subtitle */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                  Subtitle
-                </label>
-                <input
-                  type="text"
-                  value={form.subtitle}
-                  onChange={(e) =>
-                    setForm({ ...form, subtitle: e.target.value })
-                  }
-                  placeholder="Up to 60% off on premium beauty"
-                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                />
-              </div>
+                {/* Subtitle */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                    Subtitle
+                  </label>
+                  <input
+                    type="text"
+                    value={form.subtitle}
+                    onChange={(e) =>
+                      setForm({ ...form, subtitle: e.target.value })
+                    }
+                    placeholder="Up to 60% off on premium beauty"
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                  />
+                </div>
 
-              {/* Emoji + Image */}
-              <div className="grid grid-cols-2 gap-4">
+                {/* Emoji */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
                     Emoji
@@ -561,206 +738,526 @@ function AdminAppBanners() {
                   />
                 </div>
 
+                {/* Image Upload */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Image URL (optional)
+                    Banner Image
                   </label>
-                  <input
-                    type="text"
-                    value={form.image}
-                    onChange={(e) =>
-                      setForm({ ...form, image: e.target.value })
-                    }
-                    placeholder="https://..."
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                  />
-                </div>
-              </div>
 
-              {/* CTA */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    CTA Text
-                  </label>
-                  <input
-                    type="text"
-                    value={form.ctaText}
-                    onChange={(e) =>
-                      setForm({ ...form, ctaText: e.target.value })
-                    }
-                    placeholder="Shop Now"
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    CTA Link
-                  </label>
-                  <input
-                    type="text"
-                    value={form.ctaLink}
-                    onChange={(e) =>
-                      setForm({ ...form, ctaLink: e.target.value })
-                    }
-                    placeholder="/shop?sale=glowup"
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Gradient Colors */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Gradient Start
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={form.gradientStart}
-                      onChange={(e) =>
-                        setForm({ ...form, gradientStart: e.target.value })
-                      }
-                      className="w-12 h-12 rounded-lg border-2 border-slate-200 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={form.gradientStart}
-                      onChange={(e) =>
-                        setForm({ ...form, gradientStart: e.target.value })
-                      }
-                      className="flex-1 px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Gradient End
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="color"
-                      value={form.gradientEnd}
-                      onChange={(e) =>
-                        setForm({ ...form, gradientEnd: e.target.value })
-                      }
-                      className="w-12 h-12 rounded-lg border-2 border-slate-200 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={form.gradientEnd}
-                      onChange={(e) =>
-                        setForm({ ...form, gradientEnd: e.target.value })
-                      }
-                      className="flex-1 px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Preview */}
-              {(form.title || form.emoji) && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Preview
-                  </label>
-                  <div
-                    className="rounded-2xl p-6 flex items-center justify-between h-32"
-                    style={{
-                      background: `linear-gradient(135deg, ${form.gradientStart}, ${form.gradientEnd})`,
-                    }}
-                  >
-                    <div>
-                      {form.type && (
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-white/80 mb-1">
-                          {form.type}
-                        </p>
-                      )}
-                      <p className="text-white font-bold text-lg leading-tight">
-                        {form.title || 'Title here'}
-                      </p>
-                      {form.subtitle && (
-                        <p className="text-white/90 text-xs mt-1">
-                          {form.subtitle}
-                        </p>
+                  {form.image ? (
+                    <div className="relative rounded-xl overflow-hidden border-2 border-slate-200">
+                      <img
+                        src={form.image}
+                        alt="Banner"
+                        className="w-full h-32 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-pink-500 hover:bg-pink-50/30 cursor-pointer transition"
+                    >
+                      {uploading ? (
+                        <>
+                          <span className="text-3xl animate-spin inline-block">⟳</span>
+                          <p className="text-sm font-bold text-slate-700 mt-2">
+                            Uploading...
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-4xl">📷</span>
+                          <p className="text-sm font-bold text-slate-700 mt-2">
+                            Click to upload image
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1">
+                            PNG, JPG, WebP • Max 5MB
+                          </p>
+                        </>
                       )}
                     </div>
-                    {form.emoji && (
-                      <div className="text-6xl">{form.emoji}</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Order + Active */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Order Index
-                  </label>
+                  )}
                   <input
-                    type="number"
-                    value={form.orderIndex}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        orderIndex: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Status
-                  </label>
+                {/* CTA */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      CTA Text
+                    </label>
+                    <input
+                      type="text"
+                      value={form.ctaText}
+                      onChange={(e) =>
+                        setForm({ ...form, ctaText: e.target.value })
+                      }
+                      placeholder="Shop Now"
+                      className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      CTA Link
+                    </label>
+                    <input
+                      type="text"
+                      value={form.ctaLink}
+                      onChange={(e) =>
+                        setForm({ ...form, ctaLink: e.target.value })
+                      }
+                      placeholder="/shop"
+                      className="w-full px-3 py-2.5 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Colors — 3 columns */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      Start
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        type="color"
+                        value={form.gradientStart}
+                        onChange={(e) =>
+                          setForm({ ...form, gradientStart: e.target.value })
+                        }
+                        className="w-10 h-10 rounded-lg border-2 border-slate-200 cursor-pointer shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={form.gradientStart}
+                        onChange={(e) =>
+                          setForm({ ...form, gradientStart: e.target.value })
+                        }
+                        className="flex-1 px-2 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-[10px] font-mono min-w-0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      End
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        type="color"
+                        value={form.gradientEnd}
+                        onChange={(e) =>
+                          setForm({ ...form, gradientEnd: e.target.value })
+                        }
+                        className="w-10 h-10 rounded-lg border-2 border-slate-200 cursor-pointer shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={form.gradientEnd}
+                        onChange={(e) =>
+                          setForm({ ...form, gradientEnd: e.target.value })
+                        }
+                        className="flex-1 px-2 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-[10px] font-mono min-w-0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      Text
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        type="color"
+                        value={form.textColor}
+                        onChange={(e) =>
+                          setForm({ ...form, textColor: e.target.value })
+                        }
+                        className="w-10 h-10 rounded-lg border-2 border-slate-200 cursor-pointer shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={form.textColor}
+                        onChange={(e) =>
+                          setForm({ ...form, textColor: e.target.value })
+                        }
+                        className="flex-1 px-2 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-[10px] font-mono min-w-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Text Styling */}
+                <div className="border-t-2 border-slate-100 pt-4">
+                  <p className="text-xs font-bold text-slate-700 mb-3 uppercase">
+                    📝 Text Styling
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
+                        Size
+                      </label>
+                      <select
+                        value={form.textSize}
+                        onChange={(e) =>
+                          setForm({ ...form, textSize: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-xs"
+                      >
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                        <option value="xlarge">Extra Large</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
+                        Weight
+                      </label>
+                      <select
+                        value={form.textWeight}
+                        onChange={(e) =>
+                          setForm({ ...form, textWeight: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-xs"
+                      >
+                        <option value="regular">Regular</option>
+                        <option value="bold">Bold</option>
+                        <option value="black">Extra Bold</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Text Position 3x3 Grid */}
+                  <div className="mt-3">
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
+                      Position
+                    </label>
+                    <div className="grid grid-cols-3 gap-1 w-32">
+                      {[
+                        'top-left', 'top-center', 'top-right',
+                        'center-left', 'center', 'center-right',
+                        'bottom-left', 'bottom-center', 'bottom-right',
+                      ].map((pos) => (
+                        <button
+                          key={pos}
+                          type="button"
+                          onClick={() => setForm({ ...form, textPosition: pos })}
+                          className={`aspect-square rounded border-2 transition ${
+                            form.textPosition === pos
+                              ? 'bg-pink-500 border-pink-500'
+                              : 'bg-white border-slate-200 hover:border-pink-300'
+                          }`}
+                          title={pos}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Opacity */}
+                  <div className="mt-3">
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
+                      Text Opacity: {Math.round(form.textOpacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={form.textOpacity}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          textOpacity: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full accent-pink-500"
+                    />
+                  </div>
+
+                  {/* Shadow toggle */}
                   <button
+                    type="button"
                     onClick={() =>
-                      setForm({ ...form, isActive: !form.isActive })
+                      setForm({ ...form, textShadow: form.textShadow ? 0 : 1 })
                     }
-                    className={`w-full px-4 py-3 rounded-xl font-bold text-sm transition ${
-                      form.isActive
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-slate-200 text-slate-700'
+                    className={`mt-3 w-full px-3 py-2 rounded-lg text-xs font-bold transition ${
+                      form.textShadow
+                        ? 'bg-pink-500 text-white'
+                        : 'bg-slate-100 text-slate-600'
                     }`}
                   >
-                    {form.isActive ? '● ACTIVE' : '○ INACTIVE'}
+                    {form.textShadow ? '● Text Shadow ON' : '○ Text Shadow OFF'}
                   </button>
+                </div>
+
+                {/* Image Styling */}
+                <div className="border-t-2 border-slate-100 pt-4">
+                  <p className="text-xs font-bold text-slate-700 mb-3 uppercase">
+                    🖼️ Image Styling
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
+                        Position
+                      </label>
+                      <select
+                        value={form.imagePosition}
+                        onChange={(e) =>
+                          setForm({ ...form, imagePosition: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-xs"
+                      >
+                        <option value="right">Right</option>
+                        <option value="left">Left</option>
+                        <option value="background">Background</option>
+                        <option value="none">None (hide)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">
+                        Size
+                      </label>
+                      <select
+                        value={form.imageSize}
+                        onChange={(e) =>
+                          setForm({ ...form, imageSize: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border-2 border-slate-200 rounded-lg focus:border-pink-500 focus:outline-none text-xs"
+                      >
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                        <option value="full">Full</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Layout */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                    Layout
+                  </label>
+                  <select
+                    value={form.layout}
+                    onChange={(e) =>
+                      setForm({ ...form, layout: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                  >
+                    <option value="gradient">🎨 Gradient (text on gradient)</option>
+                    <option value="image-overlay">🖼️ Image Overlay (image with text on top)</option>
+                    <option value="product-card">🛍️ Product Card (Amazon style)</option>
+                  </select>
+                </div>
+
+                {/* Order + Active + Dates */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      Order
+                    </label>
+                    <input
+                      type="number"
+                      value={form.orderIndex}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          orderIndex: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
+                      Status
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm({ ...form, isActive: !form.isActive })
+                      }
+                      className={`w-full px-4 py-3 rounded-xl font-bold text-xs transition ${
+                        form.isActive
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {form.isActive ? '● ACTIVE' : '○ INACTIVE'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    Start Date (optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={form.startDate}
-                    onChange={(e) =>
-                      setForm({ ...form, startDate: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                  />
+              {/* RIGHT — Live Preview */}
+              <div className="lg:sticky lg:top-6 h-fit">
+                <div className="bg-slate-900 rounded-3xl p-4 shadow-2xl">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 tracking-wider">
+                    📱 Mobile Preview
+                  </p>
+
+                  {/* Phone mockup */}
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
+                    {/* Phone notch */}
+                    <div className="flex justify-center pt-2 pb-1 bg-slate-100">
+                      <div className="w-16 h-4 bg-slate-900 rounded-full"></div>
+                    </div>
+
+                    {/* Banner Preview */}
+                    <div
+                      className="relative h-56 overflow-hidden"
+                      style={{
+                        background:
+                          form.layout === 'gradient' || !form.image
+                            ? `linear-gradient(135deg, ${form.gradientStart}, ${form.gradientEnd})`
+                            : '#000',
+                      }}
+                    >
+                      {/* Background image */}
+                      {form.image && form.imagePosition === 'background' && (
+                        <img
+                          src={form.image}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover opacity-50"
+                        />
+                      )}
+
+                      <div
+                        className={`absolute inset-0 p-5 flex ${
+                          form.imagePosition === 'left'
+                            ? 'flex-row-reverse'
+                            : 'flex-row'
+                        } ${getPositionClasses(form.textPosition)}`}
+                      >
+                        {/* Image left */}
+                        {form.image && form.imagePosition === 'left' && (
+                          <img
+                            src={form.image}
+                            alt=""
+                            className={`object-cover rounded-xl shadow-2xl mr-3 ${
+                              form.imageSize === 'small'
+                                ? 'h-16 w-16'
+                                : form.imageSize === 'large'
+                                ? 'h-32 w-32'
+                                : 'h-24 w-24'
+                            }`}
+                          />
+                        )}
+
+                        <div
+                          className="flex-1"
+                          style={{
+                            color: form.textColor,
+                            opacity: form.textOpacity,
+                            textShadow: form.textShadow
+                              ? '0 2px 8px rgba(0,0,0,0.4)'
+                              : 'none',
+                          }}
+                        >
+                          <p
+                            className={`text-[10px] uppercase tracking-wider mb-1 ${getTextWeightClass(
+                              form.textWeight
+                            )}`}
+                            style={{ opacity: 0.85 }}
+                          >
+                            {form.type}
+                          </p>
+                          <p
+                            className={`${getTextSizeClass(
+                              form.textSize
+                            )} leading-tight mb-1 ${getTextWeightClass(
+                              form.textWeight
+                            )}`}
+                          >
+                            {form.title || 'Your title here'}
+                          </p>
+                          {form.subtitle && (
+                            <p className="text-xs" style={{ opacity: 0.9 }}>
+                              {form.subtitle}
+                            </p>
+                          )}
+
+                          {form.ctaText && (
+                            <div className="mt-3">
+                              <span
+                                className="inline-block px-4 py-1.5 rounded-full text-xs font-bold"
+                                style={{
+                                  background: form.textColor,
+                                  color: form.gradientStart,
+                                }}
+                              >
+                                {form.ctaText}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Image right */}
+                        {form.image && form.imagePosition === 'right' && (
+                          <img
+                            src={form.image}
+                            alt=""
+                            className={`object-cover rounded-xl shadow-2xl ml-3 ${
+                              form.imageSize === 'small'
+                                ? 'h-16 w-16'
+                                : form.imageSize === 'large'
+                                ? 'h-32 w-32'
+                                : 'h-24 w-24'
+                            }`}
+                          />
+                        )}
+
+                        {/* Emoji fallback */}
+                        {!form.image && form.emoji && (
+                          <div className="text-6xl opacity-90">
+                            {form.emoji}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fake app content below */}
+                    <div className="p-3 bg-slate-50">
+                      <div className="h-3 w-24 bg-slate-200 rounded mb-2"></div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div
+                            key={i}
+                            className="aspect-square bg-slate-200 rounded-lg"
+                          ></div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
-                    End Date (optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={form.endDate}
-                    onChange={(e) =>
-                      setForm({ ...form, endDate: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-pink-500 focus:outline-none text-sm"
-                  />
+                {/* Quick Info */}
+                <div className="mt-4 p-4 bg-pink-50 border border-pink-200 rounded-2xl">
+                  <p className="text-[10px] font-bold text-pink-700 uppercase mb-2">
+                    💡 Tips
+                  </p>
+                  <ul className="text-xs text-pink-600 space-y-1">
+                    <li>• Image on right with text on left looks best</li>
+                    <li>• Use "background" for full-bleed images</li>
+                    <li>• Enable text shadow on busy backgrounds</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -779,7 +1276,7 @@ function AdminAppBanners() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || uploading}
                 className="px-6 py-3 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-xl font-bold hover:shadow-lg disabled:opacity-50 transition flex items-center gap-2"
               >
                 {saving ? (
