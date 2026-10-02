@@ -11,6 +11,8 @@ import AdminAdAnalytics from './pages/admin/AdminAdAnalytics';
 import ErrorBoundary from './components/ErrorBoundary';
 import BrandPage from './pages/BrandPage';
 import AdminBrands from './pages/admin/AdminBrands';
+import AdminAppBanners from './pages/admin/AdminAppBanners';
+
 
 // ============================================================
 // ✅ LAZY WITH RETRY — network hiccup handle karega
@@ -230,6 +232,7 @@ function App() {
                     <Route path="/admin/notifications" element={<AdminNotifications />} />
                     <Route path="/admin/ad-analytics" element={<AdminAdAnalytics />} />
                     <Route path="/admin/brands" element={<AdminBrands />} />
+                    <Route path="/admin/app-banners" element={<AdminAppBanners />} />
 
                     {/* ============ VENDOR ROUTES ============ */}
                     <Route path="/vendor/login" element={<VendorLogin />} />
