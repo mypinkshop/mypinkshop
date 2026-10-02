@@ -116,6 +116,7 @@ function AdminSidebar() {
       items: [
         { name: 'Offers', icon: '🎁', path: '/admin/offers' },
         { name: 'Banners', icon: '🎨', path: '/admin/banners' },
+        { name: 'App Banners', icon: '📱', path: '/admin/app-banners' },
         { name: 'Coupons', icon: '🎫', path: '/admin/coupons' },
         { name: 'Homepage', icon: '🏠', path: '/admin/homepage' },
         { name: 'Advertising', icon: '📢', path: '/admin/advertising' },
