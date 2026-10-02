@@ -110,21 +110,33 @@ function HealthPage() {
     loadProducts();
   }, []);
 
+  /* ✅ FIXED: Sirf wahi subcategories dikhao jisme products hain */
   const subcategories = useMemo(() => {
+    const normalize = (s) => String(s || '').toLowerCase().trim();
+
+    const productSubs = new Set(
+      products.map(p => normalize(p.subCategory)).filter(Boolean)
+    );
+
     const seen = new Set();
     const unique = [];
+
     if (apiSubcategories.length > 0) {
       apiSubcategories.forEach((s) => {
-        const key = String(s.name || '').trim().toLowerCase();
+        const name = String(s.name || '').trim();
+        const key = normalize(name);
         if (!key || seen.has(key)) return;
+        // ✅ Sirf wahi subcategory dikhao jisme product hai
+        if (productSubs.size > 0 && !productSubs.has(key)) return;
         seen.add(key);
-        unique.push({ id: s.id, name: s.name, icon: s.icon || '💊' });
+        unique.push({ id: s.id, name, icon: s.icon || '💊' });
       });
       return unique;
     }
+
     products.forEach((p) => {
       const name = String(p.subCategory || '').trim();
-      const key = name.toLowerCase();
+      const key = normalize(name);
       if (!key || seen.has(key)) return;
       seen.add(key);
       unique.push({ id: unique.length, name, icon: '💊' });
@@ -411,6 +423,32 @@ function HealthPage() {
                 </div>
               </div>
 
+              {showFilters && (
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm md:hidden" onClick={() => setShowFilters(false)}>
+                  <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl p-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-emerald-100">
+                      <h3 className="font-semibold text-gray-800 text-base">Refine</h3>
+                      <button onClick={() => setShowFilters(false)} className="text-gray-400 text-xl">✕</button>
+                    </div>
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-emerald-500 uppercase mb-2 font-semibold">Brand</label>
+                        <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl text-sm">
+                          {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] tracking-widest text-emerald-500 uppercase mb-2 font-semibold">Price</label>
+                        <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className="w-full p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl text-sm">
+                          {priceRanges.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={clearFilters} className="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-full text-xs tracking-widest uppercase font-medium shadow-md">Clear All</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-6">
                 <p className="text-xs tracking-wider text-gray-400">
                   {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
@@ -441,6 +479,7 @@ function HealthPage() {
                         removeFromWishlist={removeFromWishlist}
                         user={user}
                         wishlistContext={wishlist}
+                        theme="green"        {/* ✅ GREEN THEME */}
                       />
                       {(index + 1) % 4 === 0 && midOffers[Math.floor(index / 4)] && (
                         <div className="col-span-full my-4">
@@ -534,8 +573,8 @@ function HealthPage() {
               <div>
                 <h4 className="text-white text-sm mb-4 tracking-wide font-semibold">Follow</h4>
                 <ul className="space-y-2.5 text-xs">
-                  <li><a href="#" className="hover:text-pink-400 transition-colors">Instagram</a></li>
-                  <li><a href="#" className="hover:text-pink-400 transition-colors">Pinterest</a></li>
+                  <li><a href="https://instagram.com/mypinkshopofficial" className="hover:text-pink-400 transition-colors">Instagram</a></li>
+                  <li><a href="https://facebook.com/mypinkshopofficial" className="hover:text-pink-400 transition-colors">Pinterest</a></li>
                 </ul>
               </div>
             </div>
