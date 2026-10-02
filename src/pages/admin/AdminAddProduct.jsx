@@ -95,6 +95,28 @@ const generateMetaKeywords = (name, brand, category, subCategory, keyFeatures = 
 
 const FALLBACK_BRANDS = ['Nykaa Beauty', 'Mamaearth', 'Sugar Cosmetics', 'Lakmé', 'Maybelline', 'Loreal Paris', 'Plum', 'Wow Skin Science', 'Biotique', 'Forest Essentials', 'MyGlamm', 'MAC', 'The Face Shop', 'Kama Ayurveda', 'Mcaffeine', 'Estee Lauder', 'Clinique', 'Huda Beauty', 'St.Botanica', 'Richfem', 'SKINQ', 'Fashion Colour'];
 
+/* ✅ FIXED: Health & Wellness ke sahi subcategories add kiye */
+const FALLBACK_SUB_CATEGORIES = {
+  Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
+  Makeup: ['Foundation', 'Concealer', 'Compact Powder', 'Primer', 'Highlighter', 'Blush', 'Lipstick', 'Lip Gloss', 'Eyeshadow', 'Eyeliner', 'Kajal', 'Mascara'],
+  Haircare: ['Shampoo', 'Conditioner', 'Hair Mask', 'Hair Oil', 'Hair Serum', 'Hair Color'],
+  Fashion: ['T-Shirt', 'Top', 'Kurti', 'Saree', 'Lehenga', 'Dress', 'Jeans', 'Jacket', 'Nightwear'],
+  Accessories: ['Bag', 'Handbag', 'Jewelry', 'Necklace', 'Earrings', 'Watch', 'Sunglasses', 'Belt', 'Scarf'],
+  Electronics: ['Mobile Phones', 'Mobile Accessories', 'Chargers & Cables', 'Power Banks', 'Earphones', 'Headphones', 'Keyboards', 'Mouse', 'Smart Watches'],
+  'Home & Kitchen': ['Kitchen Tools', 'Storage & Organizers', 'Home Decor', 'Wall Art', 'Bedding', 'Cushions', 'Bathroom Accessories'],
+  'Health & Wellness': [
+    'Ayurvedic Products',
+    'BP Monitor',
+    'Fitness & Yoga',
+    'Health Devices',
+    'Personal Care',
+    'Supplements & Vitamins',
+    'Thermometer',
+    'Weighing Scale',
+  ],
+  'Books & Stationery': ['Fiction', 'Non-Fiction', 'Self-Help', 'Academic', 'Notebooks & Diaries', 'Pens & Pencils', 'Art Supplies'],
+};
+
 /* ============================================================ */
 /* AMAZON IMPORTER                                              */
 /* ============================================================ */
@@ -124,8 +146,8 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     const categoryKeywords = {
       'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
       'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
-      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+      'Haircare': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+      'Fashion': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
       'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
     };
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
@@ -141,8 +163,8 @@ const AmazonImporter = ({ onProductImported, setFormData, setVariations, setImag
     const subCategoryMap = {
       'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
       'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
-      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
-      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+      'Haircare': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+      'Fashion': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
       'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
     };
     const subCats = subCategoryMap[category] || [];
@@ -347,8 +369,8 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
     const categoryKeywords = {
       'Skincare': ['face wash', 'cleanser', 'serum', 'moisturizer', 'sunscreen', 'cream', 'lotion', 'toner', 'mask', 'eye cream', 'scrub'],
       'Makeup': ['lipstick', 'foundation', 'kajal', 'eyeshadow', 'blush', 'mascara', 'highlighter', 'concealer', 'primer', 'compact', 'lip gloss'],
-      'Hair': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
-      'Clothing': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
+      'Haircare': ['shampoo', 'conditioner', 'hair oil', 'hair serum', 'hair mask', 'hair color', 'hair spray', 'dandruff', 'hair fall'],
+      'Fashion': ['dress', 'top', 'kurti', 'saree', 'jeans', 't-shirt', 'shirt', 'jacket', 'lehenga'],
       'Accessories': ['bag', 'jewelry', 'watch', 'sunglasses', 'belt', 'scarf', 'wallet', 'earrings']
     };
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
@@ -364,8 +386,8 @@ const FlipkartImporter = ({ onProductImported, setFormData, setVariations, setIm
     const subCategoryMap = {
       'Skincare': ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
       'Makeup': ['Foundation', 'Lipstick', 'Kajal', 'Eyeshadow', 'Blush', 'Mascara', 'Highlighter', 'Concealer', 'Primer', 'Compact', 'Lip Gloss'],
-      'Hair': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
-      'Clothing': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
+      'Haircare': ['Shampoo', 'Conditioner', 'Hair Oil', 'Hair Serum', 'Hair Mask', 'Hair Color'],
+      'Fashion': ['Dress', 'Top', 'Kurti', 'Saree', 'Jeans', 'T-Shirt', 'Jacket', 'Lehenga'],
       'Accessories': ['Bag', 'Jewelry', 'Watch', 'Sunglasses', 'Belt', 'Scarf', 'Wallet']
     };
     const subCats = subCategoryMap[category] || [];
@@ -667,7 +689,7 @@ function AdminAddProduct() {
 
   const generateSKU = () => `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-  /* ------------------ ✅ Fetch Categories (slug-based subMap) ------------------ */
+  /* ------------------ ✅ Fetch Categories ------------------ */
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -756,17 +778,8 @@ function AdminAddProduct() {
   const hairConcernsList = ['Hairfall', 'Dandruff', 'Dry Hair', 'Frizzy Hair', 'Split Ends', 'Damaged Hair', 'Hair Growth', 'Volume', 'Scalp Itching', 'Premature Greying'];
   const hairTypes = ['All', 'Oily', 'Dry', 'Normal', 'Curly', 'Wavy', 'Straight', 'Coily', 'Fine', 'Thick'];
 
-  const fallbackSubCategories = {
-    Skincare: ['Face Wash', 'Cleanser', 'Serum', 'Moisturizer', 'Sunscreen', 'Face Mask', 'Eye Cream', 'Toner', 'Face Scrub', 'Lip Balm'],
-    Makeup: ['Foundation', 'Concealer', 'Compact Powder', 'Primer', 'Highlighter', 'Blush', 'Lipstick', 'Lip Gloss', 'Eyeshadow', 'Eyeliner', 'Kajal', 'Mascara'],
-    Haircare: ['Shampoo', 'Conditioner', 'Hair Mask', 'Hair Oil', 'Hair Serum', 'Hair Color'],
-    Fashion: ['T-Shirt', 'Top', 'Kurti', 'Saree', 'Lehenga', 'Dress', 'Jeans', 'Jacket', 'Nightwear'],
-    Accessories: ['Bag', 'Handbag', 'Jewelry', 'Necklace', 'Earrings', 'Watch', 'Sunglasses', 'Belt', 'Scarf'],
-    Electronics: ['Mobile Phones', 'Mobile Accessories', 'Chargers & Cables', 'Power Banks', 'Earphones', 'Headphones', 'Keyboards', 'Mouse', 'Smart Watches'],
-    'Home & Kitchen': ['Kitchen Tools', 'Storage & Organizers', 'Home Decor', 'Wall Art', 'Bedding', 'Cushions', 'Bathroom Accessories'],
-    'Health & Wellness': ['Supplements', 'Ayurvedic Products', 'Personal Care', 'Fitness & Yoga', 'Health Devices'],
-    'Books & Stationery': ['Fiction', 'Non-Fiction', 'Self-Help', 'Academic', 'Notebooks & Diaries', 'Pens & Pencils', 'Art Supplies']
-  };
+  /* ✅ FIXED: fallbackSubCategories ab upar constant me define hai */
+  const fallbackSubCategories = FALLBACK_SUB_CATEGORIES;
 
   const getCategoryKey = () => {
     const cat = formData.category;
@@ -802,19 +815,72 @@ function AdminAddProduct() {
     localStorage.setItem('brandsList', JSON.stringify(customBrands));
   };
 
-  /* ------------------ ✅ getCurrentSubCategories — slug-based API ------------------ */
+  /* ============================================================ */
+  /* ✅ FIXED: getCurrentSubCategories — multiple slug variants   */
+  /* ============================================================ */
   const getCurrentSubCategories = () => {
     const category = formData.category;
     if (!category) return [];
 
-    const slug = category
+    const normalize = (s) => String(s || '')
       .toLowerCase()
+      .trim()
       .replace(/&/g, 'and')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
 
-    const apiSubs = apiSubCategories[slug] || [];
+    const normalizeNoAnd = (s) => String(s || '')
+      .toLowerCase()
+      .trim()
+      .replace(/&/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
 
+    // ✅ Multiple slug variations try karo
+    const slugVariants = [
+      normalize(category),           // health-and-wellness
+      normalizeNoAnd(category),      // health-wellness ✅
+      category.toLowerCase().replace(/\s+/g, '-'),
+      category.toLowerCase().replace(/[^a-z0-9]+/g, ''),
+    ];
+
+    let apiSubs = [];
+    for (const slug of slugVariants) {
+      if (apiSubCategories[slug] && apiSubCategories[slug].length > 0) {
+        apiSubs = apiSubCategories[slug];
+        break;
+      }
+    }
+
+    // ✅ Fallback 1: partial match
+    if (apiSubs.length === 0) {
+      const catKey = normalize(category);
+      for (const [key, subs] of Object.entries(apiSubCategories)) {
+        const nk = normalize(key);
+        if (nk === catKey || nk.includes(catKey) || catKey.includes(nk)) {
+          apiSubs = subs;
+          break;
+        }
+      }
+    }
+
+    // ✅ Fallback 2: tree me direct dhoondo
+    if (apiSubs.length === 0 && apiCategories.length > 0) {
+      const found = apiCategories.find(
+        (c) =>
+          normalize(c.name) === normalize(category) ||
+          normalize(c.slug) === normalize(category)
+      );
+      if (found?.children?.length > 0) {
+        apiSubs = found.children.map((child) => ({
+          id: child.id,
+          name: child.name,
+          icon: child.icon || '🌸',
+        }));
+      }
+    }
+
+    // ✅ Dedupe
     const seen = new Set();
     const result = [];
     apiSubs.forEach((s) => {
@@ -825,6 +891,17 @@ function AdminAddProduct() {
       seen.add(key);
       result.push(clean);
     });
+
+    // ✅ Fallback 3: hardcoded list
+    if (result.length === 0) {
+      const fallbackKey = Object.keys(fallbackSubCategories).find(
+        (k) => normalize(k) === normalize(category)
+      );
+      if (fallbackKey) {
+        return fallbackSubCategories[fallbackKey];
+      }
+    }
+
     return result;
   };
 
@@ -1552,7 +1629,7 @@ function AdminAddProduct() {
               </div>
             )}
 
-            {/* STEP 3: Pricing & Inventory ✅ UPDATED with Stock field */}
+            {/* STEP 3: Pricing & Inventory */}
             {step === 3 && (
               <div className="bg-white rounded-xl shadow-sm border border-pink-100 p-4 sm:p-6">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-5">💰 Pricing & Inventory</h2>
@@ -1569,7 +1646,6 @@ function AdminAddProduct() {
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tax (GST) %</label>
                     <input type="number" value={formData.tax} onChange={(e) => setFormData({ ...formData, tax: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 focus:outline-none focus:border-pink-400 text-sm" />
                   </div>
-                  {/* ✅ NAYA — Stock field */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       Stock (Pieces) <span className="text-red-500">*</span>
